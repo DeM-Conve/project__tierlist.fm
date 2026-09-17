@@ -52,13 +52,29 @@ export default function App() {
     const moves = [];
     for (const tier of TIER_ORDER) {
       for (const video of tierItems[tier] || []) {
-        const original = originalTierOfRef.current[video.videoId];
-        if (original && original !== tier) {
-          moves.push({ video, from: original, to: tier });
+        const originalTiers = originalTierOfRef.current[video.videoId];
+        // A video counts as "moved" only if the tier it's sitting in now isn't
+        // one it originally belonged to. If the same video happens to exist
+        // in two real YouTube tier playlists at once, it originally belongs
+        // to both, so neither counts as a move - avoids false positives from
+        // a video that's just duplicated across playlists.
+        if (originalTiers && !originalTiers.has(tier)) {
+          moves.push({ video, from: [...originalTiers][0], to: tier });
         }
       }
     }
     return moves;
+  }, [tierItems]);
+
+  // Videos that exist in more than one of this board's real YouTube tier
+  // playlists at once - flagged visually rather than auto-resolved, since
+  // only the user knows which copy should actually go.
+  const duplicateVideoIds = useMemo(() => {
+    const set = new Set();
+    Object.entries(originalTierOfRef.current).forEach(([videoId, tiers]) => {
+      if (tiers.size > 1) set.add(videoId);
+    });
+    return set;
   }, [tierItems]);
 
   const duelPool = useMemo(() => TIER_ORDER.flatMap((t) => tierItems[t] || []), [tierItems]);
@@ -71,9 +87,19 @@ export default function App() {
     [tierItems]
   );
 
-  const focusedList = focusedVideo ? tierItems[focusedVideo.tier] || [] : [];
-  const focusedIndex = focusedVideo ? focusedList.findIndex((v) => v.videoId === focusedVideo.videoId) : -1;
-  const focusedVideoData = focusedIndex >= 0 ? focusedList[focusedIndex] : null;
+  // Flattened across every tier of the current board, in tier order, so
+  // "next" can walk off the end of one tier straight into the start of the
+  // next one instead of stopping dead at each tier's own boundary.
+  const focusSequence = useMemo(
+    () => TIER_ORDER.flatMap((t) => (tierItems[t] || []).map((video) => ({ tier: t, video }))),
+    [tierItems]
+  );
+  const focusedSeqIndex = focusedVideo
+    ? focusSequence.findIndex(
+        (e) => e.tier === focusedVideo.tier && e.video.videoId === focusedVideo.videoId
+      )
+    : -1;
+  const focusedVideoData = focusedSeqIndex >= 0 ? focusSequence[focusedSeqIndex].video : null;
   const focusedAvailableTiers = focusedVideo
     ? TIER_ORDER.filter((t) => tierGroups[activeView.category]?.[t])
     : [];
@@ -262,7 +288,8 @@ export default function App() {
       presentTiers.map(async (t) => {
         const fetched = await fetchPlaylistItems(tiers[t].id);
         fetched.forEach((v) => {
-          originalTierOfRef.current[v.videoId] = t;
+          if (!originalTierOfRef.current[v.videoId]) originalTierOfRef.current[v.videoId] = new Set();
+          originalTierOfRef.current[v.videoId].add(t);
         });
         originalTierItemsRef.current[t] = fetched;
         setTierItems((prev) => ({ ...prev, [t]: fetched }));
@@ -390,10 +417,11 @@ export default function App() {
   }
 
   function navigateFocus(delta) {
-    if (!focusedVideo || focusedIndex < 0) return;
-    const nextIndex = focusedIndex + delta;
-    if (nextIndex < 0 || nextIndex >= focusedList.length) return;
-    setFocusedVideo({ tier: focusedVideo.tier, videoId: focusedList[nextIndex].videoId });
+    if (focusedSeqIndex < 0) return;
+    const nextIndex = focusedSeqIndex + delta;
+    if (nextIndex < 0 || nextIndex >= focusSequence.length) return;
+    const entry = focusSequence[nextIndex];
+    setFocusedVideo({ tier: entry.tier, videoId: entry.video.videoId });
   }
 
   function changeFocusedTier(newTier) {
@@ -523,6 +551,7 @@ export default function App() {
             onThumbDragEnd={handleThumbDragEnd}
             onThumbClick={openFocus}
             pendingMoves={pendingMoves}
+            duplicateVideoIds={duplicateVideoIds}
             syncStatus={syncStatus}
             onDiscard={discardChanges}
             onSync={syncChanges}
@@ -548,8 +577,8 @@ export default function App() {
           video={focusedVideoData}
           currentTier={focusedVideo.tier}
           availableTiers={focusedAvailableTiers}
-          hasPrev={focusedIndex > 0}
-          hasNext={focusedIndex < focusedList.length - 1}
+          hasPrev={focusedSeqIndex > 0}
+          hasNext={focusedSeqIndex < focusSequence.length - 1}
           onClose={closeFocus}
           onPrev={() => navigateFocus(-1)}
           onNext={() => navigateFocus(1)}

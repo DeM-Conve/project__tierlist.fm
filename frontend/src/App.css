@@ -391,6 +391,18 @@
   transition: opacity 0.15s ease;
 }
 .tier-thumb:hover .tier-thumb-link { opacity: 1; }
+.tier-thumb-duplicate-tag {
+  position: absolute;
+  bottom: 6px;
+  left: 6px;
+  padding: 2px 6px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: #1a1200;
+  background: #f2b544;
+  border-radius: 4px;
+}
 .tier-thumb-skeleton {
   flex: 0 0 auto;
   width: 176px;
@@ -711,8 +723,12 @@
   cursor: pointer;
   z-index: 2;
 }
-.focus-nav-prev { left: 10px; }
-.focus-nav-next { right: 10px; }
+/* Sit fully outside the video frame (in the card's own padding gutter)
+   rather than on top of it - the embed overlaps YouTube's own native UI
+   (title card, suggested-video overlay) near its edges, so a nav button
+   placed inside the frame visually collides with that. */
+.focus-nav-prev { left: -24px; }
+.focus-nav-next { right: -24px; }
 .focus-embed {
   position: relative;
   aspect-ratio: 16/9;

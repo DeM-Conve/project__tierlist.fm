@@ -24,6 +24,7 @@ function TierRow({
   onThumbDragEnd,
   onThumbClick,
   draggedVideoId,
+  duplicateVideoIds,
 }) {
   const [overIndex, setOverIndex] = useState(null);
 
@@ -82,6 +83,11 @@ function TierRow({
               title={v.title}
             >
               <img src={v.thumbnail || ''} alt={v.title} draggable={false} />
+              {duplicateVideoIds?.has(v.videoId) && (
+                <span className="tier-thumb-duplicate-tag" title="This video is also in another tier's playlist">
+                  Duplicate
+                </span>
+              )}
               <a
                 className="tier-thumb-link"
                 href={`https://www.youtube.com/watch?v=${v.videoId}`}
@@ -151,6 +157,7 @@ export default function TierBoardView({
   onThumbDragEnd,
   onThumbClick,
   pendingMoves,
+  duplicateVideoIds,
   syncStatus,
   onDiscard,
   onSync,
@@ -208,6 +215,7 @@ export default function TierBoardView({
             onThumbDragStart={onThumbDragStart}
             onThumbDragEnd={onThumbDragEnd}
             onThumbClick={onThumbClick}
+            duplicateVideoIds={duplicateVideoIds}
           />
         ))}
       </div>

@@ -28,19 +28,20 @@ export default function VideoFocusModal({
     function onKeyDown(e) {
       if (e.key === 'Escape') {
         onClose();
-      } else if (e.key === 'ArrowLeft') {
+      } else if (e.key === 'ArrowLeft' || e.key === 'h') {
         e.preventDefault();
         if (hasPrev) onPrev();
-      } else if (e.key === 'ArrowRight') {
+      } else if (e.key === 'ArrowRight' || e.key === 'l') {
         e.preventDefault();
         if (hasNext) onNext();
-      } else if (e.key >= '1' && e.key <= '9') {
-        // Plain digits are also YouTube's native "seek to N0%" shortcut, but
-        // only once focus is actually inside the embedded player - the modal
-        // focuses itself on open, so this is reliable until the video itself
-        // is clicked directly.
+      } else if (e.shiftKey && e.code.startsWith('Digit')) {
+        // Shift+digit, not a plain digit - plain 1-9 is YouTube's own native
+        // "seek to N0%" shortcut, so tier-reassignment needs a modifier to
+        // stay unambiguous. e.code (not e.key) is used because e.key turns
+        // into a shifted symbol like "!" once Shift is held.
         e.preventDefault();
-        const tier = availableTiers[Number(e.key) - 1];
+        const digit = Number(e.code.slice('Digit'.length));
+        const tier = availableTiers[digit - 1];
         if (tier) onChangeTier(tier);
       }
     }
@@ -57,7 +58,11 @@ export default function VideoFocusModal({
 
         <div className="focus-media">
           <div className="focus-embed">
-            <EmbeddedPlayer key={video.videoId} videoId={video.videoId} />
+            <EmbeddedPlayer
+              key={video.videoId}
+              videoId={video.videoId}
+              onEnded={hasNext ? onNext : undefined}
+            />
           </div>
 
           {hasPrev && (
@@ -86,12 +91,14 @@ export default function VideoFocusModal({
               onClick={() => onChangeTier(t)}
             >
               {t}
-              <span className="tier-pill-key">{i + 1}</span>
+              <span className="tier-pill-key">⇧{i + 1}</span>
             </button>
           ))}
         </div>
 
-        <p className="focus-hint">esc close · ← → navigate · 1-{availableTiers.length} set tier</p>
+        <p className="focus-hint">
+          esc close · ← → / h l navigate · shift+1-{availableTiers.length} set tier
+        </p>
       </div>
     </div>
   );
