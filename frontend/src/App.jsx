@@ -30,6 +30,7 @@ import {
   setLoadedCategory,
   setTierForCategory,
   setTierItems,
+  applySyncedMoves,
   discardTierChanges,
   setSyncStatus,
   setDraggedVideoId,
@@ -41,6 +42,7 @@ import {
   closeFocus as closeFocusAction,
   minimizePlayer,
   expandPlayer,
+  floatPlayer,
   startShuffle,
   setFocusedVideo,
 } from './store/focusSlice';
@@ -204,13 +206,20 @@ function Layout() {
       const result = await tierSyncMutation.mutateAsync(payload);
       const finishedStatus = result.applied < result.total ? 'partial' : 'done';
 
-      // Mark every underlying playlist stale, then clear the local draft so
-      // the tier board's queries refetch and TierBoardPage's mirror effect
-      // re-applies the confirmed-fresh server state (see useLoadTierBoard).
-      await invalidatePlaylistItems(Object.values(tiers).map((t) => t.id));
-      const presentTiers = TIER_ORDER.filter((t) => tiers[t]);
-      dispatch(resetTierBoard({ category, presentTiers }));
-      dispatch(setLoadedCategory(null));
+      // Apply whichever moves actually succeeded (per-item, from the
+      // backend's own results) straight to the local draft, rather than
+      // clearing it and waiting on a refetch of YouTube's playlist API to
+      // reflect the change - that refetch can lag behind the write that
+      // just happened, which used to leave the just-synced duplicate/moved
+      // video sitting on screen looking unsynced. See the comment on
+      // `tiersSlice.applySyncedMoves`.
+      const succeededMoves = pendingMoves.filter((_, i) => result.results?.[i]?.success);
+      dispatch(applySyncedMoves({ moves: succeededMoves }));
+
+      // Still invalidate the underlying query cache in the background so a
+      // stale copy isn't served if the user leaves and comes back later -
+      // this no longer needs to be awaited before updating the UI.
+      invalidatePlaylistItems(Object.values(tiers).map((t) => t.id));
 
       dispatch(setSyncStatus(finishedStatus));
       setTimeout(() => dispatch(setSyncStatus('idle')), 2500);
@@ -230,7 +239,15 @@ function Layout() {
   function openFocus(tier, videoId) {
     // Freeze the current tier-order sequence as this session's browsing
     // order, so later tier reassignments can't reshuffle where "next" goes.
-    dispatch(openFocusAction({ tier, videoId, queue: focusSequence.map((e) => e.video.videoId) }));
+    dispatch(
+      openFocusAction({
+        tier,
+        videoId,
+        queue: focusSequence.map((e) => e.video.videoId),
+        entries: focusSequence,
+        category: currentCategory,
+      })
+    );
   }
 
   function startShufflePlay() {
@@ -241,7 +258,15 @@ function Layout() {
       [ids[i], ids[j]] = [ids[j], ids[i]];
     }
     const first = videoLookup.get(ids[0]);
-    dispatch(startShuffle({ queue: ids, tier: first.tier, videoId: first.video.videoId }));
+    dispatch(
+      startShuffle({
+        queue: ids,
+        tier: first.tier,
+        videoId: first.video.videoId,
+        entries: focusSequence,
+        category: currentCategory,
+      })
+    );
   }
 
   function navigateFocus(delta) {
@@ -363,6 +388,7 @@ function Layout() {
           onStop={() => dispatch(closeFocusAction())}
           onMinimize={() => dispatch(minimizePlayer())}
           onExpand={() => dispatch(expandPlayer())}
+          onFloat={() => dispatch(floatPlayer())}
           onPrev={() => navigateFocus(-1)}
           onNext={() => navigateFocus(1)}
           onChangeTier={changeFocusedTier}

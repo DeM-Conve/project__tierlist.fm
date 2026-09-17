@@ -1,6 +1,6 @@
-import { useState } from 'react';
-import { Button } from '@mantine/core';
-import { Shuffle } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { ActionIcon, Badge, Button, Card, Group, Paper, Stack, Text, TextInput, Title } from '@mantine/core';
+import { ArrowUpRight, Search, Shuffle } from 'lucide-react';
 import { TIER_COLORS, TIER_ORDER } from '../tiers';
 
 // Where among the existing thumbnails does clientX fall? Used so a drop
@@ -27,8 +27,19 @@ function TierRow({
   onThumbClick,
   draggedVideoId,
   pendingRemovalKeys,
+  searchActive,
+  matchedKeys,
+  activeMatchKey,
 }) {
   const [overIndex, setOverIndex] = useState(null);
+  // While a "/" search is active, a tier with hundreds of videos becomes
+  // unusable if matches just get dimmed in place - you'd still have to
+  // scroll through the whole row to find them. Filter down to only the
+  // matches instead; the active-match highlight still shows which one n/N
+  // is currently on.
+  const visibleItems = searchActive
+    ? items?.filter((v) => matchedKeys?.has(`${tier}:${v.videoId}`))
+    : items;
 
   function handleContentDragOver(e) {
     e.preventDefault();
@@ -52,7 +63,11 @@ function TierRow({
     <div className={`tier-row${isDragOver ? ' tier-row-dragover' : ''}`}>
       <div className="tier-label" style={{ background: TIER_COLORS[tier] }}>
         <span>{tier}</span>
-        {!loading && <span className="tier-count">{items?.length ?? 0}</span>}
+        {!loading && (
+          <span className="tier-count">
+            {searchActive ? `${visibleItems?.length ?? 0}/${items?.length ?? 0}` : items?.length ?? 0}
+          </span>
+        )}
       </div>
       <div
         className="tier-content"
@@ -64,12 +79,27 @@ function TierRow({
           Array.from({ length: 4 }).map((_, i) => (
             <div key={i} className="skeleton-block tier-thumb-skeleton" />
           ))}
-        {!loading && items?.length === 0 && <p className="tier-empty">Drop videos here</p>}
-        {items?.map((v, i) => (
+        {!loading && !searchActive && items?.length === 0 && (
+          <p className="tier-empty">Drop videos here</p>
+        )}
+        {!loading && searchActive && visibleItems?.length === 0 && (
+          <p className="tier-empty">No matches in this tier</p>
+        )}
+        {visibleItems?.map((v, i) => {
+          const key = `${tier}:${v.videoId}`;
+          const isActiveMatch = activeMatchKey === key;
+          return (
           <div key={v.videoId} className="tier-thumb-wrap">
             {isDragOver && overIndex === i && <span className="drop-indicator" />}
-            <div
-              className={`tier-thumb${draggedVideoId === v.videoId ? ' tier-thumb-dragging' : ''}`}
+            <Card
+              className={`tier-thumb${draggedVideoId === v.videoId ? ' tier-thumb-dragging' : ''}${
+                searchActive ? ' tier-thumb-search-match' : ''
+              }${isActiveMatch ? ' tier-thumb-search-active' : ''}`}
+              data-video-id={v.videoId}
+              data-tier={tier}
+              padding={0}
+              radius="sm"
+              withBorder
               draggable
               onDragStart={(e) => onThumbDragStart(e, v, tier)}
               onDragEnd={onThumbDragEnd}
@@ -84,29 +114,41 @@ function TierRow({
               tabIndex={0}
               title={v.title}
             >
-              <img src={v.thumbnail || ''} alt={v.title} draggable={false} />
-              {pendingRemovalKeys?.has(`${tier}:${v.videoId}`) && (
-                <span
-                  className="tier-thumb-duplicate-tag"
-                  title="Also in a higher tier's playlist - this copy will be removed on sync"
+              <Card.Section pos="relative">
+                <img src={v.thumbnail || ''} alt={v.title} draggable={false} />
+                {pendingRemovalKeys?.has(`${tier}:${v.videoId}`) && (
+                  <Badge
+                    color="yellow"
+                    size="xs"
+                    className="tier-thumb-duplicate-tag"
+                    title="Also in a higher tier's playlist - this copy will be removed on sync"
+                  >
+                    Removing (duplicate)
+                  </Badge>
+                )}
+                <ActionIcon
+                  component="a"
+                  href={`https://www.youtube.com/watch?v=${v.videoId}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  variant="filled"
+                  color="dark"
+                  size="sm"
+                  className="tier-thumb-link"
+                  title="Open on YouTube"
+                  onClick={(e) => e.stopPropagation()}
                 >
-                  Removing (duplicate)
-                </span>
-              )}
-              <a
-                className="tier-thumb-link"
-                href={`https://www.youtube.com/watch?v=${v.videoId}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                title="Open on YouTube"
-                onClick={(e) => e.stopPropagation()}
-              >
-                ↗
-              </a>
-            </div>
+                  <ArrowUpRight size={14} />
+                </ActionIcon>
+              </Card.Section>
+              <Text size="xs" c="dimmed" truncate="end" px={8} py={6} title={v.title}>
+                {v.title}
+              </Text>
+            </Card>
           </div>
-        ))}
-        {isDragOver && overIndex === items?.length && <span className="drop-indicator" />}
+          );
+        })}
+        {isDragOver && overIndex === visibleItems?.length && <span className="drop-indicator" />}
       </div>
     </div>
   );
@@ -186,32 +228,128 @@ export default function TierBoardView({
     pendingMoves.filter((m) => m.kind === 'dedupe').map((m) => `${m.tier}:${m.video.videoId}`)
   );
 
+  // Vim/Vimium-style "/" find: "/" opens it, Enter (in the box) or n/N
+  // (once you've clicked away) step through matches, Escape closes it.
+  // Matches are highlighted in place and scrolled to, rather than filtering
+  // the board down to just matches - the tier/dedupe context around a
+  // result stays visible.
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [matchIndex, setMatchIndex] = useState(0);
+  const searchInputRef = useRef(null);
+
+  const searchableEntries = useMemo(() => {
+    const list = [];
+    TIER_ORDER.forEach((t) => {
+      if (!tierGroups[category]?.[t]) return;
+      (tierItems[t] || []).forEach((video) => list.push({ tier: t, video }));
+    });
+    return list;
+  }, [tierGroups, category, tierItems]);
+
+  const matches = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return [];
+    return searchableEntries.filter((e) => e.video.title.toLowerCase().includes(q));
+  }, [searchableEntries, searchQuery]);
+
+  useEffect(() => {
+    setMatchIndex(0);
+  }, [searchQuery]);
+
+  useEffect(() => {
+    if (matches.length === 0) return;
+    const active = matches[matchIndex % matches.length];
+    const el = document.querySelector(
+      `[data-tier="${active.tier}"][data-video-id="${CSS.escape(active.video.videoId)}"]`
+    );
+    el?.scrollIntoView({ block: 'center', inline: 'center', behavior: 'smooth' });
+  }, [matches, matchIndex]);
+
+  useEffect(() => {
+    function onKeyDown(e) {
+      const active = document.activeElement;
+      const inSearchBox = active === searchInputRef.current;
+      const isTyping =
+        active?.tagName === 'INPUT' || active?.tagName === 'TEXTAREA' || active?.isContentEditable;
+
+      if (e.key === '/' && !isTyping) {
+        e.preventDefault();
+        setSearchOpen(true);
+        requestAnimationFrame(() => searchInputRef.current?.focus());
+        return;
+      }
+      if (!searchOpen) return;
+
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        setSearchOpen(false);
+        setSearchQuery('');
+        searchInputRef.current?.blur();
+        return;
+      }
+      if (e.key === 'Enter' && inSearchBox) {
+        e.preventDefault();
+        if (matches.length === 0) return;
+        setMatchIndex((i) => (e.shiftKey ? i - 1 + matches.length : i + 1) % matches.length);
+        return;
+      }
+      if (!isTyping && (e.key === 'n' || e.key === 'N')) {
+        e.preventDefault();
+        if (matches.length === 0) return;
+        setMatchIndex((i) => (e.key === 'N' ? i - 1 + matches.length : i + 1) % matches.length);
+      }
+    }
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [searchOpen, matches]);
+
+  const matchedKeys = useMemo(
+    () => new Set(matches.map((e) => `${e.tier}:${e.video.videoId}`)),
+    [matches]
+  );
+  const activeMatchKey =
+    matches.length > 0 ? `${matches[matchIndex % matches.length].tier}:${matches[matchIndex % matches.length].video.videoId}` : null;
+
   return (
     <section>
-      <div className="canvas-header tier-board-header">
-        <div>
-          <h1>{category}</h1>
-          <p className="hint-text">Drag a video into another tier, then sync when you're ready.</p>
-        </div>
+      <Group justify="space-between" align="flex-start" wrap="wrap" gap="lg" mb="sm">
+        <Stack gap={2}>
+          <Title order={1} fz={28} fw={800} lh={1.2}>
+            {category}
+          </Title>
+          <Text c="dimmed" size="sm">
+            Drag a video into another tier, then sync when you're ready.
+          </Text>
+        </Stack>
 
-        <div className="tier-board-actions">
+        <Group gap="md" wrap="wrap">
           {pendingMoves.length > 0 && (
-            <div className="sync-bar">
-              <Button variant="subtle" onClick={() => setShowPending(true)}>
-                {pendingMoves.length} pending
-              </Button>
-              {syncStatus === 'done' && <span className="sync-status sync-status-done">Synced</span>}
-              {syncStatus === 'partial' && <span className="sync-status sync-status-error">Some failed</span>}
-              {syncStatus === 'error' && <span className="sync-status sync-status-error">Sync failed</span>}
-              <Button variant="default" onClick={onDiscard} disabled={syncStatus === 'syncing'}>
-                Discard
-              </Button>
-              <Button onClick={onSync} disabled={syncStatus === 'syncing'} loading={syncStatus === 'syncing'}>
-                Push to YouTube
-              </Button>
-            </div>
+            <Paper withBorder radius="sm" p={6}>
+              <Group gap="xs">
+                <Button variant="subtle" onClick={() => setShowPending(true)}>
+                  {pendingMoves.length} pending
+                </Button>
+                {syncStatus === 'done' && (
+                  <Badge color="teal" variant="light">
+                    Synced
+                  </Badge>
+                )}
+                {(syncStatus === 'partial' || syncStatus === 'error') && (
+                  <Badge color="red" variant="light">
+                    {syncStatus === 'partial' ? 'Some failed' : 'Sync failed'}
+                  </Badge>
+                )}
+                <Button variant="default" onClick={onDiscard} disabled={syncStatus === 'syncing'}>
+                  Discard
+                </Button>
+                <Button onClick={onSync} disabled={syncStatus === 'syncing'} loading={syncStatus === 'syncing'}>
+                  Push to YouTube
+                </Button>
+              </Group>
+            </Paper>
           )}
-          <div className="tier-board-utility-actions">
+          <Group gap="xs">
             <Button
               variant="default"
               leftSection={<Shuffle size={15} />}
@@ -223,9 +361,9 @@ export default function TierBoardView({
             <Button variant="default" onClick={onStartDuel}>
               Start duel
             </Button>
-          </div>
-        </div>
-      </div>
+          </Group>
+        </Group>
+      </Group>
 
       {showPending && (
         <PendingChangesModal moves={pendingMoves} onClose={() => setShowPending(false)} />
@@ -247,9 +385,43 @@ export default function TierBoardView({
             onThumbDragEnd={onThumbDragEnd}
             onThumbClick={onThumbClick}
             pendingRemovalKeys={pendingRemovalKeys}
+            searchActive={searchQuery.trim().length > 0}
+            matchedKeys={matchedKeys}
+            activeMatchKey={activeMatchKey}
           />
         ))}
       </div>
+
+      {searchOpen && (
+        <Paper
+          withBorder
+          radius="sm"
+          shadow="md"
+          p={6}
+          style={{
+            position: 'fixed',
+            left: 16,
+            bottom: 'calc(16px + var(--player-dock-height))',
+            zIndex: 60,
+            width: 300,
+          }}
+        >
+          <Group gap="xs" wrap="nowrap">
+            <TextInput
+              ref={searchInputRef}
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search titles..."
+              leftSection={<Search size={14} />}
+              size="xs"
+              style={{ flex: 1 }}
+            />
+            <Text size="xs" c="dimmed" style={{ whiteSpace: 'nowrap' }}>
+              {matches.length > 0 ? `${(matchIndex % matches.length) + 1}/${matches.length}` : '0/0'}
+            </Text>
+          </Group>
+        </Paper>
+      )}
     </section>
   );
 }

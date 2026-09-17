@@ -74,7 +74,20 @@ auto-grouped into a tier board per category.
   router `Layout` (above `<Outlet/>`), and no route/page effect ever dispatches
   `closeFocus` on mount - only its own "stop" control (and logout) does. Don't
   reintroduce a "close the player when navigating away" call; that defeats the whole
-  point of a background-playback mini bar.
+  point of a background-playback mini bar. Also don't derive the *playing* video's
+  data from `state.tiers.tierItems` (live, current-board-only) - `focusSlice.focusEntries`
+  is a snapshot of `{tier, video}` taken when the dock opens/shuffle starts, and
+  `selectActiveSequence` reads from that snapshot instead. This was a real bug, not
+  just theoretical: navigating to a different tier board replaces `tierItems`, so a
+  selector chain rooted in it loses the still-playing video and the dock silently
+  unmounts mid-navigation - the snapshot is what actually makes the dock global.
+- **Real Document Picture-in-Picture doesn't work for the YouTube iframe embed** -
+  moving it into a separate top-level browsing context makes YouTube's embed treat it
+  as an unauthorized origin and refuse to play ("owner has disabled embedding"),
+  regardless of the video. `PlayerDock`'s "floating corner" button is a CSS-only
+  restyle of the mini bar into a small fixed box in the bottom-right corner (like
+  YouTube Music's in-app miniplayer) - nothing is ever moved to another window/
+  document. Don't reintroduce `window.documentPictureInPicture`.
 - **Routing is React Router** (`react-router-dom`), not hand-rolled History API calls -
   see `App.jsx`. `tiersSlice.loadedCategory` guards `TierBoardPage`/`DuelPage` against
   re-fetching a board that's already loaded when the router remounts the page (e.g.
@@ -114,13 +127,22 @@ The user asked for these on top of the Mantine/Redux migration above. Tracked he
   ...">` across the app converted to Mantine `Button`/`ActionIcon`
   (`App.css`'s now-dead `.btn`/`.btn-primary`/`.btn-ghost`/`.sidebar-search`/
   `.duel-strategy-select` rules removed as each one emptied out), the sidebar filter
-  input converted to Mantine `TextInput`, and the duel-strategy dropdown to Mantine
-  `Select`. Still hand-rolled CSS in `App.css`: the tier board grid/rows, drag-and-
-  drop thumbnails, `PlayerDock`'s expanded/mini layouts, the duel cards, and most of
-  `Sidebar`'s/`SettingsView`'s structural layout. Convert opportunistically whenever
-  one of those is next touched, rather than in one big-bang rewrite - and when a
-  `.btn`-style class's last usage is removed, delete its now-dead CSS rule in the
-  same pass (don't leave it orphaned "just in case").
+  input converted to Mantine `TextInput`, the duel-strategy dropdown to Mantine
+  `Select`, the Settings duel-strategy picker to Mantine `Radio.Group` +
+  `Radio.Card`, the tier board's thumbnail cards to Mantine `Card`/`Card.Section` +
+  `Text` (truncated title) + `ActionIcon`/`Badge` (link/duplicate tag), the header/
+  button-row layout on the tier board to Mantine `Group`/`Stack`/`Title`/`Paper`/
+  `Badge`, and all of `Sidebar`'s structure to Mantine `NavLink` (active state via
+  `useLocation()`, not a hand-rolled `isActive` className), `ScrollArea`, `Kbd`,
+  `Divider`, `Group`/`Stack`/`Text`/`UnstyledButton` (`App.css`'s `.settings-option*`,
+  `.sync-*`, `.tier-board-*`, and every `.sidebar-*` rule except the structural
+  `.sidebar`/`.sidebar-scrim` positioning removed as each emptied out). Still
+  hand-rolled CSS in `App.css`: the tier board's own grid/row layout (`.tier-row`,
+  `.tier-content`, drag-and-drop positioning), `PlayerDock`'s expanded/mini/floating
+  layouts, and the duel cards. Convert opportunistically whenever one of those is
+  next touched, rather than in one big-bang rewrite - and when a hand-rolled class's
+  last usage is removed, delete its now-dead CSS rule in the same pass (don't leave
+  it orphaned "just in case").
 
 ## Housekeeping
 

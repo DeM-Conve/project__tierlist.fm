@@ -36,7 +36,7 @@
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
-  padding: 24px 16px;
+  padding: 14px 16px;
   /* Reserves space for the mini player bar (0px when it isn't showing) so
      the footer - Settings/Log out - never ends up sitting underneath it. */
   padding-bottom: calc(24px + var(--player-dock-height));
@@ -46,107 +46,6 @@
   top: 0;
   height: 100vh;
 }
-.sidebar-brand {
-  font-family: var(--font-display);
-  font-weight: 800;
-  font-size: 17px;
-  padding: 0 8px;
-  margin-bottom: 18px;
-}
-.sidebar-palette-btn {
-  font-family: var(--font-body);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  background: var(--surface-2);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  color: var(--text-dim);
-  padding: 8px 10px;
-  font-size: 13px;
-  margin-bottom: 10px;
-  cursor: pointer;
-  transition: background 0.1s ease;
-}
-.sidebar-palette-btn:hover { background: var(--surface-3); color: var(--text); }
-.sidebar-palette-btn kbd {
-  font-family: var(--font-body);
-  font-size: 11px;
-  background: var(--surface-3);
-  border: 1px solid var(--border);
-  border-radius: 3px;
-  padding: 2px 5px;
-  color: var(--text-faint);
-}
-
-
-.sidebar-nav {
-  flex: 1;
-  overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-.sidebar-heading {
-  font-family: var(--font-body);
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--text-faint);
-  margin: 4px 8px 6px;
-}
-.sidebar-empty {
-  color: var(--text-faint);
-  font-size: 13px;
-  padding: 4px 8px;
-  margin: 0;
-}
-.sidebar-item {
-  font-family: var(--font-body);
-  background: none;
-  border: none;
-  color: var(--text-dim);
-  text-align: left;
-  text-decoration: none;
-  padding: 8px 8px;
-  border-radius: var(--radius);
-  font-size: 13.5px;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  transition: background 0.1s ease, color 0.1s ease;
-}
-.sidebar-item:hover { background: var(--surface-2); color: var(--text); }
-/* The global :focus-visible ring (index.css) sits 2px outside the element
-   with square corners - fine for most controls, but on a lone rounded nav
-   item like this it reads as a disconnected floating box rather than a
-   focus indicator. Pull it inside and round it to match instead. */
-.sidebar-item:focus-visible {
-  outline-offset: -2px;
-  border-radius: var(--radius);
-}
-.sidebar-item-active {
-  background: var(--surface-3);
-  color: var(--text);
-  font-weight: 600;
-  box-shadow: inset 2px 0 0 var(--accent);
-}
-.sidebar-item-count {
-  font-size: 11px;
-  color: var(--text-faint);
-}
-.sidebar-divider {
-  height: 1px;
-  background: var(--border-soft);
-  margin: 10px 4px;
-}
-.sidebar-footer {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-top: 12px;
-}
-
 .sidebar-scrim { display: none; }
 
 .mobile-menu-btn { display: none; }
@@ -155,10 +54,10 @@
 .canvas {
   flex: 1;
   min-width: 0;
-  padding: 36px 40px calc(120px + var(--player-dock-height));
+  padding: 14px 40px calc(32px + var(--player-dock-height));
 }
 
-.canvas-header { margin-bottom: 20px; }
+.canvas-header { margin-bottom: 12px; }
 .canvas-header h1 {
   font-family: var(--font-display);
   font-size: 32px;
@@ -166,14 +65,6 @@
   margin: 0 0 6px;
   letter-spacing: -0.4px;
 }
-.tier-board-header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 24px;
-  flex-wrap: wrap;
-}
-
 .hint-text {
   color: var(--text-dim);
   font-size: 14px;
@@ -304,17 +195,28 @@
   background: var(--accent);
   border-radius: 2px;
 }
+/* The card's own look (border, background, radius) and its title text
+   (truncation) come from Mantine's Card/Text - these rules are only the
+   drag-and-drop-specific behavior Mantine has no concept of: fixed
+   thumbnail width, grab cursor, and the dim-while-dragging state. */
 .tier-thumb {
-  position: relative;
   flex: 0 0 auto;
   width: 176px;
   cursor: grab;
-  border: 1px solid var(--border-soft);
-  transition: opacity 0.15s ease, border-color 0.15s ease, transform 0.1s ease;
+  transition: opacity 0.15s ease, transform 0.1s ease;
 }
-.tier-thumb:hover { border-color: var(--text-faint); }
 .tier-thumb:active { cursor: grabbing; }
 .tier-thumb-dragging { opacity: 0.35; }
+/* The "/" find bar's result highlighting - a tier's row filters down to
+   just its matches (not just dimmed) so a row of hundreds of videos doesn't
+   need horizontal scrolling to find a hit; the current match (n/N steps
+   through these) gets a stronger halo so it's easy to spot after
+   scrollIntoView. */
+.tier-thumb-search-match { outline: 2px solid var(--accent); outline-offset: -2px; }
+.tier-thumb-search-active {
+  outline: 2px solid var(--accent);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 35%, transparent);
+}
 .tier-thumb img {
   width: 100%;
   aspect-ratio: 16/9;
@@ -323,21 +225,12 @@
   background: var(--surface-2);
   pointer-events: none;
 }
+/* Positioning only - ActionIcon/Badge supply their own visual styling. */
 .tier-thumb-link {
   position: absolute;
   top: 6px;
   right: 6px;
-  width: 24px;
-  height: 24px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--text);
-  font-size: 13px;
-  text-decoration: none;
   opacity: 0;
-  background: rgba(0, 0, 0, 0.65);
-  border-radius: 4px;
   transition: opacity 0.15s ease;
 }
 .tier-thumb:hover .tier-thumb-link { opacity: 1; }
@@ -345,13 +238,6 @@
   position: absolute;
   bottom: 6px;
   left: 6px;
-  padding: 2px 6px;
-  font-size: 10px;
-  font-weight: 600;
-  letter-spacing: 0.02em;
-  color: #1a1200;
-  background: #f2b544;
-  border-radius: 4px;
 }
 .tier-thumb-skeleton {
   flex: 0 0 auto;
@@ -363,40 +249,6 @@
   font-size: 13px;
   margin: 0;
   padding: 0 8px;
-}
-
-.sync-status {
-  padding: 4px 9px;
-  font-size: 12px;
-  font-weight: 700;
-  white-space: nowrap;
-  border-radius: 999px;
-}
-.sync-status-done { color: var(--success); background: color-mix(in srgb, var(--success) 16%, transparent); }
-.sync-status-error { color: var(--danger); background: color-mix(in srgb, var(--danger) 16%, transparent); }
-
-/* Two visually separate clusters: sync controls (only shown when there's
-   something to sync) and general board utilities - previously all five
-   buttons + a loose colored status string sat in one undifferentiated row. */
-.tier-board-actions {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  flex-wrap: wrap;
-}
-.sync-bar {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 8px;
-  background: var(--surface-2);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-}
-.tier-board-utility-actions {
-  display: flex;
-  align-items: center;
-  gap: 8px;
 }
 
 /* Pending-moves popup, opened by clicking the "N pending" button */
@@ -611,7 +463,7 @@
     background: rgba(0, 0, 0, 0.5);
     z-index: 35;
   }
-  .canvas { padding: 72px 20px calc(100px + var(--player-dock-height)); }
+  .canvas { padding: 72px 20px calc(32px + var(--player-dock-height)); }
   .tier-thumb, .tier-thumb-skeleton { width: 128px; }
   .player-dock-expanded .player-dock-card { width: 94vw; }
   .focus-nav { display: none; }
@@ -789,19 +641,45 @@
 .player-dock-icon-btn:hover:not(:disabled) { color: var(--text); background: var(--surface-2); }
 .player-dock-icon-btn:disabled { opacity: 0.3; cursor: not-allowed; }
 .player-dock-icon-btn-active { color: var(--accent); }
-.focus-media-slot { position: relative; }
-.focus-media-pip-placeholder {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  text-align: center;
-  aspect-ratio: 1 / 1;
-  font-size: 10px;
-  color: var(--text-faint);
-  background: var(--surface-2);
-  border-radius: 4px;
+
+/* Floating corner mode: an in-page floating box pinned to the bottom-right
+   corner, the way YouTube Music's own in-app miniplayer works - a CSS-only
+   restyle of the same mini-bar DOM, not a real OS Picture-in-Picture window
+   (moving the YouTube iframe into a separate top-level browsing context
+   makes YouTube's embed reject it as an unauthorized origin). */
+.player-dock-mini.player-dock-floating {
+  left: auto;
+  right: 24px;
+  bottom: 24px;
+  width: 300px;
+  z-index: 45;
 }
-.player-dock-mini .focus-media-pip-placeholder { width: 44px; }
+.player-dock-floating .player-dock-card {
+  flex-direction: column;
+  align-items: stretch;
+  padding: 0;
+  gap: 0;
+  border-width: 1px;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.6);
+}
+.player-dock-floating .player-dock-progress-track { top: auto; bottom: 0; margin-top: 0; }
+.player-dock-floating .player-dock-toolbar {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 3;
+}
+.player-dock-floating .focus-media {
+  flex: none;
+  width: 100%;
+  margin-bottom: 0;
+}
+.player-dock-floating .focus-embed { aspect-ratio: 16 / 9; border-radius: 0; }
+.player-dock-floating .player-dock-body { padding: 8px 10px; }
+
+.focus-media-slot { position: relative; }
 .player-dock-play-btn {
   width: 34px;
   height: 34px;
@@ -1020,45 +898,6 @@
   margin: 0 0 6px;
 }
 .settings-section .hint-text { margin-bottom: 20px; }
-.settings-options {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-.settings-option {
-  display: flex;
-  align-items: flex-start;
-  gap: 12px;
-  text-align: left;
-  background: var(--surface);
-  border: 1px solid var(--border-soft);
-  border-radius: var(--radius);
-  padding: 14px 16px;
-  cursor: pointer;
-  transition: border-color 0.12s ease;
-}
-.settings-option:hover { border-color: var(--text-faint); }
-.settings-option-active { border-color: var(--accent); }
-.settings-option-radio {
-  flex: 0 0 16px;
-  width: 16px;
-  height: 16px;
-  margin-top: 2px;
-  border-radius: 50%;
-  border: 2px solid var(--border);
-  position: relative;
-}
-.settings-option-active .settings-option-radio { border-color: var(--accent); }
-.settings-option-active .settings-option-radio::after {
-  content: '';
-  position: absolute;
-  inset: 2px;
-  border-radius: 50%;
-  background: var(--accent);
-}
-.settings-option-text { display: flex; flex-direction: column; gap: 4px; }
-.settings-option-label { font-weight: 600; font-size: 14px; }
-.settings-option-desc { color: var(--text-dim); font-size: 13px; line-height: 1.4; }
 
 @media (max-width: 640px) {
   .settings-layout { flex-direction: column; gap: 16px; }

@@ -14,10 +14,16 @@ import {
 import { TIER_COLORS } from '../tiers';
 import EmbeddedPlayer from './EmbeddedPlayer';
 
-// Renders in both 'expanded' (full-screen modal) and 'mini' (YouTube-Music-
-// style bottom bar) modes. Critically, the same EmbeddedPlayer stays mounted
-// across that switch - only CSS classes change - so minimizing never stops
-// or restarts playback, it just changes how much of the screen it occupies.
+// Renders in 'expanded' (full-screen modal), 'mini' (YouTube-Music-style
+// bottom bar) or 'floating' (small bottom-right corner box) modes.
+// Critically, the same EmbeddedPlayer stays mounted across every switch -
+// only CSS classes change - so changing views never stops or restarts
+// playback, it just changes how much of the screen it occupies.
+// The three views the dock cycles through (in this order) via the vim-style
+// j shortcut - full-screen, then the bottom bar, then the floating corner
+// box - wrapping back around to expanded.
+const MODE_CYCLE = ['expanded', 'mini', 'floating'];
+
 export default function PlayerDock({
   mode,
   video,
@@ -29,20 +35,31 @@ export default function PlayerDock({
   onStop,
   onMinimize,
   onExpand,
+  onFloat,
   onPrev,
   onNext,
   onChangeTier,
 }) {
   const cardRef = useRef(null);
   const playerRef = useRef(null);
-  const focusMediaRef = useRef(null);
-  const pipWindowRef = useRef(null);
   const [isPlaying, setIsPlaying] = useState(true);
   const [progressPct, setProgressPct] = useState(0);
   const [isMuted, setIsMuted] = useState(false);
-  const [isPipActive, setIsPipActive] = useState(false);
   const expanded = mode === 'expanded';
-  const pipSupported = typeof window !== 'undefined' && 'documentPictureInPicture' in window;
+  // "Floating corner" mode: an in-page floating box pinned to the bottom-right
+  // corner, the way YouTube Music's own in-app miniplayer works. This is
+  // deliberately *not* the real Document Picture-in-Picture API - that moves
+  // the iframe into a separate top-level browsing context, which makes
+  // YouTube's embed treat it as an unauthorized origin and refuse to play
+  // ("owner has disabled embedding"). It's just a CSS class toggle on the
+  // same mini-bar DOM shape - the player never stops or reloads.
+  const floating = mode === 'floating';
+
+  function applyMode(nextMode) {
+    if (nextMode === 'expanded') onExpand();
+    else if (nextMode === 'mini') onMinimize();
+    else onFloat();
+  }
 
   useEffect(() => {
     if (expanded) cardRef.current?.focus();
@@ -56,7 +73,9 @@ export default function PlayerDock({
   // showing as a bar, and never a guessed/hardcoded pixel value.
   useEffect(() => {
     const root = document.documentElement;
-    if (expanded) {
+    // Floating mode is a small corner box, not a full-width bar - it
+    // shouldn't reserve any bottom padding on the rest of the layout.
+    if (expanded || floating) {
       root.style.setProperty('--player-dock-height', '0px');
       return;
     }
@@ -67,7 +86,7 @@ export default function PlayerDock({
     });
     observer.observe(el);
     return () => observer.disconnect();
-  }, [expanded]);
+  }, [expanded, floating]);
 
   useEffect(() => {
     return () => document.documentElement.style.setProperty('--player-dock-height', '0px');
@@ -90,21 +109,55 @@ export default function PlayerDock({
     setProgressPct(0);
   }, [video.videoId]);
 
-  // Keyboard shortcuts only make sense while the dock owns the screen -
-  // while minimized, the rest of the app is in normal use and shouldn't
-  // have its typing/scrolling hijacked by leftover player shortcuts.
+  // Vim-style navigation for the dock, active globally (not just while
+  // expanded) since the dock is meant to work like a background player:
+  // h/l (and the arrow keys) skip prev/next track. j steps down through the
+  // three views in MODE_CYCLE order (expanded -> mini -> floating -> back to
+  // expanded), k jumps straight back up to the full expanded view from
+  // wherever you are - same physical direction as vim's own j (down)/k (up).
+  // Skipped entirely while the user is typing (filter box, command
+  // palette, ...) so it never hijacks normal input, and h/l/arrow keys are
+  // skipped on the duel screen, which already uses left/right arrow itself
+  // to pick a duel's winner.
   useEffect(() => {
-    if (!expanded) return;
     function onKeyDown(e) {
+      const active = document.activeElement;
+      const isTyping =
+        active?.tagName === 'INPUT' || active?.tagName === 'TEXTAREA' || active?.isContentEditable;
+      if (isTyping) return;
+      // Ctrl/Cmd-K opens the command palette, Alt-anything is a browser/OS
+      // shortcut - e.key is still just 'k' either way, so without this
+      // check e.g. Cmd+K would open the palette *and* expand the dock at
+      // the same time. Shift is allowed through (shift+digit reassigns a
+      // tier below).
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+
       if (e.key === 'Escape') {
-        onMinimize();
-      } else if (e.key === 'ArrowLeft' || e.key === 'h') {
+        if (expanded) onMinimize();
+        return;
+      }
+      if (e.key === 'j') {
+        e.preventDefault();
+        const nextIndex = (MODE_CYCLE.indexOf(mode) + 1) % MODE_CYCLE.length;
+        applyMode(MODE_CYCLE[nextIndex]);
+        return;
+      }
+      if (e.key === 'k') {
+        e.preventDefault();
+        if (mode !== 'expanded') applyMode('expanded');
+        return;
+      }
+
+      const onDuelScreen = document.querySelector('.duel-view');
+      if (onDuelScreen) return;
+
+      if (e.key === 'ArrowLeft' || e.key === 'h') {
         e.preventDefault();
         if (hasPrev) onPrev();
       } else if (e.key === 'ArrowRight' || e.key === 'l') {
         e.preventDefault();
         if (hasNext) onNext();
-      } else if (e.shiftKey && e.code.startsWith('Digit')) {
+      } else if (expanded && e.shiftKey && e.code.startsWith('Digit')) {
         // Shift+digit, not a plain digit - plain 1-9 is YouTube's own native
         // "seek to N0%" shortcut, so tier-reassignment needs a modifier to
         // stay unambiguous. e.code (not e.key) is used because e.key turns
@@ -117,7 +170,8 @@ export default function PlayerDock({
     }
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [expanded, onMinimize, onPrev, onNext, hasPrev, hasNext, availableTiers, onChangeTier]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mode, expanded, onMinimize, onExpand, onFloat, onPrev, onNext, hasPrev, hasNext, availableTiers, onChangeTier]);
 
   function togglePlay() {
     const player = playerRef.current;
@@ -144,66 +198,24 @@ export default function PlayerDock({
     setProgressPct(ratio * 100);
   }
 
-  // Real browser Picture-in-Picture, the same feature YouTube's own
-  // "miniplayer" button uses - not something faked with a floating div.
-  // The IFrame embed isn't a <video> element, so the classic
-  // video.requestPictureInPicture() API doesn't apply; the Document
-  // Picture-in-Picture API instead moves an actual DOM node (here, the
-  // video area) into a real always-on-top OS window, then back when it's
-  // closed. Chrome-only for now, so the button only appears when supported.
-  async function togglePiP() {
-    if (!pipSupported) return;
-    if (pipWindowRef.current) {
-      pipWindowRef.current.close();
-      return;
-    }
-    const el = focusMediaRef.current;
-    if (!el) return;
-
-    const pipWindow = await window.documentPictureInPicture.requestWindow({
-      width: 320,
-      height: 180,
-    });
-    [...document.styleSheets].forEach((sheet) => {
-      try {
-        const rules = [...sheet.cssRules].map((r) => r.cssText).join('\n');
-        const style = pipWindow.document.createElement('style');
-        style.textContent = rules;
-        pipWindow.document.head.appendChild(style);
-      } catch {
-        if (sheet.href) {
-          const link = pipWindow.document.createElement('link');
-          link.rel = 'stylesheet';
-          link.href = sheet.href;
-          pipWindow.document.head.appendChild(link);
-        }
-      }
-    });
-    pipWindow.document.body.style.margin = '0';
-    pipWindow.document.body.style.background = '#000';
-    pipWindow.document.body.append(el);
-    pipWindowRef.current = pipWindow;
-    setIsPipActive(true);
-
-    pipWindow.addEventListener(
-      'pagehide',
-      () => {
-        cardRef.current?.querySelector('.focus-media-slot')?.append(el);
-        pipWindowRef.current = null;
-        setIsPipActive(false);
-      },
-      { once: true }
-    );
+  // The on-screen ‹ › overlay buttons scrub within the current video, the
+  // same way YouTube's own player does - track skipping is h/l or the
+  // dedicated prev/next buttons in the mini bar's controls, not these.
+  function seekBy(deltaSeconds) {
+    const player = playerRef.current;
+    const duration = player?.getDuration?.();
+    if (!duration) return;
+    const next = Math.min(duration, Math.max(0, player.getCurrentTime() + deltaSeconds));
+    player.seekTo(next, true);
+    setProgressPct((next / duration) * 100);
   }
 
-  // If the whole dock unmounts (playback fully stopped) while PiP is open,
-  // close the floating window with it rather than leaving it orphaned.
-  useEffect(() => {
-    return () => pipWindowRef.current?.close();
-  }, []);
-
   return (
-    <div className={`player-dock ${expanded ? 'player-dock-expanded' : 'player-dock-mini'}`}>
+    <div
+      className={`player-dock ${expanded ? 'player-dock-expanded' : 'player-dock-mini'}${
+        floating ? ' player-dock-floating' : ''
+      }`}
+    >
       <div className="player-dock-backdrop" onClick={onMinimize} />
       <div
         className="player-dock-card"
@@ -239,10 +251,7 @@ export default function PlayerDock({
         </div>
 
         <div className="focus-media-slot">
-          {isPipActive && (
-            <div className="focus-media-pip-placeholder">Playing in Picture-in-Picture</div>
-          )}
-          <div className="focus-media" ref={focusMediaRef} onClick={!expanded ? onExpand : undefined}>
+          <div className="focus-media" onClick={!expanded ? onExpand : undefined}>
             <div className="focus-embed">
               <EmbeddedPlayer
                 key={video.videoId}
@@ -255,13 +264,27 @@ export default function PlayerDock({
               />
             </div>
 
-            {expanded && hasPrev && (
-              <button className="focus-nav focus-nav-prev" onClick={onPrev} aria-label="Previous video">
+            {expanded && (
+              <button
+                className="focus-nav focus-nav-prev"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  seekBy(-10);
+                }}
+                aria-label="Back 10 seconds"
+              >
                 ‹
               </button>
             )}
-            {expanded && hasNext && (
-              <button className="focus-nav focus-nav-next" onClick={onNext} aria-label="Next video">
+            {expanded && (
+              <button
+                className="focus-nav focus-nav-next"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  seekBy(10);
+                }}
+                aria-label="Forward 10 seconds"
+              >
                 ›
               </button>
             )}
@@ -320,38 +343,39 @@ export default function PlayerDock({
               >
                 {isMuted ? <VolumeX size={17} /> : <Volume2 size={17} />}
               </button>
-              {pipSupported && (
-                <button
-                  className={`player-dock-icon-btn${isPipActive ? ' player-dock-icon-btn-active' : ''}`}
-                  onClick={togglePiP}
-                  aria-label={isPipActive ? 'Exit Picture-in-Picture' : 'Picture-in-Picture'}
-                  title="Picture-in-Picture"
-                >
-                  <PictureInPicture2 size={17} />
-                </button>
-              )}
+              <button
+                className={`player-dock-icon-btn${floating ? ' player-dock-icon-btn-active' : ''}`}
+                onClick={() => applyMode(floating ? 'mini' : 'floating')}
+                aria-label={floating ? 'Exit floating corner' : 'Floating corner'}
+                title="Floating corner"
+              >
+                <PictureInPicture2 size={17} />
+              </button>
             </div>
           )}
         </div>
 
         {expanded && (
           <>
-            <div className="focus-tiers">
-              {availableTiers.map((t, i) => (
-                <button
-                  key={t}
-                  className={`tier-pill${t === currentTier ? ' tier-pill-active' : ''}`}
-                  style={{ background: TIER_COLORS[t] }}
-                  onClick={() => onChangeTier(t)}
-                >
-                  {t}
-                  <span className="tier-pill-key">⇧{i + 1}</span>
-                </button>
-              ))}
-            </div>
+            {availableTiers.length > 0 && (
+              <div className="focus-tiers">
+                {availableTiers.map((t, i) => (
+                  <button
+                    key={t}
+                    className={`tier-pill${t === currentTier ? ' tier-pill-active' : ''}`}
+                    style={{ background: TIER_COLORS[t] }}
+                    onClick={() => onChangeTier(t)}
+                  >
+                    {t}
+                    <span className="tier-pill-key">⇧{i + 1}</span>
+                  </button>
+                ))}
+              </div>
+            )}
 
             <p className="focus-hint">
-              esc minimize · ← → / h l navigate · shift+1-{availableTiers.length} set tier
+              esc/j minimize · ← → / h l navigate
+              {availableTiers.length > 0 && ` · shift+1-${availableTiers.length} set tier`}
             </p>
           </>
         )}

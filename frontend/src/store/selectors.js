@@ -7,6 +7,8 @@ const selectOriginalTierOf = (state) => state.tiers.originalTierOf;
 const selectCurrentCategory = (state) => state.view.currentCategory;
 const selectFocusedVideo = (state) => state.focus.focusedVideo;
 const selectFocusQueue = (state) => state.focus.focusQueue;
+const selectFocusEntries = (state) => state.focus.focusEntries;
+const selectFocusedCategory = (state) => state.focus.focusedCategory;
 
 export const selectTierGroups = createSelector([selectPlaylists], (playlists) =>
   playlists ? groupByTier(playlists) : {}
@@ -74,19 +76,34 @@ export const selectVideoLookup = createSelector([selectFocusSequence], (sequence
   return map;
 });
 
+// Looked up from the snapshot taken when the dock opened (`focusEntries`),
+// not the live per-category `tierItems` - see the comment on
+// `focusSlice.focusEntries` for why. `videoLookup` above is still used for
+// the brief moment a queue is first constructed, while still on that
+// board's own page.
+const selectSnapshotLookup = createSelector([selectFocusEntries], (entries) => {
+  const map = new Map();
+  (entries || []).forEach((e) => map.set(e.video.videoId, e));
+  return map;
+});
+
 export const selectActiveSequence = createSelector(
-  [selectFocusQueue, selectFocusSequence, selectVideoLookup],
-  (focusQueue, focusSequence, videoLookup) =>
-    focusQueue ? focusQueue.map((id) => videoLookup.get(id)).filter(Boolean) : focusSequence
+  [selectFocusQueue, selectSnapshotLookup],
+  (focusQueue, snapshotLookup) =>
+    focusQueue ? focusQueue.map((id) => snapshotLookup.get(id)).filter(Boolean) : []
 );
 
+// Matched by videoId only, not tier - `focusEntries` is a snapshot frozen
+// when the dock opened, so its `.tier` for a given video stays whatever it
+// was at that moment. Reassigning the focused video's tier (the dock's
+// shift+digit shortcut) updates `focusedVideo.tier` but not the snapshot,
+// so matching on tier too would never find it again and silently kill the
+// dock the instant you reassigned a tier mid-playback.
 export const selectFocusedSeqIndex = createSelector(
   [selectFocusedVideo, selectActiveSequence],
   (focusedVideo, activeSequence) =>
     focusedVideo
-      ? activeSequence.findIndex(
-          (e) => e.tier === focusedVideo.tier && e.video.videoId === focusedVideo.videoId
-        )
+      ? activeSequence.findIndex((e) => e.video.videoId === focusedVideo.videoId)
       : -1
 );
 
@@ -95,8 +112,16 @@ export const selectFocusedVideoData = createSelector(
   (index, activeSequence) => (index >= 0 ? activeSequence[index].video : null)
 );
 
+// Tier reassignment only makes sense - and only actually works - while
+// you're viewing the same board the playing video was opened from: the
+// pills/shift+digit shortcut write into `tiersSlice.tierItems`, which only
+// ever holds the currently loaded category. If you've since navigated to a
+// different tier board while the video keeps playing in the background,
+// hide the controls entirely rather than let them silently no-op.
 export const selectFocusedAvailableTiers = createSelector(
-  [selectFocusedVideo, selectCurrentCategory, selectTierGroups],
-  (focusedVideo, currentCategory, tierGroups) =>
-    focusedVideo ? TIER_ORDER.filter((t) => tierGroups[currentCategory]?.[t]) : []
+  [selectFocusedVideo, selectFocusedCategory, selectCurrentCategory, selectTierGroups],
+  (focusedVideo, focusedCategory, currentCategory, tierGroups) =>
+    focusedVideo && focusedCategory && focusedCategory === currentCategory
+      ? TIER_ORDER.filter((t) => tierGroups[focusedCategory]?.[t])
+      : []
 );

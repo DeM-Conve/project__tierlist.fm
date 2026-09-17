@@ -12,14 +12,36 @@ const focusSlice = createSlice({
     // (which appends it to the end of its new tier) would silently
     // teleport your position and make "next" jump into the wrong tier.
     focusQueue: null,
+    // A snapshot of { tier, video } for every id in focusQueue, taken once
+    // when the dock opens. The player dock is meant to be global - it keeps
+    // playing no matter what page you navigate to - but a tier board's
+    // `tierItems` only ever holds the *currently loaded* category's videos
+    // (see `tiersSlice.loadedCategory`). Without this snapshot, navigating
+    // to a different tier board replaces `tierItems` and the still-playing
+    // video would vanish from every video-lookup selector, silently killing
+    // the dock mid-navigation instead of continuing in the background.
+    focusEntries: null,
+    // The tier-board category the focused video was opened from, frozen the
+    // same way `focusEntries` is. Tier-reassignment (the pills/shift+digit
+    // in the expanded view) has to write into `tiersSlice.tierItems`, which
+    // only ever holds one *currently loaded* category - if you navigate to a
+    // different board while a video keeps playing in the background and try
+    // to reassign its tier there, the write would silently target the wrong
+    // (or no) board and do nothing. `selectFocusedAvailableTiers` only shows
+    // those controls when this matches the board you're actually viewing.
+    focusedCategory: null,
     isShuffling: false,
-    // 'expanded' (full-screen) or 'mini' (bottom bar, app stays usable).
+    // 'expanded' (full-screen), 'mini' (bottom bar), or 'floating' (small
+    // corner box) - the three views the dock cycles through, in that order,
+    // via the vim-style j/k shortcut (see PlayerDock).
     playerMode: 'expanded',
   },
   reducers: {
     openFocus: (state, action) => {
-      const { tier, videoId, queue } = action.payload;
+      const { tier, videoId, queue, entries, category } = action.payload;
       state.focusQueue = queue;
+      state.focusEntries = entries;
+      state.focusedCategory = category;
       state.isShuffling = false;
       state.playerMode = 'expanded';
       state.focusedVideo = { tier, videoId };
@@ -27,6 +49,8 @@ const focusSlice = createSlice({
     closeFocus: (state) => {
       state.focusedVideo = null;
       state.focusQueue = null;
+      state.focusEntries = null;
+      state.focusedCategory = null;
       state.isShuffling = false;
       state.playerMode = 'expanded';
     },
@@ -36,9 +60,14 @@ const focusSlice = createSlice({
     expandPlayer: (state) => {
       state.playerMode = 'expanded';
     },
+    floatPlayer: (state) => {
+      state.playerMode = 'floating';
+    },
     startShuffle: (state, action) => {
-      const { queue, tier, videoId } = action.payload;
+      const { queue, tier, videoId, entries, category } = action.payload;
       state.focusQueue = queue;
+      state.focusEntries = entries;
+      state.focusedCategory = category;
       state.isShuffling = true;
       state.playerMode = 'expanded';
       state.focusedVideo = { tier, videoId };
@@ -54,6 +83,7 @@ export const {
   closeFocus,
   minimizePlayer,
   expandPlayer,
+  floatPlayer,
   startShuffle,
   setFocusedVideo,
 } = focusSlice.actions;

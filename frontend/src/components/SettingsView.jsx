@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Tabs } from '@mantine/core';
+import { Group, Radio, Stack, Tabs, Text } from '@mantine/core';
 import { DUEL_STRATEGIES, DUEL_STRATEGY_LABELS, DEFAULT_DUEL_STRATEGY } from '../duel';
 import { SETTINGS, getSetting, setSetting } from '../settings';
 
@@ -46,21 +46,25 @@ export default function SettingsView() {
               strategies for a single session from the duel screen itself.
             </p>
 
-            <div className="settings-options">
-              {Object.keys(DUEL_STRATEGIES).map((key) => (
-                <button
-                  key={key}
-                  className={`settings-option${duelStrategy === key ? ' settings-option-active' : ''}`}
-                  onClick={() => chooseStrategy(key)}
-                >
-                  <span className="settings-option-radio" />
-                  <span className="settings-option-text">
-                    <span className="settings-option-label">{DUEL_STRATEGY_LABELS[key]}</span>
-                    <span className="settings-option-desc">{STRATEGY_DESCRIPTIONS[key]}</span>
-                  </span>
-                </button>
-              ))}
-            </div>
+            <Radio.Group value={duelStrategy} onChange={chooseStrategy}>
+              <Stack gap="sm">
+                {Object.keys(DUEL_STRATEGIES).map((key) => (
+                  <Radio.Card key={key} value={key} radius="md" p="md">
+                    <Group wrap="nowrap" align="flex-start" gap="md">
+                      <Radio.Indicator mt={2} />
+                      <div>
+                        <Text fw={600} size="sm">
+                          {DUEL_STRATEGY_LABELS[key]}
+                        </Text>
+                        <Text size="sm" c="dimmed">
+                          {STRATEGY_DESCRIPTIONS[key]}
+                        </Text>
+                      </div>
+                    </Group>
+                  </Radio.Card>
+                ))}
+              </Stack>
+            </Radio.Group>
           </div>
         </Tabs.Panel>
       </Tabs>

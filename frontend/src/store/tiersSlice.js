@@ -51,6 +51,43 @@ const tiersSlice = createSlice({
     setTierItems: (state, action) => {
       state.tierItems = action.payload;
     },
+    // Applies a sync's succeeded moves straight to the local draft instead
+    // of waiting on a refetch of YouTube's own playlist API to reflect
+    // them. That refetch can lag a moment behind the write that just
+    // happened (or, before this, a stale-while-revalidate cache would serve
+    // pre-sync data as "fresh" the instant loadedCategory was cleared,
+    // stopping any later real refresh from ever landing - see the comment
+    // in App.jsx's syncChanges). The local draft already shows the intended
+    // end state - a dedupe's duplicate copy or a moved video is already
+    // sitting where the user put it - so this just makes that the new
+    // baseline (dropping it from `originalTierOf`/`originalTierItems`, and
+    // for a dedupe, actually removing the now-deleted duplicate) rather
+    // than re-deriving it from a server round trip.
+    applySyncedMoves: (state, action) => {
+      const { moves } = action.payload;
+      moves.forEach((m) => {
+        if (m.kind === 'dedupe') {
+          state.tierItems[m.tier] = (state.tierItems[m.tier] || []).filter(
+            (v) => v.videoId !== m.video.videoId
+          );
+          state.originalTierItems[m.tier] = (state.originalTierItems[m.tier] || []).filter(
+            (v) => v.videoId !== m.video.videoId
+          );
+          state.originalTierOf[m.video.videoId] = (state.originalTierOf[m.video.videoId] || []).filter(
+            (t) => t !== m.tier
+          );
+        } else {
+          state.originalTierItems[m.from] = (state.originalTierItems[m.from] || []).filter(
+            (v) => v.videoId !== m.video.videoId
+          );
+          const target = state.originalTierItems[m.to] || [];
+          if (!target.some((v) => v.videoId === m.video.videoId)) {
+            state.originalTierItems[m.to] = [...target, m.video];
+          }
+          state.originalTierOf[m.video.videoId] = [m.to];
+        }
+      });
+    },
     discardTierChanges: (state) => {
       state.tierItems = JSON.parse(JSON.stringify(state.originalTierItems));
       state.syncStatus = 'idle';
@@ -96,6 +133,7 @@ export const {
   setLoadedCategory,
   setTierForCategory,
   setTierItems,
+  applySyncedMoves,
   discardTierChanges,
   setSyncStatus,
   setDraggedVideoId,
