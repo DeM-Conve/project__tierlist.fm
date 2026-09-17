@@ -29,9 +29,14 @@ export default function App() {
   const originalTierOfRef = useRef({});
   const originalTierItemsRef = useRef({});
   const autoSelectedRef = useRef(false);
+  const playlistsRef = useRef(null);
+  const tierGroupsRef = useRef({});
 
   const tierGroups = useMemo(() => (playlists ? groupByTier(playlists) : {}), [playlists]);
   const tierCategories = Object.keys(tierGroups).sort();
+
+  playlistsRef.current = playlists;
+  tierGroupsRef.current = tierGroups;
 
   const pendingMoves = useMemo(() => {
     const moves = [];
@@ -50,13 +55,54 @@ export default function App() {
     checkAuth();
   }, []);
 
+  // Restore whichever tier board / playlist the URL points at (so refresh and
+  // back/forward don't just dump you back on the first tier board), falling
+  // back to the first tier board only when the URL has nothing usable.
   useEffect(() => {
     if (playlists && !autoSelectedRef.current) {
       autoSelectedRef.current = true;
-      if (tierCategories.length > 0) openTierBoard(tierCategories[0]);
+      resolveFromLocation({ push: false, fallbackToFirst: true });
     }
+
+    function onPopState() {
+      resolveFromLocation({ push: false, fallbackToFirst: false });
+    }
+    window.addEventListener('popstate', onPopState);
+    return () => window.removeEventListener('popstate', onPopState);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [playlists]);
+
+  function resolveFromLocation({ push, fallbackToFirst }) {
+    const path = window.location.pathname;
+    const tierMatch = path.match(/^\/tier\/([^/]+)/);
+    const playlistMatch = path.match(/^\/playlist\/([^/]+)/);
+    const groups = tierGroupsRef.current;
+    const list = playlistsRef.current;
+
+    if (tierMatch) {
+      const category = decodeURIComponent(tierMatch[1]);
+      if (groups[category]) {
+        openTierBoard(category, { push });
+        return;
+      }
+    }
+    if (playlistMatch) {
+      const id = decodeURIComponent(playlistMatch[1]);
+      const playlist = list?.find((p) => p.id === id);
+      if (playlist) {
+        openItems(playlist, { push });
+        return;
+      }
+    }
+    if (fallbackToFirst) {
+      const categories = Object.keys(groups).sort();
+      if (categories.length > 0) {
+        openTierBoard(categories[0], { push: false, replace: true });
+        return;
+      }
+    }
+    selectPlaylists({ push: false });
+  }
 
   async function checkAuth() {
     try {
@@ -79,9 +125,10 @@ export default function App() {
     setPlaylists(await res.json());
   }
 
-  async function openItems(playlist) {
+  async function openItems(playlist, { push = true, replace = false } = {}) {
     setActiveView({ type: 'items', playlist });
     setMobileSidebarOpen(false);
+    updateUrl(`/playlist/${encodeURIComponent(playlist.id)}`, { push, replace });
     setItems(null);
     setLoadingItems(true);
     const res = await fetch(`${API_BASE}/api/playlists/${playlist.id}/items`, { credentials: 'include' });
@@ -121,16 +168,24 @@ export default function App() {
     );
   }
 
-  async function openTierBoard(category) {
+  async function openTierBoard(category, { push = true, replace = false } = {}) {
     setActiveView({ type: 'tierBoard', category });
     setMobileSidebarOpen(false);
     setSyncStatus('idle');
+    updateUrl(`/tier/${encodeURIComponent(category)}`, { push, replace });
     await loadTierBoardData(category);
   }
 
-  function selectPlaylists() {
+  function selectPlaylists({ push = true } = {}) {
     setActiveView({ type: 'playlists' });
     setMobileSidebarOpen(false);
+    updateUrl('/', { push, replace: false });
+  }
+
+  function updateUrl(path, { push, replace }) {
+    if (window.location.pathname === path) return;
+    if (replace) window.history.replaceState(null, '', path);
+    else if (push) window.history.pushState(null, '', path);
   }
 
   function handleThumbDragStart(e, video, fromTier) {
@@ -153,7 +208,7 @@ export default function App() {
     setDragOverTier((prev) => (prev === tier ? null : prev));
   }
 
-  function handleRowDrop(e, toTier) {
+  function handleRowDrop(e, toTier, dropIndex) {
     e.preventDefault();
     let data;
     try {
@@ -164,15 +219,29 @@ export default function App() {
     const { videoId, fromTier } = data;
     setDragOverTier(null);
     setDraggedVideoId(null);
-    if (!videoId || fromTier === toTier) return;
+    if (!videoId) return;
 
     setTierItems((prev) => {
-      const video = prev[fromTier]?.find((v) => v.videoId === videoId);
+      const sourceArr = prev[fromTier] || [];
+      const video = sourceArr.find((v) => v.videoId === videoId);
       if (!video) return prev;
+
+      if (fromTier === toTier) {
+        const originalIndex = sourceArr.findIndex((v) => v.videoId === videoId);
+        const withoutVideo = sourceArr.filter((v) => v.videoId !== videoId);
+        let index = originalIndex < dropIndex ? dropIndex - 1 : dropIndex;
+        index = Math.max(0, Math.min(index, withoutVideo.length));
+        withoutVideo.splice(index, 0, video);
+        return { ...prev, [fromTier]: withoutVideo };
+      }
+
+      const targetArr = [...(prev[toTier] || [])];
+      const index = Math.max(0, Math.min(dropIndex, targetArr.length));
+      targetArr.splice(index, 0, video);
       return {
         ...prev,
-        [fromTier]: prev[fromTier].filter((v) => v.videoId !== videoId),
-        [toTier]: [...(prev[toTier] || []), video],
+        [fromTier]: sourceArr.filter((v) => v.videoId !== videoId),
+        [toTier]: targetArr,
       };
     });
   }
@@ -226,6 +295,7 @@ export default function App() {
     setTierLoading({});
     setSyncStatus('idle');
     autoSelectedRef.current = false;
+    window.history.replaceState(null, '', '/');
   }
 
   if (loggedIn === false) {
