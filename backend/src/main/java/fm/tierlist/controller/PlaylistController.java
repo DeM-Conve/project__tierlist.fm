@@ -10,6 +10,8 @@ import org.springframework.security.oauth2.client.OAuth2AuthorizedClient;
 import org.springframework.security.oauth2.client.annotation.RegisteredOAuth2AuthorizedClient;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.client.RestTemplate;
 
@@ -85,6 +87,21 @@ public class PlaylistController {
             result.add(out);
         }
         return result;
+    }
+
+    /**
+     * Mock endpoint: does not actually mutate YouTube playlists. Our OAuth scope is
+     * youtube.readonly, so writing would require re-consenting with a broader scope.
+     * This just validates the request shape and echoes back what "would" happen, so
+     * the frontend's sync flow can be built and tested end to end ahead of that.
+     */
+    @PostMapping("/api/tier-sync")
+    public Map<String, Object> tierSync(@RequestBody List<Map<String, Object>> moves) {
+        return Map.of(
+            "success", true,
+            "applied", moves.size(),
+            "mock", true
+        );
     }
 
     private List<Map<String, Object>> fetchAllPages(OAuth2AuthorizedClient client, String baseUrl) {

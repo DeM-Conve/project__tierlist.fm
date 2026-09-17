@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import './App.css';
 import { TIER_COLORS, TIER_ORDER, groupByTier } from './tiers';
 
@@ -50,26 +50,40 @@ function TierBoardCard({ category, tiers, onClick }) {
   );
 }
 
-function TierRow({ tier, items, loading }) {
+function TierRow({ tier, items, loading, isDragOver, onDragOver, onDragLeave, onDrop, onThumbDragStart, onThumbDragEnd, draggedVideoId }) {
   return (
-    <div className="tier-row">
+    <div
+      className={`tier-row${isDragOver ? ' tier-row-dragover' : ''}`}
+      onDragOver={onDragOver}
+      onDragLeave={onDragLeave}
+      onDrop={onDrop}
+    >
       <div className="tier-label" style={{ background: TIER_COLORS[tier] }}>
         {tier}
       </div>
       <div className="tier-content">
         {loading && <p className="tier-loading">Loading...</p>}
-        {!loading && items?.length === 0 && <p className="tier-loading">No videos</p>}
+        {!loading && items?.length === 0 && <p className="tier-loading">Drop videos here</p>}
         {items?.map((v) => (
-          <a
+          <div
             key={v.videoId}
-            className="tier-thumb"
-            href={`https://www.youtube.com/watch?v=${v.videoId}`}
-            target="_blank"
-            rel="noopener noreferrer"
+            className={`tier-thumb${draggedVideoId === v.videoId ? ' tier-thumb-dragging' : ''}`}
+            draggable
+            onDragStart={(e) => onThumbDragStart(e, v, tier)}
+            onDragEnd={onThumbDragEnd}
             title={v.title}
           >
-            <img src={v.thumbnail || ''} alt={v.title} />
-          </a>
+            <img src={v.thumbnail || ''} alt={v.title} draggable={false} />
+            <a
+              className="tier-thumb-link"
+              href={`https://www.youtube.com/watch?v=${v.videoId}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={(e) => e.stopPropagation()}
+            >
+              ▶
+            </a>
+          </div>
         ))}
       </div>
     </div>
@@ -90,9 +104,28 @@ export default function App() {
   const [selectedCategory, setSelectedCategory] = useState(null);
   const [tierItems, setTierItems] = useState({});
   const [tierLoading, setTierLoading] = useState({});
+  const [draggedVideoId, setDraggedVideoId] = useState(null);
+  const [dragOverTier, setDragOverTier] = useState(null);
+  const [syncStatus, setSyncStatus] = useState('idle'); // idle | syncing | done | error
+
+  const originalTierOfRef = useRef({});
+  const originalTierItemsRef = useRef({});
 
   const tierGroups = useMemo(() => (playlists ? groupByTier(playlists) : {}), [playlists]);
   const tierCategories = Object.keys(tierGroups).sort();
+
+  const pendingMoves = useMemo(() => {
+    const moves = [];
+    for (const tier of TIER_ORDER) {
+      for (const video of tierItems[tier] || []) {
+        const original = originalTierOfRef.current[video.videoId];
+        if (original && original !== tier) {
+          moves.push({ video, from: original, to: tier });
+        }
+      }
+    }
+    return moves;
+  }, [tierItems]);
 
   useEffect(() => {
     checkAuth();
@@ -142,19 +175,107 @@ export default function App() {
   async function openTierBoard(category) {
     setSelectedCategory(category);
     setView('tierBoard');
+    setSyncStatus('idle');
     const tiers = tierGroups[category];
     const presentTiers = TIER_ORDER.filter((t) => tiers[t]);
 
+    originalTierOfRef.current = {};
+    originalTierItemsRef.current = {};
     setTierItems({});
     setTierLoading(Object.fromEntries(presentTiers.map((t) => [t, true])));
 
     await Promise.all(
       presentTiers.map(async (t) => {
-        const items = await fetchPlaylistItems(tiers[t].id);
-        setTierItems((prev) => ({ ...prev, [t]: items }));
+        const fetched = await fetchPlaylistItems(tiers[t].id);
+        fetched.forEach((v) => {
+          originalTierOfRef.current[v.videoId] = t;
+        });
+        originalTierItemsRef.current[t] = fetched;
+        setTierItems((prev) => ({ ...prev, [t]: fetched }));
         setTierLoading((prev) => ({ ...prev, [t]: false }));
       })
     );
+  }
+
+  function handleThumbDragStart(e, video, fromTier) {
+    e.dataTransfer.setData('application/json', JSON.stringify({ videoId: video.videoId, fromTier }));
+    e.dataTransfer.effectAllowed = 'move';
+    setDraggedVideoId(video.videoId);
+  }
+
+  function handleThumbDragEnd() {
+    setDraggedVideoId(null);
+    setDragOverTier(null);
+  }
+
+  function handleRowDragOver(e, tier) {
+    e.preventDefault();
+    if (dragOverTier !== tier) setDragOverTier(tier);
+  }
+
+  function handleRowDragLeave(tier) {
+    setDragOverTier((prev) => (prev === tier ? null : prev));
+  }
+
+  function handleRowDrop(e, toTier) {
+    e.preventDefault();
+    let data;
+    try {
+      data = JSON.parse(e.dataTransfer.getData('application/json') || '{}');
+    } catch {
+      data = {};
+    }
+    const { videoId, fromTier } = data;
+    setDragOverTier(null);
+    setDraggedVideoId(null);
+    if (!videoId || fromTier === toTier) return;
+
+    setTierItems((prev) => {
+      const video = prev[fromTier]?.find((v) => v.videoId === videoId);
+      if (!video) return prev;
+      return {
+        ...prev,
+        [fromTier]: prev[fromTier].filter((v) => v.videoId !== videoId),
+        [toTier]: [...(prev[toTier] || []), video],
+      };
+    });
+  }
+
+  function discardChanges() {
+    setTierItems(JSON.parse(JSON.stringify(originalTierItemsRef.current)));
+    setSyncStatus('idle');
+  }
+
+  async function syncChanges() {
+    setSyncStatus('syncing');
+    const tiers = tierGroups[selectedCategory] || {};
+    const payload = pendingMoves.map((m) => ({
+      videoId: m.video.videoId,
+      title: m.video.title,
+      fromTier: m.from,
+      toTier: m.to,
+      fromPlaylistId: tiers[m.from]?.id,
+      toPlaylistId: tiers[m.to]?.id,
+    }));
+
+    try {
+      const res = await fetch(`${API_BASE}/api/tier-sync`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) throw new Error('sync failed');
+
+      pendingMoves.forEach((m) => {
+        originalTierOfRef.current[m.video.videoId] = m.to;
+      });
+      originalTierItemsRef.current = JSON.parse(JSON.stringify(tierItems));
+      setSyncStatus('done');
+      setTimeout(() => setSyncStatus('idle'), 2500);
+    } catch {
+      setSyncStatus('error');
+    }
   }
 
   function backToPlaylists() {
@@ -164,6 +285,7 @@ export default function App() {
     setSelectedCategory(null);
     setTierItems({});
     setTierLoading({});
+    setSyncStatus('idle');
   }
 
   function login() {
@@ -180,9 +302,16 @@ export default function App() {
   return (
     <>
       <header>
-        <h1>My YouTube Playlists</h1>
+        <h1>
+          <span className="logo-dot" />
+          My YouTube Playlists
+        </h1>
         <div id="auth-area">
-          {loggedIn && <button onClick={logout}>Logout</button>}
+          {loggedIn && (
+            <button className="btn btn-ghost" onClick={logout}>
+              Logout
+            </button>
+          )}
         </div>
       </header>
 
@@ -190,7 +319,15 @@ export default function App() {
         {loggedIn === false && (
           <section id="login-view">
             <p>Sign in with your Google account to see your playlists.</p>
-            <button onClick={login}>Login with Google</button>
+            <button className="btn btn-primary" onClick={login}>
+              Login with Google
+            </button>
+          </section>
+        )}
+
+        {loggedIn === null && (
+          <section id="login-view">
+            <p>Loading...</p>
           </section>
         )}
 
@@ -198,7 +335,7 @@ export default function App() {
           <section id="playlists-view">
             {tierCategories.length > 0 && (
               <>
-                <div id="playlist-header">
+                <div className="section-header">
                   <h2>Tier Boards</h2>
                 </div>
                 <div className="grid">
@@ -214,12 +351,12 @@ export default function App() {
               </>
             )}
 
-            <div id="playlist-header">
+            <div className="section-header">
               <h2>Your Playlists</h2>
             </div>
             <div className="grid">
-              {playlists === null && <p>Loading playlists...</p>}
-              {playlists?.length === 0 && <p>No playlists found.</p>}
+              {playlists === null && <p className="hint-text">Loading playlists...</p>}
+              {playlists?.length === 0 && <p className="hint-text">No playlists found.</p>}
               {playlists?.map((p) => (
                 <PlaylistCard key={p.id} playlist={p} onClick={() => loadItems(p)} />
               ))}
@@ -229,13 +366,13 @@ export default function App() {
 
         {loggedIn && view === 'items' && (
           <section id="items-view">
-            <button id="back-btn" onClick={backToPlaylists}>
+            <button className="btn btn-ghost back-btn" onClick={backToPlaylists}>
               &larr; Back to playlists
             </button>
             <h2>{selectedPlaylist?.title}</h2>
             <div className="grid">
-              {loadingItems && <p>Loading videos...</p>}
-              {items?.length === 0 && !loadingItems && <p>No videos in this playlist.</p>}
+              {loadingItems && <p className="hint-text">Loading videos...</p>}
+              {items?.length === 0 && !loadingItems && <p className="hint-text">No videos in this playlist.</p>}
               {items?.map((v) => (
                 <VideoCard key={v.videoId} video={v} />
               ))}
@@ -245,15 +382,46 @@ export default function App() {
 
         {loggedIn && view === 'tierBoard' && (
           <section id="tier-board-view">
-            <button id="back-btn" onClick={backToPlaylists}>
+            <button className="btn btn-ghost back-btn" onClick={backToPlaylists}>
               &larr; Back to playlists
             </button>
             <h2>{selectedCategory}</h2>
+            <p className="hint-text tier-hint">Drag a video into another tier to move it, then sync when you're ready.</p>
             <div className="tier-board">
               {TIER_ORDER.filter((t) => tierGroups[selectedCategory]?.[t]).map((t) => (
-                <TierRow key={t} tier={t} items={tierItems[t]} loading={tierLoading[t]} />
+                <TierRow
+                  key={t}
+                  tier={t}
+                  items={tierItems[t]}
+                  loading={tierLoading[t]}
+                  isDragOver={dragOverTier === t}
+                  draggedVideoId={draggedVideoId}
+                  onDragOver={(e) => handleRowDragOver(e, t)}
+                  onDragLeave={() => handleRowDragLeave(t)}
+                  onDrop={(e) => handleRowDrop(e, t)}
+                  onThumbDragStart={handleThumbDragStart}
+                  onThumbDragEnd={handleThumbDragEnd}
+                />
               ))}
             </div>
+
+            {pendingMoves.length > 0 && (
+              <div className="sync-bar">
+                <span className="sync-count">
+                  {pendingMoves.length} change{pendingMoves.length === 1 ? '' : 's'} pending
+                </span>
+                <div className="sync-actions">
+                  <button className="btn btn-ghost" onClick={discardChanges} disabled={syncStatus === 'syncing'}>
+                    Discard
+                  </button>
+                  <button className="btn btn-primary" onClick={syncChanges} disabled={syncStatus === 'syncing'}>
+                    {syncStatus === 'syncing' ? 'Syncing...' : 'Sync to YouTube'}
+                  </button>
+                </div>
+                {syncStatus === 'done' && <span className="sync-status sync-status-done">✓ Synced</span>}
+                {syncStatus === 'error' && <span className="sync-status sync-status-error">✕ Sync failed</span>}
+              </div>
+            )}
           </section>
         )}
       </main>
