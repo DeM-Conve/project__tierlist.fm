@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import {
   ChevronDown,
   ChevronUp,
+  PictureInPicture2,
   Pause,
   Play,
   SkipBack,
@@ -34,10 +35,14 @@ export default function PlayerDock({
 }) {
   const cardRef = useRef(null);
   const playerRef = useRef(null);
+  const focusMediaRef = useRef(null);
+  const pipWindowRef = useRef(null);
   const [isPlaying, setIsPlaying] = useState(true);
   const [progressPct, setProgressPct] = useState(0);
   const [isMuted, setIsMuted] = useState(false);
+  const [isPipActive, setIsPipActive] = useState(false);
   const expanded = mode === 'expanded';
+  const pipSupported = typeof window !== 'undefined' && 'documentPictureInPicture' in window;
 
   useEffect(() => {
     if (expanded) cardRef.current?.focus();
@@ -139,6 +144,64 @@ export default function PlayerDock({
     setProgressPct(ratio * 100);
   }
 
+  // Real browser Picture-in-Picture, the same feature YouTube's own
+  // "miniplayer" button uses - not something faked with a floating div.
+  // The IFrame embed isn't a <video> element, so the classic
+  // video.requestPictureInPicture() API doesn't apply; the Document
+  // Picture-in-Picture API instead moves an actual DOM node (here, the
+  // video area) into a real always-on-top OS window, then back when it's
+  // closed. Chrome-only for now, so the button only appears when supported.
+  async function togglePiP() {
+    if (!pipSupported) return;
+    if (pipWindowRef.current) {
+      pipWindowRef.current.close();
+      return;
+    }
+    const el = focusMediaRef.current;
+    if (!el) return;
+
+    const pipWindow = await window.documentPictureInPicture.requestWindow({
+      width: 320,
+      height: 180,
+    });
+    [...document.styleSheets].forEach((sheet) => {
+      try {
+        const rules = [...sheet.cssRules].map((r) => r.cssText).join('\n');
+        const style = pipWindow.document.createElement('style');
+        style.textContent = rules;
+        pipWindow.document.head.appendChild(style);
+      } catch {
+        if (sheet.href) {
+          const link = pipWindow.document.createElement('link');
+          link.rel = 'stylesheet';
+          link.href = sheet.href;
+          pipWindow.document.head.appendChild(link);
+        }
+      }
+    });
+    pipWindow.document.body.style.margin = '0';
+    pipWindow.document.body.style.background = '#000';
+    pipWindow.document.body.append(el);
+    pipWindowRef.current = pipWindow;
+    setIsPipActive(true);
+
+    pipWindow.addEventListener(
+      'pagehide',
+      () => {
+        cardRef.current?.querySelector('.focus-media-slot')?.append(el);
+        pipWindowRef.current = null;
+        setIsPipActive(false);
+      },
+      { once: true }
+    );
+  }
+
+  // If the whole dock unmounts (playback fully stopped) while PiP is open,
+  // close the floating window with it rather than leaving it orphaned.
+  useEffect(() => {
+    return () => pipWindowRef.current?.close();
+  }, []);
+
   return (
     <div className={`player-dock ${expanded ? 'player-dock-expanded' : 'player-dock-mini'}`}>
       <div className="player-dock-backdrop" onClick={onMinimize} />
@@ -175,29 +238,34 @@ export default function PlayerDock({
           )}
         </div>
 
-        <div className="focus-media" onClick={!expanded ? onExpand : undefined}>
-          <div className="focus-embed">
-            <EmbeddedPlayer
-              key={video.videoId}
-              videoId={video.videoId}
-              onEnded={hasNext ? onNext : undefined}
-              onPlayerReady={(p) => {
-                playerRef.current = p;
-              }}
-              onPlayingChange={setIsPlaying}
-            />
-          </div>
+        <div className="focus-media-slot">
+          {isPipActive && (
+            <div className="focus-media-pip-placeholder">Playing in Picture-in-Picture</div>
+          )}
+          <div className="focus-media" ref={focusMediaRef} onClick={!expanded ? onExpand : undefined}>
+            <div className="focus-embed">
+              <EmbeddedPlayer
+                key={video.videoId}
+                videoId={video.videoId}
+                onEnded={hasNext ? onNext : undefined}
+                onPlayerReady={(p) => {
+                  playerRef.current = p;
+                }}
+                onPlayingChange={setIsPlaying}
+              />
+            </div>
 
-          {expanded && hasPrev && (
-            <button className="focus-nav focus-nav-prev" onClick={onPrev} aria-label="Previous video">
-              ‹
-            </button>
-          )}
-          {expanded && hasNext && (
-            <button className="focus-nav focus-nav-next" onClick={onNext} aria-label="Next video">
-              ›
-            </button>
-          )}
+            {expanded && hasPrev && (
+              <button className="focus-nav focus-nav-prev" onClick={onPrev} aria-label="Previous video">
+                ‹
+              </button>
+            )}
+            {expanded && hasNext && (
+              <button className="focus-nav focus-nav-next" onClick={onNext} aria-label="Next video">
+                ›
+              </button>
+            )}
+          </div>
         </div>
 
         <div className="player-dock-body">
@@ -244,13 +312,25 @@ export default function PlayerDock({
           )}
 
           {!expanded && (
-            <button
-              className="player-dock-icon-btn player-dock-mute-btn"
-              onClick={toggleMute}
-              aria-label={isMuted ? 'Unmute' : 'Mute'}
-            >
-              {isMuted ? <VolumeX size={17} /> : <Volume2 size={17} />}
-            </button>
+            <div className="player-dock-secondary">
+              <button
+                className="player-dock-icon-btn"
+                onClick={toggleMute}
+                aria-label={isMuted ? 'Unmute' : 'Mute'}
+              >
+                {isMuted ? <VolumeX size={17} /> : <Volume2 size={17} />}
+              </button>
+              {pipSupported && (
+                <button
+                  className={`player-dock-icon-btn${isPipActive ? ' player-dock-icon-btn-active' : ''}`}
+                  onClick={togglePiP}
+                  aria-label={isPipActive ? 'Exit Picture-in-Picture' : 'Picture-in-Picture'}
+                  title="Picture-in-Picture"
+                >
+                  <PictureInPicture2 size={17} />
+                </button>
+              )}
+            </div>
           )}
         </div>
 

@@ -826,7 +826,7 @@
   align-items: center;
   gap: 2px;
 }
-.player-dock-mute-btn { grid-column: 3; }
+.player-dock-secondary { grid-column: 3; display: flex; align-items: center; gap: 2px; }
 .player-dock-icon-btn {
   display: flex;
   align-items: center;
@@ -841,6 +841,20 @@
 }
 .player-dock-icon-btn:hover:not(:disabled) { color: var(--text); background: var(--surface-2); }
 .player-dock-icon-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+.player-dock-icon-btn-active { color: var(--accent); }
+.focus-media-slot { position: relative; }
+.focus-media-pip-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  aspect-ratio: 1 / 1;
+  font-size: 10px;
+  color: var(--text-faint);
+  background: var(--surface-2);
+  border-radius: 4px;
+}
+.player-dock-mini .focus-media-pip-placeholder { width: 44px; }
 .player-dock-play-btn {
   width: 34px;
   height: 34px;
