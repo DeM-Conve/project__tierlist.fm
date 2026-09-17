@@ -1,11 +1,61 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { DEFAULT_DUEL_STRATEGY, DUEL_STRATEGIES, DUEL_STRATEGY_LABELS } from '../duel';
 import { SETTINGS, getSetting, setSetting } from '../settings';
+import { TIER_COLORS } from '../tiers';
+import EmbeddedPlayer from './EmbeddedPlayer';
+
+function DuelCard({ video, tier, isPreviewing, onTogglePreview, onChoose }) {
+  return (
+    <div className="duel-card" onClick={onChoose}>
+      <div className="duel-card-media">
+        {tier && (
+          <span className="tier-chip duel-card-tier" style={{ background: TIER_COLORS[tier] }}>
+            {tier}
+          </span>
+        )}
+        {isPreviewing ? (
+          <EmbeddedPlayer videoId={video.videoId} autoplay />
+        ) : (
+          <img src={video.thumbnail || ''} alt={video.title} />
+        )}
+        <button
+          className="duel-card-preview-btn"
+          onClick={(e) => {
+            e.stopPropagation();
+            onTogglePreview();
+          }}
+        >
+          {isPreviewing ? '✕ Stop' : '▶ Preview'}
+        </button>
+      </div>
+      <p className="duel-card-title">{video.title}</p>
+      <p className="hint-text">{video.channelTitle}</p>
+    </div>
+  );
+}
 
 export default function DuelView({ videos, runs, tierSizes, onComplete, onCancel }) {
   const [strategyKey, setStrategyKeyState] = useState(() =>
     getSetting(SETTINGS.duelStrategy, DEFAULT_DUEL_STRATEGY)
   );
+  const [currentPair, setCurrentPair] = useState(null);
+  const [progress, setProgress] = useState({ completed: 0, total: 0 });
+  const [spine, setSpine] = useState(null);
+  const [previewing, setPreviewing] = useState(null);
+
+  const strategyRef = useRef(null);
+  const videoMapRef = useRef(new Map());
+  videoMapRef.current = new Map(videos.map((v) => [v.videoId, v]));
+
+  const tierOfId = useMemo(() => {
+    const map = {};
+    tierSizes.forEach((entry, i) => {
+      (runs[i] || []).forEach((id) => {
+        map[id] = entry.tier;
+      });
+    });
+    return map;
+  }, [runs, tierSizes]);
 
   // Picking a strategy here also updates the persisted default, so Settings
   // and the in-session dropdown always agree on "what happens next time."
@@ -13,17 +63,11 @@ export default function DuelView({ videos, runs, tierSizes, onComplete, onCancel
     setStrategyKeyState(key);
     setSetting(SETTINGS.duelStrategy, key);
   }
-  const [currentPair, setCurrentPair] = useState(null);
-  const [progress, setProgress] = useState({ completed: 0, total: 0 });
-  const [spine, setSpine] = useState(null);
-
-  const strategyRef = useRef(null);
-  const videoMapRef = useRef(new Map());
-  videoMapRef.current = new Map(videos.map((v) => [v.videoId, v]));
 
   function advance(strategy) {
     const pair = strategy.nextPair();
     setProgress(strategy.getProgress());
+    setPreviewing(null);
     if (!pair) {
       setCurrentPair(null);
       setSpine(strategy.getSpine());
@@ -112,7 +156,9 @@ export default function DuelView({ videos, runs, tierSizes, onComplete, onCancel
             <div className="duel-progress-fill" style={{ width: `${pct}%` }} />
           </div>
           <span className="hint-text">
-            {spine ? 'All duels settled' : `${progress.completed} / ${progress.total} duels`}
+            {spine
+              ? 'All duels settled'
+              : `${progress.completed} of ${progress.total} duels · ${pct}% settled`}
           </span>
         </div>
 
@@ -133,17 +179,21 @@ export default function DuelView({ videos, runs, tierSizes, onComplete, onCancel
         <>
           <h1 className="duel-question">Which one deserves the higher tier?</h1>
           <div className="duel-pair">
-            <button className="duel-card" onClick={() => chooseWinner(a.videoId)}>
-              <img src={a.thumbnail || ''} alt={a.title} />
-              <p className="duel-card-title">{a.title}</p>
-              <p className="hint-text">{a.channelTitle}</p>
-            </button>
+            <DuelCard
+              video={a}
+              tier={tierOfId[a.videoId]}
+              isPreviewing={previewing === a.videoId}
+              onTogglePreview={() => setPreviewing((p) => (p === a.videoId ? null : a.videoId))}
+              onChoose={() => chooseWinner(a.videoId)}
+            />
             <span className="duel-or">or</span>
-            <button className="duel-card" onClick={() => chooseWinner(b.videoId)}>
-              <img src={b.thumbnail || ''} alt={b.title} />
-              <p className="duel-card-title">{b.title}</p>
-              <p className="hint-text">{b.channelTitle}</p>
-            </button>
+            <DuelCard
+              video={b}
+              tier={tierOfId[b.videoId]}
+              isPreviewing={previewing === b.videoId}
+              onTogglePreview={() => setPreviewing((p) => (p === b.videoId ? null : b.videoId))}
+              onChoose={() => chooseWinner(b.videoId)}
+            />
           </div>
           <p className="focus-hint">
             ← left wins · → right wins{strategy?.supportsSkip ? ' · space too close to call' : ''} · u undo

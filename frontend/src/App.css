@@ -482,7 +482,7 @@
 
 /* Duel view */
 .duel-view {
-  max-width: 760px;
+  max-width: 980px;
   margin: 0 auto;
   padding-top: 24px;
   text-align: center;
@@ -537,7 +537,7 @@
 }
 .duel-card {
   flex: 1;
-  max-width: 320px;
+  max-width: 420px;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 8px;
@@ -547,14 +547,41 @@
   transition: border-color 0.15s ease, transform 0.1s ease;
 }
 .duel-card:hover { border-color: var(--accent); transform: translateY(-2px); }
-.duel-card img {
-  width: 100%;
+.duel-card-media {
+  position: relative;
   aspect-ratio: 16/9;
+  border-radius: 8px 8px 0 0;
+  overflow: hidden;
+  background: #000;
+  margin-bottom: 10px;
+}
+.duel-card-media img {
+  width: 100%;
+  height: 100%;
   object-fit: cover;
   display: block;
-  border-radius: 8px 8px 0 0;
   background: var(--surface-2);
-  margin-bottom: 10px;
+}
+.duel-card-tier {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  z-index: 2;
+}
+.duel-card-preview-btn {
+  position: absolute;
+  bottom: 8px;
+  right: 8px;
+  z-index: 2;
+  background: rgba(0, 0, 0, 0.75);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  color: #fff;
+  font-family: var(--font-body);
+  font-size: 12px;
+  font-weight: 600;
+  padding: 5px 10px;
+  border-radius: 6px;
+  cursor: pointer;
 }
 .duel-card-title {
   font-weight: 600;
