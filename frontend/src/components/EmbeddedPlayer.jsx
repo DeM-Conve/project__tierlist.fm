@@ -7,15 +7,19 @@ import { loadYouTubeApi } from '../youtubePlayer';
 // element were the one React manages directly, React would later try to
 // clean up a node that's already gone. So the API is only ever handed a
 // plain child we create and manage ourselves, one layer below React's div.
-export default function EmbeddedPlayer({ videoId, autoplay = true, onEnded }) {
+export default function EmbeddedPlayer({ videoId, autoplay = true, onEnded, onPlayerReady, onPlayingChange }) {
   const containerRef = useRef(null);
   const playerRef = useRef(null);
   const [status, setStatus] = useState('loading'); // loading | ready | blocked
 
-  // Kept in a ref so the player isn't torn down and recreated just because a
-  // parent re-render passed a new onEnded closure - only videoId should do that.
+  // Kept in refs so the player isn't torn down and recreated just because a
+  // parent re-render passed new closures - only videoId should do that.
   const onEndedRef = useRef(onEnded);
   onEndedRef.current = onEnded;
+  const onPlayerReadyRef = useRef(onPlayerReady);
+  onPlayerReadyRef.current = onPlayerReady;
+  const onPlayingChangeRef = useRef(onPlayingChange);
+  onPlayingChangeRef.current = onPlayingChange;
 
   useEffect(() => {
     let cancelled = false;
@@ -32,12 +36,17 @@ export default function EmbeddedPlayer({ videoId, autoplay = true, onEnded }) {
         videoId,
         playerVars: { autoplay: autoplay ? 1 : 0, rel: 0 },
         events: {
-          onReady: () => !cancelled && setStatus('ready'),
+          onReady: () => {
+            if (cancelled) return;
+            setStatus('ready');
+            onPlayerReadyRef.current?.(playerRef.current);
+          },
           onError: () => !cancelled && setStatus('blocked'),
           onStateChange: (e) => {
-            if (!cancelled && e.data === window.YT.PlayerState.ENDED) {
-              onEndedRef.current?.();
-            }
+            if (cancelled) return;
+            if (e.data === window.YT.PlayerState.ENDED) onEndedRef.current?.();
+            if (e.data === window.YT.PlayerState.PLAYING) onPlayingChangeRef.current?.(true);
+            if (e.data === window.YT.PlayerState.PAUSED) onPlayingChangeRef.current?.(false);
           },
         },
       });
@@ -51,6 +60,7 @@ export default function EmbeddedPlayer({ videoId, autoplay = true, onEnded }) {
         // already gone (e.g. API never finished loading before unmount)
       }
       playerRef.current = null;
+      onPlayerReadyRef.current?.(null);
       if (containerRef.current) containerRef.current.innerHTML = '';
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps

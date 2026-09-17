@@ -5,7 +5,7 @@ import Sidebar from './components/Sidebar';
 import PlaylistsView from './components/PlaylistsView';
 import ItemsView from './components/ItemsView';
 import TierBoardView from './components/TierBoardView';
-import VideoFocusModal from './components/VideoFocusModal';
+import PlayerDock from './components/PlayerDock';
 import CommandPalette from './components/CommandPalette';
 import DuelView from './components/DuelView';
 import SettingsView from './components/SettingsView';
@@ -42,6 +42,11 @@ export default function App() {
   // make "next" jump into a different tier than you were actually browsing.
   const [focusQueue, setFocusQueue] = useState(null);
   const [isShuffling, setIsShuffling] = useState(false);
+  // 'expanded' (full-screen modal) or 'mini' (YouTube-Music-style bottom
+  // bar that doesn't block the rest of the app). The player itself is never
+  // unmounted when switching between the two - only its layout changes -
+  // so minimizing keeps the video/audio playing in the background.
+  const [playerMode, setPlayerMode] = useState('expanded');
   const [paletteOpen, setPaletteOpen] = useState(false);
 
   const originalTierOfRef = useRef({});
@@ -428,13 +433,25 @@ export default function App() {
     // order, so later tier reassignments can't reshuffle where "next" goes.
     setFocusQueue(focusSequence.map((e) => e.video.videoId));
     setIsShuffling(false);
+    setPlayerMode('expanded');
     setFocusedVideo({ tier, videoId });
   }
 
+  // Fully stops playback - as opposed to minimizePlayer, which keeps it
+  // running in the background.
   function closeFocus() {
     setFocusedVideo(null);
     setFocusQueue(null);
     setIsShuffling(false);
+    setPlayerMode('expanded');
+  }
+
+  function minimizePlayer() {
+    setPlayerMode('mini');
+  }
+
+  function expandPlayer() {
+    setPlayerMode('expanded');
   }
 
   function startShufflePlay() {
@@ -446,6 +463,7 @@ export default function App() {
     }
     setFocusQueue(ids);
     setIsShuffling(true);
+    setPlayerMode('expanded');
     const first = videoLookup.get(ids[0]);
     setFocusedVideo({ tier: first.tier, videoId: first.video.videoId });
   }
@@ -609,14 +627,17 @@ export default function App() {
       </main>
 
       {focusedVideoData && (
-        <VideoFocusModal
+        <PlayerDock
+          mode={playerMode}
           video={focusedVideoData}
           currentTier={focusedVideo.tier}
           availableTiers={focusedAvailableTiers}
           hasPrev={focusedSeqIndex > 0}
           hasNext={focusedSeqIndex < activeSequence.length - 1}
           isShuffling={isShuffling}
-          onClose={closeFocus}
+          onStop={closeFocus}
+          onMinimize={minimizePlayer}
+          onExpand={expandPlayer}
           onPrev={() => navigateFocus(-1)}
           onNext={() => navigateFocus(1)}
           onChangeTier={changeFocusedTier}

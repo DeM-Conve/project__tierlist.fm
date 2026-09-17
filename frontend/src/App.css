@@ -681,8 +681,10 @@
   }
   .canvas { padding: 72px 20px 100px; }
   .tier-thumb, .tier-thumb-skeleton { width: 128px; }
-  .focus-card { width: 94vw; }
+  .player-dock-expanded .player-dock-card { width: 94vw; }
   .focus-nav { display: none; }
+  .player-dock-mini .focus-media { flex-basis: 96px; width: 96px; }
+  .player-dock-mini .focus-info .hint-text { display: none; }
 }
 
 /* Shared modal overlay (focus card + command palette) */
@@ -698,8 +700,28 @@
   padding: 20px;
 }
 
-/* Video focus card */
-.focus-card {
+/* Player dock: expanded (full-screen, blocks the app underneath) vs mini
+   (YouTube-Music-style bottom bar, app stays fully usable). Same DOM shape
+   in both modes - only layout changes - so the embedded player is never
+   torn down and rebuilt when switching between them. */
+.player-dock-expanded {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 50;
+  padding: 20px;
+}
+.player-dock-expanded .player-dock-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(8, 7, 6, 0.75);
+  backdrop-filter: blur(4px);
+}
+.player-dock-mini .player-dock-backdrop { display: none; }
+
+.player-dock-card {
   position: relative;
   width: 100%;
   max-width: 1080px;
@@ -712,11 +734,39 @@
   padding: 24px;
   box-shadow: 0 24px 64px rgba(0, 0, 0, 0.5);
 }
-.focus-card:focus { outline: none; }
-.modal-close {
+.player-dock-card:focus { outline: none; }
+
+.player-dock-mini {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 40;
+}
+.player-dock-mini .player-dock-card {
+  max-width: none;
+  max-height: none;
+  overflow: visible;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 8px 16px;
+  border-width: 1px 0 0;
+  border-radius: 0;
+  box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.4);
+}
+
+.player-dock-toolbar {
   position: absolute;
   top: 12px;
   right: 12px;
+  display: flex;
+  gap: 8px;
+  z-index: 2;
+}
+.player-dock-mini .player-dock-toolbar { position: static; order: 3; }
+
+.modal-close {
   background: var(--surface-2);
   border: 1px solid var(--border);
   color: var(--text-dim);
@@ -725,9 +775,51 @@
   border-radius: 50%;
   cursor: pointer;
   font-size: 14px;
-  z-index: 2;
 }
 .modal-close:hover { color: var(--text); }
+
+.player-dock-mini .focus-media {
+  flex: 0 0 160px;
+  width: 160px;
+  margin-bottom: 0;
+  cursor: pointer;
+}
+.player-dock-mini .focus-embed { border-radius: 4px; }
+.player-dock-mini .focus-nav { display: none; }
+
+.player-dock-body { min-width: 0; }
+.player-dock-mini .player-dock-body {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex: 1;
+  min-width: 0;
+}
+.player-dock-mini .focus-info { min-width: 0; cursor: pointer; }
+.player-dock-mini .focus-info h2 {
+  font-size: 14px;
+  margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.player-dock-mini .focus-info .hint-text {
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.player-dock-controls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 0 0 auto;
+}
+.player-dock-controls .btn {
+  padding: 6px 12px;
+  font-size: 15px;
+}
+.player-dock-controls .btn:disabled { opacity: 0.35; }
 .focus-media {
   position: relative;
   margin-bottom: 16px;
