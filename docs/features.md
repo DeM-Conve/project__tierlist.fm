@@ -20,20 +20,26 @@
 - Changes are staged locally first; nothing touches real YouTube data until you sync.
 
 ## Sync to YouTube
-- "N pending" / "Discard" / "Push N to YouTube" controls appear only when there are real staged moves.
-- Clicking "N pending" opens a popup itemizing every staged move (video, from tier → to tier).
+- "N pending" / "Discard" / "Push to YouTube" controls appear only when there are real staged changes, grouped in their own pill in the board header, separate from general board utilities (Shuffle play, Start duel).
+- Clicking "N pending" opens a popup itemizing every staged change (video, from tier → to tier, or a duplicate removal - see below).
 - "Push to YouTube" calls the backend, which inserts each video into its new playlist before removing it from the old one (so a failed delete never loses a video). Partial failures are reported per item.
 - "Discard" reverts the board back to what's actually on YouTube.
 
-## Duplicate detection
-- If the same video genuinely exists in two of a board's real tier playlists at once, it's tagged with a "Duplicate" badge on its thumbnail (hover for why) instead of being misreported as a false pending move.
+## Duplicate cleanup
+- If the same video genuinely exists in two of a board's real tier playlists at once, the lower-tier copy is automatically staged as a pending removal (kept: the highest tier it's in; removed: every other copy) - no manual action needed to flag it.
+- It shows up in the pending popup as `tier → removed (duplicate)`, and the thumbnail is tagged "Removing (duplicate)" until you sync.
+- "Push to YouTube" actually deletes the redundant playlist entry (no bogus re-insert into the same playlist).
 
 ## Video focus modal
 - Click any thumbnail to open a modal with a real, playable embedded YouTube player (via the official IFrame Player API — not a raw iframe), so playback failures (embedding disabled) are detected and shown with a clear fallback + "Open on YouTube" link.
 - Keyboard shortcuts: `Esc` close, `←`/`→` or `h`/`l` (vim-style) to move prev/next, `Shift+1`–`Shift+N` to reassign the current video's tier.
 - Navigation walks the whole board in tier order — reaching the end of one tier's videos rolls straight into the next tier instead of stopping.
+- The browsing order is frozen the moment the modal opens, so reassigning a video's tier mid-browse never disturbs where "next" takes you.
 - When a video finishes playing, it automatically advances to the next one (same tier first, then the next tier).
 - Tier pills at the bottom show the current tier and let you reassign with a click as well as a shortcut.
+
+## Shuffle play
+- A "🔀 Shuffle play" button on each tier board opens the focus modal on a random video from that board and auto-advances through a shuffled order (a "🔀 Shuffle" badge marks the session as shuffled). Uses the same auto-advance-on-end and prev/next controls as normal browsing.
 
 ## Command palette
 - `Cmd/Ctrl+K` opens a fuzzy-searchable palette to jump straight to any tier board or playlist, or trigger contextual actions (start a duel, sync/discard pending changes) without leaving the keyboard.

@@ -144,6 +144,14 @@
   transition: background 0.1s ease, color 0.1s ease;
 }
 .sidebar-item:hover { background: var(--surface-2); color: var(--text); }
+/* The global :focus-visible ring (index.css) sits 2px outside the element
+   with square corners - fine for most controls, but on a lone rounded nav
+   item like this it reads as a disconnected floating box rather than a
+   focus indicator. Pull it inside and round it to match instead. */
+.sidebar-item:focus-visible {
+  outline-offset: -2px;
+  border-radius: var(--radius);
+}
 .sidebar-item-active {
   background: var(--surface-3);
   color: var(--text);
