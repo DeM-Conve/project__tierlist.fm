@@ -37,6 +37,9 @@
   display: flex;
   flex-direction: column;
   padding: 24px 16px;
+  /* Reserves space for the mini player bar (0px when it isn't showing) so
+     the footer - Settings/Log out - never ends up sitting underneath it. */
+  padding-bottom: calc(24px + var(--player-dock-height));
   background: var(--surface);
   border-right: 1px solid var(--border-soft);
   position: sticky;
@@ -168,7 +171,7 @@
 .canvas {
   flex: 1;
   min-width: 0;
-  padding: 36px 40px 120px;
+  padding: 36px 40px calc(120px + var(--player-dock-height));
 }
 
 .canvas-header { margin-bottom: 20px; }
@@ -660,11 +663,10 @@
     background: rgba(0, 0, 0, 0.5);
     z-index: 35;
   }
-  .canvas { padding: 72px 20px 100px; }
+  .canvas { padding: 72px 20px calc(100px + var(--player-dock-height)); }
   .tier-thumb, .tier-thumb-skeleton { width: 128px; }
   .player-dock-expanded .player-dock-card { width: 94vw; }
   .focus-nav { display: none; }
-  .player-dock-mini .focus-media { flex-basis: 96px; width: 96px; }
   .player-dock-mini .focus-info .hint-text { display: none; }
 }
 
@@ -724,25 +726,39 @@
   bottom: 0;
   z-index: 40;
 }
+/* Slim, YouTube-Music-style strip - not a shrunken version of the
+   full-screen player. Compact square art, small text, small icon
+   buttons, ~56px tall total instead of the ~106px a 16:9 thumbnail at
+   full padding worked out to. */
 .player-dock-mini .player-dock-card {
   max-width: none;
   max-height: none;
   overflow: visible;
   display: flex;
   align-items: center;
-  gap: 14px;
-  padding: 8px 16px;
+  gap: 10px;
+  padding: 6px 12px;
   border-width: 1px 0 0;
   border-radius: 0;
   box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.4);
 }
-.player-dock-progress {
+.player-dock-progress-track {
   position: absolute;
   top: 0;
+  left: 0;
+  right: 0;
+  height: 6px;
+  margin-top: -3px;
+  cursor: pointer;
+}
+.player-dock-progress {
+  position: absolute;
+  top: 3px;
   left: 0;
   height: 2px;
   background: var(--accent);
   transition: width 0.2s linear;
+  pointer-events: none;
 }
 
 .player-dock-toolbar {
@@ -754,6 +770,7 @@
   z-index: 2;
 }
 .player-dock-mini .player-dock-toolbar { position: static; order: 3; }
+.player-dock-mini .player-dock-toolbar .modal-close { width: 26px; height: 26px; }
 
 .modal-close {
   background: var(--surface-2);
@@ -768,36 +785,36 @@
 .modal-close:hover { color: var(--text); }
 
 .player-dock-mini .focus-media {
-  flex: 0 0 160px;
-  width: 160px;
+  flex: 0 0 44px;
+  width: 44px;
   margin-bottom: 0;
   cursor: pointer;
 }
-.player-dock-mini .focus-embed { border-radius: 4px; }
+.player-dock-mini .focus-embed { aspect-ratio: 1 / 1; border-radius: 4px; }
 .player-dock-mini .focus-nav { display: none; }
 
 .player-dock-body { min-width: 0; }
-/* Three equal regions (title | controls | spacer) so the controls sit
-   centered in the bar's remaining width, the way YouTube Music's own
-   bottom bar does, instead of bunched right next to the thumbnail. */
+/* Three regions (title | controls | mute) so the controls sit centered
+   in the bar's remaining width, the way YouTube Music's own bottom bar
+   does, instead of bunched right next to the thumbnail. */
 .player-dock-mini .player-dock-body {
   display: grid;
-  grid-template-columns: 1fr auto 1fr;
+  grid-template-columns: 1fr auto auto;
   align-items: center;
-  gap: 16px;
+  gap: 12px;
   flex: 1;
   min-width: 0;
 }
 .player-dock-mini .focus-info { grid-column: 1; min-width: 0; cursor: pointer; }
 .player-dock-mini .focus-info h2 {
-  font-size: 14px;
+  font-size: 13px;
   margin: 0;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 .player-dock-mini .focus-info .hint-text {
-  font-size: 12px;
+  font-size: 11px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -806,14 +823,15 @@
   grid-column: 2;
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 2px;
 }
+.player-dock-mute-btn { grid-column: 3; }
 .player-dock-icon-btn {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 34px;
-  height: 34px;
+  width: 30px;
+  height: 30px;
   border-radius: 50%;
   border: none;
   background: none;
@@ -823,8 +841,8 @@
 .player-dock-icon-btn:hover:not(:disabled) { color: var(--text); background: var(--surface-2); }
 .player-dock-icon-btn:disabled { opacity: 0.3; cursor: not-allowed; }
 .player-dock-play-btn {
-  width: 38px;
-  height: 38px;
+  width: 34px;
+  height: 34px;
   color: var(--text);
   background: var(--surface-2);
 }

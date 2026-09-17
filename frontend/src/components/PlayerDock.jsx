@@ -1,5 +1,15 @@
 import { useEffect, useRef, useState } from 'react';
-import { ChevronDown, ChevronUp, Pause, Play, SkipBack, SkipForward, X } from 'lucide-react';
+import {
+  ChevronDown,
+  ChevronUp,
+  Pause,
+  Play,
+  SkipBack,
+  SkipForward,
+  Volume2,
+  VolumeX,
+  X,
+} from 'lucide-react';
 import { TIER_COLORS } from '../tiers';
 import EmbeddedPlayer from './EmbeddedPlayer';
 
@@ -26,11 +36,37 @@ export default function PlayerDock({
   const playerRef = useRef(null);
   const [isPlaying, setIsPlaying] = useState(true);
   const [progressPct, setProgressPct] = useState(0);
+  const [isMuted, setIsMuted] = useState(false);
   const expanded = mode === 'expanded';
 
   useEffect(() => {
     if (expanded) cardRef.current?.focus();
   }, [expanded]);
+
+  // The mini bar is fixed to the bottom of the viewport, so anything else
+  // fixed/scrollable at the page's own bottom (the sidebar's footer, the
+  // last row of a tier board, ...) would otherwise render underneath it.
+  // Expose its real, measured height as a CSS variable so the rest of the
+  // layout can reserve exactly that much space - only while it's actually
+  // showing as a bar, and never a guessed/hardcoded pixel value.
+  useEffect(() => {
+    const root = document.documentElement;
+    if (expanded) {
+      root.style.setProperty('--player-dock-height', '0px');
+      return;
+    }
+    const el = cardRef.current;
+    if (!el) return;
+    const observer = new ResizeObserver(([entry]) => {
+      root.style.setProperty('--player-dock-height', `${entry.contentRect.height}px`);
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [expanded]);
+
+  useEffect(() => {
+    return () => document.documentElement.style.setProperty('--player-dock-height', '0px');
+  }, []);
 
   // The IFrame API doesn't push time-update events, so the mini bar's
   // progress line has to be polled from the player instead.
@@ -85,6 +121,24 @@ export default function PlayerDock({
     else player.playVideo?.();
   }
 
+  function toggleMute() {
+    const player = playerRef.current;
+    if (!player) return;
+    if (isMuted) player.unMute?.();
+    else player.mute?.();
+    setIsMuted(!isMuted);
+  }
+
+  function seek(e) {
+    const player = playerRef.current;
+    const duration = player?.getDuration?.();
+    if (!duration) return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    const ratio = Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width));
+    player.seekTo(ratio * duration, true);
+    setProgressPct(ratio * 100);
+  }
+
   return (
     <div className={`player-dock ${expanded ? 'player-dock-expanded' : 'player-dock-mini'}`}>
       <div className="player-dock-backdrop" onClick={onMinimize} />
@@ -94,7 +148,11 @@ export default function PlayerDock({
         ref={cardRef}
         onClick={(e) => e.stopPropagation()}
       >
-        {!expanded && <div className="player-dock-progress" style={{ width: `${progressPct}%` }} />}
+        {!expanded && (
+          <div className="player-dock-progress-track" onClick={seek}>
+            <div className="player-dock-progress" style={{ width: `${progressPct}%` }} />
+          </div>
+        )}
 
         <div className="player-dock-toolbar">
           {expanded ? (
@@ -183,6 +241,16 @@ export default function PlayerDock({
                 <SkipForward size={18} fill="currentColor" />
               </button>
             </div>
+          )}
+
+          {!expanded && (
+            <button
+              className="player-dock-icon-btn player-dock-mute-btn"
+              onClick={toggleMute}
+              aria-label={isMuted ? 'Unmute' : 'Mute'}
+            >
+              {isMuted ? <VolumeX size={17} /> : <Volume2 size={17} />}
+            </button>
           )}
         </div>
 
