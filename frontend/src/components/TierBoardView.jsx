@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ActionIcon, Badge, Button, Card, Group, Paper, Stack, Text, TextInput, Title } from '@mantine/core';
-import { ArrowUpRight, Search, Shuffle } from 'lucide-react';
+import { ArrowUpRight, Shuffle } from 'lucide-react';
 import { TIER_COLORS, TIER_ORDER } from '../tiers';
 
 // Where among the existing thumbnails does clientX fall? Used so a drop
@@ -228,11 +228,13 @@ export default function TierBoardView({
     pendingMoves.filter((m) => m.kind === 'dedupe').map((m) => `${m.tier}:${m.video.videoId}`)
   );
 
-  // Vim/Vimium-style "/" find: "/" opens it, Enter (in the box) or n/N
-  // (once you've clicked away) step through matches, Escape closes it.
-  // Matches are highlighted in place and scrolled to, rather than filtering
-  // the board down to just matches - the tier/dedupe context around a
-  // result stays visible.
+  // Vim-style "/" find: "/" opens it and is typed straight into the box as
+  // the literal command-line prefix, the way vim's own "/" shows up in its
+  // command line - deleting it (e.g. select-all + backspace) cancels the
+  // search entirely rather than leaving a bare, unprefixed query active.
+  // Enter (in the box) or n/N (once you've clicked away) step through
+  // matches, Escape closes it. Each tier row filters down to just its
+  // matches rather than merely highlighting them in place.
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [matchIndex, setMatchIndex] = useState(0);
@@ -247,11 +249,27 @@ export default function TierBoardView({
     return list;
   }, [tierGroups, category, tierItems]);
 
+  // The box's value is the literal vim command line - it always starts
+  // with the "/" that opened it, and the real query is whatever follows.
+  const queryText = searchQuery.slice(1);
+
   const matches = useMemo(() => {
-    const q = searchQuery.trim().toLowerCase();
+    const q = queryText.trim().toLowerCase();
     if (!q) return [];
     return searchableEntries.filter((e) => e.video.title.toLowerCase().includes(q));
-  }, [searchableEntries, searchQuery]);
+  }, [searchableEntries, queryText]);
+
+  function handleSearchChange(value) {
+    if (!value.startsWith('/')) {
+      // The leading "/" itself got deleted (e.g. select-all + backspace) -
+      // same as vim, clearing the command line cancels the search outright
+      // rather than leaving an unprefixed query active.
+      setSearchOpen(false);
+      setSearchQuery('');
+      return;
+    }
+    setSearchQuery(value);
+  }
 
   useEffect(() => {
     setMatchIndex(0);
@@ -276,7 +294,12 @@ export default function TierBoardView({
       if (e.key === '/' && !isTyping) {
         e.preventDefault();
         setSearchOpen(true);
-        requestAnimationFrame(() => searchInputRef.current?.focus());
+        setSearchQuery('/');
+        requestAnimationFrame(() => {
+          const el = searchInputRef.current;
+          el?.focus();
+          el?.setSelectionRange(el.value.length, el.value.length);
+        });
         return;
       }
       if (!searchOpen) return;
@@ -396,7 +419,7 @@ export default function TierBoardView({
             onThumbDragEnd={onThumbDragEnd}
             onThumbClick={onThumbClick}
             pendingRemovalKeys={pendingRemovalKeys}
-            searchActive={searchQuery.trim().length > 0}
+            searchActive={queryText.trim().length > 0}
             matchedKeys={matchedKeys}
             activeMatchKey={activeMatchKey}
           />
@@ -421,11 +444,10 @@ export default function TierBoardView({
             <TextInput
               ref={searchInputRef}
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search titles..."
-              leftSection={<Search size={14} />}
+              onChange={(e) => handleSearchChange(e.target.value)}
+              placeholder="/search titles..."
               size="xs"
-              style={{ flex: 1 }}
+              style={{ flex: 1, fontFamily: 'monospace' }}
             />
             <Text size="xs" c="dimmed" style={{ whiteSpace: 'nowrap' }}>
               {matches.length > 0 ? `${(matchIndex % matches.length) + 1}/${matches.length}` : '0/0'}
