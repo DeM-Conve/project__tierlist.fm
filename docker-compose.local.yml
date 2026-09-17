@@ -1,0 +1,30 @@
+services:
+  backend:
+    image: maven:3.9-eclipse-temurin-21
+    working_dir: /app
+    command: mvn spring-boot:run
+    volumes:
+      - ./backend:/app
+      - maven-repo:/root/.m2
+    ports:
+      - "${SERVER_PORT:-8080}:8080"
+    env_file:
+      - .env
+
+  frontend:
+    image: node:22-alpine
+    working_dir: /app
+    command: sh -c "npm install && npm run dev -- --host 0.0.0.0"
+    volumes:
+      - ./frontend:/app
+      - frontend-node-modules:/app/node_modules
+    ports:
+      - "5173:5173"
+    environment:
+      VITE_API_BASE: ${VITE_API_BASE:-http://localhost:8080}
+    depends_on:
+      - backend
+
+volumes:
+  maven-repo:
+  frontend-node-modules:

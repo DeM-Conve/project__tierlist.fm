@@ -1,8 +1,8 @@
 server:
-  port: 8080
+  port: ${SERVER_PORT:8080}
 
 app:
-  frontend-url: http://localhost:5173
+  frontend-url: ${FRONTEND_URL:http://localhost:5173}
 
 spring:
   security:
@@ -10,8 +10,8 @@ spring:
       client:
         registration:
           google:
-            client-id: your-client-id.apps.googleusercontent.com
-            client-secret: your-client-secret
+            client-id: ${GOOGLE_CLIENT_ID}
+            client-secret: ${GOOGLE_CLIENT_SECRET}
             scope:
               - openid
               - profile

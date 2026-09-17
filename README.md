@@ -9,39 +9,57 @@ Login with your Google account, see all your YouTube playlists, click one to see
 
 1. Go to https://console.cloud.google.com/ and create a project (or pick an existing one).
 2. Enable the **YouTube Data API v3**: APIs & Services → Library → search "YouTube Data API v3" → Enable.
-3. Configure the OAuth consent screen (Google Auth Platform → Audience): User type External, add yourself under **Test users**, and under **Data access** add the scope `.../auth/youtube.readonly`.
+3. Configure the OAuth consent screen (Google Auth Platform → Audience): User type External, add yourself under **Test users**, and under **Data access** add the scopes `openid`, `profile`, and `.../auth/youtube.readonly`.
 4. Create credentials (Clients → Create Client):
    - Application type: **Web application**
    - Authorized redirect URI: `http://localhost:8080/login/oauth2/code/google`
 5. Copy the **Client ID** and **Client Secret**.
 
-## 2. Configure the backend
+## 2. Configure environment variables
 
 ```bash
-cd backend
-cp src/main/resources/application.yml.example src/main/resources/application.yml
+cp .env.example .env
 ```
 
-Edit `application.yml` and paste in your `client-id` and `client-secret` under `spring.security.oauth2.client.registration.google`.
+Edit `.env` and paste in your `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`.
 
-## 3. Run the backend
+## 3. Run with Docker Compose (recommended)
 
 ```bash
+docker compose -f docker-compose.yml up --build
+```
+
+This builds both images (backend jar + nginx-served frontend build) and runs them:
+- Backend: http://localhost:8080
+- Frontend: http://localhost:5173
+
+For local development with live code reload (no rebuild needed per change):
+
+```bash
+docker compose -f docker-compose.local.yml up
+```
+
+This mounts your source code into containers running `mvn spring-boot:run` and `npm run dev` directly.
+
+## 4. Run without Docker (alternative)
+
+Backend:
+```bash
 cd backend
+export $(grep -v '^#' ../.env | xargs)
 mvn spring-boot:run
 ```
 
-Runs on http://localhost:8080.
-
-## 4. Run the frontend
-
+Frontend:
 ```bash
 cd frontend
 npm install
 npm run dev
 ```
 
-Runs on http://localhost:5173. Open it, click "Login with Google", approve access, and you'll see your playlists. Click a playlist to see its videos (opens the video on YouTube when clicked).
+## Usage
+
+Open http://localhost:5173, click "Login with Google", approve access, and you'll see your playlists. Click a playlist to see its videos (opens the video on YouTube when clicked).
 
 ## Notes
 
