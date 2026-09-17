@@ -101,6 +101,52 @@ function TierRow({
   );
 }
 
+function PendingChangesPanel({ moves, syncStatus, onDiscard, onSync }) {
+  if (moves.length === 0) return null;
+  return (
+    <div className="pending-panel">
+      <div className="pending-panel-header">
+        <h2>
+          {moves.length} move{moves.length === 1 ? '' : 's'} staged
+        </h2>
+        {syncStatus === 'done' && <span className="sync-status sync-status-done">Synced</span>}
+        {syncStatus === 'partial' && <span className="sync-status sync-status-error">Some failed</span>}
+        {syncStatus === 'error' && <span className="sync-status sync-status-error">Sync failed</span>}
+      </div>
+
+      <ul className="pending-list">
+        {moves.map((m) => (
+          <li key={m.video.videoId} className="pending-row">
+            <span className="pending-title" title={m.video.title}>
+              {m.video.title}
+            </span>
+            <span className="pending-tiers">
+              <span className="tier-chip" style={{ background: TIER_COLORS[m.from] }}>
+                {m.from}
+              </span>
+              <span className="pending-arrow">→</span>
+              <span className="tier-chip" style={{ background: TIER_COLORS[m.to] }}>
+                {m.to}
+              </span>
+            </span>
+          </li>
+        ))}
+      </ul>
+
+      <div className="pending-actions">
+        <button className="btn btn-ghost" onClick={onDiscard} disabled={syncStatus === 'syncing'}>
+          Discard
+        </button>
+        <button className="btn btn-primary" onClick={onSync} disabled={syncStatus === 'syncing'}>
+          {syncStatus === 'syncing'
+            ? 'Syncing...'
+            : `Push ${moves.length} move${moves.length === 1 ? '' : 's'} to YouTube`}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export default function TierBoardView({
   category,
   tierGroups,
@@ -118,6 +164,7 @@ export default function TierBoardView({
   syncStatus,
   onDiscard,
   onSync,
+  onStartDuel,
 }) {
   return (
     <section>
@@ -127,23 +174,12 @@ export default function TierBoardView({
           <p className="hint-text">Drag a video into another tier, then sync when you're ready.</p>
         </div>
 
-        {pendingMoves.length > 0 && (
-          <div className="sync-controls">
-            <span className="sync-count">
-              {pendingMoves.length} pending
-            </span>
-            {syncStatus === 'done' && <span className="sync-status sync-status-done">Synced</span>}
-            {syncStatus === 'partial' && <span className="sync-status sync-status-error">Some failed</span>}
-            {syncStatus === 'error' && <span className="sync-status sync-status-error">Sync failed</span>}
-            <button className="btn btn-ghost" onClick={onDiscard} disabled={syncStatus === 'syncing'}>
-              Discard
-            </button>
-            <button className="btn btn-primary" onClick={onSync} disabled={syncStatus === 'syncing'}>
-              {syncStatus === 'syncing' ? 'Syncing...' : 'Sync to YouTube'}
-            </button>
-          </div>
-        )}
+        <button className="btn btn-ghost" onClick={onStartDuel}>
+          Start duel
+        </button>
       </div>
+
+      <PendingChangesPanel moves={pendingMoves} syncStatus={syncStatus} onDiscard={onDiscard} onSync={onSync} />
 
       <div className="tier-board">
         {TIER_ORDER.filter((t) => tierGroups[category]?.[t]).map((t) => (

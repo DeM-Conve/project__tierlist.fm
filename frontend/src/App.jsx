@@ -7,6 +7,7 @@ import ItemsView from './components/ItemsView';
 import TierBoardView from './components/TierBoardView';
 import VideoFocusModal from './components/VideoFocusModal';
 import CommandPalette from './components/CommandPalette';
+import DuelView from './components/DuelView';
 
 const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8080';
 
@@ -16,7 +17,8 @@ export default function App() {
   const [query, setQuery] = useState('');
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
 
-  // activeView: { type: 'playlists' } | { type: 'items', playlist } | { type: 'tierBoard', category }
+  // activeView: { type: 'playlists' } | { type: 'items', playlist }
+  //           | { type: 'tierBoard', category } | { type: 'duel', category }
   const [activeView, setActiveView] = useState({ type: 'playlists' });
 
   const [items, setItems] = useState(null);
@@ -57,6 +59,12 @@ export default function App() {
     return moves;
   }, [tierItems]);
 
+  const duelPool = useMemo(() => TIER_ORDER.flatMap((t) => tierItems[t] || []), [tierItems]);
+  const duelTierSizes = useMemo(
+    () => TIER_ORDER.filter((t) => tierItems[t]).map((t) => ({ tier: t, count: tierItems[t].length })),
+    [tierItems]
+  );
+
   const focusedList = focusedVideo ? tierItems[focusedVideo.tier] || [] : [];
   const focusedIndex = focusedVideo ? focusedList.findIndex((v) => v.videoId === focusedVideo.videoId) : -1;
   const focusedVideoData = focusedIndex >= 0 ? focusedList[focusedIndex] : null;
@@ -88,19 +96,27 @@ export default function App() {
       label: 'Go to Playlists',
       action: () => selectPlaylists(),
     });
-    if (activeView.type === 'tierBoard' && pendingMoves.length > 0) {
+    if (activeView.type === 'tierBoard') {
       items.push({
-        id: 'action-sync',
+        id: 'action-duel',
         section: 'Actions',
-        label: `Sync ${activeView.category} to YouTube (${pendingMoves.length} pending)`,
-        action: () => syncChanges(),
+        label: `Start a duel on ${activeView.category}`,
+        action: () => enterDuel(activeView.category),
       });
-      items.push({
-        id: 'action-discard',
-        section: 'Actions',
-        label: `Discard changes on ${activeView.category}`,
-        action: () => discardChanges(),
-      });
+      if (pendingMoves.length > 0) {
+        items.push({
+          id: 'action-sync',
+          section: 'Actions',
+          label: `Sync ${activeView.category} to YouTube (${pendingMoves.length} pending)`,
+          action: () => syncChanges(),
+        });
+        items.push({
+          id: 'action-discard',
+          section: 'Actions',
+          label: `Discard changes on ${activeView.category}`,
+          action: () => discardChanges(),
+        });
+      }
     }
     return items;
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -142,11 +158,19 @@ export default function App() {
 
   function resolveFromLocation({ push, fallbackToFirst }) {
     const path = window.location.pathname;
-    const tierMatch = path.match(/^\/tier\/([^/]+)/);
+    const duelMatch = path.match(/^\/tier\/([^/]+)\/duel/);
+    const tierMatch = path.match(/^\/tier\/([^/]+)$/);
     const playlistMatch = path.match(/^\/playlist\/([^/]+)/);
     const groups = tierGroupsRef.current;
     const list = playlistsRef.current;
 
+    if (duelMatch) {
+      const category = decodeURIComponent(duelMatch[1]);
+      if (groups[category]) {
+        openTierBoard(category, { push: false }).then(() => enterDuel(category, { push }));
+        return;
+      }
+    }
     if (tierMatch) {
       const category = decodeURIComponent(tierMatch[1]);
       if (groups[category]) {
@@ -244,6 +268,24 @@ export default function App() {
     setFocusedVideo(null);
     updateUrl(`/tier/${encodeURIComponent(category)}`, { push, replace });
     await loadTierBoardData(category);
+  }
+
+  function enterDuel(category, { push = true, replace = false } = {}) {
+    setActiveView({ type: 'duel', category });
+    setMobileSidebarOpen(false);
+    setFocusedVideo(null);
+    updateUrl(`/tier/${encodeURIComponent(category)}/duel`, { push, replace });
+  }
+
+  function backToTierBoard(category, { push = true } = {}) {
+    setActiveView({ type: 'tierBoard', category });
+    setMobileSidebarOpen(false);
+    updateUrl(`/tier/${encodeURIComponent(category)}`, { push, replace: false });
+  }
+
+  function applyDuelResult(category, newTierItems) {
+    setTierItems(newTierItems);
+    backToTierBoard(category);
   }
 
   function selectPlaylists({ push = true } = {}) {
@@ -466,6 +508,16 @@ export default function App() {
             syncStatus={syncStatus}
             onDiscard={discardChanges}
             onSync={syncChanges}
+            onStartDuel={() => enterDuel(activeView.category)}
+          />
+        )}
+
+        {activeView.type === 'duel' && (
+          <DuelView
+            videos={duelPool}
+            tierSizes={duelTierSizes}
+            onComplete={(result) => applyDuelResult(activeView.category, result)}
+            onCancel={() => backToTierBoard(activeView.category)}
           />
         )}
       </main>

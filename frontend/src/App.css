@@ -396,19 +396,6 @@
   padding: 0 8px;
 }
 
-/* Sync controls, docked in the tier board header (not a floating toast) */
-.sync-controls {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  flex-wrap: wrap;
-}
-.sync-count {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--text-dim);
-  white-space: nowrap;
-}
 .sync-status {
   font-size: 13px;
   font-weight: 600;
@@ -416,6 +403,169 @@
 }
 .sync-status-done { color: var(--success); }
 .sync-status-error { color: var(--danger); }
+
+/* Preview of staged tier moves, shown before syncing to YouTube */
+.pending-panel {
+  margin-top: 12px;
+  margin-bottom: 16px;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius);
+  background: var(--surface);
+  overflow: hidden;
+}
+.pending-panel-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border-soft);
+}
+.pending-panel-header h2 { margin: 0; }
+.pending-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 220px;
+  overflow-y: auto;
+}
+.pending-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 9px 16px;
+  border-bottom: 1px dashed var(--border-soft);
+  font-size: 13.5px;
+}
+.pending-row:last-child { border-bottom: none; }
+.pending-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text);
+}
+.pending-tiers {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+.tier-chip {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 11px;
+  color: #1a1509;
+  padding: 2px 7px;
+  border-radius: 4px;
+}
+.pending-arrow { color: var(--text-faint); font-size: 12px; }
+.pending-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 12px 16px;
+  background: var(--surface-2);
+}
+
+/* Duel view */
+.duel-view {
+  max-width: 760px;
+  margin: 0 auto;
+  padding-top: 24px;
+  text-align: center;
+}
+.duel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 48px;
+  text-align: left;
+}
+.duel-progress {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-width: 320px;
+}
+.duel-progress-bar {
+  height: 6px;
+  border-radius: 3px;
+  background: var(--surface-2);
+  overflow: hidden;
+}
+.duel-progress-fill {
+  height: 100%;
+  background: var(--accent);
+  transition: width 0.2s ease;
+}
+.duel-strategy-select {
+  font-family: var(--font-body);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text);
+  padding: 8px 10px;
+  font-size: 13px;
+}
+.duel-question {
+  font-family: var(--font-display);
+  font-size: 26px;
+  font-weight: 800;
+  margin: 0 0 32px;
+  letter-spacing: -0.3px;
+}
+.duel-pair {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+}
+.duel-card {
+  flex: 1;
+  max-width: 320px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0 0 14px;
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 0.15s ease, transform 0.1s ease;
+}
+.duel-card:hover { border-color: var(--accent); transform: translateY(-2px); }
+.duel-card img {
+  width: 100%;
+  aspect-ratio: 16/9;
+  object-fit: cover;
+  display: block;
+  border-radius: 8px 8px 0 0;
+  background: var(--surface-2);
+  margin-bottom: 10px;
+}
+.duel-card-title {
+  font-weight: 600;
+  font-size: 14px;
+  margin: 0 14px 4px;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.duel-card .hint-text { margin: 0 14px; }
+.duel-or {
+  color: var(--text-faint);
+  font-size: 13px;
+  text-transform: lowercase;
+}
+.duel-done { padding: 40px 0; }
+.duel-done h2 { margin-bottom: 8px; }
+.duel-done p { max-width: 440px; margin: 0 auto 20px; }
+
+@media (max-width: 640px) {
+  .duel-pair { flex-direction: column; }
+  .duel-header { flex-wrap: wrap; }
+}
 
 @media (max-width: 900px) {
   .mobile-menu-btn {
