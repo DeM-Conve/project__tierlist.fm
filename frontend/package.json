@@ -14,10 +14,14 @@
     "@mantine/hooks": "^9.6.1",
     "@mantine/spotlight": "^9.6.1",
     "@reduxjs/toolkit": "^2.12.0",
+    "@tanstack/react-query": "^5.103.1",
+    "axios": "^1.20.0",
     "lucide-react": "^1.47.0",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
-    "react-redux": "^9.3.0"
+    "react-hook-form": "^7.88.0",
+    "react-redux": "^9.3.0",
+    "react-router-dom": "^7.18.4"
   },
   "devDependencies": {
     "@types/react": "^19.2.18",

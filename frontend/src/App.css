@@ -118,6 +118,7 @@
   border: none;
   color: var(--text-dim);
   text-align: left;
+  text-decoration: none;
   padding: 8px 8px;
   border-radius: var(--radius);
   font-size: 13.5px;

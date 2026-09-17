@@ -1,11 +1,10 @@
+import { NavLink } from 'react-router-dom';
+
 export default function Sidebar({
   query,
   onQueryChange,
   tierCategories,
   playlistCount,
-  activeView,
-  onSelectTierBoard,
-  onSelectPlaylists,
   onSelectSettings,
   onLogout,
   onOpenPalette,
@@ -41,33 +40,30 @@ export default function Sidebar({
               <p className="sidebar-heading">Tier boards</p>
               {filteredCategories.length === 0 && <p className="sidebar-empty">No matches</p>}
               {filteredCategories.map((category) => (
-                <button
+                <NavLink
                   key={category}
-                  className={`sidebar-item${
-                    activeView.type === 'tierBoard' && activeView.category === category ? ' sidebar-item-active' : ''
-                  }`}
-                  onClick={() => onSelectTierBoard(category)}
+                  to={`/tier/${encodeURIComponent(category)}`}
+                  className={({ isActive }) => `sidebar-item${isActive ? ' sidebar-item-active' : ''}`}
                 >
                   {category}
-                </button>
+                </NavLink>
               ))}
               <div className="sidebar-divider" />
             </>
           )}
 
-          <button
-            className={`sidebar-item${activeView.type === 'playlists' ? ' sidebar-item-active' : ''}`}
-            onClick={onSelectPlaylists}
+          <NavLink
+            to="/"
+            end
+            className={({ isActive }) => `sidebar-item${isActive ? ' sidebar-item-active' : ''}`}
           >
             Playlists <span className="sidebar-item-count">{playlistCount}</span>
-          </button>
+          </NavLink>
         </nav>
 
         <div className="sidebar-footer">
           <button
-            className={`btn btn-ghost sidebar-settings-btn${
-              activeView.type === 'settings' ? ' sidebar-item-active' : ''
-            }`}
+            className="btn btn-ghost sidebar-settings-btn"
             onClick={onSelectSettings}
             aria-label="Settings"
             title="Settings"

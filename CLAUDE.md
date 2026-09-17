@@ -57,6 +57,17 @@ auto-grouped into a tier board per category.
   YouTube-Music-style) mode via CSS class changes on the same DOM shape - never via
   conditionally mounting/unmounting the player subtree - so minimizing never
   interrupts playback.
+- **The player dock is global and navigation-independent.** It's mounted once in the
+  router `Layout` (above `<Outlet/>`), and no route/page effect ever dispatches
+  `closeFocus` on mount - only its own "stop" control (and logout) does. Don't
+  reintroduce a "close the player when navigating away" call; that defeats the whole
+  point of a background-playback mini bar.
+- **Routing is React Router** (`react-router-dom`), not hand-rolled History API calls -
+  see `App.jsx`. `tiersSlice.loadedCategory` guards `TierBoardPage`/`DuelPage` against
+  re-fetching a board that's already loaded when the router remounts the page (e.g.
+  returning from a duel) - removing that guard would silently discard an unsynced duel
+  result or drag on every board/duel round-trip. Don't refetch tier-board data on mount
+  without checking `loadedCategory` first.
 - **Duel ranking uses the Strategy pattern** (`frontend/src/duel/`): multiple
   interchangeable ranking algorithms (`tierAwareMerge` default, `mergeSort`, `elo`)
   behind a common interface, swappable at runtime from the duel screen or persisted as a
@@ -64,7 +75,40 @@ auto-grouped into a tier board per category.
 - Full feature list: `docs/features.md`. Keep it updated when you add a user-facing
   feature.
 
-## Housekeeping
+## Pending work (frontend stack migration, in progress)
+
+The user asked for these on top of the Mantine/Redux migration above. Tracked here
+(no task-tracking tool is available in this environment) - update as items land:
+
+- [x] **React Router** - done. Replaced the hand-rolled History-API routing in
+  `App.jsx` with real `Routes`/`Route`s (`/`, `/playlist/:id`, `/tier/:category`,
+  `/tier/:category/duel`, `/settings`), a `Layout` route (Sidebar + player dock +
+  command palette, mounted once) wrapping page components that read `useParams`.
+  Also fixed a latent bug while doing this: navigating to a different page used to
+  unconditionally close the player dock, defeating the "plays in the background"
+  point of the mini bar - navigation no longer touches it at all.
+- [ ] **TanStack Query** (`@tanstack/react-query`, installed) as the primary data-fetching
+  layer, with **axios** (installed) as the HTTP client, replacing the manual
+  `fetch`/`dispatch(setX(...))` boilerplate in `loadPlaylists`/`openItems`/
+  `loadTierBoardData`/`syncChanges`. Plan: TanStack Query owns the *pristine* server
+  snapshot (playlists, playlist items, tier-board items); Redux's `tiersSlice` keeps
+  owning the *local editable draft* (`tierItems`, drag state) seeded from query
+  results, since drag-and-drop staging before sync doesn't fit a pure server-cache
+  model. `syncChanges` becomes a `useMutation` that invalidates the relevant queries.
+- [ ] **React Hook Form** (`react-hook-form`, installed) - flagged, but there is
+  currently no real form in this app to use it on (login is a plain OAuth redirect;
+  filter/search/settings inputs are simple controlled inputs with no validation
+  need). Don't force it in somewhere it doesn't fit; use it if/when a real form
+  appears (e.g. a settings field with validation).
+- [ ] **Stop hand-writing CSS, use Mantine components instead.** The user wants
+  `App.css` phased out in favor of Mantine's own components (`Group`, `Stack`,
+  `AppShell`, `Card`, `TextInput`, `ActionIcon`, `Badge`, etc.) rather than custom
+  divs + classNames. This is a large, incremental effort across every existing
+  component (Sidebar, TierBoardView, DuelView, PlaylistsView, ItemsView, PlayerDock,
+  CommandPalette, SettingsView) - convert opportunistically whenever a component is
+  already being touched, rather than as one risky big-bang rewrite.
+
+
 
 - Commit incrementally as you go (the user asked for this explicitly, more than once).
 - After changing frontend code, rebuild and redeploy before saying a fix is live:

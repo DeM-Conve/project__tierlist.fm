@@ -4,7 +4,7 @@ import { TIER_ORDER, groupByTier } from '../tiers';
 const selectPlaylists = (state) => state.auth.playlists;
 const selectTierItems = (state) => state.tiers.tierItems;
 const selectOriginalTierOf = (state) => state.tiers.originalTierOf;
-const selectActiveView = (state) => state.view.activeView;
+const selectCurrentCategory = (state) => state.view.currentCategory;
 const selectFocusedVideo = (state) => state.focus.focusedVideo;
 const selectFocusQueue = (state) => state.focus.focusQueue;
 
@@ -96,7 +96,7 @@ export const selectFocusedVideoData = createSelector(
 );
 
 export const selectFocusedAvailableTiers = createSelector(
-  [selectFocusedVideo, selectActiveView, selectTierGroups],
-  (focusedVideo, activeView, tierGroups) =>
-    focusedVideo ? TIER_ORDER.filter((t) => tierGroups[activeView.category]?.[t]) : []
+  [selectFocusedVideo, selectCurrentCategory, selectTierGroups],
+  (focusedVideo, currentCategory, tierGroups) =>
+    focusedVideo ? TIER_ORDER.filter((t) => tierGroups[currentCategory]?.[t]) : []
 );

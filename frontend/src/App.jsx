@@ -1,5 +1,16 @@
-import { useEffect, useMemo, useRef } from 'react';
-import { useDispatch, useSelector, useStore } from 'react-redux';
+import { useEffect, useMemo } from 'react';
+import { useDispatch, useSelector } from 'react-redux';
+import {
+  Routes,
+  Route,
+  Navigate,
+  Outlet,
+  useNavigate,
+  useParams,
+  useMatch,
+  useOutletContext,
+} from 'react-router-dom';
+import { spotlight } from '@mantine/spotlight';
 import './App.css';
 import { TIER_ORDER } from './tiers';
 import Sidebar from './components/Sidebar';
@@ -8,11 +19,10 @@ import ItemsView from './components/ItemsView';
 import TierBoardView from './components/TierBoardView';
 import PlayerDock from './components/PlayerDock';
 import CommandPalette from './components/CommandPalette';
-import { spotlight } from '@mantine/spotlight';
 import DuelView from './components/DuelView';
 import SettingsView from './components/SettingsView';
 import { setLoggedIn, setPlaylists } from './store/authSlice';
-import { setActiveView, setQuery, setMobileSidebarOpen } from './store/viewSlice';
+import { setCurrentCategory, setQuery, setMobileSidebarOpen } from './store/viewSlice';
 import { setItems, setLoadingItems } from './store/itemsSlice';
 import {
   resetTierBoard,
@@ -49,22 +59,89 @@ import {
 
 const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8080';
 
+// Module-level (not component state) so it survives route component
+// remounts but resets on an actual page reload - "redirect to the first
+// tier board on the very first landing at '/', but not on every later
+// visit to Playlists via the sidebar" only makes sense as a one-time,
+// whole-session flag, not per-mount state.
+let hasAutoRedirected = false;
+
 export default function App() {
   const dispatch = useDispatch();
-  const store = useStore();
-
   const loggedIn = useSelector((s) => s.auth.loggedIn);
-  const playlists = useSelector((s) => s.auth.playlists);
+
+  useEffect(() => {
+    checkAuth();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  async function checkAuth() {
+    try {
+      const res = await fetch(`${API_BASE}/api/auth/status`, { credentials: 'include' });
+      const data = await res.json();
+      dispatch(setLoggedIn(data.loggedIn));
+      if (data.loggedIn) {
+        dispatch(setPlaylists(null));
+        const plRes = await fetch(`${API_BASE}/api/playlists`, { credentials: 'include' });
+        dispatch(setPlaylists(plRes.ok ? await plRes.json() : []));
+      }
+    } catch {
+      dispatch(setLoggedIn(false));
+    }
+  }
+
+  function login() {
+    window.location.href = `${API_BASE}/oauth2/authorization/google`;
+  }
+
+  if (loggedIn === false) {
+    return (
+      <main className="login-screen">
+        <section id="login-view">
+          <h2 className="login-headline">Your playlists, ranked.</h2>
+          <p>Sign in to load your playlists and start sorting them into tiers.</p>
+          <button className="btn btn-primary" onClick={login}>
+            Continue with Google
+          </button>
+        </section>
+      </main>
+    );
+  }
+
+  if (loggedIn === null) {
+    return (
+      <main className="login-screen">
+        <p className="hint-text">Loading...</p>
+      </main>
+    );
+  }
+
+  return (
+    <Routes>
+      <Route path="/" element={<Layout />}>
+        <Route index element={<PlaylistsPage />} />
+        <Route path="playlist/:id" element={<ItemsPage />} />
+        <Route path="tier/:category" element={<TierBoardPage />} />
+        <Route path="tier/:category/duel" element={<DuelPage />} />
+        <Route path="settings" element={<SettingsPage />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Route>
+    </Routes>
+  );
+}
+
+// Sidebar + the persistent player dock + command palette, all of which stay
+// mounted across every route change - the routed page renders into
+// <Outlet/>. Navigation never touches the mini player: it's meant to keep
+// playing in the background regardless of what page you're on, so only an
+// explicit "stop" (the dock's own ✕, or logout) closes it.
+function Layout() {
+  const dispatch = useDispatch();
+  const navigate = useNavigate();
+
   const query = useSelector((s) => s.view.query);
   const mobileSidebarOpen = useSelector((s) => s.view.mobileSidebarOpen);
-  const activeView = useSelector((s) => s.view.activeView);
-  const items = useSelector((s) => s.items.items);
-  const loadingItems = useSelector((s) => s.items.loadingItems);
-  const tierItems = useSelector((s) => s.tiers.tierItems);
-  const tierLoading = useSelector((s) => s.tiers.tierLoading);
-  const draggedVideoId = useSelector((s) => s.tiers.draggedVideoId);
-  const dragOverTier = useSelector((s) => s.tiers.dragOverTier);
-  const syncStatus = useSelector((s) => s.tiers.syncStatus);
+  const playlists = useSelector((s) => s.auth.playlists);
   const focusedVideo = useSelector((s) => s.focus.focusedVideo);
   const isShuffling = useSelector((s) => s.focus.isShuffling);
   const playerMode = useSelector((s) => s.focus.playerMode);
@@ -72,9 +149,6 @@ export default function App() {
   const tierGroups = useSelector(selectTierGroups);
   const tierCategories = useSelector(selectTierCategories);
   const pendingMoves = useSelector(selectPendingMoves);
-  const duelPool = useSelector(selectDuelPool);
-  const duelRuns = useSelector(selectDuelRuns);
-  const duelTierSizes = useSelector(selectDuelTierSizes);
   const focusSequence = useSelector(selectFocusSequence);
   const videoLookup = useSelector(selectVideoLookup);
   const activeSequence = useSelector(selectActiveSequence);
@@ -82,168 +156,8 @@ export default function App() {
   const focusedVideoData = useSelector(selectFocusedVideoData);
   const focusedAvailableTiers = useSelector(selectFocusedAvailableTiers);
 
-  // Kept as plain refs (not store state) - they only exist so
-  // resolveFromLocation's popstate handler can read the latest playlists/
-  // tierGroups without re-subscribing the listener on every change.
-  const autoSelectedRef = useRef(false);
-  const playlistsRef = useRef(null);
-  const tierGroupsRef = useRef({});
-  playlistsRef.current = playlists;
-  tierGroupsRef.current = tierGroups;
-
-  const commandItems = useMemo(() => {
-    const list = [];
-    for (const category of tierCategories) {
-      list.push({
-        id: `board-${category}`,
-        section: 'Boards',
-        label: `Go to board ${category}`,
-        action: () => openTierBoard(category),
-      });
-    }
-    for (const p of playlists || []) {
-      list.push({
-        id: `playlist-${p.id}`,
-        section: 'Playlists',
-        label: `Open ${p.title}`,
-        action: () => openItems(p),
-      });
-    }
-    list.push({
-      id: 'action-playlists',
-      section: 'Actions',
-      label: 'Go to Playlists',
-      action: () => selectPlaylists(),
-    });
-    if (activeView.type === 'tierBoard') {
-      list.push({
-        id: 'action-duel',
-        section: 'Actions',
-        label: `Start a duel on ${activeView.category}`,
-        action: () => enterDuel(activeView.category),
-      });
-      if (pendingMoves.length > 0) {
-        list.push({
-          id: 'action-sync',
-          section: 'Actions',
-          label: `Sync ${activeView.category} to YouTube (${pendingMoves.length} pending)`,
-          action: () => syncChanges(),
-        });
-        list.push({
-          id: 'action-discard',
-          section: 'Actions',
-          label: `Discard changes on ${activeView.category}`,
-          action: () => discardChanges(),
-        });
-      }
-    }
-    return list;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tierCategories, playlists, activeView, pendingMoves]);
-
-  useEffect(() => {
-    checkAuth();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  // Restore whichever tier board / playlist the URL points at (so refresh and
-  // back/forward don't just dump you back on the first tier board), falling
-  // back to the first tier board only when the URL has nothing usable.
-  useEffect(() => {
-    if (playlists && !autoSelectedRef.current) {
-      autoSelectedRef.current = true;
-      resolveFromLocation({ push: false, fallbackToFirst: true });
-    }
-
-    function onPopState() {
-      resolveFromLocation({ push: false, fallbackToFirst: false });
-    }
-    window.addEventListener('popstate', onPopState);
-    return () => window.removeEventListener('popstate', onPopState);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [playlists]);
-
-
-  function resolveFromLocation({ push, fallbackToFirst }) {
-    const path = window.location.pathname;
-    const duelMatch = path.match(/^\/tier\/([^/]+)\/duel/);
-    const tierMatch = path.match(/^\/tier\/([^/]+)$/);
-    const playlistMatch = path.match(/^\/playlist\/([^/]+)/);
-    const groups = tierGroupsRef.current;
-    const list = playlistsRef.current;
-
-    if (duelMatch) {
-      const category = decodeURIComponent(duelMatch[1]);
-      if (groups[category]) {
-        openTierBoard(category, { push: false }).then(() => enterDuel(category, { push }));
-        return;
-      }
-    }
-    if (tierMatch) {
-      const category = decodeURIComponent(tierMatch[1]);
-      if (groups[category]) {
-        openTierBoard(category, { push });
-        return;
-      }
-    }
-    if (playlistMatch) {
-      const id = decodeURIComponent(playlistMatch[1]);
-      const playlist = list?.find((p) => p.id === id);
-      if (playlist) {
-        openItems(playlist, { push });
-        return;
-      }
-    }
-    if (path === '/settings') {
-      selectSettings({ push });
-      return;
-    }
-    if (fallbackToFirst) {
-      const categories = Object.keys(groups).sort();
-      if (categories.length > 0) {
-        openTierBoard(categories[0], { push: false, replace: true });
-        return;
-      }
-    }
-    selectPlaylists({ push: false });
-  }
-
-  async function checkAuth() {
-    try {
-      const res = await fetch(`${API_BASE}/api/auth/status`, { credentials: 'include' });
-      const data = await res.json();
-      dispatch(setLoggedIn(data.loggedIn));
-      if (data.loggedIn) loadPlaylists();
-    } catch {
-      dispatch(setLoggedIn(false));
-    }
-  }
-
-  async function loadPlaylists() {
-    dispatch(setPlaylists(null));
-    const res = await fetch(`${API_BASE}/api/playlists`, { credentials: 'include' });
-    if (!res.ok) {
-      dispatch(setPlaylists([]));
-      return;
-    }
-    dispatch(setPlaylists(await res.json()));
-  }
-
-  async function openItems(playlist, { push = true, replace = false } = {}) {
-    dispatch(setActiveView({ type: 'items', playlist }));
-    dispatch(setMobileSidebarOpen(false));
-    dispatch(closeFocusAction());
-    updateUrl(`/playlist/${encodeURIComponent(playlist.id)}`, { push, replace });
-    dispatch(setItems(null));
-    dispatch(setLoadingItems(true));
-    const res = await fetch(`${API_BASE}/api/playlists/${playlist.id}/items`, { credentials: 'include' });
-    dispatch(setLoadingItems(false));
-    if (!res.ok) {
-      dispatch(setItems([]));
-      return;
-    }
-    dispatch(setItems(await res.json()));
-  }
+  const tierMatch = useMatch('/tier/:category');
+  const currentCategory = tierMatch ? decodeURIComponent(tierMatch.params.category) : null;
 
   async function fetchPlaylistItems(playlistId) {
     const res = await fetch(`${API_BASE}/api/playlists/${playlistId}/items`, { credentials: 'include' });
@@ -252,9 +166,10 @@ export default function App() {
   }
 
   async function loadTierBoardData(category) {
-    const tiers = tierGroupsRef.current[category];
+    const tiers = tierGroups[category];
+    if (!tiers) return;
     const presentTiers = TIER_ORDER.filter((t) => tiers[t]);
-    dispatch(resetTierBoard(presentTiers));
+    dispatch(resetTierBoard({ category, presentTiers }));
 
     await Promise.all(
       presentTiers.map(async (t) => {
@@ -264,137 +179,10 @@ export default function App() {
     );
   }
 
-  async function openTierBoard(category, { push = true, replace = false } = {}) {
-    dispatch(setActiveView({ type: 'tierBoard', category }));
-    dispatch(setMobileSidebarOpen(false));
-    dispatch(setSyncStatus('idle'));
-    dispatch(closeFocusAction());
-    updateUrl(`/tier/${encodeURIComponent(category)}`, { push, replace });
-    await loadTierBoardData(category);
-  }
-
-  function enterDuel(category, { push = true, replace = false } = {}) {
-    dispatch(setActiveView({ type: 'duel', category }));
-    dispatch(setMobileSidebarOpen(false));
-    dispatch(closeFocusAction());
-    updateUrl(`/tier/${encodeURIComponent(category)}/duel`, { push, replace });
-  }
-
-  function backToTierBoard(category, { push = true } = {}) {
-    dispatch(setActiveView({ type: 'tierBoard', category }));
-    dispatch(setMobileSidebarOpen(false));
-    updateUrl(`/tier/${encodeURIComponent(category)}`, { push, replace: false });
-  }
-
-  function applyDuelResult(category, newTierItems) {
-    dispatch(setTierItems(newTierItems));
-    backToTierBoard(category);
-  }
-
-  function selectPlaylists({ push = true } = {}) {
-    dispatch(setActiveView({ type: 'playlists' }));
-    dispatch(setMobileSidebarOpen(false));
-    dispatch(closeFocusAction());
-    updateUrl('/', { push, replace: false });
-  }
-
-  function selectSettings({ push = true } = {}) {
-    dispatch(setActiveView({ type: 'settings' }));
-    dispatch(setMobileSidebarOpen(false));
-    dispatch(closeFocusAction());
-    updateUrl('/settings', { push, replace: false });
-  }
-
-  function updateUrl(path, { push, replace }) {
-    if (window.location.pathname === path) return;
-    if (replace) window.history.replaceState(null, '', path);
-    else if (push) window.history.pushState(null, '', path);
-  }
-
-  function handleThumbDragStart(e, video, fromTier) {
-    e.dataTransfer.setData('application/json', JSON.stringify({ videoId: video.videoId, fromTier }));
-    e.dataTransfer.effectAllowed = 'move';
-    dispatch(setDraggedVideoId(video.videoId));
-  }
-
-  function handleThumbDragEnd() {
-    dispatch(setDraggedVideoId(null));
-    dispatch(setDragOverTier(null));
-  }
-
-  function handleRowDragOver(e, tier) {
-    e.preventDefault();
-    if (dragOverTier !== tier) dispatch(setDragOverTier(tier));
-  }
-
-  function handleRowDragLeave(tier) {
-    if (dragOverTier === tier) dispatch(setDragOverTier(null));
-  }
-
-  function moveVideoToTier(fromTier, toTier, videoId, dropIndex) {
-    dispatch(moveVideoToTierAction({ fromTier, toTier, videoId, dropIndex }));
-  }
-
-  function handleRowDrop(e, toTier, dropIndex) {
-    e.preventDefault();
-    let data;
-    try {
-      data = JSON.parse(e.dataTransfer.getData('application/json') || '{}');
-    } catch {
-      data = {};
-    }
-    const { videoId, fromTier } = data;
-    dispatch(setDragOverTier(null));
-    dispatch(setDraggedVideoId(null));
-    if (!videoId) return;
-    moveVideoToTier(fromTier, toTier, videoId, dropIndex);
-  }
-
-  function openFocus(tier, videoId) {
-    // Freeze the current tier-order sequence as this session's browsing
-    // order, so later tier reassignments can't reshuffle where "next" goes.
-    dispatch(openFocusAction({ tier, videoId, queue: focusSequence.map((e) => e.video.videoId) }));
-  }
-
-  function closeFocus() {
-    dispatch(closeFocusAction());
-  }
-
-  function startShufflePlay() {
-    if (focusSequence.length === 0) return;
-    const ids = focusSequence.map((e) => e.video.videoId);
-    for (let i = ids.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [ids[i], ids[j]] = [ids[j], ids[i]];
-    }
-    const first = videoLookup.get(ids[0]);
-    dispatch(startShuffle({ queue: ids, tier: first.tier, videoId: first.video.videoId }));
-  }
-
-  function navigateFocus(delta) {
-    if (focusedSeqIndex < 0) return;
-    const nextIndex = focusedSeqIndex + delta;
-    if (nextIndex < 0 || nextIndex >= activeSequence.length) return;
-    const entry = activeSequence[nextIndex];
-    dispatch(setFocusedVideo({ tier: entry.tier, videoId: entry.video.videoId }));
-  }
-
-  function changeFocusedTier(newTier) {
-    if (!focusedVideo || newTier === focusedVideo.tier) return;
-    moveVideoToTier(focusedVideo.tier, newTier, focusedVideo.videoId, null);
-    dispatch(setFocusedVideo({ tier: newTier, videoId: focusedVideo.videoId }));
-  }
-
-  function discardChanges() {
-    dispatch(discardTierChanges());
-  }
-
-  async function syncChanges() {
+  async function syncChanges(category) {
     dispatch(setSyncStatus('syncing'));
-    const category = activeView.category;
     const tiers = tierGroups[category] || {};
-    const currentPendingMoves = selectPendingMoves(store.getState());
-    const payload = currentPendingMoves.map((m) => ({
+    const payload = pendingMoves.map((m) => ({
       videoId: m.video.videoId,
       title: m.video.title,
       fromItemId: m.video.id,
@@ -422,45 +210,107 @@ export default function App() {
     }
   }
 
-  function login() {
-    window.location.href = `${API_BASE}/oauth2/authorization/google`;
+  function discardChanges() {
+    dispatch(discardTierChanges());
+  }
+
+  function moveVideoToTier(fromTier, toTier, videoId, dropIndex) {
+    dispatch(moveVideoToTierAction({ fromTier, toTier, videoId, dropIndex }));
+  }
+
+  function openFocus(tier, videoId) {
+    // Freeze the current tier-order sequence as this session's browsing
+    // order, so later tier reassignments can't reshuffle where "next" goes.
+    dispatch(openFocusAction({ tier, videoId, queue: focusSequence.map((e) => e.video.videoId) }));
+  }
+
+  function startShufflePlay() {
+    if (focusSequence.length === 0) return;
+    const ids = focusSequence.map((e) => e.video.videoId);
+    for (let i = ids.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [ids[i], ids[j]] = [ids[j], ids[i]];
+    }
+    const first = videoLookup.get(ids[0]);
+    dispatch(startShuffle({ queue: ids, tier: first.tier, videoId: first.video.videoId }));
+  }
+
+  function navigateFocus(delta) {
+    if (focusedSeqIndex < 0) return;
+    const nextIndex = focusedSeqIndex + delta;
+    if (nextIndex < 0 || nextIndex >= activeSequence.length) return;
+    const entry = activeSequence[nextIndex];
+    dispatch(setFocusedVideo({ tier: entry.tier, videoId: entry.video.videoId }));
+  }
+
+  function changeFocusedTier(newTier) {
+    if (!focusedVideo || newTier === focusedVideo.tier) return;
+    moveVideoToTier(focusedVideo.tier, newTier, focusedVideo.videoId, null);
+    dispatch(setFocusedVideo({ tier: newTier, videoId: focusedVideo.videoId }));
   }
 
   async function logout() {
     await fetch(`${API_BASE}/api/auth/logout`, { method: 'POST', credentials: 'include' });
     dispatch(setLoggedIn(false));
     dispatch(setPlaylists(null));
-    dispatch(setActiveView({ type: 'playlists' }));
     dispatch(setItems(null));
     dispatch(setTierItems({}));
     dispatch(setSyncStatus('idle'));
     dispatch(closeFocusAction());
     spotlight.close();
-    autoSelectedRef.current = false;
-    window.history.replaceState(null, '', '/');
+    hasAutoRedirected = false;
+    navigate('/', { replace: true });
   }
 
-  if (loggedIn === false) {
-    return (
-      <main className="login-screen">
-        <section id="login-view">
-          <h2 className="login-headline">Your playlists, ranked.</h2>
-          <p>Sign in to load your playlists and start sorting them into tiers.</p>
-          <button className="btn btn-primary" onClick={login}>
-            Continue with Google
-          </button>
-        </section>
-      </main>
-    );
-  }
-
-  if (loggedIn === null) {
-    return (
-      <main className="login-screen">
-        <p className="hint-text">Loading...</p>
-      </main>
-    );
-  }
+  const commandItems = useMemo(() => {
+    const list = [];
+    for (const category of tierCategories) {
+      list.push({
+        id: `board-${category}`,
+        section: 'Boards',
+        label: `Go to board ${category}`,
+        action: () => navigate(`/tier/${encodeURIComponent(category)}`),
+      });
+    }
+    for (const p of playlists || []) {
+      list.push({
+        id: `playlist-${p.id}`,
+        section: 'Playlists',
+        label: `Open ${p.title}`,
+        action: () => navigate(`/playlist/${encodeURIComponent(p.id)}`),
+      });
+    }
+    list.push({
+      id: 'action-playlists',
+      section: 'Actions',
+      label: 'Go to Playlists',
+      action: () => navigate('/'),
+    });
+    if (currentCategory) {
+      list.push({
+        id: 'action-duel',
+        section: 'Actions',
+        label: `Start a duel on ${currentCategory}`,
+        action: () => navigate(`/tier/${encodeURIComponent(currentCategory)}/duel`),
+      });
+      if (pendingMoves.length > 0) {
+        list.push({
+          id: 'action-sync',
+          section: 'Actions',
+          label: `Sync ${currentCategory} to YouTube (${pendingMoves.length} pending)`,
+          action: () => syncChanges(currentCategory),
+        });
+        list.push({
+          id: 'action-discard',
+          section: 'Actions',
+          label: `Discard changes on ${currentCategory}`,
+          action: () => discardChanges(),
+        });
+      }
+    }
+    return list;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tierCategories, playlists, currentCategory, pendingMoves]);
 
   return (
     <div className="app-shell">
@@ -473,10 +323,7 @@ export default function App() {
         onQueryChange={(q) => dispatch(setQuery(q))}
         tierCategories={tierCategories}
         playlistCount={playlists?.length ?? 0}
-        activeView={activeView}
-        onSelectTierBoard={openTierBoard}
-        onSelectPlaylists={selectPlaylists}
-        onSelectSettings={selectSettings}
+        onSelectSettings={() => navigate('/settings')}
         onLogout={logout}
         onOpenPalette={() => spotlight.open()}
         mobileOpen={mobileSidebarOpen}
@@ -484,48 +331,16 @@ export default function App() {
       />
 
       <main className="canvas">
-        {activeView.type === 'playlists' && (
-          <PlaylistsView playlists={playlists} query={query} onOpenPlaylist={openItems} />
-        )}
-
-        {activeView.type === 'items' && (
-          <ItemsView playlist={activeView.playlist} items={items} loading={loadingItems} />
-        )}
-
-        {activeView.type === 'tierBoard' && (
-          <TierBoardView
-            category={activeView.category}
-            tierGroups={tierGroups}
-            tierItems={tierItems}
-            tierLoading={tierLoading}
-            dragOverTier={dragOverTier}
-            draggedVideoId={draggedVideoId}
-            onRowDragOver={handleRowDragOver}
-            onRowDragLeave={handleRowDragLeave}
-            onRowDrop={handleRowDrop}
-            onThumbDragStart={handleThumbDragStart}
-            onThumbDragEnd={handleThumbDragEnd}
-            onThumbClick={openFocus}
-            pendingMoves={pendingMoves}
-            syncStatus={syncStatus}
-            onDiscard={discardChanges}
-            onSync={syncChanges}
-            onStartDuel={() => enterDuel(activeView.category)}
-            onShufflePlay={startShufflePlay}
-          />
-        )}
-
-        {activeView.type === 'duel' && (
-          <DuelView
-            videos={duelPool}
-            runs={duelRuns}
-            tierSizes={duelTierSizes}
-            onComplete={(result) => applyDuelResult(activeView.category, result)}
-            onCancel={() => backToTierBoard(activeView.category)}
-          />
-        )}
-
-        {activeView.type === 'settings' && <SettingsView />}
+        <Outlet
+          context={{
+            loadTierBoardData,
+            syncChanges,
+            discardChanges,
+            moveVideoToTier,
+            openFocus,
+            startShufflePlay,
+          }}
+        />
       </main>
 
       {focusedVideoData && (
@@ -537,7 +352,7 @@ export default function App() {
           hasPrev={focusedSeqIndex > 0}
           hasNext={focusedSeqIndex < activeSequence.length - 1}
           isShuffling={isShuffling}
-          onStop={closeFocus}
+          onStop={() => dispatch(closeFocusAction())}
           onMinimize={() => dispatch(minimizePlayer())}
           onExpand={() => dispatch(expandPlayer())}
           onPrev={() => navigateFocus(-1)}
@@ -549,4 +364,218 @@ export default function App() {
       <CommandPalette items={commandItems} />
     </div>
   );
+}
+
+function PlaylistsPage() {
+  const dispatch = useDispatch();
+  const navigate = useNavigate();
+  const playlists = useSelector((s) => s.auth.playlists);
+  const query = useSelector((s) => s.view.query);
+  const tierCategories = useSelector(selectTierCategories);
+
+  useEffect(() => {
+    dispatch(setCurrentCategory(null));
+    dispatch(setMobileSidebarOpen(false));
+  }, [dispatch]);
+
+  // Land on the first tier board on the very first visit to "/" (so a fresh
+  // login doesn't just show an empty playlists grid when boards exist), but
+  // never again afterwards - clicking "Playlists" later should show
+  // Playlists, not bounce back to a board.
+  useEffect(() => {
+    if (playlists && !hasAutoRedirected) {
+      hasAutoRedirected = true;
+      if (tierCategories.length > 0) {
+        navigate(`/tier/${encodeURIComponent(tierCategories[0])}`, { replace: true });
+      }
+    }
+  }, [playlists, tierCategories, navigate]);
+
+  return (
+    <PlaylistsView
+      playlists={playlists}
+      query={query}
+      onOpenPlaylist={(p) => navigate(`/playlist/${encodeURIComponent(p.id)}`)}
+    />
+  );
+}
+
+function ItemsPage() {
+  const { id } = useParams();
+  const playlistId = decodeURIComponent(id);
+  const dispatch = useDispatch();
+  const playlists = useSelector((s) => s.auth.playlists);
+  const items = useSelector((s) => s.items.items);
+  const loadingItems = useSelector((s) => s.items.loadingItems);
+  const playlist = playlists?.find((p) => p.id === playlistId);
+
+  useEffect(() => {
+    dispatch(setCurrentCategory(null));
+    dispatch(setMobileSidebarOpen(false));
+    dispatch(setItems(null));
+    dispatch(setLoadingItems(true));
+    fetch(`${API_BASE}/api/playlists/${playlistId}/items`, { credentials: 'include' })
+      .then((res) => (res.ok ? res.json() : []))
+      .then((data) => {
+        dispatch(setLoadingItems(false));
+        dispatch(setItems(data));
+      });
+  }, [dispatch, playlistId]);
+
+  return <ItemsView playlist={playlist} items={items} loading={loadingItems} />;
+}
+
+function TierBoardPage() {
+  const { category: rawCategory } = useParams();
+  const category = decodeURIComponent(rawCategory);
+  const dispatch = useDispatch();
+  const navigate = useNavigate();
+  const { loadTierBoardData, syncChanges, discardChanges, openFocus, startShufflePlay } =
+    useOutletContext();
+
+  const playlists = useSelector((s) => s.auth.playlists);
+  const tierGroups = useSelector(selectTierGroups);
+  const tierItems = useSelector((s) => s.tiers.tierItems);
+  const tierLoading = useSelector((s) => s.tiers.tierLoading);
+  const dragOverTier = useSelector((s) => s.tiers.dragOverTier);
+  const draggedVideoId = useSelector((s) => s.tiers.draggedVideoId);
+  const syncStatus = useSelector((s) => s.tiers.syncStatus);
+  const loadedCategory = useSelector((s) => s.tiers.loadedCategory);
+  const pendingMoves = useSelector(selectPendingMoves);
+
+  useEffect(() => {
+    dispatch(setCurrentCategory(category));
+    dispatch(setMobileSidebarOpen(false));
+  }, [dispatch, category]);
+
+  useEffect(() => {
+    if (!playlists) return; // wait for playlists to load before judging validity
+    if (!tierGroups[category]) {
+      navigate('/', { replace: true });
+      return;
+    }
+    // Re-entering this same board's page (e.g. returning from a duel) must
+    // not refetch - that would silently discard an already-applied duel
+    // result or drag that hasn't been synced to YouTube yet.
+    if (loadedCategory !== category) loadTierBoardData(category);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [category, playlists, tierGroups, loadedCategory]);
+
+  function handleThumbDragStart(e, video, fromTier) {
+    e.dataTransfer.setData('application/json', JSON.stringify({ videoId: video.videoId, fromTier }));
+    e.dataTransfer.effectAllowed = 'move';
+    dispatch(setDraggedVideoId(video.videoId));
+  }
+
+  function handleThumbDragEnd() {
+    dispatch(setDraggedVideoId(null));
+    dispatch(setDragOverTier(null));
+  }
+
+  function handleRowDragOver(e, tier) {
+    e.preventDefault();
+    if (dragOverTier !== tier) dispatch(setDragOverTier(tier));
+  }
+
+  function handleRowDragLeave(tier) {
+    if (dragOverTier === tier) dispatch(setDragOverTier(null));
+  }
+
+  function handleRowDrop(e, toTier, dropIndex) {
+    e.preventDefault();
+    let data;
+    try {
+      data = JSON.parse(e.dataTransfer.getData('application/json') || '{}');
+    } catch {
+      data = {};
+    }
+    const { videoId, fromTier } = data;
+    dispatch(setDragOverTier(null));
+    dispatch(setDraggedVideoId(null));
+    if (!videoId) return;
+    dispatch(moveVideoToTierAction({ fromTier, toTier, videoId, dropIndex }));
+  }
+
+  return (
+    <TierBoardView
+      category={category}
+      tierGroups={tierGroups}
+      tierItems={tierItems}
+      tierLoading={tierLoading}
+      dragOverTier={dragOverTier}
+      draggedVideoId={draggedVideoId}
+      onRowDragOver={handleRowDragOver}
+      onRowDragLeave={handleRowDragLeave}
+      onRowDrop={handleRowDrop}
+      onThumbDragStart={handleThumbDragStart}
+      onThumbDragEnd={handleThumbDragEnd}
+      onThumbClick={openFocus}
+      pendingMoves={pendingMoves}
+      syncStatus={syncStatus}
+      onDiscard={discardChanges}
+      onSync={() => syncChanges(category)}
+      onStartDuel={() => navigate(`/tier/${encodeURIComponent(category)}/duel`)}
+      onShufflePlay={startShufflePlay}
+    />
+  );
+}
+
+function DuelPage() {
+  const { category: rawCategory } = useParams();
+  const category = decodeURIComponent(rawCategory);
+  const dispatch = useDispatch();
+  const navigate = useNavigate();
+  const { loadTierBoardData } = useOutletContext();
+
+  const playlists = useSelector((s) => s.auth.playlists);
+  const tierGroups = useSelector(selectTierGroups);
+  const loadedCategory = useSelector((s) => s.tiers.loadedCategory);
+  const duelPool = useSelector(selectDuelPool);
+  const duelRuns = useSelector(selectDuelRuns);
+  const duelTierSizes = useSelector(selectDuelTierSizes);
+
+  useEffect(() => {
+    dispatch(setCurrentCategory(category));
+    dispatch(setMobileSidebarOpen(false));
+  }, [dispatch, category]);
+
+  // Support deep-linking straight to a duel: load the board's data first if
+  // it isn't already loaded. Coming from "Start duel" on an already-open
+  // board has nothing left to fetch, and must not refetch - that would
+  // discard any local edits (drags) not yet synced to YouTube.
+  useEffect(() => {
+    if (!playlists) return;
+    if (!tierGroups[category]) {
+      navigate('/', { replace: true });
+      return;
+    }
+    if (loadedCategory !== category) loadTierBoardData(category);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [category, playlists, tierGroups, loadedCategory]);
+
+  function applyDuelResult(result) {
+    dispatch(setTierItems(result));
+    navigate(`/tier/${encodeURIComponent(category)}`);
+  }
+
+  return (
+    <DuelView
+      videos={duelPool}
+      runs={duelRuns}
+      tierSizes={duelTierSizes}
+      onComplete={applyDuelResult}
+      onCancel={() => navigate(`/tier/${encodeURIComponent(category)}`)}
+    />
+  );
+}
+
+function SettingsPage() {
+  const dispatch = useDispatch();
+
+  useEffect(() => {
+    dispatch(setCurrentCategory(null));
+    dispatch(setMobileSidebarOpen(false));
+  }, [dispatch]);
+
+  return <SettingsView />;
 }

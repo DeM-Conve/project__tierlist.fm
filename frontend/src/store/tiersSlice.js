@@ -15,14 +15,22 @@ const tiersSlice = createSlice({
     syncStatus: 'idle', // idle | syncing | done | partial | error
     draggedVideoId: null,
     dragOverTier: null,
+    // Which category's data tierItems currently holds. Lets a routed page
+    // component tell "I need to fetch this board" apart from "this board is
+    // already loaded, possibly with local edits (a duel result, a drag) that
+    // a redundant refetch would silently discard" - the router remounts the
+    // tier board page every time you navigate back to it (e.g. after a
+    // duel), which must NOT re-trigger a fetch for the same category.
+    loadedCategory: null,
   },
   reducers: {
     resetTierBoard: (state, action) => {
-      const presentTiers = action.payload;
+      const { category, presentTiers } = action.payload;
       state.tierItems = {};
       state.tierLoading = Object.fromEntries(presentTiers.map((t) => [t, true]));
       state.originalTierItems = {};
       state.originalTierOf = {};
+      state.loadedCategory = category;
     },
     setTierForCategory: (state, action) => {
       const { tier, videos } = action.payload;
