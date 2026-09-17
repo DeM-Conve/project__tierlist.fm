@@ -6,6 +6,7 @@ export default function Sidebar({
   activeView,
   onSelectTierBoard,
   onSelectPlaylists,
+  onSelectSettings,
   onLogout,
   onOpenPalette,
   mobileOpen,
@@ -62,9 +63,21 @@ export default function Sidebar({
           </button>
         </nav>
 
-        <button className="btn btn-ghost sidebar-logout" onClick={onLogout}>
-          Log out
-        </button>
+        <div className="sidebar-footer">
+          <button
+            className={`btn btn-ghost sidebar-settings-btn${
+              activeView.type === 'settings' ? ' sidebar-item-active' : ''
+            }`}
+            onClick={onSelectSettings}
+            aria-label="Settings"
+            title="Settings"
+          >
+            ⚙
+          </button>
+          <button className="btn btn-ghost sidebar-logout" onClick={onLogout}>
+            Log out
+          </button>
+        </div>
       </aside>
     </>
   );

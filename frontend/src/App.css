@@ -159,10 +159,17 @@
   background: var(--border-soft);
   margin: 10px 4px;
 }
-.sidebar-logout {
+.sidebar-footer {
+  display: flex;
+  gap: 8px;
   margin-top: 12px;
-  width: 100%;
 }
+.sidebar-settings-btn {
+  flex: 0 0 auto;
+  font-size: 16px;
+  padding: 10px 14px;
+}
+.sidebar-logout { flex: 1; }
 
 .sidebar-scrim { display: none; }
 
@@ -825,4 +832,69 @@
   border-top: 1px solid var(--border-soft);
   color: var(--text-faint);
   font-size: 12px;
+}
+
+/* Settings page: sub-nav + content, same shape regardless of category count */
+.settings-layout {
+  display: flex;
+  gap: 32px;
+  align-items: flex-start;
+}
+.settings-nav {
+  flex: 0 0 180px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  position: sticky;
+  top: 24px;
+}
+.settings-content { flex: 1; min-width: 0; max-width: 640px; }
+.settings-section h2 {
+  font-size: 17px;
+  margin: 0 0 6px;
+}
+.settings-section .hint-text { margin-bottom: 20px; }
+.settings-options {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.settings-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  text-align: left;
+  background: var(--surface);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  cursor: pointer;
+  transition: border-color 0.12s ease;
+}
+.settings-option:hover { border-color: var(--text-faint); }
+.settings-option-active { border-color: var(--accent); }
+.settings-option-radio {
+  flex: 0 0 16px;
+  width: 16px;
+  height: 16px;
+  margin-top: 2px;
+  border-radius: 50%;
+  border: 2px solid var(--border);
+  position: relative;
+}
+.settings-option-active .settings-option-radio { border-color: var(--accent); }
+.settings-option-active .settings-option-radio::after {
+  content: '';
+  position: absolute;
+  inset: 2px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+.settings-option-text { display: flex; flex-direction: column; gap: 4px; }
+.settings-option-label { font-weight: 600; font-size: 14px; }
+.settings-option-desc { color: var(--text-dim); font-size: 13px; line-height: 1.4; }
+
+@media (max-width: 640px) {
+  .settings-layout { flex-direction: column; gap: 16px; }
+  .settings-nav { flex-direction: row; position: static; width: 100%; }
 }

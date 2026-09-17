@@ -1,8 +1,18 @@
 import { useEffect, useRef, useState } from 'react';
 import { DEFAULT_DUEL_STRATEGY, DUEL_STRATEGIES, DUEL_STRATEGY_LABELS } from '../duel';
+import { SETTINGS, getSetting, setSetting } from '../settings';
 
 export default function DuelView({ videos, runs, tierSizes, onComplete, onCancel }) {
-  const [strategyKey, setStrategyKey] = useState(DEFAULT_DUEL_STRATEGY);
+  const [strategyKey, setStrategyKeyState] = useState(() =>
+    getSetting(SETTINGS.duelStrategy, DEFAULT_DUEL_STRATEGY)
+  );
+
+  // Picking a strategy here also updates the persisted default, so Settings
+  // and the in-session dropdown always agree on "what happens next time."
+  function setStrategyKey(key) {
+    setStrategyKeyState(key);
+    setSetting(SETTINGS.duelStrategy, key);
+  }
   const [currentPair, setCurrentPair] = useState(null);
   const [progress, setProgress] = useState({ completed: 0, total: 0 });
   const [spine, setSpine] = useState(null);

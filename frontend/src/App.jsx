@@ -8,6 +8,7 @@ import TierBoardView from './components/TierBoardView';
 import VideoFocusModal from './components/VideoFocusModal';
 import CommandPalette from './components/CommandPalette';
 import DuelView from './components/DuelView';
+import SettingsView from './components/SettingsView';
 
 const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8080';
 
@@ -19,6 +20,7 @@ export default function App() {
 
   // activeView: { type: 'playlists' } | { type: 'items', playlist }
   //           | { type: 'tierBoard', category } | { type: 'duel', category }
+  //           | { type: 'settings' }
   const [activeView, setActiveView] = useState({ type: 'playlists' });
 
   const [items, setItems] = useState(null);
@@ -190,6 +192,10 @@ export default function App() {
         return;
       }
     }
+    if (path === '/settings') {
+      selectSettings({ push });
+      return;
+    }
     if (fallbackToFirst) {
       const categories = Object.keys(groups).sort();
       if (categories.length > 0) {
@@ -297,6 +303,13 @@ export default function App() {
     setMobileSidebarOpen(false);
     setFocusedVideo(null);
     updateUrl('/', { push, replace: false });
+  }
+
+  function selectSettings({ push = true } = {}) {
+    setActiveView({ type: 'settings' });
+    setMobileSidebarOpen(false);
+    setFocusedVideo(null);
+    updateUrl('/settings', { push, replace: false });
   }
 
   function updateUrl(path, { push, replace }) {
@@ -479,6 +492,7 @@ export default function App() {
         activeView={activeView}
         onSelectTierBoard={openTierBoard}
         onSelectPlaylists={selectPlaylists}
+        onSelectSettings={selectSettings}
         onLogout={logout}
         onOpenPalette={() => setPaletteOpen(true)}
         mobileOpen={mobileSidebarOpen}
@@ -525,6 +539,8 @@ export default function App() {
             onCancel={() => backToTierBoard(activeView.category)}
           />
         )}
+
+        {activeView.type === 'settings' && <SettingsView />}
       </main>
 
       {focusedVideoData && (
