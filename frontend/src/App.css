@@ -942,7 +942,19 @@
   font-size: 12px;
 }
 
-/* Command palette */
+/* Command palette - Dialog.Overlay and Dialog.Content render as siblings
+   (not nested) under Radix's Portal, so Content needs its own centering
+   instead of relying on .modal-overlay's flex-center like before. */
+.palette-center-wrapper {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+.palette-center-wrapper:focus { outline: none; }
 .palette {
   width: 100%;
   max-width: 560px;
@@ -1024,6 +1036,31 @@
   top: 24px;
 }
 .settings-content { flex: 1; min-width: 0; max-width: 640px; }
+/* Same look as the main sidebar's nav items, but driven by Radix Tabs'
+   own data-state instead of a hand-toggled active class - it also owns
+   keyboard roving/focus behavior between triggers for free. */
+.settings-nav-item {
+  font-family: var(--font-body);
+  background: none;
+  border: none;
+  color: var(--text-dim);
+  text-align: left;
+  padding: 8px 8px;
+  border-radius: var(--radius);
+  font-size: 13.5px;
+  cursor: pointer;
+}
+.settings-nav-item:hover { background: var(--surface-2); color: var(--text); }
+.settings-nav-item[data-state='active'] {
+  background: var(--surface-3);
+  color: var(--text);
+  font-weight: 600;
+  box-shadow: inset 2px 0 0 var(--accent);
+}
+.settings-nav-item:focus-visible {
+  outline-offset: -2px;
+  border-radius: var(--radius);
+}
 .settings-section h2 {
   font-size: 17px;
   margin: 0 0 6px;

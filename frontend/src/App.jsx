@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
+import { useDispatch, useSelector, useStore } from 'react-redux';
 import './App.css';
-import { TIER_ORDER, groupByTier } from './tiers';
+import { TIER_ORDER } from './tiers';
 import Sidebar from './components/Sidebar';
 import PlaylistsView from './components/PlaylistsView';
 import ItemsView from './components/ItemsView';
@@ -9,125 +10,97 @@ import PlayerDock from './components/PlayerDock';
 import CommandPalette from './components/CommandPalette';
 import DuelView from './components/DuelView';
 import SettingsView from './components/SettingsView';
+import { setLoggedIn, setPlaylists } from './store/authSlice';
+import {
+  setActiveView,
+  setQuery,
+  setMobileSidebarOpen,
+  setPaletteOpen,
+  togglePalette,
+} from './store/viewSlice';
+import { setItems, setLoadingItems } from './store/itemsSlice';
+import {
+  resetTierBoard,
+  setTierForCategory,
+  setTierItems,
+  discardTierChanges,
+  setSyncStatus,
+  setDraggedVideoId,
+  setDragOverTier,
+  moveVideoToTier as moveVideoToTierAction,
+} from './store/tiersSlice';
+import {
+  openFocus as openFocusAction,
+  closeFocus as closeFocusAction,
+  minimizePlayer,
+  expandPlayer,
+  startShuffle,
+  setFocusedVideo,
+} from './store/focusSlice';
+import {
+  selectTierGroups,
+  selectTierCategories,
+  selectPendingMoves,
+  selectDuelPool,
+  selectDuelRuns,
+  selectDuelTierSizes,
+  selectFocusSequence,
+  selectVideoLookup,
+  selectActiveSequence,
+  selectFocusedSeqIndex,
+  selectFocusedVideoData,
+  selectFocusedAvailableTiers,
+} from './store/selectors';
 
 const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8080';
 
 export default function App() {
-  const [loggedIn, setLoggedIn] = useState(null);
-  const [playlists, setPlaylists] = useState(null);
-  const [query, setQuery] = useState('');
-  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+  const dispatch = useDispatch();
+  const store = useStore();
 
-  // activeView: { type: 'playlists' } | { type: 'items', playlist }
-  //           | { type: 'tierBoard', category } | { type: 'duel', category }
-  //           | { type: 'settings' }
-  const [activeView, setActiveView] = useState({ type: 'playlists' });
+  const loggedIn = useSelector((s) => s.auth.loggedIn);
+  const playlists = useSelector((s) => s.auth.playlists);
+  const query = useSelector((s) => s.view.query);
+  const mobileSidebarOpen = useSelector((s) => s.view.mobileSidebarOpen);
+  const activeView = useSelector((s) => s.view.activeView);
+  const paletteOpen = useSelector((s) => s.view.paletteOpen);
+  const items = useSelector((s) => s.items.items);
+  const loadingItems = useSelector((s) => s.items.loadingItems);
+  const tierItems = useSelector((s) => s.tiers.tierItems);
+  const tierLoading = useSelector((s) => s.tiers.tierLoading);
+  const draggedVideoId = useSelector((s) => s.tiers.draggedVideoId);
+  const dragOverTier = useSelector((s) => s.tiers.dragOverTier);
+  const syncStatus = useSelector((s) => s.tiers.syncStatus);
+  const focusedVideo = useSelector((s) => s.focus.focusedVideo);
+  const isShuffling = useSelector((s) => s.focus.isShuffling);
+  const playerMode = useSelector((s) => s.focus.playerMode);
 
-  const [items, setItems] = useState(null);
-  const [loadingItems, setLoadingItems] = useState(false);
+  const tierGroups = useSelector(selectTierGroups);
+  const tierCategories = useSelector(selectTierCategories);
+  const pendingMoves = useSelector(selectPendingMoves);
+  const duelPool = useSelector(selectDuelPool);
+  const duelRuns = useSelector(selectDuelRuns);
+  const duelTierSizes = useSelector(selectDuelTierSizes);
+  const focusSequence = useSelector(selectFocusSequence);
+  const videoLookup = useSelector(selectVideoLookup);
+  const activeSequence = useSelector(selectActiveSequence);
+  const focusedSeqIndex = useSelector(selectFocusedSeqIndex);
+  const focusedVideoData = useSelector(selectFocusedVideoData);
+  const focusedAvailableTiers = useSelector(selectFocusedAvailableTiers);
 
-  const [tierItems, setTierItems] = useState({});
-  const [tierLoading, setTierLoading] = useState({});
-  const [draggedVideoId, setDraggedVideoId] = useState(null);
-  const [dragOverTier, setDragOverTier] = useState(null);
-  const [syncStatus, setSyncStatus] = useState('idle'); // idle | syncing | done | partial | error
-
-  // { tier, videoId } for the video open in the focus/embed modal, or null.
-  const [focusedVideo, setFocusedVideo] = useState(null);
-  // The browsing order for the currently-open focus session (video ids only,
-  // in either tier order or shuffled order), frozen the moment the modal is
-  // opened. Without this, "next" was recomputed live from current tier
-  // membership, so reassigning a video's tier mid-browse (which appends it
-  // to the end of its new tier) would silently teleport your position and
-  // make "next" jump into a different tier than you were actually browsing.
-  const [focusQueue, setFocusQueue] = useState(null);
-  const [isShuffling, setIsShuffling] = useState(false);
-  // 'expanded' (full-screen modal) or 'mini' (YouTube-Music-style bottom
-  // bar that doesn't block the rest of the app). The player itself is never
-  // unmounted when switching between the two - only its layout changes -
-  // so minimizing keeps the video/audio playing in the background.
-  const [playerMode, setPlayerMode] = useState('expanded');
-  const [paletteOpen, setPaletteOpen] = useState(false);
-
-  const originalTierOfRef = useRef({});
-  const originalTierItemsRef = useRef({});
+  // Kept as plain refs (not store state) - they only exist so
+  // resolveFromLocation's popstate handler can read the latest playlists/
+  // tierGroups without re-subscribing the listener on every change.
   const autoSelectedRef = useRef(false);
   const playlistsRef = useRef(null);
   const tierGroupsRef = useRef({});
-
-  const tierGroups = useMemo(() => (playlists ? groupByTier(playlists) : {}), [playlists]);
-  const tierCategories = Object.keys(tierGroups).sort();
-
   playlistsRef.current = playlists;
   tierGroupsRef.current = tierGroups;
 
-  const pendingMoves = useMemo(() => {
-    const moves = [];
-    for (const tier of TIER_ORDER) {
-      for (const video of tierItems[tier] || []) {
-        const originalTiers = originalTierOfRef.current[video.videoId];
-        if (!originalTiers) continue;
-
-        if (originalTiers.size > 1) {
-          // Genuinely exists in more than one of this board's real YouTube
-          // tier playlists. Keep the highest (earliest in TIER_ORDER) copy
-          // and auto-stage every other occurrence for removal - there's
-          // nothing to ask the user, the lower copy is just clutter.
-          const keepTier = TIER_ORDER.find((t) => originalTiers.has(t));
-          if (tier !== keepTier) {
-            moves.push({ kind: 'dedupe', video, tier });
-          }
-          continue;
-        }
-
-        if (!originalTiers.has(tier)) {
-          moves.push({ kind: 'move', video, from: [...originalTiers][0], to: tier });
-        }
-      }
-    }
-    return moves;
-  }, [tierItems]);
-
-  const duelPool = useMemo(() => TIER_ORDER.flatMap((t) => tierItems[t] || []), [tierItems]);
-  const duelRuns = useMemo(
-    () => TIER_ORDER.filter((t) => tierItems[t]).map((t) => tierItems[t].map((v) => v.videoId)),
-    [tierItems]
-  );
-  const duelTierSizes = useMemo(
-    () => TIER_ORDER.filter((t) => tierItems[t]).map((t) => ({ tier: t, count: tierItems[t].length })),
-    [tierItems]
-  );
-
-  // Flattened across every tier of the current board, in tier order, so
-  // "next" can walk off the end of one tier straight into the start of the
-  // next one instead of stopping dead at each tier's own boundary.
-  const focusSequence = useMemo(
-    () => TIER_ORDER.flatMap((t) => (tierItems[t] || []).map((video) => ({ tier: t, video }))),
-    [tierItems]
-  );
-  // Looked up by videoId only (not tier) so a shuffle order stays valid even
-  // if a video's tier changes mid-playthrough via a tier-reassign shortcut.
-  const videoLookup = useMemo(
-    () => new Map(focusSequence.map((e) => [e.video.videoId, e])),
-    [focusSequence]
-  );
-  const activeSequence = focusQueue
-    ? focusQueue.map((id) => videoLookup.get(id)).filter(Boolean)
-    : focusSequence;
-  const focusedSeqIndex = focusedVideo
-    ? activeSequence.findIndex(
-        (e) => e.tier === focusedVideo.tier && e.video.videoId === focusedVideo.videoId
-      )
-    : -1;
-  const focusedVideoData = focusedSeqIndex >= 0 ? activeSequence[focusedSeqIndex].video : null;
-  const focusedAvailableTiers = focusedVideo
-    ? TIER_ORDER.filter((t) => tierGroups[activeView.category]?.[t])
-    : [];
-
   const commandItems = useMemo(() => {
-    const items = [];
+    const list = [];
     for (const category of tierCategories) {
-      items.push({
+      list.push({
         id: `board-${category}`,
         section: 'Boards',
         label: `Go to board ${category}`,
@@ -135,34 +108,34 @@ export default function App() {
       });
     }
     for (const p of playlists || []) {
-      items.push({
+      list.push({
         id: `playlist-${p.id}`,
         section: 'Playlists',
         label: `Open ${p.title}`,
         action: () => openItems(p),
       });
     }
-    items.push({
+    list.push({
       id: 'action-playlists',
       section: 'Actions',
       label: 'Go to Playlists',
       action: () => selectPlaylists(),
     });
     if (activeView.type === 'tierBoard') {
-      items.push({
+      list.push({
         id: 'action-duel',
         section: 'Actions',
         label: `Start a duel on ${activeView.category}`,
         action: () => enterDuel(activeView.category),
       });
       if (pendingMoves.length > 0) {
-        items.push({
+        list.push({
           id: 'action-sync',
           section: 'Actions',
           label: `Sync ${activeView.category} to YouTube (${pendingMoves.length} pending)`,
           action: () => syncChanges(),
         });
-        items.push({
+        list.push({
           id: 'action-discard',
           section: 'Actions',
           label: `Discard changes on ${activeView.category}`,
@@ -170,12 +143,13 @@ export default function App() {
         });
       }
     }
-    return items;
+    return list;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tierCategories, playlists, activeView, pendingMoves]);
 
   useEffect(() => {
     checkAuth();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Restore whichever tier board / playlist the URL points at (so refresh and
@@ -201,11 +175,12 @@ export default function App() {
       const modifier = isMac ? e.metaKey : e.ctrlKey;
       if (modifier && e.key.toLowerCase() === 'k') {
         e.preventDefault();
-        setPaletteOpen((prev) => !prev);
+        dispatch(togglePalette());
       }
     }
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   function resolveFromLocation({ push, fallbackToFirst }) {
@@ -256,37 +231,37 @@ export default function App() {
     try {
       const res = await fetch(`${API_BASE}/api/auth/status`, { credentials: 'include' });
       const data = await res.json();
-      setLoggedIn(data.loggedIn);
+      dispatch(setLoggedIn(data.loggedIn));
       if (data.loggedIn) loadPlaylists();
     } catch {
-      setLoggedIn(false);
+      dispatch(setLoggedIn(false));
     }
   }
 
   async function loadPlaylists() {
-    setPlaylists(null);
+    dispatch(setPlaylists(null));
     const res = await fetch(`${API_BASE}/api/playlists`, { credentials: 'include' });
     if (!res.ok) {
-      setPlaylists([]);
+      dispatch(setPlaylists([]));
       return;
     }
-    setPlaylists(await res.json());
+    dispatch(setPlaylists(await res.json()));
   }
 
   async function openItems(playlist, { push = true, replace = false } = {}) {
-    setActiveView({ type: 'items', playlist });
-    setMobileSidebarOpen(false);
-    setFocusedVideo(null);
+    dispatch(setActiveView({ type: 'items', playlist }));
+    dispatch(setMobileSidebarOpen(false));
+    dispatch(closeFocusAction());
     updateUrl(`/playlist/${encodeURIComponent(playlist.id)}`, { push, replace });
-    setItems(null);
-    setLoadingItems(true);
+    dispatch(setItems(null));
+    dispatch(setLoadingItems(true));
     const res = await fetch(`${API_BASE}/api/playlists/${playlist.id}/items`, { credentials: 'include' });
-    setLoadingItems(false);
+    dispatch(setLoadingItems(false));
     if (!res.ok) {
-      setItems([]);
+      dispatch(setItems([]));
       return;
     }
-    setItems(await res.json());
+    dispatch(setItems(await res.json()));
   }
 
   async function fetchPlaylistItems(playlistId) {
@@ -296,66 +271,56 @@ export default function App() {
   }
 
   async function loadTierBoardData(category) {
-    const tiers = tierGroups[category];
+    const tiers = tierGroupsRef.current[category];
     const presentTiers = TIER_ORDER.filter((t) => tiers[t]);
-
-    originalTierOfRef.current = {};
-    originalTierItemsRef.current = {};
-    setTierItems({});
-    setTierLoading(Object.fromEntries(presentTiers.map((t) => [t, true])));
+    dispatch(resetTierBoard(presentTiers));
 
     await Promise.all(
       presentTiers.map(async (t) => {
-        const fetched = await fetchPlaylistItems(tiers[t].id);
-        fetched.forEach((v) => {
-          if (!originalTierOfRef.current[v.videoId]) originalTierOfRef.current[v.videoId] = new Set();
-          originalTierOfRef.current[v.videoId].add(t);
-        });
-        originalTierItemsRef.current[t] = fetched;
-        setTierItems((prev) => ({ ...prev, [t]: fetched }));
-        setTierLoading((prev) => ({ ...prev, [t]: false }));
+        const videos = await fetchPlaylistItems(tiers[t].id);
+        dispatch(setTierForCategory({ tier: t, videos }));
       })
     );
   }
 
   async function openTierBoard(category, { push = true, replace = false } = {}) {
-    setActiveView({ type: 'tierBoard', category });
-    setMobileSidebarOpen(false);
-    setSyncStatus('idle');
-    setFocusedVideo(null);
+    dispatch(setActiveView({ type: 'tierBoard', category }));
+    dispatch(setMobileSidebarOpen(false));
+    dispatch(setSyncStatus('idle'));
+    dispatch(closeFocusAction());
     updateUrl(`/tier/${encodeURIComponent(category)}`, { push, replace });
     await loadTierBoardData(category);
   }
 
   function enterDuel(category, { push = true, replace = false } = {}) {
-    setActiveView({ type: 'duel', category });
-    setMobileSidebarOpen(false);
-    setFocusedVideo(null);
+    dispatch(setActiveView({ type: 'duel', category }));
+    dispatch(setMobileSidebarOpen(false));
+    dispatch(closeFocusAction());
     updateUrl(`/tier/${encodeURIComponent(category)}/duel`, { push, replace });
   }
 
   function backToTierBoard(category, { push = true } = {}) {
-    setActiveView({ type: 'tierBoard', category });
-    setMobileSidebarOpen(false);
+    dispatch(setActiveView({ type: 'tierBoard', category }));
+    dispatch(setMobileSidebarOpen(false));
     updateUrl(`/tier/${encodeURIComponent(category)}`, { push, replace: false });
   }
 
   function applyDuelResult(category, newTierItems) {
-    setTierItems(newTierItems);
+    dispatch(setTierItems(newTierItems));
     backToTierBoard(category);
   }
 
   function selectPlaylists({ push = true } = {}) {
-    setActiveView({ type: 'playlists' });
-    setMobileSidebarOpen(false);
-    setFocusedVideo(null);
+    dispatch(setActiveView({ type: 'playlists' }));
+    dispatch(setMobileSidebarOpen(false));
+    dispatch(closeFocusAction());
     updateUrl('/', { push, replace: false });
   }
 
   function selectSettings({ push = true } = {}) {
-    setActiveView({ type: 'settings' });
-    setMobileSidebarOpen(false);
-    setFocusedVideo(null);
+    dispatch(setActiveView({ type: 'settings' }));
+    dispatch(setMobileSidebarOpen(false));
+    dispatch(closeFocusAction());
     updateUrl('/settings', { push, replace: false });
   }
 
@@ -368,49 +333,25 @@ export default function App() {
   function handleThumbDragStart(e, video, fromTier) {
     e.dataTransfer.setData('application/json', JSON.stringify({ videoId: video.videoId, fromTier }));
     e.dataTransfer.effectAllowed = 'move';
-    setDraggedVideoId(video.videoId);
+    dispatch(setDraggedVideoId(video.videoId));
   }
 
   function handleThumbDragEnd() {
-    setDraggedVideoId(null);
-    setDragOverTier(null);
+    dispatch(setDraggedVideoId(null));
+    dispatch(setDragOverTier(null));
   }
 
   function handleRowDragOver(e, tier) {
     e.preventDefault();
-    if (dragOverTier !== tier) setDragOverTier(tier);
+    if (dragOverTier !== tier) dispatch(setDragOverTier(tier));
   }
 
   function handleRowDragLeave(tier) {
-    setDragOverTier((prev) => (prev === tier ? null : prev));
+    if (dragOverTier === tier) dispatch(setDragOverTier(null));
   }
 
-  // dropIndex omitted (null/undefined) means "append to the end of the target tier".
   function moveVideoToTier(fromTier, toTier, videoId, dropIndex) {
-    setTierItems((prev) => {
-      const sourceArr = prev[fromTier] || [];
-      const video = sourceArr.find((v) => v.videoId === videoId);
-      if (!video) return prev;
-
-      if (fromTier === toTier) {
-        if (dropIndex == null) return prev;
-        const originalIndex = sourceArr.findIndex((v) => v.videoId === videoId);
-        const withoutVideo = sourceArr.filter((v) => v.videoId !== videoId);
-        let index = originalIndex < dropIndex ? dropIndex - 1 : dropIndex;
-        index = Math.max(0, Math.min(index, withoutVideo.length));
-        withoutVideo.splice(index, 0, video);
-        return { ...prev, [fromTier]: withoutVideo };
-      }
-
-      const targetArr = [...(prev[toTier] || [])];
-      const index = dropIndex == null ? targetArr.length : Math.max(0, Math.min(dropIndex, targetArr.length));
-      targetArr.splice(index, 0, video);
-      return {
-        ...prev,
-        [fromTier]: sourceArr.filter((v) => v.videoId !== videoId),
-        [toTier]: targetArr,
-      };
-    });
+    dispatch(moveVideoToTierAction({ fromTier, toTier, videoId, dropIndex }));
   }
 
   function handleRowDrop(e, toTier, dropIndex) {
@@ -422,8 +363,8 @@ export default function App() {
       data = {};
     }
     const { videoId, fromTier } = data;
-    setDragOverTier(null);
-    setDraggedVideoId(null);
+    dispatch(setDragOverTier(null));
+    dispatch(setDraggedVideoId(null));
     if (!videoId) return;
     moveVideoToTier(fromTier, toTier, videoId, dropIndex);
   }
@@ -431,27 +372,11 @@ export default function App() {
   function openFocus(tier, videoId) {
     // Freeze the current tier-order sequence as this session's browsing
     // order, so later tier reassignments can't reshuffle where "next" goes.
-    setFocusQueue(focusSequence.map((e) => e.video.videoId));
-    setIsShuffling(false);
-    setPlayerMode('expanded');
-    setFocusedVideo({ tier, videoId });
+    dispatch(openFocusAction({ tier, videoId, queue: focusSequence.map((e) => e.video.videoId) }));
   }
 
-  // Fully stops playback - as opposed to minimizePlayer, which keeps it
-  // running in the background.
   function closeFocus() {
-    setFocusedVideo(null);
-    setFocusQueue(null);
-    setIsShuffling(false);
-    setPlayerMode('expanded');
-  }
-
-  function minimizePlayer() {
-    setPlayerMode('mini');
-  }
-
-  function expandPlayer() {
-    setPlayerMode('expanded');
+    dispatch(closeFocusAction());
   }
 
   function startShufflePlay() {
@@ -461,11 +386,8 @@ export default function App() {
       const j = Math.floor(Math.random() * (i + 1));
       [ids[i], ids[j]] = [ids[j], ids[i]];
     }
-    setFocusQueue(ids);
-    setIsShuffling(true);
-    setPlayerMode('expanded');
     const first = videoLookup.get(ids[0]);
-    setFocusedVideo({ tier: first.tier, videoId: first.video.videoId });
+    dispatch(startShuffle({ queue: ids, tier: first.tier, videoId: first.video.videoId }));
   }
 
   function navigateFocus(delta) {
@@ -473,25 +395,25 @@ export default function App() {
     const nextIndex = focusedSeqIndex + delta;
     if (nextIndex < 0 || nextIndex >= activeSequence.length) return;
     const entry = activeSequence[nextIndex];
-    setFocusedVideo({ tier: entry.tier, videoId: entry.video.videoId });
+    dispatch(setFocusedVideo({ tier: entry.tier, videoId: entry.video.videoId }));
   }
 
   function changeFocusedTier(newTier) {
     if (!focusedVideo || newTier === focusedVideo.tier) return;
     moveVideoToTier(focusedVideo.tier, newTier, focusedVideo.videoId, null);
-    setFocusedVideo({ tier: newTier, videoId: focusedVideo.videoId });
+    dispatch(setFocusedVideo({ tier: newTier, videoId: focusedVideo.videoId }));
   }
 
   function discardChanges() {
-    setTierItems(JSON.parse(JSON.stringify(originalTierItemsRef.current)));
-    setSyncStatus('idle');
+    dispatch(discardTierChanges());
   }
 
   async function syncChanges() {
-    setSyncStatus('syncing');
+    dispatch(setSyncStatus('syncing'));
     const category = activeView.category;
     const tiers = tierGroups[category] || {};
-    const payload = pendingMoves.map((m) => ({
+    const currentPendingMoves = selectPendingMoves(store.getState());
+    const payload = currentPendingMoves.map((m) => ({
       videoId: m.video.videoId,
       title: m.video.title,
       fromItemId: m.video.id,
@@ -512,10 +434,10 @@ export default function App() {
       const result = await res.json();
       const finishedStatus = result.applied < result.total ? 'partial' : 'done';
       await loadTierBoardData(category);
-      setSyncStatus(finishedStatus);
-      setTimeout(() => setSyncStatus('idle'), 2500);
+      dispatch(setSyncStatus(finishedStatus));
+      setTimeout(() => dispatch(setSyncStatus('idle')), 2500);
     } catch {
-      setSyncStatus('error');
+      dispatch(setSyncStatus('error'));
     }
   }
 
@@ -525,15 +447,14 @@ export default function App() {
 
   async function logout() {
     await fetch(`${API_BASE}/api/auth/logout`, { method: 'POST', credentials: 'include' });
-    setLoggedIn(false);
-    setPlaylists(null);
-    setActiveView({ type: 'playlists' });
-    setItems(null);
-    setTierItems({});
-    setTierLoading({});
-    setSyncStatus('idle');
-    setFocusedVideo(null);
-    setPaletteOpen(false);
+    dispatch(setLoggedIn(false));
+    dispatch(setPlaylists(null));
+    dispatch(setActiveView({ type: 'playlists' }));
+    dispatch(setItems(null));
+    dispatch(setTierItems({}));
+    dispatch(setSyncStatus('idle'));
+    dispatch(closeFocusAction());
+    dispatch(setPaletteOpen(false));
     autoSelectedRef.current = false;
     window.history.replaceState(null, '', '/');
   }
@@ -562,13 +483,13 @@ export default function App() {
 
   return (
     <div className="app-shell">
-      <button className="mobile-menu-btn" onClick={() => setMobileSidebarOpen(true)}>
+      <button className="mobile-menu-btn" onClick={() => dispatch(setMobileSidebarOpen(true))}>
         Menu
       </button>
 
       <Sidebar
         query={query}
-        onQueryChange={setQuery}
+        onQueryChange={(q) => dispatch(setQuery(q))}
         tierCategories={tierCategories}
         playlistCount={playlists?.length ?? 0}
         activeView={activeView}
@@ -576,9 +497,9 @@ export default function App() {
         onSelectPlaylists={selectPlaylists}
         onSelectSettings={selectSettings}
         onLogout={logout}
-        onOpenPalette={() => setPaletteOpen(true)}
+        onOpenPalette={() => dispatch(setPaletteOpen(true))}
         mobileOpen={mobileSidebarOpen}
-        onCloseMobile={() => setMobileSidebarOpen(false)}
+        onCloseMobile={() => dispatch(setMobileSidebarOpen(false))}
       />
 
       <main className="canvas">
@@ -636,8 +557,8 @@ export default function App() {
           hasNext={focusedSeqIndex < activeSequence.length - 1}
           isShuffling={isShuffling}
           onStop={closeFocus}
-          onMinimize={minimizePlayer}
-          onExpand={expandPlayer}
+          onMinimize={() => dispatch(minimizePlayer())}
+          onExpand={() => dispatch(expandPlayer())}
           onPrev={() => navigateFocus(-1)}
           onNext={() => navigateFocus(1)}
           onChangeTier={changeFocusedTier}
@@ -645,7 +566,7 @@ export default function App() {
       )}
 
       {paletteOpen && (
-        <CommandPalette items={commandItems} onClose={() => setPaletteOpen(false)} />
+        <CommandPalette items={commandItems} onClose={() => dispatch(setPaletteOpen(false))} />
       )}
     </div>
   );

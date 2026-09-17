@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { Dialog } from 'radix-ui';
 
 function rank(item, needle) {
   const label = item.label.toLowerCase();
@@ -12,10 +13,6 @@ export default function CommandPalette({ items, onClose }) {
   const [activeIndex, setActiveIndex] = useState(0);
   const inputRef = useRef(null);
   const listRef = useRef(null);
-
-  useEffect(() => {
-    inputRef.current?.focus();
-  }, []);
 
   const filtered = useMemo(() => {
     const needle = query.trim().toLowerCase();
@@ -50,9 +47,8 @@ export default function CommandPalette({ items, onClose }) {
   }
 
   function onKeyDown(e) {
-    if (e.key === 'Escape') {
-      onClose();
-    } else if (e.key === 'ArrowDown') {
+    // Escape is handled by Dialog itself (onEscapeKeyDown below).
+    if (e.key === 'ArrowDown') {
       e.preventDefault();
       setActiveIndex((i) => Math.min(i + 1, filtered.length - 1));
     } else if (e.key === 'ArrowUp') {
@@ -67,47 +63,61 @@ export default function CommandPalette({ items, onClose }) {
   let flatIndex = -1;
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="palette" onClick={(e) => e.stopPropagation()}>
-        <input
-          ref={inputRef}
-          className="palette-input"
-          type="text"
-          placeholder="Jump to a board, playlist, or action..."
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          onKeyDown={onKeyDown}
-        />
+    <Dialog.Root open onOpenChange={(open) => !open && onClose()}>
+      <Dialog.Portal>
+        <Dialog.Overlay className="modal-overlay" />
+        <Dialog.Content
+          className="palette-center-wrapper"
+          onEscapeKeyDown={onClose}
+          onOpenAutoFocus={(e) => {
+            e.preventDefault();
+            inputRef.current?.focus();
+          }}
+          aria-describedby={undefined}
+        >
+          <Dialog.Title className="sr-only">Command palette</Dialog.Title>
+          <div className="palette">
+            <input
+              ref={inputRef}
+              className="palette-input"
+              type="text"
+              placeholder="Jump to a board, playlist, or action..."
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              onKeyDown={onKeyDown}
+            />
 
-        <div className="palette-list" ref={listRef}>
-          {filtered.length === 0 && <p className="palette-empty">No matches</p>}
-          {Object.entries(sections).map(([section, sectionItems]) => (
-            <div key={section} className="palette-section">
-              <p className="palette-section-label">{section}</p>
-              {sectionItems.map((item) => {
-                flatIndex += 1;
-                const isActive = flatIndex === activeIndex;
-                return (
-                  <button
-                    key={item.id}
-                    className={`palette-item${isActive ? ' palette-item-active' : ''}`}
-                    onMouseEnter={() => setActiveIndex(flatIndex)}
-                    onClick={() => runItem(item)}
-                  >
-                    {item.label}
-                  </button>
-                );
-              })}
+            <div className="palette-list" ref={listRef}>
+              {filtered.length === 0 && <p className="palette-empty">No matches</p>}
+              {Object.entries(sections).map(([section, sectionItems]) => (
+                <div key={section} className="palette-section">
+                  <p className="palette-section-label">{section}</p>
+                  {sectionItems.map((item) => {
+                    flatIndex += 1;
+                    const isActive = flatIndex === activeIndex;
+                    return (
+                      <button
+                        key={item.id}
+                        className={`palette-item${isActive ? ' palette-item-active' : ''}`}
+                        onMouseEnter={() => setActiveIndex(flatIndex)}
+                        onClick={() => runItem(item)}
+                      >
+                        {item.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
 
-        <div className="palette-footer">
-          <span>↵ select</span>
-          <span>↑↓ navigate</span>
-          <span>esc close</span>
-        </div>
-      </div>
-    </div>
+            <div className="palette-footer">
+              <span>↵ select</span>
+              <span>↑↓ navigate</span>
+              <span>esc close</span>
+            </div>
+          </div>
+        </Dialog.Content>
+      </Dialog.Portal>
+    </Dialog.Root>
   );
 }
