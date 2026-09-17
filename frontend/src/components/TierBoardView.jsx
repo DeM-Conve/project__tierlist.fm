@@ -24,7 +24,7 @@ function TierRow({
   onThumbDragEnd,
   onThumbClick,
   draggedVideoId,
-  duplicateVideoIds,
+  pendingRemovalKeys,
 }) {
   const [overIndex, setOverIndex] = useState(null);
 
@@ -83,9 +83,12 @@ function TierRow({
               title={v.title}
             >
               <img src={v.thumbnail || ''} alt={v.title} draggable={false} />
-              {duplicateVideoIds?.has(v.videoId) && (
-                <span className="tier-thumb-duplicate-tag" title="This video is also in another tier's playlist">
-                  Duplicate
+              {pendingRemovalKeys?.has(`${tier}:${v.videoId}`) && (
+                <span
+                  className="tier-thumb-duplicate-tag"
+                  title="Also in a higher tier's playlist - this copy will be removed on sync"
+                >
+                  Removing (duplicate)
                 </span>
               )}
               <a
@@ -113,7 +116,7 @@ function PendingChangesModal({ moves, onClose }) {
       <div className="pending-modal" onClick={(e) => e.stopPropagation()}>
         <div className="pending-panel-header">
           <h2>
-            {moves.length} move{moves.length === 1 ? '' : 's'} staged
+            {moves.length} change{moves.length === 1 ? '' : 's'} staged
           </h2>
           <button className="modal-close" onClick={onClose} aria-label="Close">
             ✕
@@ -122,18 +125,30 @@ function PendingChangesModal({ moves, onClose }) {
 
         <ul className="pending-list">
           {moves.map((m) => (
-            <li key={m.video.videoId} className="pending-row">
+            <li key={`${m.kind}-${m.video.videoId}-${m.tier ?? m.to}`} className="pending-row">
               <span className="pending-title" title={m.video.title}>
                 {m.video.title}
               </span>
               <span className="pending-tiers">
-                <span className="tier-chip" style={{ background: TIER_COLORS[m.from] }}>
-                  {m.from}
-                </span>
-                <span className="pending-arrow">→</span>
-                <span className="tier-chip" style={{ background: TIER_COLORS[m.to] }}>
-                  {m.to}
-                </span>
+                {m.kind === 'dedupe' ? (
+                  <>
+                    <span className="tier-chip" style={{ background: TIER_COLORS[m.tier] }}>
+                      {m.tier}
+                    </span>
+                    <span className="pending-arrow">→</span>
+                    <span className="pending-remove-label">removed (duplicate)</span>
+                  </>
+                ) : (
+                  <>
+                    <span className="tier-chip" style={{ background: TIER_COLORS[m.from] }}>
+                      {m.from}
+                    </span>
+                    <span className="pending-arrow">→</span>
+                    <span className="tier-chip" style={{ background: TIER_COLORS[m.to] }}>
+                      {m.to}
+                    </span>
+                  </>
+                )}
               </span>
             </li>
           ))}
@@ -157,13 +172,17 @@ export default function TierBoardView({
   onThumbDragEnd,
   onThumbClick,
   pendingMoves,
-  duplicateVideoIds,
   syncStatus,
   onDiscard,
   onSync,
   onStartDuel,
+  onShufflePlay,
 }) {
   const [showPending, setShowPending] = useState(false);
+  const hasVideos = Object.values(tierItems).some((arr) => arr?.length > 0);
+  const pendingRemovalKeys = new Set(
+    pendingMoves.filter((m) => m.kind === 'dedupe').map((m) => `${m.tier}:${m.video.videoId}`)
+  );
 
   return (
     <section>
@@ -175,8 +194,8 @@ export default function TierBoardView({
 
         <div className="tier-board-actions">
           {pendingMoves.length > 0 && (
-            <>
-              <button className="btn btn-ghost" onClick={() => setShowPending(true)}>
+            <div className="sync-bar">
+              <button className="btn btn-ghost sync-bar-count" onClick={() => setShowPending(true)}>
                 {pendingMoves.length} pending
               </button>
               {syncStatus === 'done' && <span className="sync-status sync-status-done">Synced</span>}
@@ -186,13 +205,18 @@ export default function TierBoardView({
                 Discard
               </button>
               <button className="btn btn-primary" onClick={onSync} disabled={syncStatus === 'syncing'}>
-                {syncStatus === 'syncing' ? 'Syncing...' : `Push ${pendingMoves.length} to YouTube`}
+                {syncStatus === 'syncing' ? 'Syncing...' : 'Push to YouTube'}
               </button>
-            </>
+            </div>
           )}
-          <button className="btn btn-ghost" onClick={onStartDuel}>
-            Start duel
-          </button>
+          <div className="tier-board-utility-actions">
+            <button className="btn btn-ghost" onClick={onShufflePlay} disabled={!hasVideos}>
+              🔀 Shuffle play
+            </button>
+            <button className="btn btn-ghost" onClick={onStartDuel}>
+              Start duel
+            </button>
+          </div>
         </div>
       </div>
 
@@ -215,7 +239,7 @@ export default function TierBoardView({
             onThumbDragStart={onThumbDragStart}
             onThumbDragEnd={onThumbDragEnd}
             onThumbClick={onThumbClick}
-            duplicateVideoIds={duplicateVideoIds}
+            pendingRemovalKeys={pendingRemovalKeys}
           />
         ))}
       </div>

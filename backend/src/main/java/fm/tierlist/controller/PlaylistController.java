@@ -95,7 +95,10 @@ public class PlaylistController {
     /**
      * Moves videos between playlists: inserts into the target playlist first, then
      * removes the original playlistItem, so a failed delete never loses a video.
-     * Each move is applied independently; failures are reported per-item rather than
+     * A null/blank toPlaylistId means "delete only" - used for a duplicate cleanup,
+     * where the video already exists in another of this board's tier playlists and
+     * this occurrence is just the redundant copy, not a real move.
+     * Each entry is applied independently; failures are reported per-item rather than
      * aborting the whole batch.
      */
     @PostMapping("/api/tier-sync")
@@ -114,7 +117,9 @@ public class PlaylistController {
             Map<String, Object> result = new LinkedHashMap<>();
             result.put("videoId", videoId);
             try {
-                insertPlaylistItem(client, toPlaylistId, videoId);
+                if (toPlaylistId != null && !toPlaylistId.isBlank()) {
+                    insertPlaylistItem(client, toPlaylistId, videoId);
+                }
                 if (fromItemId != null) {
                     deletePlaylistItem(client, fromItemId);
                 }

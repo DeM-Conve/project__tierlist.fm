@@ -34,6 +34,14 @@ export default function App() {
 
   // { tier, videoId } for the video open in the focus/embed modal, or null.
   const [focusedVideo, setFocusedVideo] = useState(null);
+  // The browsing order for the currently-open focus session (video ids only,
+  // in either tier order or shuffled order), frozen the moment the modal is
+  // opened. Without this, "next" was recomputed live from current tier
+  // membership, so reassigning a video's tier mid-browse (which appends it
+  // to the end of its new tier) would silently teleport your position and
+  // make "next" jump into a different tier than you were actually browsing.
+  const [focusQueue, setFocusQueue] = useState(null);
+  const [isShuffling, setIsShuffling] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
 
   const originalTierOfRef = useRef({});
@@ -53,28 +61,26 @@ export default function App() {
     for (const tier of TIER_ORDER) {
       for (const video of tierItems[tier] || []) {
         const originalTiers = originalTierOfRef.current[video.videoId];
-        // A video counts as "moved" only if the tier it's sitting in now isn't
-        // one it originally belonged to. If the same video happens to exist
-        // in two real YouTube tier playlists at once, it originally belongs
-        // to both, so neither counts as a move - avoids false positives from
-        // a video that's just duplicated across playlists.
-        if (originalTiers && !originalTiers.has(tier)) {
-          moves.push({ video, from: [...originalTiers][0], to: tier });
+        if (!originalTiers) continue;
+
+        if (originalTiers.size > 1) {
+          // Genuinely exists in more than one of this board's real YouTube
+          // tier playlists. Keep the highest (earliest in TIER_ORDER) copy
+          // and auto-stage every other occurrence for removal - there's
+          // nothing to ask the user, the lower copy is just clutter.
+          const keepTier = TIER_ORDER.find((t) => originalTiers.has(t));
+          if (tier !== keepTier) {
+            moves.push({ kind: 'dedupe', video, tier });
+          }
+          continue;
+        }
+
+        if (!originalTiers.has(tier)) {
+          moves.push({ kind: 'move', video, from: [...originalTiers][0], to: tier });
         }
       }
     }
     return moves;
-  }, [tierItems]);
-
-  // Videos that exist in more than one of this board's real YouTube tier
-  // playlists at once - flagged visually rather than auto-resolved, since
-  // only the user knows which copy should actually go.
-  const duplicateVideoIds = useMemo(() => {
-    const set = new Set();
-    Object.entries(originalTierOfRef.current).forEach(([videoId, tiers]) => {
-      if (tiers.size > 1) set.add(videoId);
-    });
-    return set;
   }, [tierItems]);
 
   const duelPool = useMemo(() => TIER_ORDER.flatMap((t) => tierItems[t] || []), [tierItems]);
@@ -94,12 +100,21 @@ export default function App() {
     () => TIER_ORDER.flatMap((t) => (tierItems[t] || []).map((video) => ({ tier: t, video }))),
     [tierItems]
   );
+  // Looked up by videoId only (not tier) so a shuffle order stays valid even
+  // if a video's tier changes mid-playthrough via a tier-reassign shortcut.
+  const videoLookup = useMemo(
+    () => new Map(focusSequence.map((e) => [e.video.videoId, e])),
+    [focusSequence]
+  );
+  const activeSequence = focusQueue
+    ? focusQueue.map((id) => videoLookup.get(id)).filter(Boolean)
+    : focusSequence;
   const focusedSeqIndex = focusedVideo
-    ? focusSequence.findIndex(
+    ? activeSequence.findIndex(
         (e) => e.tier === focusedVideo.tier && e.video.videoId === focusedVideo.videoId
       )
     : -1;
-  const focusedVideoData = focusedSeqIndex >= 0 ? focusSequence[focusedSeqIndex].video : null;
+  const focusedVideoData = focusedSeqIndex >= 0 ? activeSequence[focusedSeqIndex].video : null;
   const focusedAvailableTiers = focusedVideo
     ? TIER_ORDER.filter((t) => tierGroups[activeView.category]?.[t])
     : [];
@@ -409,18 +424,37 @@ export default function App() {
   }
 
   function openFocus(tier, videoId) {
+    // Freeze the current tier-order sequence as this session's browsing
+    // order, so later tier reassignments can't reshuffle where "next" goes.
+    setFocusQueue(focusSequence.map((e) => e.video.videoId));
+    setIsShuffling(false);
     setFocusedVideo({ tier, videoId });
   }
 
   function closeFocus() {
     setFocusedVideo(null);
+    setFocusQueue(null);
+    setIsShuffling(false);
+  }
+
+  function startShufflePlay() {
+    if (focusSequence.length === 0) return;
+    const ids = focusSequence.map((e) => e.video.videoId);
+    for (let i = ids.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [ids[i], ids[j]] = [ids[j], ids[i]];
+    }
+    setFocusQueue(ids);
+    setIsShuffling(true);
+    const first = videoLookup.get(ids[0]);
+    setFocusedVideo({ tier: first.tier, videoId: first.video.videoId });
   }
 
   function navigateFocus(delta) {
     if (focusedSeqIndex < 0) return;
     const nextIndex = focusedSeqIndex + delta;
-    if (nextIndex < 0 || nextIndex >= focusSequence.length) return;
-    const entry = focusSequence[nextIndex];
+    if (nextIndex < 0 || nextIndex >= activeSequence.length) return;
+    const entry = activeSequence[nextIndex];
     setFocusedVideo({ tier: entry.tier, videoId: entry.video.videoId });
   }
 
@@ -443,7 +477,9 @@ export default function App() {
       videoId: m.video.videoId,
       title: m.video.title,
       fromItemId: m.video.id,
-      toPlaylistId: tiers[m.to]?.id,
+      // A dedupe entry has nothing to insert - it's just removing the
+      // redundant copy, so toPlaylistId is left out entirely.
+      toPlaylistId: m.kind === 'dedupe' ? null : tiers[m.to]?.id,
     }));
 
     try {
@@ -551,11 +587,11 @@ export default function App() {
             onThumbDragEnd={handleThumbDragEnd}
             onThumbClick={openFocus}
             pendingMoves={pendingMoves}
-            duplicateVideoIds={duplicateVideoIds}
             syncStatus={syncStatus}
             onDiscard={discardChanges}
             onSync={syncChanges}
             onStartDuel={() => enterDuel(activeView.category)}
+            onShufflePlay={startShufflePlay}
           />
         )}
 
@@ -578,7 +614,8 @@ export default function App() {
           currentTier={focusedVideo.tier}
           availableTiers={focusedAvailableTiers}
           hasPrev={focusedSeqIndex > 0}
-          hasNext={focusedSeqIndex < focusSequence.length - 1}
+          hasNext={focusedSeqIndex < activeSequence.length - 1}
+          isShuffling={isShuffling}
           onClose={closeFocus}
           onPrev={() => navigateFocus(-1)}
           onNext={() => navigateFocus(1)}

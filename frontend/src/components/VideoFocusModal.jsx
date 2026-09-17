@@ -12,6 +12,7 @@ export default function VideoFocusModal({
   onPrev,
   onNext,
   onChangeTier,
+  isShuffling,
 }) {
   const cardRef = useRef(null);
 
@@ -78,7 +79,10 @@ export default function VideoFocusModal({
         </div>
 
         <div className="focus-info">
-          <h2>{video.title}</h2>
+          <h2>
+            {video.title}
+            {isShuffling && <span className="shuffle-badge" title="Shuffle play is active">🔀 Shuffle</span>}
+          </h2>
           <p className="hint-text">{video.channelTitle}</p>
         </div>
 
