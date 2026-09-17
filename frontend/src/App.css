@@ -155,36 +155,36 @@
 .tier-row:last-child { border-bottom: none; }
 .tier-row-dragover { background: rgba(214, 162, 76, 0.08); }
 .tier-label {
-  flex: 0 0 76px;
+  flex: 0 0 60px;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 4px;
+  gap: 3px;
   font-family: var(--font-display);
   color: #1a1509;
   font-weight: 900;
-  font-size: 19px;
+  font-size: 15px;
 }
 .tier-count {
   font-family: var(--font-body);
   font-weight: 600;
-  font-size: 11px;
+  font-size: 10px;
   opacity: 0.7;
 }
 .tier-content {
   flex: 1;
   display: flex;
-  gap: 12px;
-  padding: 14px;
+  gap: 8px;
+  padding: 10px;
   overflow-x: auto;
   background: var(--surface);
-  /* Matches a populated row's actual height (176px-wide, 16:9 thumbnail +
+  /* Matches a populated row's actual height (140px-wide, 16:9 thumbnail +
      title caption) so an empty/no-matches row renders at the same height
      instead of collapsing - without this, typing into the "/" search bar
      made rows grow and shrink line by line as matches came and went,
      shifting everything below vertically on every keystroke. */
-  min-height: 160px;
+  min-height: 128px;
   align-items: center;
 }
 .tier-thumb-wrap {
@@ -206,7 +206,7 @@
    thumbnail width, grab cursor, and the dim-while-dragging state. */
 .tier-thumb {
   flex: 0 0 auto;
-  width: 176px;
+  width: 140px;
   cursor: grab;
   transition: opacity 0.15s ease, transform 0.1s ease;
 }
@@ -246,7 +246,7 @@
 }
 .tier-thumb-skeleton {
   flex: 0 0 auto;
-  width: 176px;
+  width: 140px;
   aspect-ratio: 16/9;
 }
 .tier-empty {
@@ -469,7 +469,7 @@
     z-index: 35;
   }
   .canvas { padding: 72px 20px calc(32px + var(--player-dock-height)); }
-  .tier-thumb, .tier-thumb-skeleton { width: 128px; }
+  .tier-thumb, .tier-thumb-skeleton { width: 112px; }
   .player-dock-expanded .player-dock-card { width: 94vw; }
   .focus-nav { display: none; }
   .player-dock-mini .focus-info .hint-text { display: none; }
