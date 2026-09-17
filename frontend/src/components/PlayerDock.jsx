@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { ChevronDown, ChevronUp, Pause, Play, SkipBack, SkipForward, X } from 'lucide-react';
 import { TIER_COLORS } from '../tiers';
 import EmbeddedPlayer from './EmbeddedPlayer';
 
@@ -24,11 +25,29 @@ export default function PlayerDock({
   const cardRef = useRef(null);
   const playerRef = useRef(null);
   const [isPlaying, setIsPlaying] = useState(true);
+  const [progressPct, setProgressPct] = useState(0);
   const expanded = mode === 'expanded';
 
   useEffect(() => {
     if (expanded) cardRef.current?.focus();
   }, [expanded]);
+
+  // The IFrame API doesn't push time-update events, so the mini bar's
+  // progress line has to be polled from the player instead.
+  useEffect(() => {
+    const id = setInterval(() => {
+      const player = playerRef.current;
+      if (!player?.getDuration) return;
+      const duration = player.getDuration();
+      if (!duration) return;
+      setProgressPct((player.getCurrentTime() / duration) * 100);
+    }, 500);
+    return () => clearInterval(id);
+  }, []);
+
+  useEffect(() => {
+    setProgressPct(0);
+  }, [video.videoId]);
 
   // Keyboard shortcuts only make sense while the dock owns the screen -
   // while minimized, the rest of the app is in normal use and shouldn't
@@ -75,6 +94,8 @@ export default function PlayerDock({
         ref={cardRef}
         onClick={(e) => e.stopPropagation()}
       >
+        {!expanded && <div className="player-dock-progress" style={{ width: `${progressPct}%` }} />}
+
         <div className="player-dock-toolbar">
           {expanded ? (
             // Closing the expanded view minimizes it to the bottom bar
@@ -82,15 +103,15 @@ export default function PlayerDock({
             // "✕" on the full player collapses to its mini bar rather than
             // ending the song.
             <button className="modal-close" onClick={onMinimize} aria-label="Minimize" title="Minimize">
-              ✕
+              <ChevronDown size={16} />
             </button>
           ) : (
             <>
               <button className="modal-close" onClick={onExpand} aria-label="Expand" title="Expand">
-                ⌃
+                <ChevronUp size={16} />
               </button>
               <button className="modal-close" onClick={onStop} aria-label="Stop" title="Stop playback">
-                ✕
+                <X size={16} />
               </button>
             </>
           )}
@@ -134,14 +155,32 @@ export default function PlayerDock({
 
           {!expanded && (
             <div className="player-dock-controls">
-              <button className="btn btn-ghost" onClick={onPrev} disabled={!hasPrev} aria-label="Previous">
-                ‹
+              <button
+                className="player-dock-icon-btn"
+                onClick={onPrev}
+                disabled={!hasPrev}
+                aria-label="Previous"
+              >
+                <SkipBack size={18} fill="currentColor" />
               </button>
-              <button className="btn btn-ghost" onClick={togglePlay} aria-label={isPlaying ? 'Pause' : 'Play'}>
-                {isPlaying ? '⏸' : '▶'}
+              <button
+                className="player-dock-icon-btn player-dock-play-btn"
+                onClick={togglePlay}
+                aria-label={isPlaying ? 'Pause' : 'Play'}
+              >
+                {isPlaying ? (
+                  <Pause size={18} fill="currentColor" />
+                ) : (
+                  <Play size={18} fill="currentColor" />
+                )}
               </button>
-              <button className="btn btn-ghost" onClick={onNext} disabled={!hasNext} aria-label="Next">
-                ›
+              <button
+                className="player-dock-icon-btn"
+                onClick={onNext}
+                disabled={!hasNext}
+                aria-label="Next"
+              >
+                <SkipForward size={18} fill="currentColor" />
               </button>
             </div>
           )}
