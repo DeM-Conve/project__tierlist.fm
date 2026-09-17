@@ -179,7 +179,12 @@
   padding: 14px;
   overflow-x: auto;
   background: var(--surface);
-  min-height: 116px;
+  /* Matches a populated row's actual height (176px-wide, 16:9 thumbnail +
+     title caption) so an empty/no-matches row renders at the same height
+     instead of collapsing - without this, typing into the "/" search bar
+     made rows grow and shrink line by line as matches came and went,
+     shifting everything below vertically on every keystroke. */
+  min-height: 160px;
   align-items: center;
 }
 .tier-thumb-wrap {
