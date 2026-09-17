@@ -65,3 +65,67 @@ button:hover { background: #a30000; }
   margin: 0;
 }
 .video-card a { text-decoration: none; color: inherit; }
+
+.tier-board-card { padding: 4px 0; }
+.tier-badges {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+  flex-wrap: wrap;
+}
+.tier-badge {
+  color: #1a1a1a;
+  font-weight: 700;
+  font-size: 12px;
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+
+.tier-board {
+  margin-top: 16px;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid #2a2a2a;
+}
+.tier-row {
+  display: flex;
+  border-bottom: 1px solid #2a2a2a;
+}
+.tier-row:last-child { border-bottom: none; }
+.tier-label {
+  flex: 0 0 72px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #1a1a1a;
+  font-weight: 700;
+  font-size: 18px;
+}
+.tier-content {
+  flex: 1;
+  display: flex;
+  gap: 8px;
+  padding: 8px;
+  overflow-x: auto;
+  background: #141414;
+  min-height: 84px;
+  align-items: center;
+}
+.tier-thumb {
+  flex: 0 0 auto;
+  width: 130px;
+}
+.tier-thumb img {
+  width: 100%;
+  aspect-ratio: 16/9;
+  object-fit: cover;
+  border-radius: 4px;
+  display: block;
+  background: #2a2a2a;
+}
+.tier-loading {
+  color: #888;
+  font-size: 13px;
+  margin: 0;
+  padding: 0 8px;
+}
