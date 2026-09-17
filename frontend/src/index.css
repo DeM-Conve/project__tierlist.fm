@@ -1,9 +1,12 @@
-@import "tailwindcss";
+@import "@mantine/core/styles.css";
+@import "@mantine/spotlight/styles.css";
 
 * { box-sizing: border-box; }
 
 body {
   margin: 0;
+  background: var(--bg);
+  color: var(--text);
   -webkit-font-smoothing: antialiased;
 }
 
@@ -28,76 +31,27 @@ body {
   * { animation: none !important; transition: none !important; }
 }
 
-/* Maps our palette onto Tailwind's own color/radius utilities (bg-primary,
-   text-muted-foreground, rounded-lg, etc.) so both hand-written CSS below
-   and Tailwind utility classes in components read from the same source of
-   truth - no separate "Tailwind theme" vs "app theme" to keep in sync. */
-@theme inline {
-  --font-heading: var(--font-display);
-  --font-sans: var(--font-body);
-  --color-ring: var(--ring);
-  --color-input: var(--input);
-  --color-border: var(--border);
-  --color-destructive: var(--destructive);
-  --color-accent-foreground: var(--accent-foreground);
-  --color-accent: var(--accent);
-  --color-muted-foreground: var(--muted-foreground);
-  --color-muted: var(--muted);
-  --color-secondary-foreground: var(--secondary-foreground);
-  --color-secondary: var(--secondary);
-  --color-primary-foreground: var(--primary-foreground);
-  --color-primary: var(--primary);
-  --color-foreground: var(--foreground);
-  --color-background: var(--background);
-  --radius-sm: calc(var(--radius) * 0.6);
-  --radius-md: calc(var(--radius) * 0.8);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) * 1.4);
-}
-
-/* This app is always dark - single palette, no light/dark toggle. */
+/* This app is always dark - single palette, no light/dark toggle. The same
+   hex values are also used to build the Mantine theme (src/mantineTheme.js),
+   so this is the one place the palette itself is defined. */
 :root {
-  --background: #131110;
-  --foreground: #f3efe8;
-  --primary: #d6a24c;
-  --primary-foreground: #1a1509;
-  --secondary: #241f1a;
-  --secondary-foreground: #f3efe8;
-  --muted: #241f1a;
-  --muted-foreground: #94897a;
-  --accent: #d6a24c;
-  --accent-foreground: #1a1509;
-  --destructive: #e8503a;
-  --border: #332c23;
-  --input: #332c23;
-  --ring: #d6a24c;
-  --radius: 0.25rem;
-
-  /* App-specific tokens not part of Tailwind's default palette - still used
-     directly (as var(--x)) by hand-written classes not yet converted to
-     Tailwind utilities. */
+  --bg: #131110;
   --surface: #1c1915;
   --surface-2: #241f1a;
   --surface-3: #2c2620;
+  --border: #332c23;
   --border-soft: #2a251e;
   --text: #f3efe8;
   --text-dim: #94897a;
   --text-faint: #5c5548;
+  --accent: #d6a24c;
   --accent-hover: #c48f3a;
   --accent-text: #1a1509;
   --success: #4caf6e;
   --danger: #e8503a;
+  --radius: 4px;
   --sidebar-w: 264px;
 
   --font-display: 'Archivo', -apple-system, sans-serif;
   --font-body: 'Inter', -apple-system, sans-serif;
-}
-
-@layer base {
-  * {
-    @apply border-border outline-ring/50;
-  }
-  body {
-    @apply bg-background text-foreground font-sans;
-  }
 }

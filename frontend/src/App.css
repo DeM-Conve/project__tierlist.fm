@@ -1,24 +1,5 @@
-:root {
-  --bg: #131110;
-  --surface: #1c1915;
-  --surface-2: #241f1a;
-  --surface-3: #2c2620;
-  --border: #332c23;
-  --border-soft: #2a251e;
-  --text: #f3efe8;
-  --text-dim: #94897a;
-  --text-faint: #5c5548;
-  --accent: #d6a24c;
-  --accent-hover: #c48f3a;
-  --accent-text: #1a1509;
-  --success: #4caf6e;
-  --danger: #e8503a;
-  --radius: 4px;
-  --sidebar-w: 264px;
-
-  --font-display: 'Archivo', -apple-system, sans-serif;
-  --font-body: 'Inter', -apple-system, sans-serif;
-}
+/* Palette variables now live in index.css, alongside the Mantine theme
+   built from the same values (src/mantineTheme.js). */
 
 .login-screen {
   min-height: 100vh;
@@ -1021,46 +1002,11 @@
   font-size: 12px;
 }
 
-/* Settings page: sub-nav + content, same shape regardless of category count */
-.settings-layout {
-  display: flex;
-  gap: 32px;
-  align-items: flex-start;
-}
-.settings-nav {
-  flex: 0 0 180px;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  position: sticky;
-  top: 24px;
-}
-.settings-content { flex: 1; min-width: 0; max-width: 640px; }
-/* Same look as the main sidebar's nav items, but driven by Radix Tabs'
-   own data-state instead of a hand-toggled active class - it also owns
-   keyboard roving/focus behavior between triggers for free. */
-.settings-nav-item {
-  font-family: var(--font-body);
-  background: none;
-  border: none;
-  color: var(--text-dim);
-  text-align: left;
-  padding: 8px 8px;
-  border-radius: var(--radius);
-  font-size: 13.5px;
-  cursor: pointer;
-}
-.settings-nav-item:hover { background: var(--surface-2); color: var(--text); }
-.settings-nav-item[data-state='active'] {
-  background: var(--surface-3);
-  color: var(--text);
-  font-weight: 600;
-  box-shadow: inset 2px 0 0 var(--accent);
-}
-.settings-nav-item:focus-visible {
-  outline-offset: -2px;
-  border-radius: var(--radius);
-}
+/* Settings page: Mantine's Tabs (orientation="vertical") owns the sub-nav
+   itself - styling, active state, keyboard roving, focus - so there's no
+   hand-rolled nav-item CSS here anymore. This just constrains the panel's
+   reading width the same way GitHub's settings pages do. */
+.settings-content { max-width: 640px; }
 .settings-section h2 {
   font-size: 17px;
   margin: 0 0 6px;
@@ -1108,5 +1054,4 @@
 
 @media (max-width: 640px) {
   .settings-layout { flex-direction: column; gap: 16px; }
-  .settings-nav { flex-direction: row; position: static; width: 100%; }
 }

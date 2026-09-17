@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Tabs } from 'radix-ui';
+import { Tabs } from '@mantine/core';
 import { DUEL_STRATEGIES, DUEL_STRATEGY_LABELS, DEFAULT_DUEL_STRATEGY } from '../duel';
 import { SETTINGS, getSetting, setSetting } from '../settings';
 
@@ -29,17 +29,17 @@ export default function SettingsView() {
         <h1>Settings</h1>
       </div>
 
-      <Tabs.Root className="settings-layout" defaultValue="duels" orientation="vertical">
-        <Tabs.List className="settings-nav" aria-label="Settings categories">
+      <Tabs defaultValue="duels" orientation="vertical" className="settings-layout">
+        <Tabs.List>
           {CATEGORIES.map((c) => (
-            <Tabs.Trigger key={c.key} value={c.key} className="settings-nav-item">
+            <Tabs.Tab key={c.key} value={c.key}>
               {c.label}
-            </Tabs.Trigger>
+            </Tabs.Tab>
           ))}
         </Tabs.List>
 
-        <div className="settings-content">
-          <Tabs.Content value="duels" className="settings-section">
+        <Tabs.Panel value="duels" className="settings-content">
+          <div className="settings-section">
             <h2>Duel ranking algorithm</h2>
             <p className="hint-text">
               Used as the default whenever you start a new duel session. You can still switch
@@ -61,9 +61,9 @@ export default function SettingsView() {
                 </button>
               ))}
             </div>
-          </Tabs.Content>
-        </div>
-      </Tabs.Root>
+          </div>
+        </Tabs.Panel>
+      </Tabs>
     </section>
   );
 }

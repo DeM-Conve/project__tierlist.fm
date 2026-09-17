@@ -7,28 +7,36 @@ auto-grouped into a tier board per category.
 ## Stack
 
 - **Frontend**: React 19 + Vite, in `frontend/`.
-  - **Tailwind CSS v4** (via `@tailwindcss/vite`) for styling. `src/index.css` defines the
-    app's palette as CSS variables mapped onto Tailwind's own semantic tokens
-    (`--background`, `--primary`, etc.) via `@theme inline` - use Tailwind utility classes
-    (`bg-primary`, `text-muted-foreground`, ...) for anything new.
-  - `App.css` is the pre-Tailwind hand-written stylesheet (still large, still loaded) -
-    most existing components' classes live there. Don't add new hand-written CSS rules
-    there; use Tailwind utilities in the component's JSX instead. Convert an existing
-    class to Tailwind opportunistically when you're already touching that component, but
-    there's no standing task to rewrite all of it at once.
-  - **Radix UI** (the `radix-ui` package, e.g. `import { Dialog, Tabs } from 'radix-ui'`)
-    for interactive primitives (dialogs, tabs, dropdowns, etc.) instead of hand-rolling
-    focus-trapping/keyboard nav/portals. Explicitly **not** shadcn/ui - the user wants
-    Radix installed as a normal dependency and styled directly, not a CLI-copied
-    component scaffold.
+  - **Mantine** (`@mantine/core`, `@mantine/hooks`, `@mantine/spotlight`) is the UI
+    component library - this is the final choice after trying MUI (rejected up front,
+    too Material-flavored), then Tailwind+shadcn/ui (rejected, shadcn is copied-in
+    scaffold code not a real dependency), then Tailwind+Radix UI (rejected in favor of a
+    single full component library rather than utility CSS + headless primitives). Use
+    Mantine's own components (`Tabs`, `Modal`, `Select`, etc.) for anything new/touched
+    instead of hand-rolling equivalents.
+  - The app's palette is themed into Mantine via `src/mantineTheme.js` (`createTheme`,
+    `colors.dark` / `colors.accent` as 10-shade scales, `primaryColor: 'accent'`) so
+    every Mantine component inherits the warm-charcoal look instead of Mantine's
+    defaults. `MantineProvider` is mounted once in `main.jsx` with
+    `forceColorScheme="dark"` (this app has no light mode).
+  - `src/index.css` still holds the same palette as plain CSS variables (`--bg`,
+    `--surface`, `--accent`, etc.) for the pre-Mantine hand-written `App.css`, which
+    most existing components still use directly. Don't add new hand-written CSS classes
+    there for anything a Mantine component could do instead; convert an existing class
+    to Mantine opportunistically when already touching that component, but there's no
+    standing task to rewrite all of `App.css` at once.
+  - The command palette (`CommandPalette.jsx`) is Mantine's `Spotlight` - it owns its
+    own Cmd/Ctrl+K shortcut and open/close state internally (via the `spotlight` object
+    from `@mantine/spotlight`), so don't reintroduce a manual keydown listener or Redux
+    state for "is the palette open."
   - **Redux Toolkit** (`@reduxjs/toolkit` + `react-redux`) for all app-level state, in
     `frontend/src/store/`. One slice per concern (`authSlice`, `viewSlice`, `itemsSlice`,
     `tiersSlice`, `focusSlice`); cross-slice derived values (pending moves, duel pools,
     focus navigation sequence, etc.) are memoized selectors in `store/selectors.js`, not
     component-level `useMemo`. `App.jsx` should stay a thin container that dispatches
     actions and reads selectors - it shouldn't hold its own `useState` for app data.
-  - `lucide-react` is available for icons (installed alongside Radix) - prefer it over
-    new unicode/emoji glyphs where a component is otherwise being touched.
+  - `lucide-react` is available for icons - prefer it over new unicode/emoji glyphs
+    where a component is otherwise being touched.
 - **Backend**: Spring Boot 3 (Java 21, Maven), in `backend/`. Session-based Google OAuth2
   login; talks to the YouTube Data API v3 directly (no separate token DB).
 - **Deploy**: Docker Compose. `docker-compose.yml` (prod-style multi-stage builds) and
@@ -37,8 +45,9 @@ auto-grouped into a tier board per category.
 
 ## Conventions / decisions worth knowing
 
-- **No shadcn/ui.** Considered and explicitly rejected in favor of Radix UI directly -
-  see git history around the Tailwind/Redux migration for the reasoning.
+- **No MUI, no Tailwind, no shadcn/ui, no bare Radix.** All considered and explicitly
+  rejected in favor of Mantine as a single, final UI library choice - see git history
+  around the frontend stack migration for the reasoning behind each.
 - **Duplicate videos are auto-resolved, not flagged for the user to decide.** If the same
   video exists in two of a board's real tier playlists, the highest-tier copy is kept and
   every other copy is automatically staged as a pending removal (shows in the "N pending"

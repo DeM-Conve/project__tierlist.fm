@@ -8,16 +8,11 @@ import ItemsView from './components/ItemsView';
 import TierBoardView from './components/TierBoardView';
 import PlayerDock from './components/PlayerDock';
 import CommandPalette from './components/CommandPalette';
+import { spotlight } from '@mantine/spotlight';
 import DuelView from './components/DuelView';
 import SettingsView from './components/SettingsView';
 import { setLoggedIn, setPlaylists } from './store/authSlice';
-import {
-  setActiveView,
-  setQuery,
-  setMobileSidebarOpen,
-  setPaletteOpen,
-  togglePalette,
-} from './store/viewSlice';
+import { setActiveView, setQuery, setMobileSidebarOpen } from './store/viewSlice';
 import { setItems, setLoadingItems } from './store/itemsSlice';
 import {
   resetTierBoard,
@@ -63,7 +58,6 @@ export default function App() {
   const query = useSelector((s) => s.view.query);
   const mobileSidebarOpen = useSelector((s) => s.view.mobileSidebarOpen);
   const activeView = useSelector((s) => s.view.activeView);
-  const paletteOpen = useSelector((s) => s.view.paletteOpen);
   const items = useSelector((s) => s.items.items);
   const loadingItems = useSelector((s) => s.items.loadingItems);
   const tierItems = useSelector((s) => s.tiers.tierItems);
@@ -169,19 +163,6 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [playlists]);
 
-  useEffect(() => {
-    function onKeyDown(e) {
-      const isMac = navigator.platform.toUpperCase().includes('MAC');
-      const modifier = isMac ? e.metaKey : e.ctrlKey;
-      if (modifier && e.key.toLowerCase() === 'k') {
-        e.preventDefault();
-        dispatch(togglePalette());
-      }
-    }
-    window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   function resolveFromLocation({ push, fallbackToFirst }) {
     const path = window.location.pathname;
@@ -454,7 +435,7 @@ export default function App() {
     dispatch(setTierItems({}));
     dispatch(setSyncStatus('idle'));
     dispatch(closeFocusAction());
-    dispatch(setPaletteOpen(false));
+    spotlight.close();
     autoSelectedRef.current = false;
     window.history.replaceState(null, '', '/');
   }
@@ -497,7 +478,7 @@ export default function App() {
         onSelectPlaylists={selectPlaylists}
         onSelectSettings={selectSettings}
         onLogout={logout}
-        onOpenPalette={() => dispatch(setPaletteOpen(true))}
+        onOpenPalette={() => spotlight.open()}
         mobileOpen={mobileSidebarOpen}
         onCloseMobile={() => dispatch(setMobileSidebarOpen(false))}
       />
@@ -565,9 +546,7 @@ export default function App() {
         />
       )}
 
-      {paletteOpen && (
-        <CommandPalette items={commandItems} onClose={() => dispatch(setPaletteOpen(false))} />
-      )}
+      <CommandPalette items={commandItems} />
     </div>
   );
 }

@@ -9,7 +9,6 @@ const viewSlice = createSlice({
     activeView: { type: 'playlists' },
     query: '',
     mobileSidebarOpen: false,
-    paletteOpen: false,
   },
   reducers: {
     setActiveView: (state, action) => {
@@ -21,15 +20,8 @@ const viewSlice = createSlice({
     setMobileSidebarOpen: (state, action) => {
       state.mobileSidebarOpen = action.payload;
     },
-    setPaletteOpen: (state, action) => {
-      state.paletteOpen = action.payload;
-    },
-    togglePalette: (state) => {
-      state.paletteOpen = !state.paletteOpen;
-    },
   },
 });
 
-export const { setActiveView, setQuery, setMobileSidebarOpen, setPaletteOpen, togglePalette } =
-  viewSlice.actions;
+export const { setActiveView, setQuery, setMobileSidebarOpen } = viewSlice.actions;
 export default viewSlice.reducer;
