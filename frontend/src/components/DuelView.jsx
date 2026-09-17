@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
-import { DUEL_STRATEGIES, DUEL_STRATEGY_LABELS } from '../duel';
+import { DEFAULT_DUEL_STRATEGY, DUEL_STRATEGIES, DUEL_STRATEGY_LABELS } from '../duel';
 
-export default function DuelView({ videos, tierSizes, onComplete, onCancel }) {
-  const [strategyKey, setStrategyKey] = useState('mergeSort');
+export default function DuelView({ videos, runs, tierSizes, onComplete, onCancel }) {
+  const [strategyKey, setStrategyKey] = useState(DEFAULT_DUEL_STRATEGY);
   const [currentPair, setCurrentPair] = useState(null);
   const [progress, setProgress] = useState({ completed: 0, total: 0 });
   const [spine, setSpine] = useState(null);
@@ -24,7 +24,7 @@ export default function DuelView({ videos, tierSizes, onComplete, onCancel }) {
 
   useEffect(() => {
     const ids = videos.map((v) => v.videoId);
-    const strategy = DUEL_STRATEGIES[strategyKey](ids);
+    const strategy = DUEL_STRATEGIES[strategyKey]({ ids, runs });
     strategyRef.current = strategy;
     setSpine(null);
     advance(strategy);

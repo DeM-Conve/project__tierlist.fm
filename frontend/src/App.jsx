@@ -60,6 +60,10 @@ export default function App() {
   }, [tierItems]);
 
   const duelPool = useMemo(() => TIER_ORDER.flatMap((t) => tierItems[t] || []), [tierItems]);
+  const duelRuns = useMemo(
+    () => TIER_ORDER.filter((t) => tierItems[t]).map((t) => tierItems[t].map((v) => v.videoId)),
+    [tierItems]
+  );
   const duelTierSizes = useMemo(
     () => TIER_ORDER.filter((t) => tierItems[t]).map((t) => ({ tier: t, count: tierItems[t].length })),
     [tierItems]
@@ -515,6 +519,7 @@ export default function App() {
         {activeView.type === 'duel' && (
           <DuelView
             videos={duelPool}
+            runs={duelRuns}
             tierSizes={duelTierSizes}
             onComplete={(result) => applyDuelResult(activeView.category, result)}
             onCancel={() => backToTierBoard(activeView.category)}

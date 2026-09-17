@@ -1,27 +1,18 @@
+import { merge } from './mergeGenerator';
+
 // Interactive merge sort: a human answers "which of these two wins?" wherever
 // the algorithm would normally call its own comparator. Written as a
 // generator so the recursive merge sort can pause mid-comparison and resume
-// once the caller supplies an answer via .next(leftWins).
+// once the caller supplies an answer via .next(leftWins). Ignores any
+// existing tier grouping and re-derives a full order from scratch - see
+// tierAwareMergeStrategy.js for a variant that trusts existing tiers as a
+// head start and needs far fewer duels.
 function* mergeSort(items) {
   if (items.length <= 1) return items;
   const mid = Math.floor(items.length / 2);
   const left = yield* mergeSort(items.slice(0, mid));
   const right = yield* mergeSort(items.slice(mid));
   return yield* merge(left, right);
-}
-
-function* merge(left, right) {
-  const result = [];
-  let i = 0;
-  let j = 0;
-  while (i < left.length && j < right.length) {
-    const leftWins = yield [left[i], right[j]];
-    if (leftWins) result.push(left[i++]);
-    else result.push(right[j++]);
-  }
-  while (i < left.length) result.push(left[i++]);
-  while (j < right.length) result.push(right[j++]);
-  return result;
 }
 
 function estimateComparisons(n) {
@@ -33,13 +24,14 @@ function estimateComparisons(n) {
  * DuelStrategy contract: constructor(ids), nextPair(), reportResult(winnerId),
  * isDone(), getSpine(), getProgress(), supportsSkip.
  *
- * Produces a full, exact ranking in ~n*log2(n) comparisons - the fewest
- * duels needed to fully order the set, at the cost of not tolerating a
- * genuine "skip" (merge sort's next step depends on every answer).
+ * Produces a full, exact ranking over the *entire* pool from scratch in
+ * ~n*log2(n) comparisons - ignores which tier a video is currently in.
+ * Use tierAwareMerge instead if you'd rather trust your existing tiers and
+ * only settle cross-tier disagreements (far fewer duels).
  */
 export class MergeSortStrategy {
   name = 'mergeSort';
-  label = 'Merge sort (fewest duels)';
+  label = 'Full re-sort (ignore current tiers)';
   supportsSkip = false;
 
   constructor(ids) {
