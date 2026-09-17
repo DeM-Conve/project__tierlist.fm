@@ -1,5 +1,58 @@
-import { useEffect } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { TIER_COLORS } from '../tiers';
+import { loadYouTubeApi } from '../youtubePlayer';
+
+function EmbeddedPlayer({ videoId }) {
+  const containerRef = useRef(null);
+  const playerRef = useRef(null);
+  const [status, setStatus] = useState('loading'); // loading | ready | blocked
+
+  useEffect(() => {
+    let cancelled = false;
+    setStatus('loading');
+
+    loadYouTubeApi().then((YT) => {
+      if (cancelled || !containerRef.current) return;
+      playerRef.current = new YT.Player(containerRef.current, {
+        videoId,
+        playerVars: { autoplay: 1, rel: 0 },
+        events: {
+          onReady: () => !cancelled && setStatus('ready'),
+          onError: () => !cancelled && setStatus('blocked'),
+        },
+      });
+    });
+
+    return () => {
+      cancelled = true;
+      playerRef.current?.destroy?.();
+      playerRef.current = null;
+    };
+  }, [videoId]);
+
+  if (status === 'blocked') {
+    return (
+      <div className="focus-embed-blocked">
+        <p>This video can't be played here — the owner has disabled embedding.</p>
+        <a
+          className="btn btn-primary"
+          href={`https://www.youtube.com/watch?v=${videoId}`}
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          Open on YouTube ↗
+        </a>
+      </div>
+    );
+  }
+
+  return (
+    <>
+      {status === 'loading' && <div className="focus-embed-loading">Loading player...</div>}
+      <div ref={containerRef} style={{ width: '100%', height: '100%' }} />
+    </>
+  );
+}
 
 export default function VideoFocusModal({
   video,
@@ -45,13 +98,7 @@ export default function VideoFocusModal({
         )}
 
         <div className="focus-embed">
-          <iframe
-            key={video.videoId}
-            src={`https://www.youtube-nocookie.com/embed/${video.videoId}?autoplay=1&rel=0`}
-            title={video.title}
-            allow="autoplay; encrypted-media; picture-in-picture"
-            allowFullScreen
-          />
+          <EmbeddedPlayer key={video.videoId} videoId={video.videoId} />
         </div>
 
         <div className="focus-info">
