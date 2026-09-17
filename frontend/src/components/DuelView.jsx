@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Button, Select } from '@mantine/core';
+import { Badge, Button, Card, Container, Group, Progress, Select, Stack, Text, Title } from '@mantine/core';
 import { DEFAULT_DUEL_STRATEGY, DUEL_STRATEGIES, DUEL_STRATEGY_LABELS } from '../duel';
 import { SETTINGS, getSetting, setSetting } from '../settings';
 import { TIER_COLORS } from '../tiers';
@@ -7,31 +7,38 @@ import EmbeddedPlayer from './EmbeddedPlayer';
 
 function DuelCard({ video, tier, isPreviewing, onTogglePreview, onChoose }) {
   return (
-    <div className="duel-card" onClick={onChoose}>
-      <div className="duel-card-media">
+    <Card className="duel-card" padding={0} radius="md" withBorder onClick={onChoose}>
+      <Card.Section className="duel-card-media">
         {tier && (
-          <span className="tier-chip duel-card-tier" style={{ background: TIER_COLORS[tier] }}>
+          <Badge className="duel-card-tier" style={{ background: TIER_COLORS[tier], color: '#1a1509' }}>
             {tier}
-          </span>
+          </Badge>
         )}
         {isPreviewing ? (
           <EmbeddedPlayer videoId={video.videoId} autoplay />
         ) : (
           <img src={video.thumbnail || ''} alt={video.title} />
         )}
-        <button
+        <Button
           className="duel-card-preview-btn"
+          size="xs"
+          variant="filled"
+          color="dark"
           onClick={(e) => {
             e.stopPropagation();
             onTogglePreview();
           }}
         >
           {isPreviewing ? '✕ Stop' : '▶ Preview'}
-        </button>
-      </div>
-      <p className="duel-card-title">{video.title}</p>
-      <p className="hint-text">{video.channelTitle}</p>
-    </div>
+        </Button>
+      </Card.Section>
+      <Text fw={600} size="sm" lineClamp={2} mx={14} mt={10} mb={4}>
+        {video.title}
+      </Text>
+      <Text c="dimmed" size="sm" mx={14} mb={14}>
+        {video.channelTitle}
+      </Text>
+    </Card>
   );
 }
 
@@ -146,22 +153,20 @@ export default function DuelView({ videos, runs, tierSizes, onComplete, onCancel
   const b = currentPair ? videoMapRef.current.get(currentPair.b) : null;
 
   return (
-    <section className="duel-view">
-      <div className="duel-header">
+    <Container className="duel-view" size={980} pt={24} ta="center">
+      <Group justify="space-between" wrap="wrap" mb={48} ta="left">
         <Button variant="default" onClick={onCancel}>
           &larr; Cancel
         </Button>
 
-        <div className="duel-progress">
-          <div className="duel-progress-bar">
-            <div className="duel-progress-fill" style={{ width: `${pct}%` }} />
-          </div>
-          <span className="hint-text">
+        <Stack gap={6} style={{ flex: 1, maxWidth: 320 }}>
+          <Progress value={pct} size="sm" radius="xl" />
+          <Text size="sm" c="dimmed">
             {spine
               ? 'All duels settled'
               : `${progress.completed} of ${progress.total} duels · ${pct}% settled`}
-          </span>
-        </div>
+          </Text>
+        </Stack>
 
         <Select
           value={strategyKey}
@@ -172,12 +177,14 @@ export default function DuelView({ videos, runs, tierSizes, onComplete, onCancel
             label: DUEL_STRATEGY_LABELS[key],
           }))}
         />
-      </div>
+      </Group>
 
       {!spine && a && b && (
         <>
-          <h1 className="duel-question">Which one deserves the higher tier?</h1>
-          <div className="duel-pair">
+          <Title order={1} fz={26} fw={800} mb={32}>
+            Which one deserves the higher tier?
+          </Title>
+          <Group justify="center" gap="lg" wrap="wrap" align="stretch">
             <DuelCard
               video={a}
               tier={tierOfId[a.videoId]}
@@ -185,7 +192,9 @@ export default function DuelView({ videos, runs, tierSizes, onComplete, onCancel
               onTogglePreview={() => setPreviewing((p) => (p === a.videoId ? null : a.videoId))}
               onChoose={() => chooseWinner(a.videoId)}
             />
-            <span className="duel-or">or</span>
+            <Text c="dimmed" size="sm" tt="lowercase">
+              or
+            </Text>
             <DuelCard
               video={b}
               tier={tierOfId[b.videoId]}
@@ -193,7 +202,7 @@ export default function DuelView({ videos, runs, tierSizes, onComplete, onCancel
               onTogglePreview={() => setPreviewing((p) => (p === b.videoId ? null : b.videoId))}
               onChoose={() => chooseWinner(b.videoId)}
             />
-          </div>
+          </Group>
           <p className="focus-hint">
             ← left wins · → right wins{strategy?.supportsSkip ? ' · space too close to call' : ''} · u undo
           </p>
@@ -201,15 +210,17 @@ export default function DuelView({ videos, runs, tierSizes, onComplete, onCancel
       )}
 
       {spine && (
-        <div className="duel-done">
-          <h2>All set.</h2>
-          <p className="hint-text">
+        <Stack align="center" gap="sm" py={40}>
+          <Title order={2} fz={22}>
+            All set.
+          </Title>
+          <Text c="dimmed" size="sm" maw={440}>
             Apply this order to your tiers — each tier keeps its current number of videos, just
             re-filled from the new ranking.
-          </p>
+          </Text>
           <Button onClick={finish}>Apply to tiers</Button>
-        </div>
+        </Stack>
       )}
-    </section>
+    </Container>
   );
 }

@@ -136,7 +136,11 @@ The user asked for these on top of the Mantine/Redux migration above. Tracked he
   `useLocation()`, not a hand-rolled `isActive` className), `ScrollArea`, `Kbd`,
   `Divider`, `Group`/`Stack`/`Text`/`UnstyledButton` (`App.css`'s `.settings-option*`,
   `.sync-*`, `.tier-board-*`, and every `.sidebar-*` rule except the structural
-  `.sidebar`/`.sidebar-scrim` positioning removed as each emptied out). Still
+  `.sidebar`/`.sidebar-scrim` positioning removed as each emptied out), and the
+  duel view to Mantine `Container`/`Group`/`Stack`/`Progress`/`Card`/`Card.Section`/
+  `Badge`/`Text`/`Title` (only card-hover-lift and absolute-overlay positioning for
+  the tier badge/preview button stayed as CSS - Mantine has no prop for either).
+  Still
   hand-rolled CSS in `App.css`: the tier board's own grid/row layout (`.tier-row`,
   `.tier-content`, drag-and-drop positioning), `PlayerDock`'s expanded/mini/floating
   layouts, and the duel cards. Convert opportunistically whenever one of those is

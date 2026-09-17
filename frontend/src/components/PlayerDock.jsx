@@ -19,10 +19,19 @@ import EmbeddedPlayer from './EmbeddedPlayer';
 // Critically, the same EmbeddedPlayer stays mounted across every switch -
 // only CSS classes change - so changing views never stops or restarts
 // playback, it just changes how much of the screen it occupies.
-// The three views the dock cycles through (in this order) via the vim-style
-// j shortcut - full-screen, then the bottom bar, then the floating corner
-// box - wrapping back around to expanded.
-const MODE_CYCLE = ['expanded', 'mini', 'floating'];
+//
+// The vim-style j/k shortcuts drive this as an explicit state machine
+// rather than a modulo-cycled list, because "down"/"up" aren't opposites of
+// a single ring: j (down) only ever moves toward *more* minimized - from
+// expanded to the mini bar, then oscillating between the mini bar and the
+// floating corner (both already "down", so j between them just swaps which
+// minimized view you're in) - it never wraps back up to expanded on its
+// own. k (up) always jumps straight back to expanded, from any state.
+const PLAYER_MODE_TRANSITIONS = {
+  expanded: { down: 'mini', up: 'expanded' },
+  mini: { down: 'floating', up: 'expanded' },
+  floating: { down: 'mini', up: 'expanded' },
+};
 
 export default function PlayerDock({
   mode,
@@ -111,14 +120,13 @@ export default function PlayerDock({
 
   // Vim-style navigation for the dock, active globally (not just while
   // expanded) since the dock is meant to work like a background player:
-  // h/l (and the arrow keys) skip prev/next track. j steps down through the
-  // three views in MODE_CYCLE order (expanded -> mini -> floating -> back to
-  // expanded), k jumps straight back up to the full expanded view from
-  // wherever you are - same physical direction as vim's own j (down)/k (up).
-  // Skipped entirely while the user is typing (filter box, command
-  // palette, ...) so it never hijacks normal input, and h/l/arrow keys are
-  // skipped on the duel screen, which already uses left/right arrow itself
-  // to pick a duel's winner.
+  // h/l (and the arrow keys) skip prev/next track. j/k drive the mode
+  // through PLAYER_MODE_TRANSITIONS - see the comment on that table for why
+  // it's a state machine rather than a simple cycle. Skipped entirely while
+  // the user is typing (filter box, command palette, ...) so it never
+  // hijacks normal input, and h/l/arrow keys are skipped on the duel
+  // screen, which already uses left/right arrow itself to pick a duel's
+  // winner.
   useEffect(() => {
     function onKeyDown(e) {
       const active = document.activeElement;
@@ -138,13 +146,12 @@ export default function PlayerDock({
       }
       if (e.key === 'j') {
         e.preventDefault();
-        const nextIndex = (MODE_CYCLE.indexOf(mode) + 1) % MODE_CYCLE.length;
-        applyMode(MODE_CYCLE[nextIndex]);
+        applyMode(PLAYER_MODE_TRANSITIONS[mode].down);
         return;
       }
       if (e.key === 'k') {
         e.preventDefault();
-        if (mode !== 'expanded') applyMode('expanded');
+        applyMode(PLAYER_MODE_TRANSITIONS[mode].up);
         return;
       }
 
