@@ -79,18 +79,6 @@
   color: var(--text-faint);
 }
 
-.sidebar-search {
-  font-family: var(--font-body);
-  background: var(--surface-2);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  color: var(--text);
-  padding: 9px 12px;
-  font-size: 13px;
-  margin-bottom: 16px;
-}
-.sidebar-search::placeholder { color: var(--text-faint); }
-.sidebar-search:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
 
 .sidebar-nav {
   flex: 1;
@@ -154,15 +142,10 @@
 }
 .sidebar-footer {
   display: flex;
+  align-items: center;
   gap: 8px;
   margin-top: 12px;
 }
-.sidebar-settings-btn {
-  flex: 0 0 auto;
-  font-size: 16px;
-  padding: 10px 14px;
-}
-.sidebar-logout { flex: 1; }
 
 .sidebar-scrim { display: none; }
 
@@ -196,32 +179,6 @@
   font-size: 14px;
   margin: 4px 0 0;
 }
-
-.btn {
-  font-family: var(--font-body);
-  border: none;
-  border-radius: var(--radius);
-  padding: 10px 18px;
-  font-size: 14px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background 0.15s ease, opacity 0.15s ease;
-}
-.btn:active { opacity: 0.85; }
-.btn:disabled { opacity: 0.45; cursor: not-allowed; }
-
-.btn-primary {
-  background: var(--accent);
-  color: var(--accent-text);
-}
-.btn-primary:hover:not(:disabled) { background: var(--accent-hover); }
-
-.btn-ghost {
-  background: var(--surface-2);
-  color: var(--text);
-  border: 1px solid var(--border);
-}
-.btn-ghost:hover:not(:disabled) { background: var(--surface-3); border-color: var(--text-faint); }
 
 /* Media grid (playlists / raw videos) */
 .grid {
@@ -436,7 +393,6 @@
   border: 1px solid var(--border);
   border-radius: var(--radius);
 }
-.sync-bar-count { background: transparent; border-color: transparent; }
 .tier-board-utility-actions {
   display: flex;
   align-items: center;
@@ -537,15 +493,6 @@
   height: 100%;
   background: var(--accent);
   transition: width 0.2s ease;
-}
-.duel-strategy-select {
-  font-family: var(--font-body);
-  background: var(--surface-2);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  color: var(--text);
-  padding: 8px 10px;
-  font-size: 13px;
 }
 .duel-question {
   font-family: var(--font-display);

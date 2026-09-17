@@ -1,4 +1,6 @@
 import { useState } from 'react';
+import { Button } from '@mantine/core';
+import { Shuffle } from 'lucide-react';
 import { TIER_COLORS, TIER_ORDER } from '../tiers';
 
 // Where among the existing thumbnails does clientX fall? Used so a drop
@@ -195,27 +197,32 @@ export default function TierBoardView({
         <div className="tier-board-actions">
           {pendingMoves.length > 0 && (
             <div className="sync-bar">
-              <button className="btn btn-ghost sync-bar-count" onClick={() => setShowPending(true)}>
+              <Button variant="subtle" onClick={() => setShowPending(true)}>
                 {pendingMoves.length} pending
-              </button>
+              </Button>
               {syncStatus === 'done' && <span className="sync-status sync-status-done">Synced</span>}
               {syncStatus === 'partial' && <span className="sync-status sync-status-error">Some failed</span>}
               {syncStatus === 'error' && <span className="sync-status sync-status-error">Sync failed</span>}
-              <button className="btn btn-ghost" onClick={onDiscard} disabled={syncStatus === 'syncing'}>
+              <Button variant="default" onClick={onDiscard} disabled={syncStatus === 'syncing'}>
                 Discard
-              </button>
-              <button className="btn btn-primary" onClick={onSync} disabled={syncStatus === 'syncing'}>
-                {syncStatus === 'syncing' ? 'Syncing...' : 'Push to YouTube'}
-              </button>
+              </Button>
+              <Button onClick={onSync} disabled={syncStatus === 'syncing'} loading={syncStatus === 'syncing'}>
+                Push to YouTube
+              </Button>
             </div>
           )}
           <div className="tier-board-utility-actions">
-            <button className="btn btn-ghost" onClick={onShufflePlay} disabled={!hasVideos}>
-              🔀 Shuffle play
-            </button>
-            <button className="btn btn-ghost" onClick={onStartDuel}>
+            <Button
+              variant="default"
+              leftSection={<Shuffle size={15} />}
+              onClick={onShufflePlay}
+              disabled={!hasVideos}
+            >
+              Shuffle play
+            </Button>
+            <Button variant="default" onClick={onStartDuel}>
               Start duel
-            </button>
+            </Button>
           </div>
         </div>
       </div>

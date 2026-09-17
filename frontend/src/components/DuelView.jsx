@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { Button, Select } from '@mantine/core';
 import { DEFAULT_DUEL_STRATEGY, DUEL_STRATEGIES, DUEL_STRATEGY_LABELS } from '../duel';
 import { SETTINGS, getSetting, setSetting } from '../settings';
 import { TIER_COLORS } from '../tiers';
@@ -147,9 +148,9 @@ export default function DuelView({ videos, runs, tierSizes, onComplete, onCancel
   return (
     <section className="duel-view">
       <div className="duel-header">
-        <button className="btn btn-ghost" onClick={onCancel}>
+        <Button variant="default" onClick={onCancel}>
           &larr; Cancel
-        </button>
+        </Button>
 
         <div className="duel-progress">
           <div className="duel-progress-bar">
@@ -162,17 +163,15 @@ export default function DuelView({ videos, runs, tierSizes, onComplete, onCancel
           </span>
         </div>
 
-        <select
-          className="duel-strategy-select"
+        <Select
           value={strategyKey}
-          onChange={(e) => setStrategyKey(e.target.value)}
-        >
-          {Object.keys(DUEL_STRATEGIES).map((key) => (
-            <option key={key} value={key}>
-              {DUEL_STRATEGY_LABELS[key]}
-            </option>
-          ))}
-        </select>
+          onChange={(value) => value && setStrategyKey(value)}
+          allowDeselect={false}
+          data={Object.keys(DUEL_STRATEGIES).map((key) => ({
+            value: key,
+            label: DUEL_STRATEGY_LABELS[key],
+          }))}
+        />
       </div>
 
       {!spine && a && b && (
@@ -208,9 +207,7 @@ export default function DuelView({ videos, runs, tierSizes, onComplete, onCancel
             Apply this order to your tiers — each tier keeps its current number of videos, just
             re-filled from the new ranking.
           </p>
-          <button className="btn btn-primary" onClick={finish}>
-            Apply to tiers
-          </button>
+          <Button onClick={finish}>Apply to tiers</Button>
         </div>
       )}
     </section>

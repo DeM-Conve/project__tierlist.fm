@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { Button } from '@mantine/core';
 import { loadYouTubeApi } from '../youtubePlayer';
 
 // React owns the outer container div and never gives it JSX children, so
@@ -70,14 +71,14 @@ export default function EmbeddedPlayer({ videoId, autoplay = true, onEnded, onPl
     return (
       <div className="focus-embed-blocked">
         <p>This video can't be played here — the owner has disabled embedding.</p>
-        <a
-          className="btn btn-primary"
+        <Button
+          component="a"
           href={`https://www.youtube.com/watch?v=${videoId}`}
           target="_blank"
           rel="noopener noreferrer"
         >
           Open on YouTube ↗
-        </a>
+        </Button>
       </div>
     );
   }

@@ -1,4 +1,6 @@
 import { NavLink } from 'react-router-dom';
+import { ActionIcon, Button, TextInput } from '@mantine/core';
+import { Settings } from 'lucide-react';
 
 export default function Sidebar({
   query,
@@ -26,12 +28,11 @@ export default function Sidebar({
           <kbd>⌘K</kbd>
         </button>
 
-        <input
-          className="sidebar-search"
-          type="text"
+        <TextInput
           placeholder="Filter boards..."
           value={query}
           onChange={(e) => onQueryChange(e.target.value)}
+          mb="sm"
         />
 
         <nav className="sidebar-nav">
@@ -62,17 +63,18 @@ export default function Sidebar({
         </nav>
 
         <div className="sidebar-footer">
-          <button
-            className="btn btn-ghost sidebar-settings-btn"
+          <ActionIcon
+            variant="default"
+            size="lg"
             onClick={onSelectSettings}
             aria-label="Settings"
             title="Settings"
           >
-            ⚙
-          </button>
-          <button className="btn btn-ghost sidebar-logout" onClick={onLogout}>
+            <Settings size={16} />
+          </ActionIcon>
+          <Button variant="default" onClick={onLogout} style={{ flex: 1 }}>
             Log out
-          </button>
+          </Button>
         </div>
       </aside>
     </>

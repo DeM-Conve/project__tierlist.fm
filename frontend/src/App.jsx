@@ -1,5 +1,6 @@
 import { useEffect, useMemo } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
+import { useQueryClient } from '@tanstack/react-query';
 import {
   Routes,
   Route,
@@ -11,6 +12,7 @@ import {
   useOutletContext,
 } from 'react-router-dom';
 import { spotlight } from '@mantine/spotlight';
+import { Button } from '@mantine/core';
 import './App.css';
 import { TIER_ORDER } from './tiers';
 import Sidebar from './components/Sidebar';
@@ -23,9 +25,9 @@ import DuelView from './components/DuelView';
 import SettingsView from './components/SettingsView';
 import { setLoggedIn, setPlaylists } from './store/authSlice';
 import { setCurrentCategory, setQuery, setMobileSidebarOpen } from './store/viewSlice';
-import { setItems, setLoadingItems } from './store/itemsSlice';
 import {
   resetTierBoard,
+  setLoadedCategory,
   setTierForCategory,
   setTierItems,
   discardTierChanges,
@@ -56,8 +58,15 @@ import {
   selectFocusedVideoData,
   selectFocusedAvailableTiers,
 } from './store/selectors';
-
-const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8080';
+import { api, API_BASE } from './api/client';
+import {
+  useAuthStatusQuery,
+  usePlaylistsQuery,
+  usePlaylistItemsQuery,
+  useTierBoardQueries,
+  useTierSyncMutation,
+  useInvalidatePlaylistItems,
+} from './api/queries';
 
 // Module-level (not component state) so it survives route component
 // remounts but resets on an actual page reload - "redirect to the first
@@ -66,29 +75,47 @@ const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8080';
 // whole-session flag, not per-mount state.
 let hasAutoRedirected = false;
 
+// Fetches a board's tiers via TanStack Query (one query per tier's
+// underlying playlist, cached by playlist id) and mirrors the result into
+// Redux's tiersSlice - which owns the *local editable draft* (drag-and-drop,
+// duel results) layered on top. loadedCategory guards the mirror so it only
+// re-applies once per fresh dataset: re-entering an already-loaded board
+// (e.g. returning from a duel) must not stomp an unsynced local edit just
+// because the query cache still holds data for it.
+function useLoadTierBoard(category, tiers) {
+  const dispatch = useDispatch();
+  const loadedCategory = useSelector((s) => s.tiers.loadedCategory);
+  const { data, isLoading } = useTierBoardQueries(category, tiers);
+
+  useEffect(() => {
+    if (!data || loadedCategory === category) return;
+    const presentTiers = Object.keys(data);
+    dispatch(resetTierBoard({ category, presentTiers }));
+    presentTiers.forEach((tier) => dispatch(setTierForCategory({ tier, videos: data[tier] })));
+    dispatch(setLoadedCategory(category));
+  }, [data, category, loadedCategory, dispatch]);
+
+  return { isLoading: isLoading || loadedCategory !== category };
+}
+
 export default function App() {
   const dispatch = useDispatch();
   const loggedIn = useSelector((s) => s.auth.loggedIn);
 
-  useEffect(() => {
-    checkAuth();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  const { data: authData, isError: authErrored } = useAuthStatusQuery();
+  const { data: playlistsData } = usePlaylistsQuery(authData?.loggedIn === true);
 
-  async function checkAuth() {
-    try {
-      const res = await fetch(`${API_BASE}/api/auth/status`, { credentials: 'include' });
-      const data = await res.json();
-      dispatch(setLoggedIn(data.loggedIn));
-      if (data.loggedIn) {
-        dispatch(setPlaylists(null));
-        const plRes = await fetch(`${API_BASE}/api/playlists`, { credentials: 'include' });
-        dispatch(setPlaylists(plRes.ok ? await plRes.json() : []));
-      }
-    } catch {
-      dispatch(setLoggedIn(false));
-    }
-  }
+  // Mirrors TanStack Query's cache into Redux so the many selectors built on
+  // state.auth.playlists (tier groups, pending moves, duel pools, ...) don't
+  // all need rewriting to read query state directly.
+  useEffect(() => {
+    if (authErrored) dispatch(setLoggedIn(false));
+    else if (authData) dispatch(setLoggedIn(authData.loggedIn));
+  }, [authData, authErrored, dispatch]);
+
+  useEffect(() => {
+    if (playlistsData) dispatch(setPlaylists(playlistsData));
+  }, [playlistsData, dispatch]);
 
   function login() {
     window.location.href = `${API_BASE}/oauth2/authorization/google`;
@@ -100,9 +127,7 @@ export default function App() {
         <section id="login-view">
           <h2 className="login-headline">Your playlists, ranked.</h2>
           <p>Sign in to load your playlists and start sorting them into tiers.</p>
-          <button className="btn btn-primary" onClick={login}>
-            Continue with Google
-          </button>
+          <Button onClick={login}>Continue with Google</Button>
         </section>
       </main>
     );
@@ -138,6 +163,7 @@ export default function App() {
 function Layout() {
   const dispatch = useDispatch();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
 
   const query = useSelector((s) => s.view.query);
   const mobileSidebarOpen = useSelector((s) => s.view.mobileSidebarOpen);
@@ -159,25 +185,8 @@ function Layout() {
   const tierMatch = useMatch('/tier/:category');
   const currentCategory = tierMatch ? decodeURIComponent(tierMatch.params.category) : null;
 
-  async function fetchPlaylistItems(playlistId) {
-    const res = await fetch(`${API_BASE}/api/playlists/${playlistId}/items`, { credentials: 'include' });
-    if (!res.ok) return [];
-    return res.json();
-  }
-
-  async function loadTierBoardData(category) {
-    const tiers = tierGroups[category];
-    if (!tiers) return;
-    const presentTiers = TIER_ORDER.filter((t) => tiers[t]);
-    dispatch(resetTierBoard({ category, presentTiers }));
-
-    await Promise.all(
-      presentTiers.map(async (t) => {
-        const videos = await fetchPlaylistItems(tiers[t].id);
-        dispatch(setTierForCategory({ tier: t, videos }));
-      })
-    );
-  }
+  const tierSyncMutation = useTierSyncMutation();
+  const invalidatePlaylistItems = useInvalidatePlaylistItems();
 
   async function syncChanges(category) {
     dispatch(setSyncStatus('syncing'));
@@ -192,17 +201,17 @@ function Layout() {
     }));
 
     try {
-      const res = await fetch(`${API_BASE}/api/tier-sync`, {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-      if (!res.ok) throw new Error('sync failed');
-
-      const result = await res.json();
+      const result = await tierSyncMutation.mutateAsync(payload);
       const finishedStatus = result.applied < result.total ? 'partial' : 'done';
-      await loadTierBoardData(category);
+
+      // Mark every underlying playlist stale, then clear the local draft so
+      // the tier board's queries refetch and TierBoardPage's mirror effect
+      // re-applies the confirmed-fresh server state (see useLoadTierBoard).
+      await invalidatePlaylistItems(Object.values(tiers).map((t) => t.id));
+      const presentTiers = TIER_ORDER.filter((t) => tiers[t]);
+      dispatch(resetTierBoard({ category, presentTiers }));
+      dispatch(setLoadedCategory(null));
+
       dispatch(setSyncStatus(finishedStatus));
       setTimeout(() => dispatch(setSyncStatus('idle')), 2500);
     } catch {
@@ -250,10 +259,10 @@ function Layout() {
   }
 
   async function logout() {
-    await fetch(`${API_BASE}/api/auth/logout`, { method: 'POST', credentials: 'include' });
+    await api.post('/api/auth/logout');
+    queryClient.clear();
     dispatch(setLoggedIn(false));
     dispatch(setPlaylists(null));
-    dispatch(setItems(null));
     dispatch(setTierItems({}));
     dispatch(setSyncStatus('idle'));
     dispatch(closeFocusAction());
@@ -333,7 +342,6 @@ function Layout() {
       <main className="canvas">
         <Outlet
           context={{
-            loadTierBoardData,
             syncChanges,
             discardChanges,
             moveVideoToTier,
@@ -405,24 +413,15 @@ function ItemsPage() {
   const playlistId = decodeURIComponent(id);
   const dispatch = useDispatch();
   const playlists = useSelector((s) => s.auth.playlists);
-  const items = useSelector((s) => s.items.items);
-  const loadingItems = useSelector((s) => s.items.loadingItems);
   const playlist = playlists?.find((p) => p.id === playlistId);
+  const { data: items, isLoading } = usePlaylistItemsQuery(playlistId);
 
   useEffect(() => {
     dispatch(setCurrentCategory(null));
     dispatch(setMobileSidebarOpen(false));
-    dispatch(setItems(null));
-    dispatch(setLoadingItems(true));
-    fetch(`${API_BASE}/api/playlists/${playlistId}/items`, { credentials: 'include' })
-      .then((res) => (res.ok ? res.json() : []))
-      .then((data) => {
-        dispatch(setLoadingItems(false));
-        dispatch(setItems(data));
-      });
-  }, [dispatch, playlistId]);
+  }, [dispatch]);
 
-  return <ItemsView playlist={playlist} items={items} loading={loadingItems} />;
+  return <ItemsView playlist={playlist} items={items ?? null} loading={isLoading} />;
 }
 
 function TierBoardPage() {
@@ -430,17 +429,14 @@ function TierBoardPage() {
   const category = decodeURIComponent(rawCategory);
   const dispatch = useDispatch();
   const navigate = useNavigate();
-  const { loadTierBoardData, syncChanges, discardChanges, openFocus, startShufflePlay } =
-    useOutletContext();
+  const { syncChanges, discardChanges, openFocus, startShufflePlay } = useOutletContext();
 
   const playlists = useSelector((s) => s.auth.playlists);
   const tierGroups = useSelector(selectTierGroups);
   const tierItems = useSelector((s) => s.tiers.tierItems);
-  const tierLoading = useSelector((s) => s.tiers.tierLoading);
   const dragOverTier = useSelector((s) => s.tiers.dragOverTier);
   const draggedVideoId = useSelector((s) => s.tiers.draggedVideoId);
   const syncStatus = useSelector((s) => s.tiers.syncStatus);
-  const loadedCategory = useSelector((s) => s.tiers.loadedCategory);
   const pendingMoves = useSelector(selectPendingMoves);
 
   useEffect(() => {
@@ -450,16 +446,15 @@ function TierBoardPage() {
 
   useEffect(() => {
     if (!playlists) return; // wait for playlists to load before judging validity
-    if (!tierGroups[category]) {
-      navigate('/', { replace: true });
-      return;
-    }
-    // Re-entering this same board's page (e.g. returning from a duel) must
-    // not refetch - that would silently discard an already-applied duel
-    // result or drag that hasn't been synced to YouTube yet.
-    if (loadedCategory !== category) loadTierBoardData(category);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [category, playlists, tierGroups, loadedCategory]);
+    if (!tierGroups[category]) navigate('/', { replace: true });
+  }, [category, playlists, tierGroups, navigate]);
+
+  const { isLoading } = useLoadTierBoard(category, tierGroups[category]);
+  const tierLoading = useMemo(() => {
+    if (!isLoading) return {};
+    const tiers = tierGroups[category];
+    return Object.fromEntries(TIER_ORDER.filter((t) => tiers?.[t]).map((t) => [t, true]));
+  }, [isLoading, tierGroups, category]);
 
   function handleThumbDragStart(e, video, fromTier) {
     e.dataTransfer.setData('application/json', JSON.stringify({ videoId: video.videoId, fromTier }));
@@ -525,11 +520,9 @@ function DuelPage() {
   const category = decodeURIComponent(rawCategory);
   const dispatch = useDispatch();
   const navigate = useNavigate();
-  const { loadTierBoardData } = useOutletContext();
 
   const playlists = useSelector((s) => s.auth.playlists);
   const tierGroups = useSelector(selectTierGroups);
-  const loadedCategory = useSelector((s) => s.tiers.loadedCategory);
   const duelPool = useSelector(selectDuelPool);
   const duelRuns = useSelector(selectDuelRuns);
   const duelTierSizes = useSelector(selectDuelTierSizes);
@@ -539,19 +532,15 @@ function DuelPage() {
     dispatch(setMobileSidebarOpen(false));
   }, [dispatch, category]);
 
-  // Support deep-linking straight to a duel: load the board's data first if
-  // it isn't already loaded. Coming from "Start duel" on an already-open
-  // board has nothing left to fetch, and must not refetch - that would
-  // discard any local edits (drags) not yet synced to YouTube.
   useEffect(() => {
     if (!playlists) return;
-    if (!tierGroups[category]) {
-      navigate('/', { replace: true });
-      return;
-    }
-    if (loadedCategory !== category) loadTierBoardData(category);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [category, playlists, tierGroups, loadedCategory]);
+    if (!tierGroups[category]) navigate('/', { replace: true });
+  }, [category, playlists, tierGroups, navigate]);
+
+  // Supports deep-linking straight to a duel: fetches (and caches) the
+  // board's data the same way TierBoardPage does. Coming from "Start duel"
+  // on an already-open board serves straight from the query cache.
+  useLoadTierBoard(category, tierGroups[category]);
 
   function applyDuelResult(result) {
     dispatch(setTierItems(result));

@@ -29,12 +29,25 @@ auto-grouped into a tier board per category.
     own Cmd/Ctrl+K shortcut and open/close state internally (via the `spotlight` object
     from `@mantine/spotlight`), so don't reintroduce a manual keydown listener or Redux
     state for "is the palette open."
-  - **Redux Toolkit** (`@reduxjs/toolkit` + `react-redux`) for all app-level state, in
-    `frontend/src/store/`. One slice per concern (`authSlice`, `viewSlice`, `itemsSlice`,
-    `tiersSlice`, `focusSlice`); cross-slice derived values (pending moves, duel pools,
-    focus navigation sequence, etc.) are memoized selectors in `store/selectors.js`, not
-    component-level `useMemo`. `App.jsx` should stay a thin container that dispatches
-    actions and reads selectors - it shouldn't hold its own `useState` for app data.
+  - **Redux Toolkit** (`@reduxjs/toolkit` + `react-redux`) for *client* state only, in
+    `frontend/src/store/` (`authSlice` mirrors login/playlists, `viewSlice`,
+    `tiersSlice` - the local editable draft over a board's data - and `focusSlice`).
+    Cross-slice derived values (pending moves, duel pools, focus navigation sequence,
+    etc.) are memoized selectors in `store/selectors.js`, not component-level `useMemo`.
+  - **TanStack Query** (`@tanstack/react-query`) is the primary data-fetching layer for
+    *server* state - all API reads/writes go through hooks in `frontend/src/api/queries.js`
+    (`usePlaylistsQuery`, `usePlaylistItemsQuery`, `useTierBoardQueries`,
+    `useTierSyncMutation`, ...), never a raw `fetch`/`axios` call inline in a component.
+    **axios** (`frontend/src/api/client.js`'s `api` instance) is the HTTP transport
+    underneath it, not a separate calling convention - nothing outside `src/api/` should
+    import axios directly. Playlists/login state is mirrored from its query result into
+    `authSlice` via a `useEffect` (selectors elsewhere in the app read Redux, not the
+    query cache, to avoid rewriting them) - see `App.jsx`'s top-level `App()` component
+    and the `useLoadTierBoard` hook for the pattern.
+  - **React Hook Form** (`react-hook-form`, installed) - there is currently no real form
+    in this app for it to manage (login is a plain OAuth redirect; filter/search/settings
+    inputs are simple controlled inputs with no validation need). Don't force it in
+    somewhere it doesn't fit; use it if/when a real form with validation appears.
   - `lucide-react` is available for icons - prefer it over new unicode/emoji glyphs
     where a component is otherwise being touched.
 - **Backend**: Spring Boot 3 (Java 21, Maven), in `backend/`. Session-based Google OAuth2
@@ -80,35 +93,36 @@ auto-grouped into a tier board per category.
 The user asked for these on top of the Mantine/Redux migration above. Tracked here
 (no task-tracking tool is available in this environment) - update as items land:
 
-- [x] **React Router** - done. Replaced the hand-rolled History-API routing in
-  `App.jsx` with real `Routes`/`Route`s (`/`, `/playlist/:id`, `/tier/:category`,
-  `/tier/:category/duel`, `/settings`), a `Layout` route (Sidebar + player dock +
-  command palette, mounted once) wrapping page components that read `useParams`.
-  Also fixed a latent bug while doing this: navigating to a different page used to
-  unconditionally close the player dock, defeating the "plays in the background"
-  point of the mini bar - navigation no longer touches it at all.
-- [ ] **TanStack Query** (`@tanstack/react-query`, installed) as the primary data-fetching
-  layer, with **axios** (installed) as the HTTP client, replacing the manual
-  `fetch`/`dispatch(setX(...))` boilerplate in `loadPlaylists`/`openItems`/
-  `loadTierBoardData`/`syncChanges`. Plan: TanStack Query owns the *pristine* server
-  snapshot (playlists, playlist items, tier-board items); Redux's `tiersSlice` keeps
-  owning the *local editable draft* (`tierItems`, drag state) seeded from query
-  results, since drag-and-drop staging before sync doesn't fit a pure server-cache
-  model. `syncChanges` becomes a `useMutation` that invalidates the relevant queries.
-- [ ] **React Hook Form** (`react-hook-form`, installed) - flagged, but there is
-  currently no real form in this app to use it on (login is a plain OAuth redirect;
-  filter/search/settings inputs are simple controlled inputs with no validation
-  need). Don't force it in somewhere it doesn't fit; use it if/when a real form
-  appears (e.g. a settings field with validation).
-- [ ] **Stop hand-writing CSS, use Mantine components instead.** The user wants
-  `App.css` phased out in favor of Mantine's own components (`Group`, `Stack`,
-  `AppShell`, `Card`, `TextInput`, `ActionIcon`, `Badge`, etc.) rather than custom
-  divs + classNames. This is a large, incremental effort across every existing
-  component (Sidebar, TierBoardView, DuelView, PlaylistsView, ItemsView, PlayerDock,
-  CommandPalette, SettingsView) - convert opportunistically whenever a component is
-  already being touched, rather than as one risky big-bang rewrite.
+- [x] **React Router** - done. Real `Routes`/`Route`s (`/`, `/playlist/:id`,
+  `/tier/:category`, `/tier/:category/duel`, `/settings`) replace the hand-rolled
+  History-API routing. Also fixed a latent bug found while doing this: navigation
+  used to unconditionally close the player dock, defeating the "plays in the
+  background" point of the mini bar - navigation no longer touches it at all.
+- [x] **TanStack Query + axios** - done. `frontend/src/api/` (`client.js`'s axios
+  instance, `queries.js`'s hooks) is now the only place API calls happen; no
+  component does a raw `fetch`. `itemsSlice` was removed entirely (ItemsPage reads
+  straight from `usePlaylistItemsQuery`); `tiersSlice.loadedCategory` mediates
+  between TanStack Query's cache (pristine server data) and the local editable draft
+  (drags, duel results) - see `useLoadTierBoard` in `App.jsx`. Don't refetch
+  tier-board data on mount without checking `loadedCategory` first, and don't
+  reintroduce a raw `fetch`/inline `axios` call in a component - add a hook in
+  `api/queries.js` instead.
+- [ ] **React Hook Form** - installed, still nothing to use it on (see Stack section
+  above). Not a gap to close proactively.
+- [~] **Stop hand-writing CSS, use Mantine components instead** - in progress, real
+  ground covered but not finished. Done so far: every plain `<button className="btn
+  ...">` across the app converted to Mantine `Button`/`ActionIcon`
+  (`App.css`'s now-dead `.btn`/`.btn-primary`/`.btn-ghost`/`.sidebar-search`/
+  `.duel-strategy-select` rules removed as each one emptied out), the sidebar filter
+  input converted to Mantine `TextInput`, and the duel-strategy dropdown to Mantine
+  `Select`. Still hand-rolled CSS in `App.css`: the tier board grid/rows, drag-and-
+  drop thumbnails, `PlayerDock`'s expanded/mini layouts, the duel cards, and most of
+  `Sidebar`'s/`SettingsView`'s structural layout. Convert opportunistically whenever
+  one of those is next touched, rather than in one big-bang rewrite - and when a
+  `.btn`-style class's last usage is removed, delete its now-dead CSS rule in the
+  same pass (don't leave it orphaned "just in case").
 
-
+## Housekeeping
 
 - Commit incrementally as you go (the user asked for this explicitly, more than once).
 - After changing frontend code, rebuild and redeploy before saying a fix is live:

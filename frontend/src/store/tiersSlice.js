@@ -25,12 +25,18 @@ const tiersSlice = createSlice({
   },
   reducers: {
     resetTierBoard: (state, action) => {
-      const { category, presentTiers } = action.payload;
+      const { presentTiers } = action.payload;
       state.tierItems = {};
       state.tierLoading = Object.fromEntries(presentTiers.map((t) => [t, true]));
       state.originalTierItems = {};
       state.originalTierOf = {};
-      state.loadedCategory = category;
+    },
+    // Deliberately separate from resetTierBoard: this marks "the mirror
+    // effect has finished applying fresh query data for this category" and
+    // must only be set once that's actually true, not the moment a reset/
+    // refetch starts - see the useLoadTierBoard hook in App.jsx.
+    setLoadedCategory: (state, action) => {
+      state.loadedCategory = action.payload;
     },
     setTierForCategory: (state, action) => {
       const { tier, videos } = action.payload;
@@ -87,6 +93,7 @@ const tiersSlice = createSlice({
 
 export const {
   resetTierBoard,
+  setLoadedCategory,
   setTierForCategory,
   setTierItems,
   discardTierChanges,
