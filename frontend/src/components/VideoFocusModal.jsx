@@ -3,6 +3,12 @@ import { TIER_COLORS } from '../tiers';
 import { loadYouTubeApi } from '../youtubePlayer';
 
 function EmbeddedPlayer({ videoId }) {
+  // React owns this div and never gives it JSX children, so it's never touched
+  // by React's own reconciliation. The YT.Player API *replaces* whatever
+  // element it's given with its own iframe - if that element were the one
+  // React manages directly, React would later try to clean up a node that's
+  // already gone. So the API is only ever handed a plain child we create and
+  // manage ourselves, one layer below React's div.
   const containerRef = useRef(null);
   const playerRef = useRef(null);
   const [status, setStatus] = useState('loading'); // loading | ready | blocked
@@ -11,9 +17,14 @@ function EmbeddedPlayer({ videoId }) {
     let cancelled = false;
     setStatus('loading');
 
+    const mountEl = document.createElement('div');
+    mountEl.style.width = '100%';
+    mountEl.style.height = '100%';
+    containerRef.current?.appendChild(mountEl);
+
     loadYouTubeApi().then((YT) => {
-      if (cancelled || !containerRef.current) return;
-      playerRef.current = new YT.Player(containerRef.current, {
+      if (cancelled) return;
+      playerRef.current = new YT.Player(mountEl, {
         videoId,
         playerVars: { autoplay: 1, rel: 0 },
         events: {
@@ -25,8 +36,13 @@ function EmbeddedPlayer({ videoId }) {
 
     return () => {
       cancelled = true;
-      playerRef.current?.destroy?.();
+      try {
+        playerRef.current?.destroy?.();
+      } catch {
+        // already gone (e.g. API never finished loading before unmount)
+      }
       playerRef.current = null;
+      if (containerRef.current) containerRef.current.innerHTML = '';
     };
   }, [videoId]);
 
