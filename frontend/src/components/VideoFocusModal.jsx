@@ -81,12 +81,31 @@ export default function VideoFocusModal({
   onNext,
   onChangeTier,
 }) {
+  const cardRef = useRef(null);
+
+  // Pull focus into the modal on open. Otherwise the thumbnail that was
+  // clicked to open it keeps browser focus, and unmodified arrow-key presses
+  // fall through to the browser's native "scroll the focused element's
+  // scrollable ancestor" behavior - visibly scrolling the tier row sitting
+  // behind the overlay.
+  useEffect(() => {
+    cardRef.current?.focus();
+  }, []);
+
   useEffect(() => {
     function onKeyDown(e) {
-      if (e.key === 'Escape') onClose();
-      else if (e.key === 'ArrowLeft' && hasPrev) onPrev();
-      else if (e.key === 'ArrowRight' && hasNext) onNext();
-      else if (e.key >= '1' && e.key <= '9') {
+      if (e.key === 'Escape') {
+        onClose();
+      } else if (e.key === 'ArrowLeft') {
+        e.preventDefault();
+        if (hasPrev) onPrev();
+      } else if (e.key === 'ArrowRight') {
+        e.preventDefault();
+        if (hasNext) onNext();
+      } else if (e.shiftKey && e.key >= '1' && e.key <= '9') {
+        // Shift+number, not bare number: plain digits are YouTube's own
+        // native "seek to N0%" shortcut once focus is inside the player.
+        e.preventDefault();
         const tier = availableTiers[Number(e.key) - 1];
         if (tier) onChangeTier(tier);
       }
@@ -97,7 +116,7 @@ export default function VideoFocusModal({
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="focus-card" onClick={(e) => e.stopPropagation()}>
+      <div className="focus-card" tabIndex={-1} ref={cardRef} onClick={(e) => e.stopPropagation()}>
         <button className="modal-close" onClick={onClose} aria-label="Close">
           ✕
         </button>
@@ -131,12 +150,14 @@ export default function VideoFocusModal({
               onClick={() => onChangeTier(t)}
             >
               {t}
-              <span className="tier-pill-key">{i + 1}</span>
+              <span className="tier-pill-key">⇧{i + 1}</span>
             </button>
           ))}
         </div>
 
-        <p className="focus-hint">esc close · ← → navigate · 1-{availableTiers.length} set tier</p>
+        <p className="focus-hint">
+          esc close · ← → navigate · ⇧1-{availableTiers.length} set tier
+        </p>
       </div>
     </div>
   );
