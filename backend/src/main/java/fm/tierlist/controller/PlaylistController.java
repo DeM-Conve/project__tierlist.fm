@@ -4,6 +4,8 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.RequestEntity;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.authentication.AnonymousAuthenticationToken;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.oauth2.client.OAuth2AuthorizedClient;
 import org.springframework.security.oauth2.client.annotation.RegisteredOAuth2AuthorizedClient;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -24,8 +26,11 @@ public class PlaylistController {
     private final RestTemplate restTemplate = new RestTemplate();
 
     @GetMapping("/api/auth/status")
-    public Map<String, Object> authStatus(@RegisteredOAuth2AuthorizedClient("google") OAuth2AuthorizedClient client) {
-        return Map.of("loggedIn", client != null);
+    public Map<String, Object> authStatus(Authentication authentication) {
+        boolean loggedIn = authentication != null
+            && authentication.isAuthenticated()
+            && !(authentication instanceof AnonymousAuthenticationToken);
+        return Map.of("loggedIn", loggedIn);
     }
 
     @GetMapping("/api/playlists")
