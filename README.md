@@ -31,7 +31,7 @@ docker compose -f docker-compose.yml up --build
 
 This builds both images (backend jar + nginx-served frontend build) and runs them:
 - Backend: http://localhost:8080
-- Frontend: http://localhost:5173
+- Frontend: http://localhost:5183
 
 For local development with live code reload (no rebuild needed per change):
 
@@ -59,7 +59,7 @@ npm run dev
 
 ## Usage
 
-Open http://localhost:5173, click "Login with Google", approve access, and you'll see your playlists. Click a playlist to see its videos (opens the video on YouTube when clicked).
+Open http://localhost:5183, click "Login with Google", approve access, and you'll see your playlists. Click a playlist to see its videos (opens the video on YouTube when clicked).
 
 ## Tier boards
 

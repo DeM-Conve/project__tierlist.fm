@@ -32,19 +32,21 @@ function VideoCard({ video }) {
   );
 }
 
-function TierBoardCard({ category, tiers, onClick }) {
+function TierBoardRow({ category, tiers, onClick }) {
   const presentTiers = TIER_ORDER.filter((t) => tiers[t]);
+  function handleKeyDown(e) {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      onClick();
+    }
+  }
   return (
-    <div className="card tier-board-card" onClick={onClick}>
-      <div className="card-body">
-        <p className="card-title">{category}</p>
-        <div className="tier-badges">
-          {presentTiers.map((t) => (
-            <span key={t} className="tier-badge" style={{ background: TIER_COLORS[t] }}>
-              {t}
-            </span>
-          ))}
-        </div>
+    <div className="shelf-row" onClick={onClick} onKeyDown={handleKeyDown} role="button" tabIndex={0}>
+      <span className="shelf-name">{category}</span>
+      <div className="shelf-bar">
+        {presentTiers.map((t) => (
+          <span key={t} className="shelf-segment" style={{ background: TIER_COLORS[t] }} title={t} />
+        ))}
       </div>
     </div>
   );
@@ -305,14 +307,11 @@ export default function App() {
   return (
     <>
       <header>
-        <h1>
-          <span className="logo-dot" />
-          My YouTube Playlists
-        </h1>
+        <h1>My YouTube Playlists</h1>
         <div id="auth-area">
           {loggedIn && (
             <button className="btn btn-ghost" onClick={logout}>
-              Logout
+              Log out
             </button>
           )}
         </div>
@@ -321,16 +320,17 @@ export default function App() {
       <main>
         {loggedIn === false && (
           <section id="login-view">
-            <p>Sign in with your Google account to see your playlists.</p>
+            <h2 className="login-headline">Your playlists, ranked.</h2>
+            <p>Sign in to load your playlists and start sorting them into tiers.</p>
             <button className="btn btn-primary" onClick={login}>
-              Login with Google
+              Continue with Google
             </button>
           </section>
         )}
 
         {loggedIn === null && (
           <section id="login-view">
-            <p>Loading...</p>
+            <p className="hint-text">Loading...</p>
           </section>
         )}
 
@@ -339,11 +339,11 @@ export default function App() {
             {tierCategories.length > 0 && (
               <>
                 <div className="section-header">
-                  <h2>Tier Boards</h2>
+                  <h2>Tier boards</h2>
                 </div>
-                <div className="grid">
+                <div className="shelf">
                   {tierCategories.map((category) => (
-                    <TierBoardCard
+                    <TierBoardRow
                       key={category}
                       category={category}
                       tiers={tierGroups[category]}
@@ -355,7 +355,7 @@ export default function App() {
             )}
 
             <div className="section-header">
-              <h2>Your Playlists</h2>
+              <h2>Your playlists</h2>
             </div>
             <div className="grid">
               {playlists === null && <p className="hint-text">Loading playlists...</p>}

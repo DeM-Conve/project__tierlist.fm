@@ -1,11 +1,11 @@
 export const TIER_ORDER = ['T1', 'T2', 'T3', 'TE', 'TZ'];
 
 export const TIER_COLORS = {
-  T1: '#ff7f7f',
-  T2: '#ffbf7f',
-  T3: '#ffdf7f',
-  TE: '#ffff7f',
-  TZ: '#bfff7f',
+  T1: '#e8503a',
+  T2: '#e8823a',
+  T3: '#e8b93a',
+  TE: '#b9c93a',
+  TZ: '#4caf6e',
 };
 
 const TIER_SET = new Set(TIER_ORDER);
