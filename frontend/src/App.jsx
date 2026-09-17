@@ -1,117 +1,34 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import './App.css';
-import { TIER_COLORS, TIER_ORDER, groupByTier } from './tiers';
+import { TIER_ORDER, groupByTier } from './tiers';
+import Sidebar from './components/Sidebar';
+import PlaylistsView from './components/PlaylistsView';
+import ItemsView from './components/ItemsView';
+import TierBoardView from './components/TierBoardView';
 
 const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8080';
-
-function PlaylistCard({ playlist, onClick }) {
-  return (
-    <div className="card" onClick={onClick}>
-      <img src={playlist.thumbnail || ''} alt={playlist.title} />
-      <div className="card-body">
-        <p className="card-title">{playlist.title}</p>
-        <p className="card-meta">
-          {playlist.itemCount} video{playlist.itemCount === 1 ? '' : 's'}
-        </p>
-      </div>
-    </div>
-  );
-}
-
-function VideoCard({ video }) {
-  return (
-    <div className="card video-card">
-      <a href={`https://www.youtube.com/watch?v=${video.videoId}`} target="_blank" rel="noopener noreferrer">
-        <img src={video.thumbnail || ''} alt={video.title} />
-        <div className="card-body">
-          <p className="card-title">{video.title}</p>
-          <p className="card-meta">{video.channelTitle || ''}</p>
-        </div>
-      </a>
-    </div>
-  );
-}
-
-function TierBoardRow({ category, tiers, onClick }) {
-  const presentTiers = TIER_ORDER.filter((t) => tiers[t]);
-  function handleKeyDown(e) {
-    if (e.key === 'Enter' || e.key === ' ') {
-      e.preventDefault();
-      onClick();
-    }
-  }
-  return (
-    <div className="shelf-row" onClick={onClick} onKeyDown={handleKeyDown} role="button" tabIndex={0}>
-      <span className="shelf-name">{category}</span>
-      <div className="shelf-bar">
-        {presentTiers.map((t) => (
-          <span key={t} className="shelf-segment" style={{ background: TIER_COLORS[t] }} title={t} />
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function TierRow({ tier, items, loading, isDragOver, onDragOver, onDragLeave, onDrop, onThumbDragStart, onThumbDragEnd, draggedVideoId }) {
-  return (
-    <div
-      className={`tier-row${isDragOver ? ' tier-row-dragover' : ''}`}
-      onDragOver={onDragOver}
-      onDragLeave={onDragLeave}
-      onDrop={onDrop}
-    >
-      <div className="tier-label" style={{ background: TIER_COLORS[tier] }}>
-        {tier}
-      </div>
-      <div className="tier-content">
-        {loading && <p className="tier-loading">Loading...</p>}
-        {!loading && items?.length === 0 && <p className="tier-loading">Drop videos here</p>}
-        {items?.map((v) => (
-          <div
-            key={v.videoId}
-            className={`tier-thumb${draggedVideoId === v.videoId ? ' tier-thumb-dragging' : ''}`}
-            draggable
-            onDragStart={(e) => onThumbDragStart(e, v, tier)}
-            onDragEnd={onThumbDragEnd}
-            title={v.title}
-          >
-            <img src={v.thumbnail || ''} alt={v.title} draggable={false} />
-            <a
-              className="tier-thumb-link"
-              href={`https://www.youtube.com/watch?v=${v.videoId}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={(e) => e.stopPropagation()}
-            >
-              ▶
-            </a>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
 
 export default function App() {
   const [loggedIn, setLoggedIn] = useState(null);
   const [playlists, setPlaylists] = useState(null);
+  const [query, setQuery] = useState('');
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
 
-  // view: 'playlists' | 'items' | 'tierBoard'
-  const [view, setView] = useState('playlists');
+  // activeView: { type: 'playlists' } | { type: 'items', playlist } | { type: 'tierBoard', category }
+  const [activeView, setActiveView] = useState({ type: 'playlists' });
 
-  const [selectedPlaylist, setSelectedPlaylist] = useState(null);
   const [items, setItems] = useState(null);
   const [loadingItems, setLoadingItems] = useState(false);
 
-  const [selectedCategory, setSelectedCategory] = useState(null);
   const [tierItems, setTierItems] = useState({});
   const [tierLoading, setTierLoading] = useState({});
   const [draggedVideoId, setDraggedVideoId] = useState(null);
   const [dragOverTier, setDragOverTier] = useState(null);
-  const [syncStatus, setSyncStatus] = useState('idle'); // idle | syncing | done | error
+  const [syncStatus, setSyncStatus] = useState('idle'); // idle | syncing | done | partial | error
 
   const originalTierOfRef = useRef({});
   const originalTierItemsRef = useRef({});
+  const autoSelectedRef = useRef(false);
 
   const tierGroups = useMemo(() => (playlists ? groupByTier(playlists) : {}), [playlists]);
   const tierCategories = Object.keys(tierGroups).sort();
@@ -132,6 +49,14 @@ export default function App() {
   useEffect(() => {
     checkAuth();
   }, []);
+
+  useEffect(() => {
+    if (playlists && !autoSelectedRef.current) {
+      autoSelectedRef.current = true;
+      if (tierCategories.length > 0) openTierBoard(tierCategories[0]);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [playlists]);
 
   async function checkAuth() {
     try {
@@ -154,9 +79,9 @@ export default function App() {
     setPlaylists(await res.json());
   }
 
-  async function loadItems(playlist) {
-    setSelectedPlaylist(playlist);
-    setView('items');
+  async function openItems(playlist) {
+    setActiveView({ type: 'items', playlist });
+    setMobileSidebarOpen(false);
     setItems(null);
     setLoadingItems(true);
     const res = await fetch(`${API_BASE}/api/playlists/${playlist.id}/items`, { credentials: 'include' });
@@ -197,10 +122,15 @@ export default function App() {
   }
 
   async function openTierBoard(category) {
-    setSelectedCategory(category);
-    setView('tierBoard');
+    setActiveView({ type: 'tierBoard', category });
+    setMobileSidebarOpen(false);
     setSyncStatus('idle');
     await loadTierBoardData(category);
+  }
+
+  function selectPlaylists() {
+    setActiveView({ type: 'playlists' });
+    setMobileSidebarOpen(false);
   }
 
   function handleThumbDragStart(e, video, fromTier) {
@@ -254,7 +184,8 @@ export default function App() {
 
   async function syncChanges() {
     setSyncStatus('syncing');
-    const tiers = tierGroups[selectedCategory] || {};
+    const category = activeView.category;
+    const tiers = tierGroups[category] || {};
     const payload = pendingMoves.map((m) => ({
       videoId: m.video.videoId,
       title: m.video.title,
@@ -273,24 +204,12 @@ export default function App() {
 
       const result = await res.json();
       const finishedStatus = result.applied < result.total ? 'partial' : 'done';
-      // Re-fetch: inserting/removing items gives them new playlistItem ids,
-      // so the local state must be refreshed to stay accurate for further moves.
-      await loadTierBoardData(selectedCategory);
+      await loadTierBoardData(category);
       setSyncStatus(finishedStatus);
       setTimeout(() => setSyncStatus('idle'), 2500);
     } catch {
       setSyncStatus('error');
     }
-  }
-
-  function backToPlaylists() {
-    setView('playlists');
-    setSelectedPlaylist(null);
-    setItems(null);
-    setSelectedCategory(null);
-    setTierItems({});
-    setTierLoading({});
-    setSyncStatus('idle');
   }
 
   function login() {
@@ -301,136 +220,84 @@ export default function App() {
     await fetch(`${API_BASE}/api/auth/logout`, { method: 'POST', credentials: 'include' });
     setLoggedIn(false);
     setPlaylists(null);
-    backToPlaylists();
+    setActiveView({ type: 'playlists' });
+    setItems(null);
+    setTierItems({});
+    setTierLoading({});
+    setSyncStatus('idle');
+    autoSelectedRef.current = false;
+  }
+
+  if (loggedIn === false) {
+    return (
+      <main className="login-screen">
+        <section id="login-view">
+          <h2 className="login-headline">Your playlists, ranked.</h2>
+          <p>Sign in to load your playlists and start sorting them into tiers.</p>
+          <button className="btn btn-primary" onClick={login}>
+            Continue with Google
+          </button>
+        </section>
+      </main>
+    );
+  }
+
+  if (loggedIn === null) {
+    return (
+      <main className="login-screen">
+        <p className="hint-text">Loading...</p>
+      </main>
+    );
   }
 
   return (
-    <>
-      <header>
-        <h1>My YouTube Playlists</h1>
-        <div id="auth-area">
-          {loggedIn && (
-            <button className="btn btn-ghost" onClick={logout}>
-              Log out
-            </button>
-          )}
-        </div>
-      </header>
+    <div className="app-shell">
+      <button className="mobile-menu-btn" onClick={() => setMobileSidebarOpen(true)}>
+        Menu
+      </button>
 
-      <main>
-        {loggedIn === false && (
-          <section id="login-view">
-            <h2 className="login-headline">Your playlists, ranked.</h2>
-            <p>Sign in to load your playlists and start sorting them into tiers.</p>
-            <button className="btn btn-primary" onClick={login}>
-              Continue with Google
-            </button>
-          </section>
+      <Sidebar
+        query={query}
+        onQueryChange={setQuery}
+        tierCategories={tierCategories}
+        playlistCount={playlists?.length ?? 0}
+        activeView={activeView}
+        onSelectTierBoard={openTierBoard}
+        onSelectPlaylists={selectPlaylists}
+        onLogout={logout}
+        mobileOpen={mobileSidebarOpen}
+        onCloseMobile={() => setMobileSidebarOpen(false)}
+      />
+
+      <main className="canvas">
+        {activeView.type === 'playlists' && (
+          <PlaylistsView playlists={playlists} query={query} onOpenPlaylist={openItems} />
         )}
 
-        {loggedIn === null && (
-          <section id="login-view">
-            <p className="hint-text">Loading...</p>
-          </section>
+        {activeView.type === 'items' && (
+          <ItemsView playlist={activeView.playlist} items={items} loading={loadingItems} />
         )}
 
-        {loggedIn && view === 'playlists' && (
-          <section id="playlists-view">
-            {tierCategories.length > 0 && (
-              <>
-                <div className="section-header">
-                  <h2>Tier boards</h2>
-                </div>
-                <div className="shelf">
-                  {tierCategories.map((category) => (
-                    <TierBoardRow
-                      key={category}
-                      category={category}
-                      tiers={tierGroups[category]}
-                      onClick={() => openTierBoard(category)}
-                    />
-                  ))}
-                </div>
-              </>
-            )}
-
-            <div className="section-header">
-              <h2>Your playlists</h2>
-            </div>
-            <div className="grid">
-              {playlists === null && <p className="hint-text">Loading playlists...</p>}
-              {playlists?.length === 0 && <p className="hint-text">No playlists found.</p>}
-              {playlists?.map((p) => (
-                <PlaylistCard key={p.id} playlist={p} onClick={() => loadItems(p)} />
-              ))}
-            </div>
-          </section>
-        )}
-
-        {loggedIn && view === 'items' && (
-          <section id="items-view">
-            <button className="btn btn-ghost back-btn" onClick={backToPlaylists}>
-              &larr; Back to playlists
-            </button>
-            <h2>{selectedPlaylist?.title}</h2>
-            <div className="grid">
-              {loadingItems && <p className="hint-text">Loading videos...</p>}
-              {items?.length === 0 && !loadingItems && <p className="hint-text">No videos in this playlist.</p>}
-              {items?.map((v) => (
-                <VideoCard key={v.videoId} video={v} />
-              ))}
-            </div>
-          </section>
-        )}
-
-        {loggedIn && view === 'tierBoard' && (
-          <section id="tier-board-view">
-            <button className="btn btn-ghost back-btn" onClick={backToPlaylists}>
-              &larr; Back to playlists
-            </button>
-            <h2>{selectedCategory}</h2>
-            <p className="hint-text tier-hint">Drag a video into another tier to move it, then sync when you're ready.</p>
-            <div className="tier-board">
-              {TIER_ORDER.filter((t) => tierGroups[selectedCategory]?.[t]).map((t) => (
-                <TierRow
-                  key={t}
-                  tier={t}
-                  items={tierItems[t]}
-                  loading={tierLoading[t]}
-                  isDragOver={dragOverTier === t}
-                  draggedVideoId={draggedVideoId}
-                  onDragOver={(e) => handleRowDragOver(e, t)}
-                  onDragLeave={() => handleRowDragLeave(t)}
-                  onDrop={(e) => handleRowDrop(e, t)}
-                  onThumbDragStart={handleThumbDragStart}
-                  onThumbDragEnd={handleThumbDragEnd}
-                />
-              ))}
-            </div>
-
-            {pendingMoves.length > 0 && (
-              <div className="sync-bar">
-                <span className="sync-count">
-                  {pendingMoves.length} change{pendingMoves.length === 1 ? '' : 's'} pending
-                </span>
-                <div className="sync-actions">
-                  <button className="btn btn-ghost" onClick={discardChanges} disabled={syncStatus === 'syncing'}>
-                    Discard
-                  </button>
-                  <button className="btn btn-primary" onClick={syncChanges} disabled={syncStatus === 'syncing'}>
-                    {syncStatus === 'syncing' ? 'Syncing...' : 'Sync to YouTube'}
-                  </button>
-                </div>
-                {syncStatus === 'done' && <span className="sync-status sync-status-done">✓ Synced</span>}
-                {syncStatus === 'partial' && (
-                  <span className="sync-status sync-status-error">⚠ Some changes failed</span>
-                )}
-                {syncStatus === 'error' && <span className="sync-status sync-status-error">✕ Sync failed</span>}
-              </div>
-            )}
-          </section>
+        {activeView.type === 'tierBoard' && (
+          <TierBoardView
+            category={activeView.category}
+            tierGroups={tierGroups}
+            tierItems={tierItems}
+            tierLoading={tierLoading}
+            dragOverTier={dragOverTier}
+            draggedVideoId={draggedVideoId}
+            onRowDragOver={handleRowDragOver}
+            onRowDragLeave={handleRowDragLeave}
+            onRowDrop={handleRowDrop}
+            onThumbDragStart={handleThumbDragStart}
+            onThumbDragEnd={handleThumbDragEnd}
+            pendingMoves={pendingMoves}
+            syncStatus={syncStatus}
+            onDiscard={discardChanges}
+            onSync={syncChanges}
+          />
         )}
       </main>
-    </>
+    </div>
   );
 }
