@@ -291,6 +291,17 @@ export default function TierBoardView({
       if (e.key === 'Enter' && inSearchBox) {
         e.preventDefault();
         if (matches.length === 0) return;
+        // A single match is unambiguous - Enter should just play it, the
+        // same way a browser's own find-in-page jumps straight there
+        // instead of making you cycle through a "1 of 1" result.
+        if (matches.length === 1) {
+          const only = matches[0];
+          onThumbClick(only.tier, only.video.videoId);
+          setSearchOpen(false);
+          setSearchQuery('');
+          searchInputRef.current?.blur();
+          return;
+        }
         setMatchIndex((i) => (e.shiftKey ? i - 1 + matches.length : i + 1) % matches.length);
         return;
       }
@@ -302,7 +313,7 @@ export default function TierBoardView({
     }
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [searchOpen, matches]);
+  }, [searchOpen, matches, onThumbClick]);
 
   const matchedKeys = useMemo(
     () => new Set(matches.map((e) => `${e.tier}:${e.video.videoId}`)),
