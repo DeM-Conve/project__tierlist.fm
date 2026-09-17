@@ -13,4 +13,6 @@ spring:
             client-id: your-client-id.apps.googleusercontent.com
             client-secret: your-client-secret
             scope:
+              - openid
+              - profile
               - https://www.googleapis.com/auth/youtube.readonly
