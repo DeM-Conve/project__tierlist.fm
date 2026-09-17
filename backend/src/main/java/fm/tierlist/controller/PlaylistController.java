@@ -1,0 +1,117 @@
+package fm.tierlist.controller;
+
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.RequestEntity;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.oauth2.client.OAuth2AuthorizedClient;
+import org.springframework.security.oauth2.client.annotation.RegisteredOAuth2AuthorizedClient;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.client.RestTemplate;
+
+import java.net.URI;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+
+@RestController
+public class PlaylistController {
+
+    private static final String YOUTUBE_API_BASE = "https://www.googleapis.com/youtube/v3";
+    private final RestTemplate restTemplate = new RestTemplate();
+
+    @GetMapping("/api/auth/status")
+    public Map<String, Object> authStatus(@RegisteredOAuth2AuthorizedClient("google") OAuth2AuthorizedClient client) {
+        return Map.of("loggedIn", client != null);
+    }
+
+    @GetMapping("/api/playlists")
+    public List<Map<String, Object>> playlists(@RegisteredOAuth2AuthorizedClient("google") OAuth2AuthorizedClient client) {
+        List<Map<String, Object>> allItems = fetchAllPages(
+            client,
+            YOUTUBE_API_BASE + "/playlists?part=snippet,contentDetails&mine=true&maxResults=50"
+        );
+
+        List<Map<String, Object>> result = new ArrayList<>();
+        for (Map<String, Object> p : allItems) {
+            Map<String, Object> snippet = (Map<String, Object>) p.get("snippet");
+            Map<String, Object> contentDetails = (Map<String, Object>) p.get("contentDetails");
+            Map<String, Object> thumbnails = (Map<String, Object>) snippet.get("thumbnails");
+
+            Map<String, Object> out = new LinkedHashMap<>();
+            out.put("id", p.get("id"));
+            out.put("title", snippet.get("title"));
+            out.put("thumbnail", extractThumbnail(thumbnails));
+            out.put("itemCount", contentDetails != null ? contentDetails.get("itemCount") : 0);
+            result.add(out);
+        }
+        return result;
+    }
+
+    @GetMapping("/api/playlists/{id}/items")
+    public List<Map<String, Object>> playlistItems(
+            @PathVariable String id,
+            @RegisteredOAuth2AuthorizedClient("google") OAuth2AuthorizedClient client
+    ) {
+        List<Map<String, Object>> allItems = fetchAllPages(
+            client,
+            YOUTUBE_API_BASE + "/playlistItems?part=snippet,contentDetails&playlistId=" + id + "&maxResults=50"
+        );
+
+        List<Map<String, Object>> result = new ArrayList<>();
+        for (Map<String, Object> i : allItems) {
+            Map<String, Object> snippet = (Map<String, Object>) i.get("snippet");
+            Map<String, Object> contentDetails = (Map<String, Object>) i.get("contentDetails");
+            Map<String, Object> thumbnails = (Map<String, Object>) snippet.get("thumbnails");
+            String title = (String) snippet.get("title");
+
+            if ("Deleted video".equals(title) || "Private video".equals(title)) {
+                continue;
+            }
+
+            Map<String, Object> out = new LinkedHashMap<>();
+            out.put("videoId", contentDetails.get("videoId"));
+            out.put("title", title);
+            out.put("channelTitle", snippet.get("videoOwnerChannelTitle"));
+            out.put("thumbnail", extractThumbnail(thumbnails));
+            result.add(out);
+        }
+        return result;
+    }
+
+    private List<Map<String, Object>> fetchAllPages(OAuth2AuthorizedClient client, String baseUrl) {
+        List<Map<String, Object>> items = new ArrayList<>();
+        String pageToken = null;
+
+        do {
+            String url = baseUrl + (pageToken != null ? "&pageToken=" + pageToken : "");
+            Map<String, Object> body = callYoutubeApi(client, url);
+            List<Map<String, Object>> pageItems = (List<Map<String, Object>>) body.get("items");
+            if (pageItems != null) {
+                items.addAll(pageItems);
+            }
+            pageToken = (String) body.get("nextPageToken");
+        } while (pageToken != null);
+
+        return items;
+    }
+
+    private Map<String, Object> callYoutubeApi(OAuth2AuthorizedClient client, String url) {
+        HttpHeaders headers = new HttpHeaders();
+        headers.setBearerAuth(client.getAccessToken().getTokenValue());
+        RequestEntity<Void> request = new RequestEntity<>(headers, HttpMethod.GET, URI.create(url));
+        ResponseEntity<Map> response = restTemplate.exchange(request, Map.class);
+        return response.getBody();
+    }
+
+    private String extractThumbnail(Map<String, Object> thumbnails) {
+        if (thumbnails == null) return null;
+        Map<String, Object> medium = (Map<String, Object>) thumbnails.get("medium");
+        if (medium != null) return (String) medium.get("url");
+        Map<String, Object> defaultThumb = (Map<String, Object>) thumbnails.get("default");
+        return defaultThumb != null ? (String) defaultThumb.get("url") : null;
+    }
+}
