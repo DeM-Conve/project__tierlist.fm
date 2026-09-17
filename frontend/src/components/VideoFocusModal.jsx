@@ -102,9 +102,11 @@ export default function VideoFocusModal({
       } else if (e.key === 'ArrowRight') {
         e.preventDefault();
         if (hasNext) onNext();
-      } else if (e.shiftKey && e.key >= '1' && e.key <= '9') {
-        // Shift+number, not bare number: plain digits are YouTube's own
-        // native "seek to N0%" shortcut once focus is inside the player.
+      } else if (e.key >= '1' && e.key <= '9') {
+        // Plain digits are also YouTube's native "seek to N0%" shortcut, but
+        // only once focus is actually inside the embedded player - the modal
+        // focuses itself on open, so this is reliable until the video itself
+        // is clicked directly.
         e.preventDefault();
         const tier = availableTiers[Number(e.key) - 1];
         if (tier) onChangeTier(tier);
@@ -121,19 +123,21 @@ export default function VideoFocusModal({
           ✕
         </button>
 
-        {hasPrev && (
-          <button className="focus-nav focus-nav-prev" onClick={onPrev} aria-label="Previous video">
-            ‹
-          </button>
-        )}
-        {hasNext && (
-          <button className="focus-nav focus-nav-next" onClick={onNext} aria-label="Next video">
-            ›
-          </button>
-        )}
+        <div className="focus-media">
+          <div className="focus-embed">
+            <EmbeddedPlayer key={video.videoId} videoId={video.videoId} />
+          </div>
 
-        <div className="focus-embed">
-          <EmbeddedPlayer key={video.videoId} videoId={video.videoId} />
+          {hasPrev && (
+            <button className="focus-nav focus-nav-prev" onClick={onPrev} aria-label="Previous video">
+              ‹
+            </button>
+          )}
+          {hasNext && (
+            <button className="focus-nav focus-nav-next" onClick={onNext} aria-label="Next video">
+              ›
+            </button>
+          )}
         </div>
 
         <div className="focus-info">
@@ -150,14 +154,12 @@ export default function VideoFocusModal({
               onClick={() => onChangeTier(t)}
             >
               {t}
-              <span className="tier-pill-key">⇧{i + 1}</span>
+              <span className="tier-pill-key">{i + 1}</span>
             </button>
           ))}
         </div>
 
-        <p className="focus-hint">
-          esc close · ← → navigate · ⇧1-{availableTiers.length} set tier
-        </p>
+        <p className="focus-hint">esc close · ← → navigate · 1-{availableTiers.length} set tier</p>
       </div>
     </div>
   );

@@ -497,6 +497,10 @@
   z-index: 2;
 }
 .modal-close:hover { color: var(--text); }
+.focus-media {
+  position: relative;
+  margin-bottom: 16px;
+}
 .focus-nav {
   position: absolute;
   top: 50%;
@@ -511,15 +515,14 @@
   cursor: pointer;
   z-index: 2;
 }
-.focus-nav-prev { left: -20px; }
-.focus-nav-next { right: -20px; }
+.focus-nav-prev { left: 10px; }
+.focus-nav-next { right: 10px; }
 .focus-embed {
   position: relative;
   aspect-ratio: 16/9;
   background: #000;
   border-radius: 4px;
   overflow: hidden;
-  margin-bottom: 16px;
 }
 .focus-embed iframe {
   width: 100%;
