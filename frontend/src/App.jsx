@@ -5,6 +5,8 @@ import Sidebar from './components/Sidebar';
 import PlaylistsView from './components/PlaylistsView';
 import ItemsView from './components/ItemsView';
 import TierBoardView from './components/TierBoardView';
+import VideoFocusModal from './components/VideoFocusModal';
+import CommandPalette from './components/CommandPalette';
 
 const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8080';
 
@@ -25,6 +27,10 @@ export default function App() {
   const [draggedVideoId, setDraggedVideoId] = useState(null);
   const [dragOverTier, setDragOverTier] = useState(null);
   const [syncStatus, setSyncStatus] = useState('idle'); // idle | syncing | done | partial | error
+
+  // { tier, videoId } for the video open in the focus/embed modal, or null.
+  const [focusedVideo, setFocusedVideo] = useState(null);
+  const [paletteOpen, setPaletteOpen] = useState(false);
 
   const originalTierOfRef = useRef({});
   const originalTierItemsRef = useRef({});
@@ -51,6 +57,55 @@ export default function App() {
     return moves;
   }, [tierItems]);
 
+  const focusedList = focusedVideo ? tierItems[focusedVideo.tier] || [] : [];
+  const focusedIndex = focusedVideo ? focusedList.findIndex((v) => v.videoId === focusedVideo.videoId) : -1;
+  const focusedVideoData = focusedIndex >= 0 ? focusedList[focusedIndex] : null;
+  const focusedAvailableTiers = focusedVideo
+    ? TIER_ORDER.filter((t) => tierGroups[activeView.category]?.[t])
+    : [];
+
+  const commandItems = useMemo(() => {
+    const items = [];
+    for (const category of tierCategories) {
+      items.push({
+        id: `board-${category}`,
+        section: 'Boards',
+        label: `Go to board ${category}`,
+        action: () => openTierBoard(category),
+      });
+    }
+    for (const p of playlists || []) {
+      items.push({
+        id: `playlist-${p.id}`,
+        section: 'Playlists',
+        label: `Open ${p.title}`,
+        action: () => openItems(p),
+      });
+    }
+    items.push({
+      id: 'action-playlists',
+      section: 'Actions',
+      label: 'Go to Playlists',
+      action: () => selectPlaylists(),
+    });
+    if (activeView.type === 'tierBoard' && pendingMoves.length > 0) {
+      items.push({
+        id: 'action-sync',
+        section: 'Actions',
+        label: `Sync ${activeView.category} to YouTube (${pendingMoves.length} pending)`,
+        action: () => syncChanges(),
+      });
+      items.push({
+        id: 'action-discard',
+        section: 'Actions',
+        label: `Discard changes on ${activeView.category}`,
+        action: () => discardChanges(),
+      });
+    }
+    return items;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tierCategories, playlists, activeView, pendingMoves]);
+
   useEffect(() => {
     checkAuth();
   }, []);
@@ -71,6 +126,19 @@ export default function App() {
     return () => window.removeEventListener('popstate', onPopState);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [playlists]);
+
+  useEffect(() => {
+    function onKeyDown(e) {
+      const isMac = navigator.platform.toUpperCase().includes('MAC');
+      const modifier = isMac ? e.metaKey : e.ctrlKey;
+      if (modifier && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        setPaletteOpen((prev) => !prev);
+      }
+    }
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, []);
 
   function resolveFromLocation({ push, fallbackToFirst }) {
     const path = window.location.pathname;
@@ -128,6 +196,7 @@ export default function App() {
   async function openItems(playlist, { push = true, replace = false } = {}) {
     setActiveView({ type: 'items', playlist });
     setMobileSidebarOpen(false);
+    setFocusedVideo(null);
     updateUrl(`/playlist/${encodeURIComponent(playlist.id)}`, { push, replace });
     setItems(null);
     setLoadingItems(true);
@@ -172,6 +241,7 @@ export default function App() {
     setActiveView({ type: 'tierBoard', category });
     setMobileSidebarOpen(false);
     setSyncStatus('idle');
+    setFocusedVideo(null);
     updateUrl(`/tier/${encodeURIComponent(category)}`, { push, replace });
     await loadTierBoardData(category);
   }
@@ -179,6 +249,7 @@ export default function App() {
   function selectPlaylists({ push = true } = {}) {
     setActiveView({ type: 'playlists' });
     setMobileSidebarOpen(false);
+    setFocusedVideo(null);
     updateUrl('/', { push, replace: false });
   }
 
@@ -208,6 +279,34 @@ export default function App() {
     setDragOverTier((prev) => (prev === tier ? null : prev));
   }
 
+  // dropIndex omitted (null/undefined) means "append to the end of the target tier".
+  function moveVideoToTier(fromTier, toTier, videoId, dropIndex) {
+    setTierItems((prev) => {
+      const sourceArr = prev[fromTier] || [];
+      const video = sourceArr.find((v) => v.videoId === videoId);
+      if (!video) return prev;
+
+      if (fromTier === toTier) {
+        if (dropIndex == null) return prev;
+        const originalIndex = sourceArr.findIndex((v) => v.videoId === videoId);
+        const withoutVideo = sourceArr.filter((v) => v.videoId !== videoId);
+        let index = originalIndex < dropIndex ? dropIndex - 1 : dropIndex;
+        index = Math.max(0, Math.min(index, withoutVideo.length));
+        withoutVideo.splice(index, 0, video);
+        return { ...prev, [fromTier]: withoutVideo };
+      }
+
+      const targetArr = [...(prev[toTier] || [])];
+      const index = dropIndex == null ? targetArr.length : Math.max(0, Math.min(dropIndex, targetArr.length));
+      targetArr.splice(index, 0, video);
+      return {
+        ...prev,
+        [fromTier]: sourceArr.filter((v) => v.videoId !== videoId),
+        [toTier]: targetArr,
+      };
+    });
+  }
+
   function handleRowDrop(e, toTier, dropIndex) {
     e.preventDefault();
     let data;
@@ -220,30 +319,28 @@ export default function App() {
     setDragOverTier(null);
     setDraggedVideoId(null);
     if (!videoId) return;
+    moveVideoToTier(fromTier, toTier, videoId, dropIndex);
+  }
 
-    setTierItems((prev) => {
-      const sourceArr = prev[fromTier] || [];
-      const video = sourceArr.find((v) => v.videoId === videoId);
-      if (!video) return prev;
+  function openFocus(tier, videoId) {
+    setFocusedVideo({ tier, videoId });
+  }
 
-      if (fromTier === toTier) {
-        const originalIndex = sourceArr.findIndex((v) => v.videoId === videoId);
-        const withoutVideo = sourceArr.filter((v) => v.videoId !== videoId);
-        let index = originalIndex < dropIndex ? dropIndex - 1 : dropIndex;
-        index = Math.max(0, Math.min(index, withoutVideo.length));
-        withoutVideo.splice(index, 0, video);
-        return { ...prev, [fromTier]: withoutVideo };
-      }
+  function closeFocus() {
+    setFocusedVideo(null);
+  }
 
-      const targetArr = [...(prev[toTier] || [])];
-      const index = Math.max(0, Math.min(dropIndex, targetArr.length));
-      targetArr.splice(index, 0, video);
-      return {
-        ...prev,
-        [fromTier]: sourceArr.filter((v) => v.videoId !== videoId),
-        [toTier]: targetArr,
-      };
-    });
+  function navigateFocus(delta) {
+    if (!focusedVideo || focusedIndex < 0) return;
+    const nextIndex = focusedIndex + delta;
+    if (nextIndex < 0 || nextIndex >= focusedList.length) return;
+    setFocusedVideo({ tier: focusedVideo.tier, videoId: focusedList[nextIndex].videoId });
+  }
+
+  function changeFocusedTier(newTier) {
+    if (!focusedVideo || newTier === focusedVideo.tier) return;
+    moveVideoToTier(focusedVideo.tier, newTier, focusedVideo.videoId, null);
+    setFocusedVideo({ tier: newTier, videoId: focusedVideo.videoId });
   }
 
   function discardChanges() {
@@ -294,6 +391,8 @@ export default function App() {
     setTierItems({});
     setTierLoading({});
     setSyncStatus('idle');
+    setFocusedVideo(null);
+    setPaletteOpen(false);
     autoSelectedRef.current = false;
     window.history.replaceState(null, '', '/');
   }
@@ -335,6 +434,7 @@ export default function App() {
         onSelectTierBoard={openTierBoard}
         onSelectPlaylists={selectPlaylists}
         onLogout={logout}
+        onOpenPalette={() => setPaletteOpen(true)}
         mobileOpen={mobileSidebarOpen}
         onCloseMobile={() => setMobileSidebarOpen(false)}
       />
@@ -361,6 +461,7 @@ export default function App() {
             onRowDrop={handleRowDrop}
             onThumbDragStart={handleThumbDragStart}
             onThumbDragEnd={handleThumbDragEnd}
+            onThumbClick={openFocus}
             pendingMoves={pendingMoves}
             syncStatus={syncStatus}
             onDiscard={discardChanges}
@@ -368,6 +469,24 @@ export default function App() {
           />
         )}
       </main>
+
+      {focusedVideoData && (
+        <VideoFocusModal
+          video={focusedVideoData}
+          currentTier={focusedVideo.tier}
+          availableTiers={focusedAvailableTiers}
+          hasPrev={focusedIndex > 0}
+          hasNext={focusedIndex < focusedList.length - 1}
+          onClose={closeFocus}
+          onPrev={() => navigateFocus(-1)}
+          onNext={() => navigateFocus(1)}
+          onChangeTier={changeFocusedTier}
+        />
+      )}
+
+      {paletteOpen && (
+        <CommandPalette items={commandItems} onClose={() => setPaletteOpen(false)} />
+      )}
     </div>
   );
 }

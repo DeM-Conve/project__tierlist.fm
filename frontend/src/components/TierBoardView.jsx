@@ -22,6 +22,7 @@ function TierRow({
   onDrop,
   onThumbDragStart,
   onThumbDragEnd,
+  onThumbClick,
   draggedVideoId,
 }) {
   const [overIndex, setOverIndex] = useState(null);
@@ -69,6 +70,15 @@ function TierRow({
               draggable
               onDragStart={(e) => onThumbDragStart(e, v, tier)}
               onDragEnd={onThumbDragEnd}
+              onClick={() => onThumbClick(tier, v.videoId)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  onThumbClick(tier, v.videoId);
+                }
+              }}
+              role="button"
+              tabIndex={0}
               title={v.title}
             >
               <img src={v.thumbnail || ''} alt={v.title} draggable={false} />
@@ -77,9 +87,10 @@ function TierRow({
                 href={`https://www.youtube.com/watch?v=${v.videoId}`}
                 target="_blank"
                 rel="noopener noreferrer"
+                title="Open on YouTube"
                 onClick={(e) => e.stopPropagation()}
               >
-                ▶
+                ↗
               </a>
             </div>
           </div>
@@ -102,6 +113,7 @@ export default function TierBoardView({
   onRowDrop,
   onThumbDragStart,
   onThumbDragEnd,
+  onThumbClick,
   pendingMoves,
   syncStatus,
   onDiscard,
@@ -147,6 +159,7 @@ export default function TierBoardView({
             onDrop={(e, dropIndex) => onRowDrop(e, t, dropIndex)}
             onThumbDragStart={onThumbDragStart}
             onThumbDragEnd={onThumbDragEnd}
+            onThumbClick={onThumbClick}
           />
         ))}
       </div>

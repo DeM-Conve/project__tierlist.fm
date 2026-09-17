@@ -7,6 +7,7 @@ export default function Sidebar({
   onSelectTierBoard,
   onSelectPlaylists,
   onLogout,
+  onOpenPalette,
   mobileOpen,
   onCloseMobile,
 }) {
@@ -20,10 +21,15 @@ export default function Sidebar({
       <aside className={`sidebar${mobileOpen ? ' sidebar-open' : ''}`}>
         <div className="sidebar-brand">Playlist Tiers</div>
 
+        <button className="sidebar-palette-btn" onClick={onOpenPalette}>
+          <span>Jump to...</span>
+          <kbd>⌘K</kbd>
+        </button>
+
         <input
           className="sidebar-search"
           type="text"
-          placeholder="Filter..."
+          placeholder="Filter boards..."
           value={query}
           onChange={(e) => onQueryChange(e.target.value)}
         />
