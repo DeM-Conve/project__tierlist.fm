@@ -1,7 +1,9 @@
 package fm.tierlist.controller;
 
+import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
+import org.springframework.http.MediaType;
 import org.springframework.http.RequestEntity;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AnonymousAuthenticationToken;
@@ -80,6 +82,7 @@ public class PlaylistController {
             }
 
             Map<String, Object> out = new LinkedHashMap<>();
+            out.put("id", i.get("id")); // playlistItem id - needed to remove this item later
             out.put("videoId", contentDetails.get("videoId"));
             out.put("title", title);
             out.put("channelTitle", snippet.get("videoOwnerChannelTitle"));
@@ -90,17 +93,69 @@ public class PlaylistController {
     }
 
     /**
-     * Mock endpoint: does not actually mutate YouTube playlists. Our OAuth scope is
-     * youtube.readonly, so writing would require re-consenting with a broader scope.
-     * This just validates the request shape and echoes back what "would" happen, so
-     * the frontend's sync flow can be built and tested end to end ahead of that.
+     * Moves videos between playlists: inserts into the target playlist first, then
+     * removes the original playlistItem, so a failed delete never loses a video.
+     * Each move is applied independently; failures are reported per-item rather than
+     * aborting the whole batch.
      */
     @PostMapping("/api/tier-sync")
-    public Map<String, Object> tierSync(@RequestBody List<Map<String, Object>> moves) {
-        return Map.of(
-            "success", true,
-            "applied", moves.size(),
-            "mock", true
+    public Map<String, Object> tierSync(
+            @RequestBody List<Map<String, Object>> moves,
+            @RegisteredOAuth2AuthorizedClient("google") OAuth2AuthorizedClient client
+    ) {
+        List<Map<String, Object>> results = new ArrayList<>();
+        int applied = 0;
+
+        for (Map<String, Object> move : moves) {
+            String videoId = (String) move.get("videoId");
+            String fromItemId = (String) move.get("fromItemId");
+            String toPlaylistId = (String) move.get("toPlaylistId");
+
+            Map<String, Object> result = new LinkedHashMap<>();
+            result.put("videoId", videoId);
+            try {
+                insertPlaylistItem(client, toPlaylistId, videoId);
+                if (fromItemId != null) {
+                    deletePlaylistItem(client, fromItemId);
+                }
+                result.put("success", true);
+                applied++;
+            } catch (Exception e) {
+                result.put("success", false);
+                result.put("error", e.getMessage());
+            }
+            results.add(result);
+        }
+
+        Map<String, Object> response = new LinkedHashMap<>();
+        response.put("applied", applied);
+        response.put("total", moves.size());
+        response.put("results", results);
+        return response;
+    }
+
+    private void insertPlaylistItem(OAuth2AuthorizedClient client, String playlistId, String videoId) {
+        HttpHeaders headers = new HttpHeaders();
+        headers.setBearerAuth(client.getAccessToken().getTokenValue());
+        headers.setContentType(MediaType.APPLICATION_JSON);
+
+        Map<String, Object> resourceId = Map.of("kind", "youtube#video", "videoId", videoId);
+        Map<String, Object> snippet = Map.of("playlistId", playlistId, "resourceId", resourceId);
+        Map<String, Object> body = Map.of("snippet", snippet);
+
+        HttpEntity<Map<String, Object>> entity = new HttpEntity<>(body, headers);
+        restTemplate.exchange(YOUTUBE_API_BASE + "/playlistItems?part=snippet", HttpMethod.POST, entity, Map.class);
+    }
+
+    private void deletePlaylistItem(OAuth2AuthorizedClient client, String playlistItemId) {
+        HttpHeaders headers = new HttpHeaders();
+        headers.setBearerAuth(client.getAccessToken().getTokenValue());
+        HttpEntity<Void> entity = new HttpEntity<>(headers);
+        restTemplate.exchange(
+            YOUTUBE_API_BASE + "/playlistItems?id=" + playlistItemId,
+            HttpMethod.DELETE,
+            entity,
+            Void.class
         );
     }
 

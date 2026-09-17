@@ -172,10 +172,7 @@ export default function App() {
     return res.json();
   }
 
-  async function openTierBoard(category) {
-    setSelectedCategory(category);
-    setView('tierBoard');
-    setSyncStatus('idle');
+  async function loadTierBoardData(category) {
     const tiers = tierGroups[category];
     const presentTiers = TIER_ORDER.filter((t) => tiers[t]);
 
@@ -195,6 +192,13 @@ export default function App() {
         setTierLoading((prev) => ({ ...prev, [t]: false }));
       })
     );
+  }
+
+  async function openTierBoard(category) {
+    setSelectedCategory(category);
+    setView('tierBoard');
+    setSyncStatus('idle');
+    await loadTierBoardData(category);
   }
 
   function handleThumbDragStart(e, video, fromTier) {
@@ -252,9 +256,7 @@ export default function App() {
     const payload = pendingMoves.map((m) => ({
       videoId: m.video.videoId,
       title: m.video.title,
-      fromTier: m.from,
-      toTier: m.to,
-      fromPlaylistId: tiers[m.from]?.id,
+      fromItemId: m.video.id,
       toPlaylistId: tiers[m.to]?.id,
     }));
 
@@ -267,11 +269,12 @@ export default function App() {
       });
       if (!res.ok) throw new Error('sync failed');
 
-      pendingMoves.forEach((m) => {
-        originalTierOfRef.current[m.video.videoId] = m.to;
-      });
-      originalTierItemsRef.current = JSON.parse(JSON.stringify(tierItems));
-      setSyncStatus('done');
+      const result = await res.json();
+      const finishedStatus = result.applied < result.total ? 'partial' : 'done';
+      // Re-fetch: inserting/removing items gives them new playlistItem ids,
+      // so the local state must be refreshed to stay accurate for further moves.
+      await loadTierBoardData(selectedCategory);
+      setSyncStatus(finishedStatus);
       setTimeout(() => setSyncStatus('idle'), 2500);
     } catch {
       setSyncStatus('error');
@@ -419,6 +422,9 @@ export default function App() {
                   </button>
                 </div>
                 {syncStatus === 'done' && <span className="sync-status sync-status-done">✓ Synced</span>}
+                {syncStatus === 'partial' && (
+                  <span className="sync-status sync-status-error">⚠ Some changes failed</span>
+                )}
                 {syncStatus === 'error' && <span className="sync-status sync-status-error">✕ Sync failed</span>}
               </div>
             )}
