@@ -43,6 +43,12 @@ export const SHORTCUTS = [
   { id: 'player-play-pause', keys: ['Space'], description: 'Play / pause', category: 'Player' },
   { id: 'player-mute', keys: ['m'], description: 'Mute / unmute', category: 'Player' },
   {
+    id: 'player-seek-percent',
+    keys: ['0-9'],
+    description: 'Jump to that 10% of the video (0 = start, 9 = 90%) - works anywhere, not just expanded',
+    category: 'Player',
+  },
+  {
     id: 'player-minimize',
     keys: ['j'],
     description: 'Minimize (expanded → mini → floating)',

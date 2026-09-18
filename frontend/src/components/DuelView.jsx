@@ -5,36 +5,55 @@ import {
   Card,
   Container,
   Group,
+  Image,
   Kbd,
   Progress,
   Select,
   Stack,
   Text,
+  ThemeIcon,
   Title,
 } from '@mantine/core';
+import { useMediaQuery } from '@mantine/hooks';
 import { Play, Square } from 'lucide-react';
 import { DEFAULT_DUEL_STRATEGY, DUEL_STRATEGIES, DUEL_STRATEGY_LABELS } from '../duel';
 import { SETTINGS, getSetting, setSetting } from '../settings';
 import { TIER_COLORS } from '../tiers';
 import EmbeddedPlayer from './EmbeddedPlayer';
 
-function DuelCard({ video, tier, arrowKey, isPreviewing, onTogglePreview, onChoose }) {
+function DuelCard({ video, tier, arrowKey, isPreviewing, onTogglePreview, onChoose, width }) {
   return (
-    <Card className="duel-card" padding={0} radius="md" withBorder onClick={onChoose}>
-      <Card.Section className="duel-card-media">
+    <Card
+      className="duel-card"
+      padding={0}
+      radius="md"
+      withBorder
+      onClick={onChoose}
+      style={{ width }}
+    >
+      <Card.Section style={{ position: 'relative', aspectRatio: '16/9', overflow: 'hidden', background: '#000' }}>
         {tier && (
-          <Badge className="duel-card-tier" style={{ background: TIER_COLORS[tier], color: '#1a1509' }}>
+          <Badge
+            style={{
+              position: 'absolute',
+              top: 8,
+              left: 8,
+              zIndex: 2,
+              background: TIER_COLORS[tier],
+              color: '#1a1509',
+            }}
+          >
             {tier}
           </Badge>
         )}
-        <Kbd className="duel-card-key">{arrowKey}</Kbd>
+        <Kbd style={{ position: 'absolute', top: 8, right: 8, zIndex: 2 }}>{arrowKey}</Kbd>
         {isPreviewing ? (
           <EmbeddedPlayer videoId={video.videoId} autoplay />
         ) : (
-          <img src={video.thumbnail || ''} alt={video.title} />
+          <Image src={video.thumbnail || ''} alt={video.title} fit="cover" h="100%" w="100%" />
         )}
         <Button
-          className="duel-card-preview-btn"
+          style={{ position: 'absolute', bottom: 8, right: 8, zIndex: 2 }}
           size="xs"
           variant="filled"
           color="dark"
@@ -166,6 +185,11 @@ export default function DuelView({ videos, runs, tierSizes, onComplete, onCancel
   const pct = progress.total > 0 ? Math.round((progress.completed / progress.total) * 100) : 0;
   const a = currentPair ? videoMapRef.current.get(currentPair.a) : null;
   const b = currentPair ? videoMapRef.current.get(currentPair.b) : null;
+  // Mantine has no responsive-numeric-prop story for "fluid up to a cap, then
+  // full-width below a breakpoint" - useMediaQuery covers that in JS instead
+  // of a hand-written @media rule.
+  const isNarrow = useMediaQuery('(max-width: 720px)');
+  const cardWidth = isNarrow ? '100%' : 'min(440px, 42vw)';
 
   return (
     <Container className="duel-view" size={1100} pt={24} ta="center">
@@ -204,20 +228,24 @@ export default function DuelView({ videos, runs, tierSizes, onComplete, onCancel
           <Title order={1} fz={28} fw={800} mb={40}>
             Which one deserves the higher tier?
           </Title>
-          <Group justify="center" wrap="wrap" align="center" className="duel-arena">
+          <Group justify="center" wrap="wrap" align="center" gap={28}>
             <DuelCard
               video={a}
               tier={tierOfId[a.videoId]}
               arrowKey="←"
+              width={cardWidth}
               isPreviewing={previewing === a.videoId}
               onTogglePreview={() => setPreviewing((p) => (p === a.videoId ? null : a.videoId))}
               onChoose={() => chooseWinner(a.videoId)}
             />
-            <div className="duel-vs">VS</div>
+            <ThemeIcon size={52} radius={100} variant="outline" color="accent" fw={800} fz={14}>
+              VS
+            </ThemeIcon>
             <DuelCard
               video={b}
               tier={tierOfId[b.videoId]}
               arrowKey="→"
+              width={cardWidth}
               isPreviewing={previewing === b.videoId}
               onTogglePreview={() => setPreviewing((p) => (p === b.videoId ? null : b.videoId))}
               onChoose={() => chooseWinner(b.videoId)}

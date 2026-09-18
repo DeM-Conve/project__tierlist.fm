@@ -85,7 +85,7 @@ function TierRow({
         )}
       </div>
       <div
-        className="tier-content"
+        className={`tier-content${searchActive ? ' tier-content-search' : ''}`}
         onDragOver={handleContentDragOver}
         onDragLeave={handleContentDragLeave}
         onDrop={handleContentDrop}

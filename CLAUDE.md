@@ -159,6 +159,17 @@ The user asked for these on top of the Mantine/Redux migration above. Tracked he
 
 ## Housekeeping
 
+- **Library-first, every time, no exceptions.** Before writing a single line of
+  hand-rolled CSS or plain-DOM/manual state code, check whether an already-installed
+  library does the job: Mantine's own component props (`style`/`styles`, `gap`, `radius`,
+  `fit`, etc.) for anything visual, `ThemeIcon`/`Badge`/`Image`/`Kbd` etc. instead of a
+  raw styled `<div>`/`<img>`, Redux Toolkit/TanStack Query patterns already established in
+  `store/`/`api/` instead of ad hoc `useState`/`fetch`. Only fall back to a plain CSS rule
+  in `App.css` when the library genuinely has no prop/component for it (a CSS Grid/flex
+  layout shape, a `:hover` pseudo-class, an `@media` breakpoint) - and say so in a comment
+  when you do, so it's clear it wasn't just the lazy default. The user has said this
+  multiple times; reaching for `className`+`App.css` first, or "as well as" a library
+  prop instead of "instead of" it, is the specific mistake to stop making.
 - Commit incrementally as you go (the user asked for this explicitly, more than once).
 - **Never add a `Co-Authored-By: Claude` (or any Claude/Anthropic attribution) line to
   commit messages or PR descriptions.** The user had these stripped from all existing

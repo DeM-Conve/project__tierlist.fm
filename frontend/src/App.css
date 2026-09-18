@@ -165,16 +165,40 @@
 }
 .tier-content {
   flex: 1;
-  display: flex;
+  display: grid;
+  /* Each of the two explicit rows sizes to its own "auto" content, not a
+     fixed height - a 1-item tier only ever puts something in row 1, so
+     row 2 naturally collapses to 0 instead of reserving dead space for a
+     row that has nothing in it. Only a tier with enough items to actually
+     fill both rows grows to two rows tall. */
+  grid-template-rows: repeat(2, auto);
+  grid-auto-flow: column;
+  /* Without this, implicit "auto" column tracks split any leftover
+     container width evenly between themselves, spreading a handful of
+     140px-wide cards across the full row with huge gaps instead of
+     packing them tightly - max-content pins each column to its actual
+     card width so only `gap` separates them. */
+  grid-auto-columns: max-content;
   gap: 8px;
   padding: 10px;
   overflow-x: auto;
   background: var(--surface);
-  /* Matches a populated row's actual height (140px-wide, 16:9 thumbnail +
-     title caption) so an empty/no-matches row renders at the same height
-     instead of collapsing - without this, typing into the "/" search bar
-     made rows grow and shrink line by line as matches came and went,
-     shifting everything below vertically on every keystroke. */
+  /* Matches one thumbnail row (140*9/16 image + title caption) so an
+     empty/no-matches row renders at that same height instead of
+     collapsing to nothing. */
+  min-height: 128px;
+  align-items: start;
+}
+/* While the "/" find bar is active, collapse back to a single row: matches
+   change on every keystroke, and a two-row column-flow grid would
+   redistribute which items land in which row/column as they do, which
+   reads far worse mid-search than just a single scrolling line whose
+   scroll position is the only thing that moves. */
+.tier-content-search {
+  grid-template-rows: none;
+  grid-auto-flow: row;
+  display: flex;
+  flex-wrap: nowrap;
   min-height: 128px;
   align-items: center;
 }
@@ -309,71 +333,14 @@
 .pending-arrow { color: var(--text-faint); font-size: 12px; }
 .pending-remove-label { color: var(--danger); font-size: 12px; font-weight: 600; }
 
-/* Duel view - the layout (header row, progress bar, card grid, spacing)
-   now comes from Mantine (Container/Group/Stack/Progress/Card/Text). What's
-   left is card-specific behavior Mantine has no prop for (hover lift, fixed
-   card width so the arena doesn't shrink-to-fit its own content) and the
-   absolute-position overlay placement for the tier badge/key hint/preview
-   button on top of the thumbnail. */
-.duel-card {
-  width: min(440px, 42vw);
-  transition: border-color 0.15s ease, transform 0.15s ease;
-}
+/* Duel view - everything (layout, card width, card media positioning, the
+   VS badge, thumbnail, responsive width) is Mantine components/props or
+   inline style now (Container/Group/Stack/Progress/Card/Image/ThemeIcon/
+   Kbd + useMediaQuery for the one responsive width swap). The only thing
+   left with no Mantine prop equivalent is the hover lift - Mantine has no
+   ":hover" styling prop, so that alone stays a plain CSS rule. */
+.duel-card { transition: border-color 0.15s ease, transform 0.15s ease; }
 .duel-card:hover { border-color: var(--accent); transform: translateY(-2px); }
-.duel-card-media {
-  position: relative;
-  aspect-ratio: 16/9;
-  overflow: hidden;
-  background: #000;
-}
-.duel-card-media img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  display: block;
-  background: var(--surface-2);
-}
-.duel-card-tier {
-  position: absolute;
-  top: 8px;
-  left: 8px;
-  z-index: 2;
-}
-.duel-card-key {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  z-index: 2;
-}
-.duel-card-preview-btn {
-  position: absolute;
-  bottom: 8px;
-  right: 8px;
-  z-index: 2;
-}
-.duel-arena {
-  gap: 28px;
-}
-.duel-vs {
-  flex-shrink: 0;
-  width: 52px;
-  height: 52px;
-  border-radius: 50%;
-  border: 2px solid var(--accent);
-  background: var(--surface-2);
-  color: var(--accent);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-family: var(--font-display);
-  font-weight: 800;
-  font-size: 14px;
-  letter-spacing: 0.02em;
-}
-@media (max-width: 720px) {
-  .duel-card { width: 100%; max-width: 440px; }
-  .duel-vs { margin: -4px 0; }
-}
 
 @media (max-width: 900px) {
   .mobile-menu-btn {

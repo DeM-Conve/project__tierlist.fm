@@ -1,10 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
+import { ActionIcon, Slider } from '@mantine/core';
 import {
   ChevronDown,
   ChevronUp,
   PictureInPicture2,
   Pause,
   Play,
+  Repeat,
+  Repeat1,
   SkipBack,
   SkipForward,
   Volume2,
@@ -54,6 +57,16 @@ export default function PlayerDock({
   const [isPlaying, setIsPlaying] = useState(true);
   const [progressPct, setProgressPct] = useState(0);
   const [isMuted, setIsMuted] = useState(false);
+  const [volume, setVolume] = useState(100);
+  // Remembers the level to restore when unmuting via the button/shortcut,
+  // the way a hardware volume knob would - dragging the slider itself to 0
+  // is just another way of reaching muted, not a separate state.
+  const lastVolumeRef = useRef(100);
+  // Like YouTube Music's repeat toggle, but just the one "repeat this song"
+  // state (not the off/repeat-all/repeat-one three-way cycle) - repeat-all
+  // would need to wrap the active sequence back to its own start, which is
+  // App.jsx's queue data, not something this component has.
+  const [repeatOne, setRepeatOne] = useState(false);
   const expanded = mode === 'expanded';
   // "Floating corner" mode: an in-page floating box pinned to the bottom-right
   // corner, the way YouTube Music's own in-app miniplayer works. This is
@@ -182,14 +195,23 @@ export default function PlayerDock({
         e.preventDefault();
         toggleMute();
       } else if (expanded && e.shiftKey && e.code.startsWith('Digit')) {
-        // Shift+digit, not a plain digit - plain 1-9 is YouTube's own native
-        // "seek to N0%" shortcut, so tier-reassignment needs a modifier to
-        // stay unambiguous. e.code (not e.key) is used because e.key turns
-        // into a shifted symbol like "!" once Shift is held.
+        // Shift+digit, not a plain digit - plain 0-9 is the seek-to-percent
+        // shortcut below, so tier-reassignment needs a modifier to stay
+        // unambiguous. e.code (not e.key) is used because e.key turns into a
+        // shifted symbol like "!" once Shift is held.
         e.preventDefault();
         const digit = Number(e.code.slice('Digit'.length));
         const tier = availableTiers[digit - 1];
         if (tier) onChangeTier(tier);
+      } else if (!e.shiftKey && e.code.startsWith('Digit')) {
+        // YouTube's own native "jump to N0% of the video" shortcut (0 = the
+        // start, 9 = 90%) - reimplemented through the IFrame API instead of
+        // relying on the embed's own listener, so it works globally (mini
+        // bar, floating corner, anywhere on the page) rather than only when
+        // the iframe itself happens to have DOM focus.
+        e.preventDefault();
+        const digit = Number(e.code.slice('Digit'.length));
+        seekToPercent(digit * 10);
       }
     }
     window.addEventListener('keydown', onKeyDown);
@@ -225,9 +247,32 @@ export default function PlayerDock({
   function toggleMute() {
     const player = playerRef.current;
     if (!player) return;
-    if (isMuted) player.unMute?.();
-    else player.mute?.();
-    setIsMuted(!isMuted);
+    if (isMuted) {
+      const restored = lastVolumeRef.current || 100;
+      player.unMute?.();
+      player.setVolume?.(restored);
+      setVolume(restored);
+      setIsMuted(false);
+    } else {
+      lastVolumeRef.current = volume || 100;
+      player.mute?.();
+      setVolume(0);
+      setIsMuted(true);
+    }
+  }
+
+  function handleVolumeChange(next) {
+    const player = playerRef.current;
+    setVolume(next);
+    if (next === 0) {
+      player?.mute?.();
+      setIsMuted(true);
+    } else {
+      lastVolumeRef.current = next;
+      player?.unMute?.();
+      player?.setVolume?.(next);
+      setIsMuted(false);
+    }
   }
 
   function seek(e) {
@@ -252,6 +297,21 @@ export default function PlayerDock({
     setProgressPct((next / duration) * 100);
   }
 
+  function replayCurrent() {
+    const player = playerRef.current;
+    if (!player) return;
+    player.seekTo(0, true);
+    player.playVideo?.();
+  }
+
+  function seekToPercent(pct) {
+    const player = playerRef.current;
+    const duration = player?.getDuration?.();
+    if (!duration) return;
+    player.seekTo((pct / 100) * duration, true);
+    setProgressPct(pct);
+  }
+
   return (
     <div
       className={`player-dock ${expanded ? 'player-dock-expanded' : 'player-dock-mini'}${
@@ -272,6 +332,18 @@ export default function PlayerDock({
         )}
 
         <div className="player-dock-toolbar">
+          <ActionIcon
+            variant={repeatOne ? 'filled' : 'default'}
+            color="accent"
+            radius="xl"
+            size={mode === 'mini' ? 26 : 30}
+            onClick={() => setRepeatOne((r) => !r)}
+            aria-label={repeatOne ? 'Repeat this song: on' : 'Repeat this song: off'}
+            aria-pressed={repeatOne}
+            title={repeatOne ? 'Repeat: on' : 'Repeat: off'}
+          >
+            {repeatOne ? <Repeat1 size={16} /> : <Repeat size={16} />}
+          </ActionIcon>
           {expanded ? (
             // Closing the expanded view minimizes it to the bottom bar
             // instead of stopping playback - matches how YouTube Music's
@@ -298,9 +370,19 @@ export default function PlayerDock({
               <EmbeddedPlayer
                 key={video.videoId}
                 videoId={video.videoId}
-                onEnded={hasNext ? onNext : undefined}
+                onEnded={repeatOne ? replayCurrent : hasNext ? onNext : undefined}
                 onPlayerReady={(p) => {
                   playerRef.current = p;
+                  // A new EmbeddedPlayer instance mounts per video (its own
+                  // effect keys off videoId) - re-sync the slider/mute state
+                  // to whatever that fresh player actually reports instead
+                  // of assuming it kept the previous instance's volume.
+                  if (p) {
+                    const v = p.getVolume?.() ?? 100;
+                    setVolume(v);
+                    lastVolumeRef.current = v || lastVolumeRef.current;
+                    setIsMuted(p.isMuted?.() ?? false);
+                  }
                 }}
                 onPlayingChange={setIsPlaying}
               />
@@ -383,8 +465,20 @@ export default function PlayerDock({
                 onClick={toggleMute}
                 aria-label={isMuted ? 'Unmute' : 'Mute'}
               >
-                {isMuted ? <VolumeX size={17} /> : <Volume2 size={17} />}
+                {isMuted || volume === 0 ? <VolumeX size={17} /> : <Volume2 size={17} />}
               </button>
+              <Slider
+                value={volume}
+                onChange={handleVolumeChange}
+                min={0}
+                max={100}
+                step={5}
+                w={80}
+                size="xs"
+                color="accent"
+                label={null}
+                aria-label="Volume"
+              />
               <button
                 className={`player-dock-icon-btn${floating ? ' player-dock-icon-btn-active' : ''}`}
                 onClick={() => applyMode(floating ? 'mini' : 'floating')}
@@ -416,7 +510,7 @@ export default function PlayerDock({
             )}
 
             <p className="focus-hint">
-              esc/j minimize · ← → seek 10s · h l navigate · space play/pause · m mute
+              esc/j minimize · ← → seek 10s · h l navigate · space play/pause · m mute · 0-9 seek %
               {availableTiers.length > 0 && ` · shift+1-${availableTiers.length} set tier`}
             </p>
           </>
