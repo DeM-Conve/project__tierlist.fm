@@ -158,7 +158,16 @@ export default function PlayerDock({
       const onDuelScreen = document.querySelector('.duel-view');
       if (onDuelScreen) return;
 
-      if (e.key === 'ArrowLeft' || e.key === 'h') {
+      if (expanded && e.key === 'ArrowLeft') {
+        // While expanded, the arrow keys match the on-screen ‹ › buttons
+        // (scrub within the current video) instead of skipping tracks -
+        // h/l are the dedicated track-skip keys in every mode.
+        e.preventDefault();
+        seekBy(-10);
+      } else if (expanded && e.key === 'ArrowRight') {
+        e.preventDefault();
+        seekBy(10);
+      } else if (e.key === 'ArrowLeft' || e.key === 'h') {
         e.preventDefault();
         if (hasPrev) onPrev();
       } else if (e.key === 'ArrowRight' || e.key === 'l') {
@@ -407,7 +416,7 @@ export default function PlayerDock({
             )}
 
             <p className="focus-hint">
-              esc/j minimize · ← → / h l navigate · space play/pause · m mute
+              esc/j minimize · ← → seek 10s · h l navigate · space play/pause · m mute
               {availableTiers.length > 0 && ` · shift+1-${availableTiers.length} set tier`}
             </p>
           </>

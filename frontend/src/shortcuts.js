@@ -34,6 +34,12 @@ export const SHORTCUTS = [
 
   { id: 'player-prev', keys: ['h'], description: 'Previous track', category: 'Player' },
   { id: 'player-next', keys: ['l'], description: 'Next track', category: 'Player' },
+  {
+    id: 'player-seek',
+    keys: ['←', '→'],
+    description: 'Seek 10s back/forward (while expanded)',
+    category: 'Player',
+  },
   { id: 'player-play-pause', keys: ['Space'], description: 'Play / pause', category: 'Player' },
   { id: 'player-mute', keys: ['m'], description: 'Mute / unmute', category: 'Player' },
   {
