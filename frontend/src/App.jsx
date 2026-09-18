@@ -14,6 +14,7 @@ import {
 import { spotlight } from '@mantine/spotlight';
 import { Button } from '@mantine/core';
 import { useDisclosure, useHotkeys } from '@mantine/hooks';
+import { useProgress } from '@bprogress/react';
 import './App.css';
 import { TIER_ORDER } from './tiers';
 import Sidebar from './components/Sidebar';
@@ -90,6 +91,7 @@ function useLoadTierBoard(category, tiers) {
   const dispatch = useDispatch();
   const loadedCategory = useSelector((s) => s.tiers.loadedCategory);
   const { data, isLoading } = useTierBoardQueries(category, tiers);
+  const boardLoading = isLoading || loadedCategory !== category;
 
   useEffect(() => {
     if (!data || loadedCategory === category) return;
@@ -99,7 +101,17 @@ function useLoadTierBoard(category, tiers) {
     dispatch(setLoadedCategory(category));
   }, [data, category, loadedCategory, dispatch]);
 
-  return { isLoading: isLoading || loadedCategory !== category };
+  // Drives the top-of-page progress bar (@bprogress/react) while switching
+  // between tier boards - the actual "stale items still showing" bug this
+  // was added alongside is fixed in TierRow (only skeletons render while
+  // `loading` is true), this is just the accompanying visual feedback.
+  const { start, stop } = useProgress();
+  useEffect(() => {
+    if (boardLoading) start();
+    else stop();
+  }, [boardLoading, start, stop]);
+
+  return { isLoading: boardLoading };
 }
 
 export default function App() {

@@ -50,6 +50,15 @@ auto-grouped into a tier board per category.
     somewhere it doesn't fit; use it if/when a real form with validation appears.
   - `lucide-react` is available for icons - prefer it over new unicode/emoji glyphs
     where a component is otherwise being touched.
+  - **Mantine's `Skeleton`** for loading placeholders (tier board thumbnails, playlist
+    cards) - don't hand-roll a shimmer div/CSS animation for a new loading state, use
+    `<Skeleton>` and only add layout-sizing CSS (width/aspect-ratio) it has no prop for.
+  - **`@bprogress/react`** (`ProgressProvider` mounted once in `main.jsx`, `useProgress()`
+    elsewhere) drives the slim top-of-page progress bar. It's manually driven
+    (`start()`/`stop()`), not the router-integrated mode, since what it currently tracks
+    is `useLoadTierBoard`'s own loading state, not raw route navigation - wire new pages'
+    async loads into it the same way rather than adding a second, differently-styled
+    loading indicator.
 - **Backend**: Spring Boot 3 (Java 21, Maven), in `backend/`. Session-based Google OAuth2
   login; talks to the YouTube Data API v3 directly (no separate token DB).
 - **Deploy**: Docker Compose. `docker-compose.yml` (prod-style multi-stage builds) and

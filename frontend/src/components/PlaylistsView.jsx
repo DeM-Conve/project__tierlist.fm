@@ -1,10 +1,12 @@
+import { Skeleton } from '@mantine/core';
+
 function SkeletonCard() {
   return (
     <div className="card skeleton-card">
-      <div className="skeleton-block" style={{ aspectRatio: '16/9' }} />
+      <Skeleton style={{ aspectRatio: '16/9' }} />
       <div className="card-body">
-        <div className="skeleton-block skeleton-line" style={{ width: '80%' }} />
-        <div className="skeleton-block skeleton-line" style={{ width: '40%' }} />
+        <Skeleton className="skeleton-line" width="80%" />
+        <Skeleton className="skeleton-line" width="40%" />
       </div>
     </div>
   );

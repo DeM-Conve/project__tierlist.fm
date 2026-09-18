@@ -125,17 +125,8 @@
 }
 .video-card a { text-decoration: none; color: inherit; }
 
-/* Skeleton loading */
-.skeleton-block {
-  background: linear-gradient(90deg, var(--surface-2) 25%, var(--surface-3) 37%, var(--surface-2) 63%);
-  background-size: 400% 100%;
-  animation: skeleton-shimmer 1.4s ease infinite;
-  border-radius: 3px;
-}
-@keyframes skeleton-shimmer {
-  0% { background-position: 100% 50%; }
-  100% { background-position: 0 50%; }
-}
+/* Skeleton loading - animation/shimmer is Mantine's own <Skeleton>, these
+   are just the layout-specific sizing it has no prop for. */
 .skeleton-card { cursor: default; }
 .skeleton-card .card-body { display: flex; flex-direction: column; gap: 8px; }
 .skeleton-line { height: 12px; }

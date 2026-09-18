@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ActionIcon, Badge, Button, Card, Group, Paper, Stack, Text, TextInput, Title, Tooltip } from '@mantine/core';
+import { ActionIcon, Badge, Button, Card, Group, Paper, Skeleton, Stack, Text, TextInput, Title, Tooltip } from '@mantine/core';
 import { ArrowUpRight, Shuffle } from 'lucide-react';
 import { TIER_COLORS, TIER_ORDER } from '../tiers';
 
@@ -92,7 +92,7 @@ function TierRow({
       >
         {loading &&
           Array.from({ length: 4 }).map((_, i) => (
-            <div key={i} className="skeleton-block tier-thumb-skeleton" />
+            <Skeleton key={i} className="tier-thumb-skeleton" radius="sm" />
           ))}
         {!loading && !searchActive && items?.length === 0 && (
           <p className="tier-empty">Drop videos here</p>
@@ -100,7 +100,7 @@ function TierRow({
         {!loading && searchActive && visibleItems?.length === 0 && (
           <p className="tier-empty">No matches in this tier</p>
         )}
-        {visibleItems?.map((v, i) => {
+        {!loading && visibleItems?.map((v, i) => {
           const key = `${tier}:${v.videoId}`;
           const isActiveMatch = activeMatchKey === key;
           return (
