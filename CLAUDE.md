@@ -151,6 +151,10 @@ The user asked for these on top of the Mantine/Redux migration above. Tracked he
 ## Housekeeping
 
 - Commit incrementally as you go (the user asked for this explicitly, more than once).
+- **Never add a `Co-Authored-By: Claude` (or any Claude/Anthropic attribution) line to
+  commit messages or PR descriptions.** The user had these stripped from all existing
+  history with `git filter-repo` and does not want Claude credited as an author
+  anywhere in this repo's git history, going forward.
 - After changing frontend code, rebuild and redeploy before saying a fix is live:
   `npx vite build` in `frontend/`, then `docker compose -f docker-compose.yml up -d
   --build` (frontend, or both if backend also changed) from the project root. Verify the
