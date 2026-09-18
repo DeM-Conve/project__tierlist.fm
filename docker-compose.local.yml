@@ -7,7 +7,7 @@ services:
       - ./backend:/app
       - maven-repo:/root/.m2
     ports:
-      - "${SERVER_PORT:-8080}:8080"
+      - "${SERVER_PORT:-48123}:${SERVER_PORT:-48123}"
     env_file:
       - .env
 
@@ -19,9 +19,9 @@ services:
       - ./frontend:/app
       - frontend-node-modules:/app/node_modules
     ports:
-      - "${FRONTEND_PORT:-5183}:5173"
+      - "${FRONTEND_PORT:-80}:5173"
     environment:
-      VITE_API_BASE: ${VITE_API_BASE:-http://localhost:8080}
+      VITE_API_BASE: ${VITE_API_BASE:-http://localhost:48123}
     depends_on:
       - backend
 

@@ -12,7 +12,7 @@ Login with your Google account, see all your YouTube playlists, click one to see
 3. Configure the OAuth consent screen (Google Auth Platform → Audience): User type External, add yourself under **Test users**, and under **Data access** add the scopes `openid`, `profile`, and `.../auth/youtube.force-ssl` (read/write — needed for the tier board's drag-and-drop sync to actually move videos between playlists).
 4. Create credentials (Clients → Create Client):
    - Application type: **Web application**
-   - Authorized redirect URI: `http://localhost:8080/login/oauth2/code/google`
+   - Authorized redirect URI: `http://localhost:48123/login/oauth2/code/google`
 5. Copy the **Client ID** and **Client Secret**.
 
 ## 2. Configure environment variables
@@ -30,8 +30,8 @@ docker compose -f docker-compose.yml up --build
 ```
 
 This builds both images (backend jar + nginx-served frontend build) and runs them:
-- Backend: http://localhost:8080
-- Frontend: http://localhost:5183
+- Backend: http://localhost:48123
+- Frontend: http://localhost:80
 
 For local development with live code reload (no rebuild needed per change):
 
@@ -59,7 +59,7 @@ npm run dev
 
 ## Usage
 
-Open http://localhost:5183, click "Login with Google", approve access, and you'll see your playlists. Click a playlist to see its videos (opens the video on YouTube when clicked).
+Open http://localhost:80, click "Login with Google", approve access, and you'll see your playlists. Click a playlist to see its videos (opens the video on YouTube when clicked).
 
 ## Tier boards
 

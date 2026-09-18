@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8080';
+const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:48123';
 
 // The one axios instance the whole app talks through. TanStack Query is the
 // primary data-fetching layer (caching, retries, loading/error state);

@@ -158,6 +158,6 @@ The user asked for these on top of the Mantine/Redux migration above. Tracked he
 - After changing frontend code, rebuild and redeploy before saying a fix is live:
   `npx vite build` in `frontend/`, then `docker compose -f docker-compose.yml up -d
   --build` (frontend, or both if backend also changed) from the project root. Verify the
-  served bundle hash actually changed via `curl -s http://localhost:5183 | grep -o
+  served bundle hash actually changed via `curl -s http://localhost:80 | grep -o
   'index-[^"]*\.\(js\|css\)'` before reporting something as fixed - this repo has a
   history of "fixes" that were actually just a stale cached bundle.
