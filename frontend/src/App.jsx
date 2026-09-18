@@ -259,9 +259,16 @@ function Layout() {
     );
   }
 
-  function startShufflePlay() {
-    if (focusSequence.length === 0) return;
-    const ids = focusSequence.map((e) => e.video.videoId);
+  // With no `tier` argument, shuffles the whole board; passed a tier (the
+  // per-tier "shuffle" button on each row), scopes both the shuffle order
+  // and hasPrev/hasNext bounds to just that tier's videos - `entries` stays
+  // the full board's snapshot either way so tier-reassignment mid-playback
+  // still resolves, only `queue` (what defines the browsing sequence) is
+  // narrowed.
+  function startShufflePlay(tier) {
+    const pool = tier ? focusSequence.filter((e) => e.tier === tier) : focusSequence;
+    if (pool.length === 0) return;
+    const ids = pool.map((e) => e.video.videoId);
     for (let i = ids.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
       [ids[i], ids[j]] = [ids[j], ids[i]];

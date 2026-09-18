@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ActionIcon, Badge, Button, Card, Group, Paper, Stack, Text, TextInput, Title } from '@mantine/core';
+import { ActionIcon, Badge, Button, Card, Group, Paper, Stack, Text, TextInput, Title, Tooltip } from '@mantine/core';
 import { ArrowUpRight, Shuffle } from 'lucide-react';
 import { TIER_COLORS, TIER_ORDER } from '../tiers';
 
@@ -30,6 +30,7 @@ function TierRow({
   searchActive,
   matchedKeys,
   activeMatchKey,
+  onShufflePlay,
 }) {
   const [overIndex, setOverIndex] = useState(null);
   // While a "/" search is active, a tier with hundreds of videos becomes
@@ -67,6 +68,20 @@ function TierRow({
           <span className="tier-count">
             {searchActive ? `${visibleItems?.length ?? 0}/${items?.length ?? 0}` : items?.length ?? 0}
           </span>
+        )}
+        {!loading && items?.length > 0 && (
+          <Tooltip label={`Shuffle play ${tier}`}>
+            <ActionIcon
+              variant="subtle"
+              color="dark"
+              size="sm"
+              className="tier-shuffle-btn"
+              onClick={() => onShufflePlay(tier)}
+              aria-label={`Shuffle play ${tier}`}
+            >
+              <Shuffle size={14} />
+            </ActionIcon>
+          </Tooltip>
         )}
       </div>
       <div
@@ -399,7 +414,7 @@ export default function TierBoardView({
             <Button
               variant="default"
               leftSection={<Shuffle size={15} />}
-              onClick={onShufflePlay}
+              onClick={() => onShufflePlay()}
               disabled={!hasVideos}
             >
               Shuffle play
@@ -434,6 +449,7 @@ export default function TierBoardView({
             searchActive={queryText.trim().length > 0}
             matchedKeys={matchedKeys}
             activeMatchKey={activeMatchKey}
+            onShufflePlay={onShufflePlay}
           />
         ))}
       </div>
