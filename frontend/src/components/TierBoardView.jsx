@@ -302,11 +302,14 @@ export default function TierBoardView({
         });
         return;
       }
-      // "p" pushes pending changes to YouTube - the same action the command
-      // palette's "Sync ... to YouTube" entry runs, just reachable without
-      // opening the palette. Only fires when there's actually something to
-      // push, matching the "Push to YouTube" button only showing then.
-      if (e.key === 'p' && !isTyping && pendingMoves.length > 0) {
+      // Shift+P pushes pending changes to YouTube - the same action the
+      // command palette's "Sync ... to YouTube" entry runs, just reachable
+      // without opening the palette. Requires Shift (checked via e.key
+      // being the uppercase 'P') since a bare "p" was too easy to hit by
+      // accident while browsing a board. Only fires when there's actually
+      // something to push, matching the "Push to YouTube" button only
+      // showing then.
+      if (e.key === 'P' && !isTyping && pendingMoves.length > 0) {
         e.preventDefault();
         onSync();
         return;

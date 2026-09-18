@@ -24,7 +24,7 @@ export const SHORTCUTS = [
   { id: 'search-close', keys: ['Esc'], description: 'Close search', category: 'Tier board' },
   {
     id: 'push',
-    keys: ['p'],
+    keys: ['Shift', 'P'],
     description: 'Push pending changes to YouTube',
     category: 'Tier board',
     // Matches the command palette's own "Sync ... to YouTube" action id, so
