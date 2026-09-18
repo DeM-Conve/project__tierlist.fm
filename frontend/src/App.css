@@ -311,9 +311,14 @@
 
 /* Duel view - the layout (header row, progress bar, card grid, spacing)
    now comes from Mantine (Container/Group/Stack/Progress/Card/Text). What's
-   left is card-specific behavior Mantine has no prop for (hover lift) and
-   the absolute-position overlay placement for the tier badge/preview button
-   on top of the thumbnail. */
+   left is card-specific behavior Mantine has no prop for (hover lift, fixed
+   card width so the arena doesn't shrink-to-fit its own content) and the
+   absolute-position overlay placement for the tier badge/key hint/preview
+   button on top of the thumbnail. */
+.duel-card {
+  width: min(440px, 42vw);
+  transition: border-color 0.15s ease, transform 0.15s ease;
+}
 .duel-card:hover { border-color: var(--accent); transform: translateY(-2px); }
 .duel-card-media {
   position: relative;
@@ -334,11 +339,40 @@
   left: 8px;
   z-index: 2;
 }
+.duel-card-key {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 2;
+}
 .duel-card-preview-btn {
   position: absolute;
   bottom: 8px;
   right: 8px;
   z-index: 2;
+}
+.duel-arena {
+  gap: 28px;
+}
+.duel-vs {
+  flex-shrink: 0;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  border: 2px solid var(--accent);
+  background: var(--surface-2);
+  color: var(--accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 14px;
+  letter-spacing: 0.02em;
+}
+@media (max-width: 720px) {
+  .duel-card { width: 100%; max-width: 440px; }
+  .duel-vs { margin: -4px 0; }
 }
 
 @media (max-width: 900px) {

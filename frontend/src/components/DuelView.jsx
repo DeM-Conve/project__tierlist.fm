@@ -1,11 +1,24 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Badge, Button, Card, Container, Group, Progress, Select, Stack, Text, Title } from '@mantine/core';
+import {
+  Badge,
+  Button,
+  Card,
+  Container,
+  Group,
+  Kbd,
+  Progress,
+  Select,
+  Stack,
+  Text,
+  Title,
+} from '@mantine/core';
+import { Play, Square } from 'lucide-react';
 import { DEFAULT_DUEL_STRATEGY, DUEL_STRATEGIES, DUEL_STRATEGY_LABELS } from '../duel';
 import { SETTINGS, getSetting, setSetting } from '../settings';
 import { TIER_COLORS } from '../tiers';
 import EmbeddedPlayer from './EmbeddedPlayer';
 
-function DuelCard({ video, tier, isPreviewing, onTogglePreview, onChoose }) {
+function DuelCard({ video, tier, arrowKey, isPreviewing, onTogglePreview, onChoose }) {
   return (
     <Card className="duel-card" padding={0} radius="md" withBorder onClick={onChoose}>
       <Card.Section className="duel-card-media">
@@ -14,6 +27,7 @@ function DuelCard({ video, tier, isPreviewing, onTogglePreview, onChoose }) {
             {tier}
           </Badge>
         )}
+        <Kbd className="duel-card-key">{arrowKey}</Kbd>
         {isPreviewing ? (
           <EmbeddedPlayer videoId={video.videoId} autoplay />
         ) : (
@@ -24,18 +38,19 @@ function DuelCard({ video, tier, isPreviewing, onTogglePreview, onChoose }) {
           size="xs"
           variant="filled"
           color="dark"
+          leftSection={isPreviewing ? <Square size={12} fill="currentColor" /> : <Play size={12} fill="currentColor" />}
           onClick={(e) => {
             e.stopPropagation();
             onTogglePreview();
           }}
         >
-          {isPreviewing ? '✕ Stop' : '▶ Preview'}
+          {isPreviewing ? 'Stop' : 'Preview'}
         </Button>
       </Card.Section>
-      <Text fw={600} size="sm" lineClamp={2} mx={14} mt={10} mb={4}>
+      <Text fw={600} size="sm" lineClamp={2} mx={16} mt={12} mb={4}>
         {video.title}
       </Text>
-      <Text c="dimmed" size="sm" mx={14} mb={14}>
+      <Text c="dimmed" size="sm" mx={16} mb={16}>
         {video.channelTitle}
       </Text>
     </Card>
@@ -153,19 +168,24 @@ export default function DuelView({ videos, runs, tierSizes, onComplete, onCancel
   const b = currentPair ? videoMapRef.current.get(currentPair.b) : null;
 
   return (
-    <Container className="duel-view" size={980} pt={24} ta="center">
-      <Group justify="space-between" wrap="wrap" mb={48} ta="left">
+    <Container className="duel-view" size={1100} pt={24} ta="center">
+      <Group justify="space-between" wrap="wrap" mb={36} ta="left">
         <Button variant="default" onClick={onCancel}>
           &larr; Cancel
         </Button>
 
         <Stack gap={6} style={{ flex: 1, maxWidth: 320 }}>
+          <Group justify="space-between" gap={8}>
+            <Text size="xs" c="dimmed" fw={600}>
+              {spine
+                ? 'All duels settled'
+                : `${progress.completed} of ${progress.total} duels`}
+            </Text>
+            <Text size="xs" c="dimmed" fw={600}>
+              {pct}%
+            </Text>
+          </Group>
           <Progress value={pct} size="sm" radius="xl" />
-          <Text size="sm" c="dimmed">
-            {spine
-              ? 'All duels settled'
-              : `${progress.completed} of ${progress.total} duels · ${pct}% settled`}
-          </Text>
         </Stack>
 
         <Select
@@ -181,44 +201,63 @@ export default function DuelView({ videos, runs, tierSizes, onComplete, onCancel
 
       {!spine && a && b && (
         <>
-          <Title order={1} fz={26} fw={800} mb={32}>
+          <Title order={1} fz={28} fw={800} mb={40}>
             Which one deserves the higher tier?
           </Title>
-          <Group justify="center" gap="lg" wrap="wrap" align="stretch">
+          <Group justify="center" wrap="wrap" align="center" className="duel-arena">
             <DuelCard
               video={a}
               tier={tierOfId[a.videoId]}
+              arrowKey="←"
               isPreviewing={previewing === a.videoId}
               onTogglePreview={() => setPreviewing((p) => (p === a.videoId ? null : a.videoId))}
               onChoose={() => chooseWinner(a.videoId)}
             />
-            <Text c="dimmed" size="sm" tt="lowercase">
-              or
-            </Text>
+            <div className="duel-vs">VS</div>
             <DuelCard
               video={b}
               tier={tierOfId[b.videoId]}
+              arrowKey="→"
               isPreviewing={previewing === b.videoId}
               onTogglePreview={() => setPreviewing((p) => (p === b.videoId ? null : b.videoId))}
               onChoose={() => chooseWinner(b.videoId)}
             />
           </Group>
-          <p className="focus-hint">
-            ← left wins · → right wins{strategy?.supportsSkip ? ' · space too close to call' : ''} · u undo
-          </p>
+          <Group justify="center" gap={20} mt={32}>
+            <Group gap={6}>
+              <Kbd>←</Kbd>
+              <Text size="sm" c="dimmed">left wins</Text>
+            </Group>
+            <Group gap={6}>
+              <Kbd>→</Kbd>
+              <Text size="sm" c="dimmed">right wins</Text>
+            </Group>
+            {strategy?.supportsSkip && (
+              <Group gap={6}>
+                <Kbd>Space</Kbd>
+                <Text size="sm" c="dimmed">too close to call</Text>
+              </Group>
+            )}
+            <Group gap={6}>
+              <Kbd>U</Kbd>
+              <Text size="sm" c="dimmed">undo</Text>
+            </Group>
+          </Group>
         </>
       )}
 
       {spine && (
-        <Stack align="center" gap="sm" py={40}>
-          <Title order={2} fz={22}>
+        <Stack align="center" gap="sm" py={64}>
+          <Title order={2} fz={24}>
             All set.
           </Title>
           <Text c="dimmed" size="sm" maw={440}>
             Apply this order to your tiers — each tier keeps its current number of videos, just
             re-filled from the new ranking.
           </Text>
-          <Button onClick={finish}>Apply to tiers</Button>
+          <Button onClick={finish} size="md" mt={8}>
+            Apply to tiers
+          </Button>
         </Stack>
       )}
     </Container>
