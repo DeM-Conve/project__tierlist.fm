@@ -302,6 +302,15 @@ export default function TierBoardView({
         });
         return;
       }
+      // "p" pushes pending changes to YouTube - the same action the command
+      // palette's "Sync ... to YouTube" entry runs, just reachable without
+      // opening the palette. Only fires when there's actually something to
+      // push, matching the "Push to YouTube" button only showing then.
+      if (e.key === 'p' && !isTyping && pendingMoves.length > 0) {
+        e.preventDefault();
+        onSync();
+        return;
+      }
       if (!searchOpen) return;
 
       if (e.key === 'Escape') {
@@ -336,7 +345,7 @@ export default function TierBoardView({
     }
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [searchOpen, matches, onThumbClick]);
+  }, [searchOpen, matches, onThumbClick, pendingMoves, onSync]);
 
   const matchedKeys = useMemo(
     () => new Set(matches.map((e) => `${e.tier}:${e.video.videoId}`)),

@@ -13,6 +13,7 @@ import {
 } from 'react-router-dom';
 import { spotlight } from '@mantine/spotlight';
 import { Button } from '@mantine/core';
+import { useDisclosure, useHotkeys } from '@mantine/hooks';
 import './App.css';
 import { TIER_ORDER } from './tiers';
 import Sidebar from './components/Sidebar';
@@ -23,6 +24,7 @@ import PlayerDock from './components/PlayerDock';
 import CommandPalette from './components/CommandPalette';
 import DuelView from './components/DuelView';
 import SettingsView from './components/SettingsView';
+import ShortcutsModal from './components/ShortcutsModal';
 import { setLoggedIn, setPlaylists } from './store/authSlice';
 import { setCurrentCategory, setQuery, setMobileSidebarOpen } from './store/viewSlice';
 import {
@@ -189,6 +191,13 @@ function Layout() {
 
   const tierSyncMutation = useTierSyncMutation();
   const invalidatePlaylistItems = useInvalidatePlaylistItems();
+
+  const [shortcutsOpened, shortcutsHandlers] = useDisclosure(false);
+  // "?" is the one shortcut in the app with no state-machine/scoping needs
+  // of its own (see shortcuts.js's header comment for why the others still
+  // have bespoke handlers) - a flat, always-on binding is exactly what
+  // useHotkeys is for, and it already ignores keydowns while typing.
+  useHotkeys([['shift+?', () => shortcutsHandlers.open()]]);
 
   async function syncChanges(category) {
     dispatch(setSyncStatus('syncing'));
@@ -396,6 +405,7 @@ function Layout() {
       )}
 
       <CommandPalette items={commandItems} />
+      <ShortcutsModal opened={shortcutsOpened} onClose={shortcutsHandlers.close} />
     </div>
   );
 }
