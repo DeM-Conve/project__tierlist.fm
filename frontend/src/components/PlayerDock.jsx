@@ -164,6 +164,14 @@ export default function PlayerDock({
       } else if (e.key === 'ArrowRight' || e.key === 'l') {
         e.preventDefault();
         if (hasNext) onNext();
+      } else if (e.key === ' ' || e.code === 'Space') {
+        // Duel owns Space for its own "skip" shortcut - the early return
+        // above for onDuelScreen already keeps this from firing there.
+        e.preventDefault();
+        togglePlay();
+      } else if (e.key === 'm') {
+        e.preventDefault();
+        toggleMute();
       } else if (expanded && e.shiftKey && e.code.startsWith('Digit')) {
         // Shift+digit, not a plain digit - plain 1-9 is YouTube's own native
         // "seek to N0%" shortcut, so tier-reassignment needs a modifier to
@@ -178,7 +186,25 @@ export default function PlayerDock({
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mode, expanded, onMinimize, onExpand, onFloat, onPrev, onNext, hasPrev, hasNext, availableTiers, onChangeTier]);
+  }, [
+    mode,
+    expanded,
+    onMinimize,
+    onExpand,
+    onFloat,
+    onPrev,
+    onNext,
+    hasPrev,
+    hasNext,
+    availableTiers,
+    onChangeTier,
+    // togglePlay/toggleMute close over isPlaying/isMuted state directly
+    // (rather than reading it fresh off the player), so this effect must
+    // re-subscribe whenever either changes or Space/m would act on a
+    // stale play/mute state.
+    isPlaying,
+    isMuted,
+  ]);
 
   function togglePlay() {
     const player = playerRef.current;
@@ -381,7 +407,7 @@ export default function PlayerDock({
             )}
 
             <p className="focus-hint">
-              esc/j minimize · ← → / h l navigate
+              esc/j minimize · ← → / h l navigate · space play/pause · m mute
               {availableTiers.length > 0 && ` · shift+1-${availableTiers.length} set tier`}
             </p>
           </>
