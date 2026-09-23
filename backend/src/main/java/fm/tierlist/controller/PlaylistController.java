@@ -3,6 +3,7 @@ package fm.tierlist.controller;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.RequestEntity;
 import org.springframework.http.ResponseEntity;
@@ -10,10 +11,12 @@ import org.springframework.security.authentication.AnonymousAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.oauth2.client.OAuth2AuthorizedClient;
 import org.springframework.security.oauth2.client.annotation.RegisteredOAuth2AuthorizedClient;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.client.RestTemplate;
 
@@ -27,6 +30,7 @@ import java.util.Map;
 public class PlaylistController {
 
     private static final String YOUTUBE_API_BASE = "https://www.googleapis.com/youtube/v3";
+    private static final int LIKES_PAGES = 4; // x50 = the 200 most recent likes
     private final RestTemplate restTemplate = new RestTemplate();
 
     @GetMapping("/api/auth/status")
@@ -70,26 +74,96 @@ public class PlaylistController {
             YOUTUBE_API_BASE + "/playlistItems?part=snippet,contentDetails&playlistId=" + id + "&maxResults=50"
         );
 
-        List<Map<String, Object>> result = new ArrayList<>();
-        for (Map<String, Object> i : allItems) {
-            Map<String, Object> snippet = (Map<String, Object>) i.get("snippet");
-            Map<String, Object> contentDetails = (Map<String, Object>) i.get("contentDetails");
-            Map<String, Object> thumbnails = (Map<String, Object>) snippet.get("thumbnails");
-            String title = (String) snippet.get("title");
+        return toVideos(allItems);
+    }
 
+    /**
+     * The account's most recent likes (YouTube's "LL" playlist, newest first) -
+     * the Inbox's source. Capped at LIKES_PAGES pages so a long like history
+     * costs a few quota units, not hundreds. `addedAt` is when it was liked.
+     */
+    @GetMapping("/api/likes")
+    public List<Map<String, Object>> likes(@RegisteredOAuth2AuthorizedClient("google") OAuth2AuthorizedClient client) {
+        List<Map<String, Object>> items = new ArrayList<>();
+        String pageToken = null;
+        int pages = 0;
+        do {
+            String url = YOUTUBE_API_BASE + "/playlistItems?part=snippet,contentDetails&playlistId=LL&maxResults=50"
+                + (pageToken != null ? "&pageToken=" + pageToken : "");
+            Map<String, Object> body = callYoutubeApi(client, url);
+            List<Map<String, Object>> pageItems = (List<Map<String, Object>>) body.get("items");
+            if (pageItems != null) items.addAll(pageItems);
+            pageToken = (String) body.get("nextPageToken");
+        } while (pageToken != null && ++pages < LIKES_PAGES);
+        return toVideos(items);
+    }
+
+    /** One video's details, for a pasted link. 404 if it doesn't exist / is private. Quota: 1 unit. */
+    @GetMapping("/api/videos/{videoId}")
+    public ResponseEntity<Map<String, Object>> video(
+            @PathVariable String videoId,
+            @RegisteredOAuth2AuthorizedClient("google") OAuth2AuthorizedClient client
+    ) {
+        Map<String, Object> body = callYoutubeApi(client, YOUTUBE_API_BASE + "/videos?part=snippet&id=" + videoId);
+        List<Map<String, Object>> items = (List<Map<String, Object>>) body.get("items");
+        if (items == null || items.isEmpty()) return ResponseEntity.notFound().build();
+        Map<String, Object> snippet = (Map<String, Object>) items.get(0).get("snippet");
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("videoId", items.get(0).get("id"));
+        out.put("title", snippet.get("title"));
+        out.put("channelTitle", snippet.get("channelTitle"));
+        out.put("thumbnail", extractThumbnail((Map<String, Object>) snippet.get("thumbnails")));
+        return ResponseEntity.ok(out);
+    }
+
+    /**
+     * Adds one video to a playlist (filing an Inbox song straight into a tier)
+     * and returns it in the same shape as /items - including the new
+     * playlistItem id, which is what undo deletes. Body: { "videoId" }.
+     */
+    @PostMapping("/api/playlists/{id}/items")
+    public Map<String, Object> addItem(
+            @PathVariable String id,
+            @RequestBody Map<String, String> body,
+            @RegisteredOAuth2AuthorizedClient("google") OAuth2AuthorizedClient client
+    ) {
+        return toVideo(insertPlaylistItem(client, id, body.get("videoId")));
+    }
+
+    @DeleteMapping("/api/playlist-items/{itemId}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void removeItem(
+            @PathVariable String itemId,
+            @RegisteredOAuth2AuthorizedClient("google") OAuth2AuthorizedClient client
+    ) {
+        deletePlaylistItem(client, itemId);
+    }
+
+    private List<Map<String, Object>> toVideos(List<Map<String, Object>> playlistItems) {
+        List<Map<String, Object>> result = new ArrayList<>();
+        for (Map<String, Object> i : playlistItems) {
+            Map<String, Object> video = toVideo(i);
+            String title = (String) video.get("title");
             if ("Deleted video".equals(title) || "Private video".equals(title)) {
                 continue;
             }
-
-            Map<String, Object> out = new LinkedHashMap<>();
-            out.put("id", i.get("id")); // playlistItem id - needed to remove this item later
-            out.put("videoId", contentDetails.get("videoId"));
-            out.put("title", title);
-            out.put("channelTitle", snippet.get("videoOwnerChannelTitle"));
-            out.put("thumbnail", extractThumbnail(thumbnails));
-            result.add(out);
+            result.add(video);
         }
         return result;
+    }
+
+    private Map<String, Object> toVideo(Map<String, Object> playlistItem) {
+        Map<String, Object> snippet = (Map<String, Object>) playlistItem.get("snippet");
+        Map<String, Object> contentDetails = (Map<String, Object>) playlistItem.get("contentDetails");
+        Map<String, Object> resourceId = (Map<String, Object>) snippet.get("resourceId");
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("id", playlistItem.get("id")); // playlistItem id - needed to remove this item later
+        out.put("videoId", contentDetails != null ? contentDetails.get("videoId") : resourceId.get("videoId"));
+        out.put("title", snippet.get("title"));
+        out.put("channelTitle", snippet.get("videoOwnerChannelTitle"));
+        out.put("thumbnail", extractThumbnail((Map<String, Object>) snippet.get("thumbnails")));
+        out.put("addedAt", snippet.get("publishedAt"));
+        return out;
     }
 
     /**
@@ -233,7 +307,7 @@ public class PlaylistController {
         return response.getBody();
     }
 
-    private void insertPlaylistItem(OAuth2AuthorizedClient client, String playlistId, String videoId) {
+    private Map<String, Object> insertPlaylistItem(OAuth2AuthorizedClient client, String playlistId, String videoId) {
         HttpHeaders headers = new HttpHeaders();
         headers.setBearerAuth(client.getAccessToken().getTokenValue());
         headers.setContentType(MediaType.APPLICATION_JSON);
@@ -243,7 +317,7 @@ public class PlaylistController {
         Map<String, Object> body = Map.of("snippet", snippet);
 
         HttpEntity<Map<String, Object>> entity = new HttpEntity<>(body, headers);
-        restTemplate.exchange(YOUTUBE_API_BASE + "/playlistItems?part=snippet", HttpMethod.POST, entity, Map.class);
+        return restTemplate.exchange(YOUTUBE_API_BASE + "/playlistItems?part=snippet", HttpMethod.POST, entity, Map.class).getBody();
     }
 
     private void deletePlaylistItem(OAuth2AuthorizedClient client, String playlistItemId) {
