@@ -11,12 +11,11 @@ export const RAIL_WIDTH = 84;
 
 // The Tier Rail: the board's tiers as a permanent strip down the right edge
 // of every board page - the "tier list is always in reach" surface.
-// One click on a tier does the most useful thing available, in this order:
-//   1. rows are selected (tier focus)  -> move the selection there
-//   2. a song from this board is playing -> re-rate the playing song
-//   3. otherwise                        -> open that tier
+// One click on a tier does the most useful thing available:
+//   1. a song from this board is playing -> re-rate the playing song
+//   2. otherwise                        -> open that tier
 // It's also a drop target for any dragged tile or row (append to that tier).
-export default function TierRail({ activeTier, selection }) {
+export default function TierRail({ activeTier }) {
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const category = useSelector((s) => s.view.currentCategory);
@@ -30,15 +29,8 @@ export default function TierRail({ activeTier, selection }) {
   if (!category || !tierGroups[category]) return null;
   const tiers = TIER_ORDER.filter((t) => tierGroups[category][t]);
   const playingHere = focusedVideo && focusedCategory === category ? focusedVideo : null;
-  const selectedCount = selection?.count ?? 0;
 
   function actionFor(tier) {
-    if (selectedCount > 0) {
-      return {
-        label: `Move ${selectedCount} selected → ${tier}`,
-        run: () => selection.onMove(tier),
-      };
-    }
     if (playingHere && playingVideo) {
       if (playingHere.tier === tier) return { label: `"${playingVideo.title}" is in ${tier}`, run: null };
       return {
@@ -53,7 +45,7 @@ export default function TierRail({ activeTier, selection }) {
     };
   }
 
-  const caption = selectedCount > 0 ? `Move ${selectedCount} to` : playingHere ? 'Rate' : 'Tiers';
+  const caption = playingHere ? 'Rate' : 'Tiers';
 
   return (
     <Box
@@ -73,7 +65,7 @@ export default function TierRail({ activeTier, selection }) {
         gap: 6,
       }}
     >
-      <Text fz={10} fw={800} tt="uppercase" c={selectedCount > 0 || playingHere ? 'accent' : 'dimmed'} ta="center" style={{ letterSpacing: 1 }}>
+      <Text fz={10} fw={800} tt="uppercase" c={playingHere ? 'accent' : 'dimmed'} ta="center" style={{ letterSpacing: 1 }}>
         {caption}
       </Text>
 
@@ -118,7 +110,7 @@ export default function TierRail({ activeTier, selection }) {
                 <Text fz={11} fw={700} c={TIER_INK} opacity={0.7} lh={1}>
                   {count}
                 </Text>
-                {playingHere && !selectedCount && (
+                {playingHere && (
                   <Text fz={9} fw={700} c={TIER_INK} opacity={0.55} lh={1}>
                     ⇧{i + 1}
                   </Text>

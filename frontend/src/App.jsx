@@ -482,7 +482,6 @@ function Layout() {
   );
 }
 
-const EMPTY_SET = new Set();
 
 function useCategoryParam() {
   const { category: rawCategory } = useParams();
@@ -520,11 +519,11 @@ function useBoardPage(category) {
 
 // Board pages sit beside the Tier Rail (desktop) and above the shared
 // staged-changes bar.
-function BoardShell({ children, rail = true, activeTier, selection }) {
+function BoardShell({ children, rail = true, activeTier }) {
   return (
     <>
       <Box pr={rail ? { base: 0, md: RAIL_WIDTH - 16 } : 0}>{children}</Box>
-      {rail && <TierRail activeTier={activeTier} selection={selection} />}
+      {rail && <TierRail activeTier={activeTier} />}
       <PendingChanges />
     </>
   );
@@ -640,32 +639,20 @@ function TierBoardPage() {
 function TierFocusPage() {
   const category = useCategoryParam();
   const { tier } = useParams();
-  const dispatch = useDispatch();
   const navigate = useNavigate();
   const { openFocus, startShufflePlay, playFrom } = useOutletContext();
   const tierItems = useSelector((s) => s.tiers.tierItems);
   const playingVideoId = useSelector(selectPlayingVideoIdOnBoard);
   const pendingRemovalKeys = usePendingRemovalKeys();
   const { tiers, isLoading } = useBoardPage(category);
-  // Selection belongs to one tier's list - switching tiers starts fresh.
-  const scopeKey = `${category}:${tier}`;
-  const [selection, setSelection] = useState({ scopeKey, ids: new Set() });
-  const selected = selection.scopeKey === scopeKey ? selection.ids : EMPTY_SET;
-  const setSelected = (ids) => setSelection({ scopeKey, ids });
   const base = `/tier/${encodeURIComponent(category)}`;
 
   useEffect(() => {
     if (!isLoading && tiers.length && !tiers.includes(tier)) navigate(base, { replace: true });
   }, [isLoading, tiers, tier, base, navigate]);
 
-  function bulkMove(toTier) {
-    const ids = (tierItems[tier] || []).filter((v) => selected.has(v.videoId)).map((v) => v.videoId);
-    dispatch(moveWithFeedback(ids.map((videoId) => ({ fromTier: tier, toTier, videoId }))));
-    setSelected(new Set());
-  }
-
   return (
-    <BoardShell activeTier={tier} selection={{ count: selected.size, onMove: bulkMove }}>
+    <BoardShell activeTier={tier}>
       <TierFocusView
         category={category}
         tier={tier}
@@ -674,9 +661,6 @@ function TierFocusPage() {
         loading={isLoading}
         playingVideoId={playingVideoId}
         pendingRemovalKeys={pendingRemovalKeys}
-        selected={selected}
-        onSelectedChange={setSelected}
-        onBulkMove={bulkMove}
         onPlay={openFocus}
         onPlayFrom={playFrom}
         onShuffle={startShufflePlay}

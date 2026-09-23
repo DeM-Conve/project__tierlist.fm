@@ -4,7 +4,6 @@ import {
   ActionIcon,
   Box,
   Button,
-  Checkbox,
   CloseButton,
   Group,
   Image,
@@ -16,14 +15,13 @@ import {
   Text,
   TextInput,
   Title,
-  Tooltip,
   UnstyledButton,
 } from '@mantine/core';
-import { ArrowLeft, ArrowUpToLine, MoreHorizontal, Play, Search, Shuffle } from 'lucide-react';
+import { ArrowLeft, MoreHorizontal, Play, Search, Shuffle } from 'lucide-react';
 import { TIER_COLORS } from '../tiers';
 import { moveWithFeedback, useTierDnd } from '../tierActions';
 import { EqualizerMark, MoveMenu, TierChip } from './TierBits';
-import { TIER_INK, indexForPointInList, videoMatches } from '../tierUtils';
+import { TIER_INK, indexForPointInList, songLabel, videoMatches } from '../tierUtils';
 
 const NO_ITEMS = [];
 
@@ -32,16 +30,15 @@ function TrackRow({
   rank,
   tier,
   tiers,
-  selected,
   isPlaying,
   isPendingRemoval,
   isDragging,
-  onToggleSelect,
   onPlay,
   onMove,
   onDragStart,
   onDragEnd,
 }) {
+  const { song, artist } = songLabel(video);
   return (
     <Box
       data-video-id={video.videoId}
@@ -64,35 +61,24 @@ function TrackRow({
       py={6}
       style={{
         display: 'grid',
-        gridTemplateColumns: '28px 34px 44px minmax(0, 1fr) auto 30px',
+        gridTemplateColumns: '34px 44px minmax(0, 1fr) auto 30px',
         alignItems: 'center',
         gap: 12,
         borderRadius: 6,
         cursor: 'grab',
         opacity: isDragging ? 0.35 : isPendingRemoval ? 0.5 : 1,
-        background: selected ? 'color-mix(in srgb, var(--accent) 12%, transparent)' : undefined,
       }}
     >
-      <Checkbox
-        checked={selected}
-        onChange={() => {}}
-        onClick={(e) => {
-          e.stopPropagation();
-          onToggleSelect(e.shiftKey);
-        }}
-        aria-label={`Select ${video.title}`}
-        size="xs"
-      />
       <Text fz="xs" c="dimmed" ta="right" ff="monospace">
         {isPlaying ? <EqualizerMark color="var(--accent)" height={11} /> : rank}
       </Text>
       <Image src={video.thumbnail || undefined} w={44} h={44} radius={4} fit="cover" alt="" draggable={false} style={{ pointerEvents: 'none' }} />
       <Box style={{ minWidth: 0 }}>
-        <Text fz="sm" fw={isPlaying ? 700 : 500} c={isPlaying ? 'accent' : undefined} truncate="end">
-          {video.title}
+        <Text fz="sm" fw={isPlaying ? 700 : 600} c={isPlaying ? 'accent' : undefined} truncate="end" title={video.title}>
+          {song}
         </Text>
         <Text fz="xs" c="dimmed" truncate="end">
-          {isPendingRemoval ? 'Duplicate - also in a higher tier, removed on sync' : video.channelTitle || ' '}
+          {isPendingRemoval ? 'Duplicate - also in a higher tier, removed on sync' : artist || ' '}
         </Text>
       </Box>
       <Group gap={4} wrap="nowrap" className="row-chips">
@@ -130,9 +116,6 @@ export default function TierFocusView({
   loading,
   playingVideoId,
   pendingRemovalKeys,
-  selected,
-  onSelectedChange,
-  onBulkMove,
   onPlay,
   onPlayFrom,
   onShuffle,
@@ -145,51 +128,18 @@ export default function TierFocusView({
   const [overIndex, setOverIndex] = useState(null);
   const listRef = useRef(null);
   const filterRef = useRef(null);
-  const lastClickedRef = useRef(null);
   const items = tierItems[tier] ?? NO_ITEMS;
   const color = TIER_COLORS[tier];
 
   const q = filter.trim();
   const visible = useMemo(() => items.filter((v) => videoMatches(v, q)), [items, q]);
   const rankOf = useMemo(() => new Map(items.map((v, i) => [v.videoId, i + 1])), [items]);
-  const allVisibleSelected = visible.length > 0 && visible.every((v) => selected.has(v.videoId));
-  const someSelected = visible.some((v) => selected.has(v.videoId));
 
   function move(fromTier, toTier, videoId, dropIndex) {
     dispatch(moveWithFeedback([{ fromTier, toTier, videoId, dropIndex }]));
   }
 
-  function toggleSelect(videoId, index, withRange) {
-    const next = new Set(selected);
-    if (withRange && lastClickedRef.current != null) {
-      const [a, b] = [lastClickedRef.current, index].sort((x, y) => x - y);
-      const turnOn = !selected.has(videoId);
-      visible.slice(a, b + 1).forEach((v) => (turnOn ? next.add(v.videoId) : next.delete(v.videoId)));
-    } else if (next.has(videoId)) next.delete(videoId);
-    else next.add(videoId);
-    lastClickedRef.current = index;
-    onSelectedChange(next);
-  }
-
-  function toggleAllVisible() {
-    const next = new Set(selected);
-    if (allVisibleSelected) visible.forEach((v) => next.delete(v.videoId));
-    else visible.forEach((v) => next.add(v.videoId));
-    onSelectedChange(next);
-  }
-
-  function moveSelectedToTop() {
-    const ids = items.filter((v) => selected.has(v.videoId)).map((v) => v.videoId);
-    // Insert in reverse so they keep their relative order at the top.
-    dispatch(
-      moveWithFeedback(
-        ids.reverse().map((videoId) => ({ fromTier: tier, toTier: tier, videoId, dropIndex: 0 }))
-      )
-    );
-  }
-
-  // "/" focuses the filter; Esc clears selection (then filter); Ctrl/Cmd+A
-  // selects everything currently shown.
+  // "/" focuses the filter; Esc clears it.
   useEffect(() => {
     function onKeyDown(e) {
       const a = document.activeElement;
@@ -197,21 +147,14 @@ export default function TierFocusView({
       if (e.key === '/' && !isTyping) {
         e.preventDefault();
         filterRef.current?.focus();
-      } else if (e.key === 'Escape') {
-        if (a === filterRef.current) {
-          setFilter('');
-          filterRef.current.blur();
-        } else if (selected.size > 0) {
-          onSelectedChange(new Set());
-        }
-      } else if ((e.key === 'a' || e.key === 'A') && (e.ctrlKey || e.metaKey) && !isTyping) {
-        e.preventDefault();
-        onSelectedChange(new Set(visible.map((v) => v.videoId)));
+      } else if (e.key === 'Escape' && a === filterRef.current) {
+        setFilter('');
+        filterRef.current.blur();
       }
     }
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [selected, visible, onSelectedChange]);
+  }, []);
 
   // Drop position in the (possibly filtered) list, mapped back to the real
   // index in the tier so reordering a filtered view lands where it looks.
@@ -277,19 +220,9 @@ export default function TierFocusView({
       </Tabs>
 
       <Group justify="space-between" mb={6} px="sm" wrap="nowrap" gap="sm">
-        <Group gap="sm" wrap="nowrap">
-          <Checkbox
-            size="xs"
-            checked={allVisibleSelected}
-            indeterminate={!allVisibleSelected && someSelected}
-            onChange={toggleAllVisible}
-            aria-label="Select all shown"
-            disabled={!visible.length}
-          />
-          <Text fz="xs" c="dimmed">
-            {selected.size > 0 ? `${selected.size} selected` : q ? `${visible.length} of ${items.length} shown` : 'Select rows to move many at once (shift-click for a range)'}
-          </Text>
-        </Group>
+        <Text fz="xs" c="dimmed">
+          {q ? `${visible.length} of ${items.length} shown` : 'Drag to reorder · tier chips move a song'}
+        </Text>
         <TextInput
           ref={filterRef}
           value={filter}
@@ -343,11 +276,9 @@ export default function TierFocusView({
                   rank={rankOf.get(v.videoId)}
                   tier={tier}
                   tiers={tiers}
-                  selected={selected.has(v.videoId)}
                   isPlaying={playingVideoId === v.videoId}
                   isPendingRemoval={pendingRemovalKeys.has(`${tier}:${v.videoId}`)}
                   isDragging={dnd.draggedVideoId === v.videoId}
-                  onToggleSelect={(range) => toggleSelect(v.videoId, i, range)}
                   onPlay={onPlay}
                   onMove={move}
                   onDragStart={dnd.onDragStart}
@@ -361,49 +292,6 @@ export default function TierFocusView({
         </Box>
       </Paper>
 
-      {selected.size > 0 && (
-        <Paper
-          withBorder
-          radius="md"
-          shadow="xl"
-          p={6}
-          pl="md"
-          className="anim-rise"
-          bg="var(--surface-3)"
-          style={{
-            position: 'fixed',
-            left: '50%',
-            bottom: 'calc(84px + var(--player-dock-height))',
-            translate: '-50% 0',
-            zIndex: 61,
-            maxWidth: 'calc(100vw - 32px)',
-          }}
-        >
-          <Group gap="sm" wrap="nowrap">
-            <Text size="sm" fw={700} style={{ whiteSpace: 'nowrap' }}>
-              {selected.size} selected
-            </Text>
-            <Text size="xs" c="dimmed" visibleFrom="sm">
-              Move to
-            </Text>
-            <Group gap={4} wrap="nowrap">
-              {tiers
-                .filter((t) => t !== tier)
-                .map((t) => (
-                  <TierChip key={t} tier={t} size={28} onClick={() => onBulkMove(t)} title={`Move ${selected.size} → ${t}`} />
-                ))}
-            </Group>
-            <Tooltip label={`Move to the top of ${tier}`} withArrow>
-              <ActionIcon variant="default" size="lg" onClick={moveSelectedToTop} aria-label="Move selected to top">
-                <ArrowUpToLine size={15} />
-              </ActionIcon>
-            </Tooltip>
-            <Tooltip label="Clear selection (Esc)" withArrow>
-              <CloseButton onClick={() => onSelectedChange(new Set())} aria-label="Clear selection" />
-            </Tooltip>
-          </Group>
-        </Paper>
-      )}
     </Box>
   );
 }

@@ -25,9 +25,7 @@ export const SHORTCUTS = [
   { id: 'search-close', keys: ['Esc'], description: 'Close search', category: 'Tier board' },
 
   { id: 'focus-filter', keys: ['/'], description: 'Filter this tier', category: 'Tier (full list)' },
-  { id: 'focus-select-all', keys: ['Ctrl', 'A'], description: 'Select every row shown', category: 'Tier (full list)' },
-  { id: 'focus-range', keys: ['Shift', 'Click'], description: 'Select a range of rows', category: 'Tier (full list)' },
-  { id: 'focus-clear', keys: ['Esc'], description: 'Clear the selection (or the filter)', category: 'Tier (full list)' },
+  { id: 'focus-clear', keys: ['Esc'], description: 'Clear the filter', category: 'Tier (full list)' },
   {
     id: 'push',
     keys: ['Shift', 'P'],

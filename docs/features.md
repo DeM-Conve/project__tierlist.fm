@@ -39,13 +39,13 @@
 - Vim-style `/` search (also the Find button): `/` opens a find box at the top of the screen (the `/` is part of the box's text - deleting it cancels), each row filters to its matches (and wraps to show all of them), `Enter`/`n` next match, `Shift+Enter`/`N` previous, `Enter` on a single match plays it, `Esc` closes. The active match is scrolled into view and highlighted. Matches song title, channel **and artist name**; every word must match, in any order, ignoring case and accents (`krsna makasam`, `beyonce`).
 
 ## Tier Rail
-- A permanent strip of the board's tiers down the right edge of the tier list and tier pages (desktop), with live counts. One click does the most useful thing available: **move the selected rows there** (when rows are selected) → otherwise **re-rate the playing song** into that tier (when it's from this board; the playing song's art sits on its current tier, with `⇧1-5` hints) → otherwise **open that tier**. The header says which mode it's in ("Move N to" / "Rate" / "Tiers").
+- A permanent strip of the board's tiers down the right edge of the tier list and tier pages (desktop), with live counts. One click does the most useful thing available: **re-rate the playing song** into that tier (when it's from this board; the playing song's art sits on its current tier, with `⇧1-5` hints) → otherwise **open that tier**. The header says which mode it's in ("Rate" / "Tiers").
 - Every rail tier is a drop target: drag any tile or row onto it to move it there.
 
 ## Tier page (full list for big tiers)
 - `/tier/<board>/t/<tier>`: a big tier header (Play / Shuffle this tier), tabs for every tier with counts (tabs are drop targets too), and the whole tier as a dense numbered list (rank, cover, title, channel).
 - Every row has **one-click tier chips** (current tier filled) and a `⋯` menu (Top / Bottom / Open on YouTube). Click a row to play it.
-- **Multi-select**: checkboxes, Shift-click for a range, header checkbox for all shown, `Ctrl+A` for all shown, `Esc` to clear. A floating bulk bar moves the selection to any tier or to the top of this one; the Tier Rail does the same.
+- Each row shows the song name and artist (same cleaned-up names as the board tiles; full title on hover), its tier chips (click one to move it) and a `⋯` menu. No multi-select - moving is per song (chips, drag, the Tier Rail).
 - Filter box (`/` focuses it, `Esc` clears) filters by title, channel or artist (same matching as the board's `/` search); drag rows to reorder (drop position maps back to the real position even while filtered).
 
 ## Instant feedback & undo
@@ -113,7 +113,7 @@ Swappable at runtime via a dropdown on the duel screen (and persisted as a defau
 Source of truth is `frontend/src/shortcuts.js` (rendered by the `?` modal and Settings → Keyboard shortcuts) - keep this list in sync with it.
 - Global: `Ctrl/Cmd+K` command palette, `?` shortcut help, `Ctrl/Cmd+Z` undo last tier edit.
 - Tier board: `/` search, `n` / `N` next/previous match, `Enter` play match (or step), `Esc` close search, `Shift+P` push to YouTube (any board page).
-- Tier page: `/` filter, `Ctrl/Cmd+A` select all shown, `Shift+Click` range select, `Esc` clear selection/filter.
+- Tier page: `/` filter, `Esc` clear the filter.
 - Player: `h` / `l` prev/next track, `←`/`→` seek 10s (expanded), `Space` play/pause, `m` mute, `0`-`9` jump to that 10%, `j` minimize (expanded → mini → floating), `k` expand, `Esc` minimize from expanded, `Shift+1`-`9` rate the playing video (any mode, on its board).
 - Duel: `←` / `→` pick left/right, `Space` skip, `u` undo.
 
