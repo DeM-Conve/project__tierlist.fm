@@ -1,5 +1,5 @@
 import { createSelector } from '@reduxjs/toolkit';
-import { BOARD_TIERS, TIER_ORDER, groupByTier } from '../tiers';
+import { BOARD_TIERS, REMOVED_TIER, TIER_ORDER, groupByTier } from '../tiers';
 import { parseTitle } from '../naming';
 
 const selectPlaylists = (state) => state.auth.playlists;
@@ -42,18 +42,23 @@ export const selectTierCategories = createSelector([selectTierGroups], (groups) 
 // it originally belonged to. If the same video genuinely exists in two of
 // this board's real YouTube tier playlists at once, the highest tier it's
 // in is kept and every other occurrence is auto-staged for removal - no
-// bogus "move" is reported for either.
+// bogus "move" is reported for either. Songs dropped in the Remove bin are
+// `remove` changes (`to` is REMOVED_TIER, so putting one back is an
+// ordinary reverse move).
 export const selectPendingMoves = createSelector(
   [selectTierItems, selectOriginalTierOf],
   (tierItems, originalTierOf) => {
     const moves = [];
+    const stillIn = (t, videoId) => (tierItems[t] || []).some((v) => v.videoId === videoId);
     for (const tier of BOARD_TIERS) {
       for (const video of tierItems[tier] || []) {
         const originalTiers = originalTierOf[video.videoId];
         if (!originalTiers) continue;
 
         if (originalTiers.length > 1) {
-          const keepTier = BOARD_TIERS.find((t) => originalTiers.includes(t));
+          // Keep the highest copy that's still on the board - if the user
+          // removed the top copy by hand, the next one down survives.
+          const keepTier = BOARD_TIERS.find((t) => originalTiers.includes(t) && stillIn(t, video.videoId));
           if (tier !== keepTier) {
             moves.push({ kind: 'dedupe', video, tier, keptTier: keepTier });
           }
@@ -64,6 +69,13 @@ export const selectPendingMoves = createSelector(
           moves.push({ kind: 'move', video, from: originalTiers[0], to: tier });
         }
       }
+    }
+    for (const video of tierItems[REMOVED_TIER] || []) {
+      const originalTiers = originalTierOf[video.videoId];
+      if (!originalTiers) continue;
+      // The copy that's no longer on the board is the one being removed.
+      const from = originalTiers.find((t) => !stillIn(t, video.videoId)) ?? originalTiers[0];
+      moves.push({ kind: 'remove', video, from, to: REMOVED_TIER });
     }
     return moves;
   }

@@ -1,4 +1,5 @@
 import { createSlice, original } from '@reduxjs/toolkit';
+import { REMOVED_TIER } from '../tiers';
 
 const UNDO_LIMIT = 50;
 
@@ -106,7 +107,15 @@ const tiersSlice = createSlice({
     applySyncedMoves: (state, action) => {
       const { moves } = action.payload;
       moves.forEach((m) => {
-        if (m.kind === 'dedupe') {
+        if (m.kind === 'remove') {
+          const drop = (list) => (list || []).filter((v) => v.videoId !== m.video.videoId);
+          state.tierItems[REMOVED_TIER] = drop(state.tierItems[REMOVED_TIER]);
+          state.originalTierItems[m.from] = drop(state.originalTierItems[m.from]);
+          state.originalTierOf[m.video.videoId] = (state.originalTierOf[m.video.videoId] || []).filter(
+            (t) => t !== m.from
+          );
+          if (!state.originalTierOf[m.video.videoId].length) delete state.originalTierOf[m.video.videoId];
+        } else if (m.kind === 'dedupe') {
           state.tierItems[m.tier] = (state.tierItems[m.tier] || []).filter(
             (v) => v.videoId !== m.video.videoId
           );
