@@ -103,6 +103,7 @@
 
 ## Command palette
 - `Cmd/Ctrl+K` opens a fuzzy-searchable palette to jump straight to any tier board, tier, or playlist, or trigger contextual actions (start a duel, sync/discard pending changes) without leaving the keyboard.
+- It also opens every page and Settings tab (**Go to**: Home, Add songs, Settings, Settings → Appearance / Playlist naming & to-do lists / Duels / Keyboard shortcuts, Show keyboard shortcuts) and Log out. Each carries search keywords, so `sett`, `theme`, `dark mode`, `todo`, `rename`, `elo` or `inbox` find the right one.
 
 ## Duels (pairwise ranking)
 - Duel on a tier board (or a Home card) launches a side-by-side comparison flow: two videos at a time, pick the one that deserves the higher tier.

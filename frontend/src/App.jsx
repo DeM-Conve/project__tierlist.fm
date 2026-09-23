@@ -470,11 +470,33 @@ function Layout() {
       label: 'Add a song (paste a link or search)',
       action: () => navigate('/add', { state: { focusInput: true } }),
     });
+    // Pages and settings, findable by what's on them ("sett", "theme",
+    // "dark mode", "todo keyword", ...) - Spotlight also filters on keywords.
+    const pages = [
+      { id: 'action-playlists', label: 'Home (boards & playlists)', to: '/', keywords: ['home', 'boards', 'tier lists'] },
+      { id: 'page-add', label: 'Add songs (liked songs to rate)', to: '/add', keywords: ['inbox', 'likes', 'liked', 'new songs', 'paste link'] },
+      { id: 'page-settings', label: 'Settings', to: '/settings', keywords: ['settings', 'preferences', 'options', 'config'] },
+      { id: 'page-settings-appearance', label: 'Settings → Appearance', to: '/settings?tab=appearance', keywords: ['settings', 'theme', 'dark mode', 'light mode', 'accent', 'color', 'tier colors', 'palette'] },
+      { id: 'page-settings-naming', label: 'Settings → Playlist naming & to-do lists', to: '/settings?tab=naming', keywords: ['settings', 'template', 'rename', 'naming', 'todo', 'to-do', 'keyword', 'tag'] },
+      { id: 'page-settings-duels', label: 'Settings → Duels', to: '/settings?tab=duels', keywords: ['settings', 'duel', 'strategy', 'elo', 'merge sort', 'ranking'] },
+      { id: 'page-settings-keyboard', label: 'Settings → Keyboard shortcuts', to: '/settings?tab=keyboard', keywords: ['settings', 'keys', 'hotkeys', 'shortcuts'] },
+    ];
+    for (const page of pages) {
+      list.push({ id: page.id, section: 'Go to', label: page.label, keywords: page.keywords, action: () => navigate(page.to) });
+    }
     list.push({
-      id: 'action-playlists',
+      id: 'action-shortcuts',
+      section: 'Go to',
+      label: 'Show keyboard shortcuts',
+      keywords: ['help', 'keys', 'hotkeys', '?'],
+      action: () => shortcutsHandlers.open(),
+    });
+    list.push({
+      id: 'action-logout',
       section: 'Actions',
-      label: 'Go to Home (boards & playlists)',
-      action: () => navigate('/'),
+      label: 'Log out',
+      keywords: ['sign out', 'logout', 'exit'],
+      action: () => logout(),
     });
     if (currentCategory) {
       if (tierGroups[currentCategory]?.[TODO_TIER]) {

@@ -13,6 +13,7 @@ export default function CommandPalette({ items }) {
     (groups[item.section] ??= []).push({
       id: item.id,
       label: item.label,
+      keywords: item.keywords,
       onClick: item.action,
       // Actions with a direct keyboard equivalent (e.g. "p" for sync) show
       // it here, sourced from shortcuts.js so the hint can't drift out of
