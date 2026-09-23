@@ -10,7 +10,7 @@ const board = (category, rest = '') => `/tier/${encodeURIComponent(category)}${r
 
 // App-wide Vimium-style keys (react-hotkeys-hook: `>` joins a sequence; form
 // fields are ignored by default). Page-level keys (board search, player,
-// Inbox, duel) stay in their own components - see shortcuts.js for the list.
+// Add songs, duel) stay in their own components - see shortcuts.js for the list.
 export function useVimKeys({ hintsRef, categories, currentCategory, playingCategory, playingVideoId, hasTodo }) {
   const navigate = useNavigate();
   const go = (path) => (e) => {
@@ -29,7 +29,10 @@ export function useVimKeys({ hintsRef, categories, currentCategory, playingCateg
   });
 
   useHotkeys('g>h', go('/'));
-  useHotkeys('g>i', go('/inbox'));
+  useHotkeys('a', (e) => {
+    e.preventDefault();
+    navigate('/add', { state: { focusInput: true } });
+  });
   useHotkeys('g>s', go('/settings'));
   useHotkeys('g>p', (e) => playingCategory && go(board(playingCategory))(e), deps);
   useHotkeys('g>b', (e) => currentCategory && go(board(currentCategory))(e), deps);

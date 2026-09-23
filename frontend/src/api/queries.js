@@ -120,31 +120,24 @@ export function useSaveSettingsMutation() {
   });
 }
 
-// ---- Inbox ---------------------------------------------------------------
+// ---- Add songs -----------------------------------------------------------
 
-// The account's ~200 most recent likes (newest first) - the Inbox's source.
-export function useLikesQuery(enabled) {
+// Music-only YouTube search. Each query is cached for the session - a search
+// costs 100 quota units, so the same words never hit YouTube twice.
+export function useSongSearchQuery(q) {
   return useQuery({
-    queryKey: ['likes'],
-    queryFn: async () => (await api.get('/api/likes')).data,
-    enabled,
-    staleTime: 5 * 60 * 1000,
-  });
-}
-
-// Video ids the user marked "Not a song" (Postgres `inbox_dismissal`).
-export function useDismissedQuery(enabled) {
-  return useQuery({
-    queryKey: ['inbox-dismissed'],
-    queryFn: async () => (await api.get('/api/inbox/dismissed')).data,
-    enabled,
+    queryKey: ['song-search', q],
+    queryFn: async () => (await api.get('/api/search', { params: { q } })).data,
+    enabled: !!q,
     staleTime: Infinity,
+    retry: false,
   });
 }
 
-// Every tier playlist's items, across all boards - what the Inbox checks a
-// like against ("already filed somewhere?") and learns artist -> board from.
-// Same query keys as the boards' own, so opening a board afterwards is instant.
+// Every tier playlist's items, across all boards - what "Add songs" checks a
+// song against ("already in a tier?") and learns artist -> board from. Same
+// query keys as the boards' own, so opening a board afterwards is instant.
+// Pass null to hold off (it's ~one request per tier playlist).
 export function useAllTierItemsQueries(tierPlaylists) {
   const results = useQueries({
     queries: (tierPlaylists ?? []).map((p) => ({
@@ -198,19 +191,5 @@ export function useRemovePlaylistItemMutation() {
       queryClient.setQueryData(['playlist-items', playlistId], (old) => old?.filter((v) => v.id !== itemId));
       queryClient.invalidateQueries({ queryKey: ['playlists'] });
     },
-  });
-}
-
-// "Not a song" / its undo - optimistic, so the card leaves instantly.
-export function useDismissMutation() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: async ({ videoId, restore }) =>
-      restore ? api.delete(`/api/inbox/dismissed/${videoId}`) : api.put(`/api/inbox/dismissed/${videoId}`),
-    onMutate: ({ videoId, restore }) =>
-      queryClient.setQueryData(['inbox-dismissed'], (old = []) =>
-        restore ? old.filter((id) => id !== videoId) : [videoId, ...old]
-      ),
-    onError: () => queryClient.invalidateQueries({ queryKey: ['inbox-dismissed'] }),
   });
 }

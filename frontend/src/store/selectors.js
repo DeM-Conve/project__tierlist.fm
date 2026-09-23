@@ -201,7 +201,7 @@ export const selectPlayingVideoIdOnBoard = createSelector(
 );
 
 // True while the player dock is open full-screen. It covers the page like a
-// modal, so page-level shortcuts ("/" search, n/N, duel arrows, Inbox keys)
+// modal, so page-level shortcuts ("/" search, n/N, duel arrows, Add songs keys)
 // check this and stand down until it's minimized - only the player's own
 // keys act while it's up.
 export const selectPlayerCoversPage = (state) =>

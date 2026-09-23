@@ -1,7 +1,7 @@
 // Vim-style two-key sequences (`g i`, `y y` - bound with react-hotkeys-hook
 // in useVimKeys) start with a prefix key. The key *after* a prefix belongs to
 // the sequence, so page-level handlers that bind single letters (the player's
-// h = previous track, the Inbox's s = skip, ...) must ignore it - call
+// h = previous track, Add songs' s = skip, ...) must ignore it - call
 // `isSequenceKey(e)` first. Registered at import time in the capture phase,
 // so it sees every keydown before any component handler does.
 export const SEQUENCE_PREFIXES = ['g', 'y'];

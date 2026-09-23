@@ -47,7 +47,7 @@ const focusSlice = createSlice({
       state.focusedCategory = category;
       state.isShuffling = false;
       state.isTriage = !!action.payload.triage;
-      // The Inbox passes 'mini' so its card stays in view while listening;
+      // Add songs passes 'mini' so its card stays in view while listening;
       // everything else opens full-screen.
       state.playerMode = mode ?? 'expanded';
       state.focusedVideo = { tier, videoId };

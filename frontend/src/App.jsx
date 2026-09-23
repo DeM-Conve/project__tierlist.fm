@@ -32,11 +32,11 @@ import TierBoardView from './components/TierBoardView';
 import PlayerDock from './components/PlayerDock';
 import CommandPalette from './components/CommandPalette';
 import DuelView from './components/DuelView';
-import InboxView from './components/InboxView';
-import { useInbox } from './inbox/useInbox';
-import { useInboxActions } from './inbox/useInboxActions';
-import { videoIdFromText } from './inbox/youtubeLink';
-import { pasteVideo } from './store/inboxSlice';
+import AddSongsView from './components/AddSongsView';
+import { useAddSongs } from './addSongs/useAddSongs';
+import { useAddSongsActions } from './addSongs/useAddSongsActions';
+import { videoIdsFromText } from './addSongs/youtubeLink';
+import { addVideos } from './store/addSongsSlice';
 import LinkHints from './keyboard/LinkHints';
 import { useVimKeys } from './keyboard/useVimKeys';
 import SettingsView from './components/SettingsView';
@@ -190,7 +190,7 @@ export default function App() {
         <Route path="tier/:category" element={<TierBoardPage />} />
         <Route path="tier/:category/t/:tier" element={<TierFocusPage />} />
         <Route path="tier/:category/duel" element={<DuelPage />} />
-        <Route path="inbox" element={<InboxPage />} />
+        <Route path="add" element={<AddSongsPage />} />
         <Route path="settings" element={<SettingsPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
@@ -230,46 +230,48 @@ function Layout() {
   const currentCategory = tierMatch ? decodeURIComponent(tierMatch.params.category) : null;
   const tierPageMatch = useMatch('/tier/:category/t/:tier');
   const duelMatch = useMatch('/tier/:category/duel');
-  const inboxMatch = useMatch('/inbox');
+  const addMatch = useMatch('/add');
   const focusedCategory = useSelector((s) => s.focus.focusedCategory);
   // The Tier Rail is global like the player: on a board page it shows that
   // board; anywhere else it follows the playing song's board, so the song
   // can still be rated from Home / Settings / a playlist page. The duel
   // screen keeps the whole width to itself.
-  // The duel and the Inbox (which has its own tier targets) keep the whole
+  // The duel and Add songs (which has its own tier targets) keep the whole
   // width to themselves.
-  const railCategory = duelMatch || inboxMatch
+  const railCategory = duelMatch || addMatch
     ? null
     : currentCategory ?? (focusedVideoData ? focusedCategory : null);
 
-  // The Inbox is computed up here: the sidebar badge, Home's card and
-  // paste-a-link-anywhere all need it, not just its page.
-  const inbox = useInbox();
-  const inboxActions = useInboxActions(inbox);
+  // Add songs lives up here: the sidebar count and paste-a-link-anywhere
+  // need it, not just its page. Where songs already are is only fetched once
+  // the page is open or something was picked (one request per playlist).
+  const waitingCount = useSelector((s) => s.addSongs.queue.length - s.addSongs.hidden.length);
+  const addSongs = useAddSongs(!!addMatch || waitingCount > 0);
+  const addSongsActions = useAddSongsActions(addSongs);
   const fetchVideo = useFetchVideo();
 
-  // A pasted YouTube link (anywhere but a text box) goes to the Inbox, or,
-  // if it's already on a board, says where. Returns whether it was a link.
-  function handlePasteLink(text) {
-    const videoId = videoIdFromText(text);
-    if (!videoId) return false;
-    const where = inbox.placed.get(videoId)?.[0];
-    if (where) {
-      notifications.show({ message: `Already on ${where.category} · ${where.tier}` });
-      return true;
-    }
-    fetchVideo(videoId)
-      .then((video) => {
-        dispatch(pasteVideo(video));
-        navigate('/inbox');
-      })
-      .catch(() => notifications.show({ color: 'red', message: 'Couldn’t find that video on YouTube' }));
+  // Pasted YouTube link(s) - anywhere but a text box, or in Add songs' own
+  // input - join Add songs. Returns whether there was a link at all.
+  function handleAddLinks(text) {
+    const ids = videoIdsFromText(text);
+    if (!ids.length) return false;
+    Promise.allSettled(ids.map(fetchVideo)).then((results) => {
+      const videos = results.filter((r) => r.status === 'fulfilled').map((r) => r.value);
+      const missing = results.length - videos.length;
+      if (videos.length) {
+        dispatch(addVideos(videos));
+        navigate('/add');
+      }
+      if (missing) {
+        notifications.show({ color: 'red', message: `Couldn’t find ${missing === 1 ? 'that video' : `${missing} of those videos`} on YouTube` });
+      }
+    });
     return true;
   }
   useWindowEvent('paste', (e) => {
     const el = document.activeElement;
     if (el?.tagName === 'INPUT' || el?.tagName === 'TEXTAREA' || el?.isContentEditable) return;
-    if (handlePasteLink(e.clipboardData?.getData('text'))) e.preventDefault();
+    if (handleAddLinks(e.clipboardData?.getData('text'))) e.preventDefault();
   });
 
   const tierSyncMutation = useTierSyncMutation();
@@ -458,10 +460,10 @@ function Layout() {
       });
     }
     list.push({
-      id: 'action-inbox',
+      id: 'action-add-songs',
       section: 'Actions',
-      label: 'Open Inbox (new liked songs)',
-      action: () => navigate('/inbox'),
+      label: 'Add a song (paste a link or search)',
+      action: () => navigate('/add', { state: { focusInput: true } }),
     });
     list.push({
       id: 'action-playlists',
@@ -530,7 +532,7 @@ function Layout() {
         tierCategories={tierCategories}
         tierGroups={tierGroups}
         playlistCount={tierPlaylists?.length ?? 0}
-        inboxCount={inbox.loading ? null : inbox.list.length}
+        waitingCount={addSongs.list.length}
         loading={tierPlaylists === null}
         onSelectSettings={() => navigate('/settings')}
         onOpenShortcuts={shortcutsHandlers.open}
@@ -551,9 +553,9 @@ function Layout() {
             openFocus,
             startShufflePlay,
             playFrom,
-            inbox,
-            inboxActions,
-            handlePasteLink,
+            addSongs,
+            addSongsActions,
+            handleAddLinks,
           }}
         />
         </Box>
@@ -655,7 +657,6 @@ function HomePage() {
   const tierCategories = useSelector(selectTierCategories);
   const focusedCategory = useSelector((s) => s.focus.focusedCategory);
   const playingVideo = useSelector(selectFocusedVideoData);
-  const { inbox } = useOutletContext();
 
   useEffect(() => {
     dispatch(setCurrentCategory(null));
@@ -664,8 +665,7 @@ function HomePage() {
 
   return (
     <HomeView
-      inbox={inbox.loading ? null : inbox.list}
-      onOpenInbox={() => navigate('/inbox')}
+      onAddSongs={() => navigate('/add', { state: { focusInput: true } })}
       playlists={tierPlaylists}
       hiddenCount={allPlaylists && tierPlaylists ? allPlaylists.length - tierPlaylists.length : 0}
       onOpenNaming={() => navigate('/settings?tab=naming')}
@@ -831,16 +831,16 @@ function DuelPage() {
   );
 }
 
-function InboxPage() {
+function AddSongsPage() {
   const dispatch = useDispatch();
-  const { inbox, inboxActions, handlePasteLink } = useOutletContext();
+  const { addSongs, addSongsActions, handleAddLinks } = useOutletContext();
 
   useEffect(() => {
     dispatch(setCurrentCategory(null));
     dispatch(setMobileSidebarOpen(false));
   }, [dispatch]);
 
-  return <InboxView inbox={inbox} actions={inboxActions} onPasteLink={handlePasteLink} />;
+  return <AddSongsView addSongs={addSongs} actions={addSongsActions} onAddLinks={handleAddLinks} />;
 }
 
 function SettingsPage() {

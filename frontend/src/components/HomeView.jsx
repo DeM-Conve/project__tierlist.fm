@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import {
   Badge,
-  Avatar,
   Box,
   Button,
   Card,
@@ -18,7 +17,7 @@ import {
   Title,
   UnstyledButton,
 } from '@mantine/core';
-import { EyeOff, Plus, Search, Swords } from 'lucide-react';
+import { EyeOff, ListPlus, Plus, Search, Swords } from 'lucide-react';
 import CreateTierPlaylistsModal from './CreateTierPlaylistsModal';
 import { BOARD_TIERS, TIER_COLORS } from '../tiers';
 import { EqualizerMark, TierChip } from './TierBits';
@@ -94,8 +93,7 @@ export default function HomeView({
   query,
   onQueryChange,
   nowPlaying,
-  inbox,
-  onOpenInbox,
+  onAddSongs,
   onOpenBoard,
   onDuel,
   onOpenPlaylist,
@@ -123,6 +121,9 @@ export default function HomeView({
           </Text>
         </Stack>
         <Group gap="sm" wrap="wrap">
+        <Button variant="default" leftSection={<ListPlus size={15} />} rightSection={<Kbd size="xs">a</Kbd>} onClick={onAddSongs}>
+          Add songs
+        </Button>
         <Button leftSection={<Plus size={15} />} onClick={() => setCreating(true)} disabled={playlists === null}>
           New tier list
         </Button>
@@ -139,31 +140,6 @@ export default function HomeView({
 
       {creating && (
         <CreateTierPlaylistsModal opened onClose={() => setCreating(false)} onCreated={onOpenBoard} />
-      )}
-
-      {inbox?.length > 0 && (
-        <Paper withBorder radius="md" p="sm" bg="var(--surface-2)">
-          <Group justify="space-between" wrap="nowrap">
-            <Group gap="sm" wrap="nowrap" style={{ minWidth: 0 }}>
-              <Avatar.Group>
-                {inbox.slice(0, 3).map((v) => (
-                  <Avatar key={v.videoId} src={v.thumbnail} radius="sm" size={44} />
-                ))}
-              </Avatar.Group>
-              <Box style={{ minWidth: 0 }}>
-                <Text fz="xs" c="accent" fw={700} tt="uppercase">
-                  Inbox
-                </Text>
-                <Text fw={600} truncate="end">
-                  {inbox.length} liked {inbox.length === 1 ? 'song isn’t' : 'songs aren’t'} on a board yet
-                </Text>
-              </Box>
-            </Group>
-            <Button variant="light" onClick={onOpenInbox} rightSection={<Kbd size="xs">g i</Kbd>}>
-              Rate them
-            </Button>
-          </Group>
-        </Paper>
       )}
 
       {nowPlaying?.category && (

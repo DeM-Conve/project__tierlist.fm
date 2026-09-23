@@ -16,7 +16,7 @@ import {
   Tooltip,
   UnstyledButton,
 } from '@mantine/core';
-import { Home, Inbox, Keyboard, ListOrdered, LogOut, Search, Settings } from 'lucide-react';
+import { Home, Keyboard, ListOrdered, ListPlus, LogOut, Search, Settings } from 'lucide-react';
 import { TIER_ORDER, TODO_TIER } from '../tiers';
 
 // Each board shows its song total straight from the playlists' own item
@@ -31,7 +31,7 @@ export default function Sidebar({
   tierCategories,
   tierGroups,
   playlistCount,
-  inboxCount,
+  waitingCount,
   loading,
   onSelectSettings,
   onOpenShortcuts,
@@ -94,26 +94,25 @@ export default function Sidebar({
         />
         <NavLink
           component={Link}
-          to="/inbox"
+          to="/add"
+          state={{ focusInput: true }}
           label={
             <Group justify="space-between" wrap="nowrap">
-              Inbox
-              <Kbd size="xs" visibleFrom="md">g i</Kbd>
+              Add songs
+              <Kbd size="xs" visibleFrom="md">a</Kbd>
             </Group>
           }
-          description="Liked songs to rate"
-          leftSection={<Inbox size={16} />}
+          description={waitingCount > 0 ? `${waitingCount} waiting for a tier` : 'Paste a link or search'}
+          leftSection={<ListPlus size={16} />}
           rightSection={
-            inboxCount == null ? (
-              <Skeleton h={16} w={22} radius="xl" />
-            ) : inboxCount > 0 ? (
-              <Badge size="sm" variant="filled" circle={inboxCount < 10}>
-                {inboxCount}
+            waitingCount > 0 ? (
+              <Badge size="sm" variant="filled" circle={waitingCount < 10}>
+                {waitingCount}
               </Badge>
             ) : null
           }
           variant="light"
-          active={location.pathname === '/inbox'}
+          active={location.pathname === '/add'}
           mb="xs"
         />
 
