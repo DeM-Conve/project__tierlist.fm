@@ -62,7 +62,7 @@ function TrackRow({
       py={6}
       style={{
         display: 'grid',
-        gridTemplateColumns: '34px 44px minmax(0, 1fr) auto 30px',
+        gridTemplateColumns: '22px 44px minmax(0, 1fr) auto 30px',
         alignItems: 'center',
         gap: 12,
         borderRadius: 6,
@@ -70,10 +70,23 @@ function TrackRow({
         opacity: isDragging ? 0.35 : isPendingRemoval ? 0.5 : 1,
       }}
     >
-      <Text fz="xs" c="dimmed" ta="right" ff="monospace">
-        {isPlaying ? <EqualizerMark color="var(--accent)" height={11} /> : rank}
+      <Text fz="xs" c={isPlaying ? 'accent' : 'dimmed'} fw={isPlaying ? 700 : undefined} ta="right" ff="monospace">
+        {rank}
       </Text>
-      <Image src={video.thumbnail || undefined} w={44} h={44} radius={4} fit="cover" alt="" draggable={false} style={{ pointerEvents: 'none' }} />
+      {/* The now-playing equalizer sits on the cover, not in the rank column. */}
+      <Box pos="relative" w={44} h={44} style={{ pointerEvents: 'none' }}>
+        <Image src={video.thumbnail || undefined} w={44} h={44} radius={4} fit="cover" alt="" draggable={false} />
+        {isPlaying && (
+          <Box
+            pos="absolute"
+            inset={0}
+            bg="var(--media-scrim)"
+            style={{ borderRadius: 4, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+          >
+            <EqualizerMark color="var(--media-fg)" height={14} />
+          </Box>
+        )}
+      </Box>
       <Box style={{ minWidth: 0 }}>
         <Text fz="sm" fw={isPlaying ? 700 : 600} c={isPlaying ? 'accent' : undefined} truncate="end" title={video.title}>
           {song}
@@ -231,18 +244,14 @@ export default function TierFocusView({
               {t} <Text span c="dimmed" fz="xs">{counts(t)}</Text>
             </Tabs.Tab>
           ))}
-        </Tabs.List>
-      </Tabs>
-
-      <Group justify="space-between" mb={6} px="sm" wrap="nowrap" gap="sm">
-        <Text fz="xs" c="dimmed">
-          {q
-            ? `${visible.length} of ${items.length} shown`
-            : isTodo
-              ? 'Click a tier chip to rate a song · click a row to listen first'
-              : 'Drag to reorder · tier chips move a song'}
-        </Text>
-        <TextInput
+          {/* The filter shares the tab row (right end) instead of its own row. */}
+          <Group ml="auto" gap="sm" wrap="nowrap" pb={6} style={{ alignSelf: 'center' }}>
+            {q && (
+              <Text fz="xs" c="dimmed">
+                {visible.length} of {items.length}
+              </Text>
+            )}
+            <TextInput
           ref={filterRef}
           value={filter}
           onChange={(e) => setFilter(e.target.value)}
@@ -250,9 +259,11 @@ export default function TierFocusView({
           leftSection={<Search size={14} />}
           rightSection={filter ? <CloseButton size="sm" onClick={() => setFilter('')} aria-label="Clear filter" /> : <Kbd size="xs">/</Kbd>}
           size="xs"
-          w={240}
+          w={220}
         />
-      </Group>
+          </Group>
+        </Tabs.List>
+      </Tabs>
 
       <Paper withBorder radius="md" p={4} bg="var(--surface)">
         <Box
@@ -310,6 +321,11 @@ export default function TierFocusView({
           )}
         </Box>
       </Paper>
+      <Text fz="xs" c="dimmed" ta="center" mt="sm">
+        {isTodo
+          ? 'Click a tier chip to rate a song · click a row to listen first'
+          : 'Drag to reorder · tier chips move a song · click a row to play'}
+      </Text>
 
     </Box>
   );
