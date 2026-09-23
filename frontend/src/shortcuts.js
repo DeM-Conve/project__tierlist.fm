@@ -19,6 +19,7 @@ export const SHORTCUTS = [
   { id: 'add-songs', keys: ['a'], description: 'Add a song (paste a link or search)', category: 'Navigation (Vim)' },
   { id: 'go-settings', keys: ['g', 's'], description: 'Go to Settings', category: 'Navigation (Vim)' },
   { id: 'go-playing', keys: ['g', 'p'], description: 'Go to the playing song’s board', category: 'Navigation (Vim)' },
+  { id: 'go-up', keys: ['g', 'u'], description: 'Up one level: tier page → its board → Home', category: 'Navigation (Vim)' },
   { id: 'go-board', keys: ['g', 'b'], description: 'Back to this board (from a tier page)', category: 'Navigation (Vim)' },
   { id: 'go-todo', keys: ['g', 't'], description: 'This board’s TODO list', category: 'Navigation (Vim)' },
   { id: 'go-duel', keys: ['g', 'd'], description: 'Duel on this board', category: 'Navigation (Vim)' },

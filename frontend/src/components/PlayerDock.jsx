@@ -437,10 +437,12 @@ export default function PlayerDock({
           <div className="player-dock-body">
             <div className="focus-info" onClick={!expanded ? onExpand : undefined}>
               <h2>{video.title}</h2>
-              <Group gap={8} wrap="nowrap">
-                <p className="hint-text" style={{ minWidth: 0 }}>{video.channelTitle}</p>
+              <Group gap={8} wrap="nowrap" align="center" mt={expanded ? 4 : 0}>
+                <Text className="dock-artist" c="dimmed" fz={expanded ? 14 : 12} lh={1.3} truncate="end" miw={0}>
+                  {video.channelTitle}
+                </Text>
                 {(isShuffling || isTriage) && expanded && (
-                  <Badge variant="light" size="sm">
+                  <Badge variant="light" size="sm" flex="none">
                     {isTriage ? 'Triage' : 'Shuffle'}
                   </Badge>
                 )}

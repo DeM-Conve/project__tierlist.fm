@@ -179,6 +179,7 @@ export default function TierFocusView({
         <Group gap={6} c="dimmed">
           <ArrowLeft size={14} />
           <Text fz="sm">{category} · tier list</Text>
+          <Kbd size="xs">g u</Kbd>
         </Group>
       </UnstyledButton>
 

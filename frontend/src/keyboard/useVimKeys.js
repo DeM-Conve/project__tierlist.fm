@@ -36,6 +36,18 @@ export function useVimKeys({ hintsRef, canvasRef, categories, currentCategory, p
   useHotkeys('g>s', go('/settings'));
   useHotkeys('g>p', (e) => playingCategory && go(board(playingCategory))(e), deps);
   useHotkeys('g>b', (e) => currentCategory && go(board(currentCategory))(e), deps);
+  // Vimium's "go up": one level up the address - a tier page or duel to its
+  // board, a board / playlist / Add songs / Settings page to Home.
+  useHotkeys(
+    'g>u',
+    (e) => {
+      const parts = window.location.pathname.split('/').filter(Boolean);
+      if (!parts.length) return;
+      e.preventDefault();
+      navigate(parts[0] === 'tier' && parts.length > 2 ? `/tier/${parts[1]}` : '/');
+    },
+    deps
+  );
   useHotkeys('g>d', (e) => currentCategory && go(board(currentCategory, '/duel'))(e), deps);
   useHotkeys('g>t', (e) => currentCategory && hasTodo && go(board(currentCategory, `/t/${TODO_TIER}`))(e), deps);
   // The page canvas scrolls, not the window (see layout/canvas.js).

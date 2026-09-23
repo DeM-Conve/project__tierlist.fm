@@ -28,12 +28,6 @@
 }
 .sidebar-scrim { display: none; }
 
-.hint-text {
-  color: var(--text-dim);
-  font-size: 14px;
-  margin: 4px 0 0;
-}
-
 /* Tier board lanes - layout/visuals are Mantine props; only what Mantine
    has no prop for stays here: hover/focus-reveal of a tile's overlay
    controls (a :hover/:focus-within pseudo-class) and the now-playing
@@ -98,7 +92,7 @@
     background: var(--overlay);
     z-index: 35;
   }
-  .player-dock-mini .focus-info .hint-text { display: none; }
+  .player-dock-mini .dock-artist { display: none; }
 }
 
 /* Player dock: expanded (full-screen, blocks the app underneath) vs mini
@@ -268,12 +262,6 @@
 .player-dock-mini .focus-info h2 {
   font-size: 14px;
   margin: 0 0 2px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.player-dock-mini .focus-info .hint-text {
-  font-size: 12px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;

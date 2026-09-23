@@ -102,7 +102,7 @@ export default function Sidebar({
               <Kbd size="xs" visibleFrom="md">a</Kbd>
             </Group>
           }
-          description={waitingCount > 0 ? `${waitingCount} waiting for a tier` : 'Paste a link or search'}
+          description={waitingCount > 0 ? `${waitingCount} waiting for a tier` : 'Paste a YouTube link'}
           leftSection={<ListPlus size={16} />}
           rightSection={
             waitingCount > 0 ? (
