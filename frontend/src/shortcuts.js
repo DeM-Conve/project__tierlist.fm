@@ -1,4 +1,7 @@
-// Single source of truth for every keyboard shortcut in the app. Nothing
+// Single source of truth for every keyboard shortcut in the app.
+// `keys`: with a modifier (Ctrl/Shift/Alt/Cmd) the keys are one combo
+// (Ctrl+K); otherwise each entry is an alternative ([ or ]), and a Vim
+// sequence is one string ('gh' = g then h). Nothing
 // here wires up a listener by itself - components still own their own
 // context-specific keydown handling (see the comments in TierBoardView,
 // PlayerDock and DuelView for why: several of these are small state
@@ -15,18 +18,19 @@ export const SHORTCUTS = [
 
   { id: 'hints', keys: ['f'], description: 'Link hints: label everything clickable, type a label to click it', category: 'Navigation (Vim)' },
   { id: 'omnibar', keys: ['o'], description: 'Open the command palette (like Ctrl+K)', category: 'Navigation (Vim)' },
-  { id: 'go-home', keys: ['g', 'h'], description: 'Go to Home', category: 'Navigation (Vim)' },
-  { id: 'add-songs', keys: ['a'], description: 'Add a song (paste a link or search)', category: 'Navigation (Vim)' },
-  { id: 'go-settings', keys: ['g', 's'], description: 'Go to Settings', category: 'Navigation (Vim)' },
-  { id: 'go-playing', keys: ['g', 'p'], description: 'Go to the playing song’s board', category: 'Navigation (Vim)' },
-  { id: 'go-up', keys: ['g', 'u'], description: 'Up one level: tier page → its board → Home', category: 'Navigation (Vim)' },
-  { id: 'go-board', keys: ['g', 'b'], description: 'Back to this board (from a tier page)', category: 'Navigation (Vim)' },
-  { id: 'go-todo', keys: ['g', 't'], description: 'This board’s TODO list', category: 'Navigation (Vim)' },
-  { id: 'go-duel', keys: ['g', 'd'], description: 'Duel on this board', category: 'Navigation (Vim)' },
+  { id: 'go-home', keys: ['gh'], description: 'Go to Home', category: 'Navigation (Vim)' },
+  { id: 'add-songs', keys: ['a'], description: 'Add a song (paste its YouTube link)', category: 'Navigation (Vim)' },
+  { id: 'go-settings', keys: ['gs'], description: 'Go to Settings', category: 'Navigation (Vim)' },
+  { id: 'go-playing', keys: ['gp'], description: 'Go to the playing song’s board', category: 'Navigation (Vim)' },
+  { id: 'go-up', keys: ['gu'], description: 'Up one level: tier page → its board → Home', category: 'Navigation (Vim)' },
+  { id: 'go-board', keys: ['gb'], description: 'Back to this board (from a tier page)', category: 'Navigation (Vim)' },
+  { id: 'go-todo', keys: ['gt'], description: 'This board’s TODO list', category: 'Navigation (Vim)' },
+  { id: 'go-duel', keys: ['gd'], description: 'Duel on this board', category: 'Navigation (Vim)' },
   { id: 'board-prev-next', keys: ['[', ']'], description: 'Previous / next board', category: 'Navigation (Vim)' },
   { id: 'history', keys: ['H', 'L'], description: 'Back / forward', category: 'Navigation (Vim)' },
-  { id: 'scroll-ends', keys: ['g', 'g', '/', 'G'], description: 'Scroll to top / bottom', category: 'Navigation (Vim)' },
-  { id: 'yank', keys: ['y', 'y'], description: 'Copy the playing song’s YouTube link', category: 'Navigation (Vim)' },
+  { id: 'scroll-top', keys: ['gg'], description: 'Scroll to the top of the page', category: 'Navigation (Vim)' },
+  { id: 'scroll-bottom', keys: ['G'], description: 'Scroll to the bottom of the page', category: 'Navigation (Vim)' },
+  { id: 'yank', keys: ['yy'], description: 'Copy the playing song’s YouTube link', category: 'Navigation (Vim)' },
 
   { id: 'search', keys: ['/'], description: 'Search this tier board', category: 'Tier board' },
   { id: 'search-next', keys: ['n'], description: 'Jump to next match', category: 'Tier board' },

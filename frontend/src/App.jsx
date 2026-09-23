@@ -25,6 +25,7 @@ import TierFocusView from './components/TierFocusView';
 import CreateTierPlaylistsModal from './components/CreateTierPlaylistsModal';
 import TodoListModal from './components/TodoListModal';
 import TierRail from './components/TierRail';
+import { CANVAS_TOP, CANVAS_X, SHELL_Y } from './layout/spacing';
 import { CanvasContext } from './layout/canvas';
 import PendingChanges from './components/PendingChanges';
 import { applyOrderWithFeedback, moveWithFeedback, undoEdit } from './tierActions';
@@ -478,7 +479,7 @@ function Layout() {
     list.push({
       id: 'action-add-songs',
       section: 'Actions',
-      label: 'Add a song (paste a link or search)',
+      label: 'Add a song (paste its YouTube link)',
       action: () => navigate('/add', { state: { focusInput: true } }),
     });
     // Pages and settings, findable by what's on them ("sett", "theme",
@@ -594,7 +595,7 @@ function Layout() {
 
         {/* The canvas is the page's scroll container (see layout/canvas.js). */}
         <Box component="main" ref={canvasRef} flex={1} miw={0} style={{ overflowY: 'auto' }}>
-          <Box pt={{ base: 72, md: 14 }} px={{ base: 20, md: 40 }} pb={32}>
+          <Box pt={CANVAS_TOP} px={CANVAS_X} pb={SHELL_Y}>
             <CanvasContext.Provider value={canvas}>
               <Outlet
                 context={{
