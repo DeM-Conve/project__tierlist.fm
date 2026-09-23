@@ -62,7 +62,6 @@ export default function PlayerDock({
   onJump,
   onRemove,
   onMoveInQueue,
-  onClearUpNext,
   onShuffleUpcoming,
   repeatMode = 'off',
   onCycleRepeat,
@@ -541,7 +540,6 @@ export default function PlayerDock({
               onJump={onJump}
               onRemove={onRemove}
               onMove={onMoveInQueue}
-              onClearUpNext={onClearUpNext}
               onShuffle={onShuffleUpcoming}
             />
           </aside>

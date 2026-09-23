@@ -1,23 +1,23 @@
 import { createSlice, nanoid } from '@reduxjs/toolkit';
 
-// The player's queue, modelled on YouTube Music's. Every entry is
-// { key, tier, video, source } - `key` is unique per entry (not the video
-// id), so the same song can sit in the queue more than once. The play order
-// is always:
+// The player's queue, modelled on YouTube Music's: one timeline.
 //
-//   history (already played, oldest first)
-//   current (the playing entry)
-//   upNext  (source 'user': songs you queued with Play next / Add to queue,
-//            from anywhere in the app)
-//   context (source 'context': the rest of what you started playing - a
-//            board, one tier, a shuffle, the TODO list)
+//   history   (already played, oldest first)
+//   current   (the playing entry)
+//   upcoming  (everything still to play - one list, "Up next")
 //
-// Starting something new replaces the whole queue, your own songs
-// included, the way YouTube Music does.
+// Every entry is { key, tier, video, source }. `key` is unique per entry
+// (not the video id), so the same song can be queued more than once.
+// `source` only decides where "Add to queue" lands: 'user' entries (Play
+// next / Add to queue, or anything you drag into place) form the front of
+// `upcoming`; Add to queue goes after the last of them, before the rest of
+// the board you started ('context' entries). The list itself is shown and
+// edited as one - drag anything anywhere, including played songs back in.
 //
 // Each entry carries a { tier, video } snapshot taken when it was queued,
 // so the dock keeps working when you navigate to a different board (a
 // board's `tiersSlice.tierItems` only holds the loaded category).
+// Starting something new replaces the whole queue, as YouTube Music does.
 
 const HISTORY_LIMIT = 200;
 
@@ -37,11 +37,11 @@ function pushHistory(state, entry) {
   if (state.history.length > HISTORY_LIMIT) state.history.splice(0, state.history.length - HISTORY_LIMIT);
 }
 
-// Puts an entry back at the front of the section it came from (going
-// backwards through the queue, or jumping back into history).
-function returnToUpcoming(state, entry) {
-  if (entry.source === 'user') state.upNext.unshift(entry);
-  else state.context.unshift(entry);
+// Where "Add to queue" inserts: after the run of your own songs at the front.
+function userRunLength(upcoming) {
+  let n = 0;
+  while (n < upcoming.length && upcoming[n].source === 'user') n++;
+  return n;
 }
 
 // Starts a new "playing from" context: `queue` (video ids, in play order)
@@ -61,14 +61,11 @@ function startContext(state, { tier, videoId, queue, entries, category, label })
   const made = ordered.map((e) => makeEntry(e, 'context'));
   state.history = made.slice(0, start);
   state.current = { ...made[start], tier: tier ?? made[start].tier };
-  state.context = made.slice(start + 1);
-  state.upNext = [];
+  state.upcoming = made.slice(start + 1);
   state.focusedCategory = category;
   state.contextLabel = label ?? category ?? null;
   return true;
 }
-
-const SECTIONS = ['upNext', 'context'];
 
 const focusSlice = createSlice({
   name: 'focus',
@@ -77,10 +74,9 @@ const focusSlice = createSlice({
     focusedVideo: null,
     history: [],
     current: null,
-    upNext: [],
-    context: [],
-    // What `context` is ("Rap", "Rap · T2", "Rap · TODO", ...), shown as
-    // "Playing from" / "Next from" in the queue panel.
+    upcoming: [],
+    // What was started ("Rap", "Rap · T2 · shuffle", "Rap · TODO", ...),
+    // shown as "Playing from" in the queue panel.
     contextLabel: null,
     // The tier-board category playback was started from. Tier reassignment
     // (the pills/Shift+digit) writes into `tiersSlice.tierItems`, which only
@@ -91,7 +87,7 @@ const focusSlice = createSlice({
     // YouTube Music's repeat button: 'off' -> 'all' (loop the whole queue)
     // -> 'one' (loop the playing song). Kept across queues.
     repeatMode: 'off',
-    // Working through a board's TODO list: the context is just the to-do
+    // Working through a board's TODO list: the queue is just the to-do
     // songs, and rating the playing one moves straight on to the next.
     isTriage: false,
     // 'expanded' (full-screen), 'mini' (bottom bar), or 'floating' (small
@@ -118,8 +114,7 @@ const focusSlice = createSlice({
     closeFocus: (state) => {
       state.history = [];
       state.current = null;
-      state.upNext = [];
-      state.context = [];
+      state.upcoming = [];
       state.contextLabel = null;
       state.focusedCategory = null;
       state.isShuffling = false;
@@ -139,21 +134,19 @@ const focusSlice = createSlice({
     cycleRepeat: (state) => {
       state.repeatMode = state.repeatMode === 'off' ? 'all' : state.repeatMode === 'all' ? 'one' : 'off';
     },
-    // Your queue first, then the context - same as YouTube Music. At the end
-    // with repeat-all on, the whole queue starts over from the top.
+    // At the end with repeat-all on, the whole queue starts over from the
+    // top, in the order it was played.
     playNextInQueue: (state) => {
-      let next = state.upNext.shift() ?? state.context.shift();
-      if (!next && state.repeatMode === 'all' && state.current && state.history.length) {
+      const next = state.upcoming.shift();
+      if (!next) {
+        if (state.repeatMode !== 'all' || !state.current || !state.history.length) return;
         const all = [...state.history, state.current];
         state.history = [];
         state.current = all[0];
-        // Replays in the order it was played; it's all one list again.
-        state.upNext = [];
-        state.context = all.slice(1).map((e) => ({ ...e, source: 'context' }));
+        state.upcoming = all.slice(1).map((e) => ({ ...e, source: 'context' }));
         sync(state);
         return;
       }
-      if (!next) return;
       if (state.current) pushHistory(state, state.current);
       state.current = next;
       sync(state);
@@ -161,73 +154,68 @@ const focusSlice = createSlice({
     playPrevInQueue: (state) => {
       const prev = state.history.pop();
       if (!prev) return;
-      if (state.current) returnToUpcoming(state, state.current);
+      if (state.current) state.upcoming.unshift(state.current);
       state.current = prev;
       sync(state);
     },
-    // Click a row in the queue panel. Jumping ahead moves the skipped songs
-    // up into history (the list is one timeline with a "now" pointer);
-    // jumping back returns the songs after it to the upcoming sections.
+    // Play a row of the queue. It's one timeline with a "now" pointer:
+    // jumping ahead moves the skipped songs up into history, jumping back
+    // puts the later ones back in front of what's upcoming.
     jumpInQueue: (state, action) => {
       const { section, index } = action.payload;
       if (!state.current) return;
       if (section === 'history') {
         const target = state.history[index];
         if (!target) return;
-        const after = state.history.splice(index);
-        after.shift();
-        [...after, state.current].reverse().forEach((e) => returnToUpcoming(state, e));
+        const after = state.history.splice(index).slice(1);
+        state.upcoming.unshift(...after, state.current);
         state.current = target;
       } else {
-        const list = state[section];
-        const target = list?.[index];
+        const target = state.upcoming[index];
         if (!target) return;
-        const skipped = section === 'context' ? [...state.upNext, ...list.slice(0, index)] : list.slice(0, index);
         pushHistory(state, state.current);
-        skipped.forEach((e) => pushHistory(state, e));
-        if (section === 'context') state.upNext = [];
-        state[section] = list.slice(index + 1);
+        state.upcoming.slice(0, index).forEach((e) => pushHistory(state, e));
+        state.upcoming = state.upcoming.slice(index + 1);
         state.current = target;
       }
       sync(state);
     },
-    // YouTube Music's "Play next" (top of your queue, right after the
-    // playing song) and "Add to queue" (end of your queue, before the rest
-    // of the context). Always a new entry - queuing a song twice plays it
-    // twice. `entry` is a { tier, video } snapshot.
+    // YouTube Music's "Play next" (right after the playing song) and "Add to
+    // queue" (after the songs you've already queued, before the rest of the
+    // board). Always a new entry - queuing a song twice plays it twice.
+    // `entry` is a { tier, video } snapshot.
     enqueue: (state, action) => {
       const { entry, position } = action.payload;
       if (!state.current) return;
       const made = makeEntry(entry, 'user');
-      if (position === 'next') state.upNext.unshift(made);
-      else state.upNext.push(made);
+      state.upcoming.splice(position === 'next' ? 0 : userRunLength(state.upcoming), 0, made);
     },
     removeFromQueue: (state, action) => {
       const key = action.payload;
       state.history = state.history.filter((e) => e.key !== key);
-      state.upNext = state.upNext.filter((e) => e.key !== key);
-      state.context = state.context.filter((e) => e.key !== key);
+      state.upcoming = state.upcoming.filter((e) => e.key !== key);
     },
-    // Drag-and-drop between/within the two upcoming sections. An entry
-    // dragged into "Up next" becomes one of yours (and survives starting a
-    // new board); one dragged down into the context goes with it.
+    // Drag-and-drop anywhere between the played list and Up next: reorder
+    // what's coming, or drag a played song back down to hear it again (and
+    // an upcoming one up into "played" to skip it). A song dropped into Up
+    // next counts as one you queued if it lands among/next to your own.
     moveInQueue: (state, action) => {
       const { from, to } = action.payload;
-      if (!SECTIONS.includes(from.section) || !SECTIONS.includes(to.section)) return;
-      const [moved] = state[from.section].splice(from.index, 1);
+      const lists = { history: state.history, upcoming: state.upcoming };
+      if (!lists[from.section] || !lists[to.section]) return;
+      const [moved] = lists[from.section].splice(from.index, 1);
       if (!moved) return;
-      moved.source = to.section === 'upNext' ? 'user' : 'context';
-      state[to.section].splice(to.index, 0, moved);
+      if (to.section === 'upcoming') {
+        moved.source = to.index <= userRunLength(state.upcoming) ? 'user' : 'context';
+      }
+      lists[to.section].splice(to.index, 0, moved);
     },
-    clearUpNext: (state) => {
-      state.upNext = [];
-    },
-    // Shuffle what's coming: `keys` is the new order of the context's
+    // Shuffle what's coming: `keys` is the new order of the upcoming
     // entries (the random permutation is made by the caller, so this
     // reducer stays pure).
-    reorderContext: (state, action) => {
-      const byKey = new Map(state.context.map((e) => [e.key, e]));
-      state.context = action.payload.map((k) => byKey.get(k)).filter(Boolean);
+    reorderUpcoming: (state, action) => {
+      const byKey = new Map(state.upcoming.map((e) => [e.key, e]));
+      state.upcoming = action.payload.map((k) => byKey.get(k)).filter(Boolean);
       state.isShuffling = true;
     },
     // Two uses, both kept from before the queue became entry-based:
@@ -237,20 +225,13 @@ const focusSlice = createSlice({
     setFocusedVideo: (state, action) => {
       const { tier, videoId } = action.payload;
       if (!state.current) return;
-      if (state.current.video.videoId === videoId) {
-        state.current.tier = tier;
-        sync(state);
-        return;
+      if (state.current.video.videoId !== videoId) {
+        const index = state.upcoming.findIndex((e) => e.video.videoId === videoId);
+        if (index < 0) return;
+        focusSlice.caseReducers.jumpInQueue(state, { payload: { section: 'upcoming', index } });
       }
-      for (const section of SECTIONS) {
-        const index = state[section].findIndex((e) => e.video.videoId === videoId);
-        if (index >= 0) {
-          focusSlice.caseReducers.jumpInQueue(state, { payload: { section, index } });
-          state.current.tier = tier ?? state.current.tier;
-          sync(state);
-          return;
-        }
-      }
+      if (tier !== undefined) state.current.tier = tier;
+      sync(state);
     },
   },
 });
@@ -262,15 +243,14 @@ export const {
   expandPlayer,
   floatPlayer,
   startShuffle,
+  cycleRepeat,
   playNextInQueue,
   playPrevInQueue,
   jumpInQueue,
   enqueue,
   removeFromQueue,
   moveInQueue,
-  clearUpNext,
-  reorderContext,
-  cycleRepeat,
+  reorderUpcoming,
   setFocusedVideo,
 } = focusSlice.actions;
 export default focusSlice.reducer;

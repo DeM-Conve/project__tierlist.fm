@@ -44,7 +44,7 @@ function advanceTriage(dispatch, getState, moves) {
   if (!rated) return;
   // Skip songs already rated some other way (e.g. dragged on the board).
   const todo = new Set((getState().tiers.tierItems[TODO_TIER] || []).map((v) => v.videoId));
-  const nextId = [...focus.upNext, ...focus.context].map((e) => e.video.videoId).find((id) => todo.has(id));
+  const nextId = focus.upcoming.map((e) => e.video.videoId).find((id) => todo.has(id));
   if (nextId) dispatch(setFocusedVideo({ tier: TODO_TIER, videoId: nextId }));
 }
 
