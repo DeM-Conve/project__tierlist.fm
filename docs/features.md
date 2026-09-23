@@ -84,8 +84,8 @@
 - `Shift+P` pushes pending changes (only when there are any) from any board page, same as the button / palette action.
 
 ## Duplicate cleanup
-- If the same video genuinely exists in two of a board's real tier playlists at once, the lower-tier copy is automatically staged as a pending removal (kept: the highest tier it's in; removed: every other copy) - no manual action needed to flag it. The review spells it out per song: **🗑 Remove from [TODO] · already in [T2]** - the outlined chip is the copy being removed, the solid chip is where the song stays (hover for a sentence). Manual removals read the same way (**🗑 Remove from [T2]**).
-- It shows up in the pending popup as "Remove from [TODO] · already in [T2]", and the tile is greyed out and tagged "Duplicate" (tooltip: removed on sync) until you sync.
+- If the same video genuinely exists in two of a board's real tier playlists at once, the lower-tier copy is automatically staged as a pending removal (kept: the highest tier it's in; removed: every other copy) - no manual action needed to flag it.
+- It shows up in the pending popup as "Remove from [TODO] · already in [T2]" (the copy going away, then the tier that keeps the song), and the tile is greyed out and tagged "Duplicate" (tooltip: removed on sync) until you sync.
 - "Push to YouTube" actually deletes the redundant playlist entry (no bogus re-insert into the same playlist).
 
 ## Video focus modal
