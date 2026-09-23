@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { ActionIcon, Badge, Box, Group, Image, ScrollArea, Slider, Stack, Text, UnstyledButton } from '@mantine/core';
+import { ActionIcon, Badge, Box, Group, Image, Paper, ScrollArea, Slider, Stack, Text, UnstyledButton } from '@mantine/core';
 import {
   ChevronDown,
   ChevronUp,
@@ -8,6 +8,8 @@ import {
   Play,
   Repeat,
   Repeat1,
+  RotateCcw,
+  RotateCw,
   SkipBack,
   SkipForward,
   Volume2,
@@ -31,6 +33,9 @@ import EmbeddedPlayer from './EmbeddedPlayer';
 // floating corner (both already "down", so j between them just swaps which
 // minimized view you're in) - it never wraps back up to expanded on its
 // own. k (up) always jumps straight back to expanded, from any state.
+// How many upcoming queue entries the expanded view renders at once.
+const QUEUE_PREVIEW = 80;
+
 const PLAYER_MODE_TRANSITIONS = {
   expanded: { down: 'mini', up: 'expanded' },
   mini: { down: 'floating', up: 'expanded' },
@@ -56,6 +61,7 @@ export default function PlayerDock({
   queue = [],
   queueIndex = -1,
   onJump,
+  onRemove,
 }) {
   const cardRef = useRef(null);
   const playerRef = useRef(null);
@@ -290,9 +296,8 @@ export default function PlayerDock({
     setProgressPct(ratio * 100);
   }
 
-  // The on-screen ‹ › overlay buttons scrub within the current video, the
-  // same way YouTube's own player does - track skipping is h/l or the
-  // dedicated prev/next buttons in the mini bar's controls, not these.
+  // The expanded view's ⟲ ⟳ buttons (and ←/→) scrub within the current
+  // video - track skipping is h/l or the prev/next buttons.
   function seekBy(deltaSeconds) {
     const player = playerRef.current;
     const duration = player?.getDuration?.();
@@ -316,6 +321,12 @@ export default function PlayerDock({
     player.seekTo((pct / 100) * duration, true);
     setProgressPct(pct);
   }
+
+  const iconSize = expanded ? 20 : 18;
+  const btnSize = expanded ? 38 : 30;
+  const upcoming = queue.slice(queueIndex + 1, queueIndex + 1 + QUEUE_PREVIEW);
+  const moreCount = Math.max(0, queue.length - queueIndex - 1 - upcoming.length);
+  const nowTier = currentTier ?? queue[queueIndex]?.tier;
 
   return (
     <div
@@ -344,7 +355,7 @@ export default function PlayerDock({
           </div>
         )}
 
-        <div className="player-dock-toolbar">
+        <Group className="player-dock-toolbar" gap={6} wrap="nowrap">
           <ActionIcon
             variant={repeatOne ? 'filled' : 'default'}
             color="accent"
@@ -362,120 +373,96 @@ export default function PlayerDock({
             // instead of stopping playback - matches how YouTube Music's
             // "✕" on the full player collapses to its mini bar rather than
             // ending the song.
-            <button className="modal-close" onClick={onMinimize} aria-label="Minimize" title="Minimize">
+            <ActionIcon variant="default" radius="xl" size={30} onClick={onMinimize} aria-label="Minimize" title="Minimize (Esc)">
               <ChevronDown size={16} />
-            </button>
+            </ActionIcon>
           ) : (
             <>
-              <button className="modal-close" onClick={onExpand} aria-label="Expand" title="Expand">
+              <ActionIcon variant="default" radius="xl" size={26} onClick={onExpand} aria-label="Expand" title="Expand (k)">
                 <ChevronUp size={16} />
-              </button>
-              <button className="modal-close" onClick={onStop} aria-label="Stop" title="Stop playback">
+              </ActionIcon>
+              <ActionIcon variant="default" radius="xl" size={26} onClick={onStop} aria-label="Stop" title="Stop playback">
                 <X size={16} />
-              </button>
+              </ActionIcon>
             </>
           )}
-        </div>
+        </Group>
 
-        <div className="focus-media-slot">
-          <div className="focus-media" onClick={!expanded ? onExpand : undefined}>
-            <div className="focus-embed">
-              <EmbeddedPlayer
-                key={video.videoId}
-                videoId={video.videoId}
-                onEnded={repeatOne ? replayCurrent : hasNext ? onNext : undefined}
-                onPlayerReady={(p) => {
-                  playerRef.current = p;
-                  // A new EmbeddedPlayer instance mounts per video (its own
-                  // effect keys off videoId) - re-sync the slider/mute state
-                  // to whatever that fresh player actually reports instead
-                  // of assuming it kept the previous instance's volume.
-                  if (p) {
-                    const v = p.getVolume?.() ?? 100;
-                    setVolume(v);
-                    lastVolumeRef.current = v || lastVolumeRef.current;
-                    setIsMuted(p.isMuted?.() ?? false);
-                  }
-                }}
-                onPlayingChange={setIsPlaying}
-              />
+        {/* Main column. `display: contents` in the mini/floating layouts, so
+            it only groups children for the expanded grid - the player
+            subtree inside keeps the same DOM position in every mode. */}
+        <div className="player-dock-main">
+          <div className="focus-media-slot">
+            <div className="focus-media" onClick={!expanded ? onExpand : undefined}>
+              <div className="focus-embed">
+                <EmbeddedPlayer
+                  key={video.videoId}
+                  videoId={video.videoId}
+                  onEnded={repeatOne ? replayCurrent : hasNext ? onNext : undefined}
+                  onPlayerReady={(p) => {
+                    playerRef.current = p;
+                    // A new EmbeddedPlayer instance mounts per video (its own
+                    // effect keys off videoId) - re-sync the slider/mute state
+                    // to whatever that fresh player actually reports instead
+                    // of assuming it kept the previous instance's volume.
+                    if (p) {
+                      const v = p.getVolume?.() ?? 100;
+                      setVolume(v);
+                      lastVolumeRef.current = v || lastVolumeRef.current;
+                      setIsMuted(p.isMuted?.() ?? false);
+                    }
+                  }}
+                  onPlayingChange={setIsPlaying}
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="player-dock-body">
+            <div className="focus-info" onClick={!expanded ? onExpand : undefined}>
+              <h2>{video.title}</h2>
+              <Group gap={8} wrap="nowrap">
+                <p className="hint-text" style={{ minWidth: 0 }}>{video.channelTitle}</p>
+                {(isShuffling || isTriage) && expanded && (
+                  <Badge variant="light" size="sm">
+                    {isTriage ? 'Triage' : 'Shuffle'}
+                  </Badge>
+                )}
+              </Group>
             </div>
 
-            {expanded && (
-              <button
-                className="focus-nav focus-nav-prev"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  seekBy(-10);
-                }}
-                aria-label="Back 10 seconds"
-              >
-                ‹
-              </button>
-            )}
-            {expanded && (
-              <button
-                className="focus-nav focus-nav-next"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  seekBy(10);
-                }}
-                aria-label="Forward 10 seconds"
-              >
-                ›
-              </button>
-            )}
-          </div>
-        </div>
-
-        <div className="player-dock-body">
-          <div className="focus-info" onClick={!expanded ? onExpand : undefined}>
-            <h2>
-              {video.title}
-              {(isShuffling || isTriage) && expanded && (
-                <Badge ml="sm" variant="light" size="sm" style={{ verticalAlign: 'middle' }}>
-                  {isTriage ? 'Triage' : 'Shuffle'}
-                </Badge>
+            <Group className="player-dock-controls" gap={expanded ? 6 : 2} wrap="nowrap">
+              <ActionIcon variant="subtle" color="gray" radius="xl" size={btnSize} onClick={onPrev} disabled={!hasPrev} aria-label="Previous" title="Previous (h)">
+                <SkipBack size={iconSize} fill="currentColor" />
+              </ActionIcon>
+              {expanded && (
+                <ActionIcon variant="subtle" color="gray" radius="xl" size={btnSize} onClick={() => seekBy(-10)} aria-label="Back 10 seconds" title="Back 10s (←)">
+                  <RotateCcw size={iconSize} />
+                </ActionIcon>
               )}
-            </h2>
-            <p className="hint-text">{video.channelTitle}</p>
-          </div>
-
-          {!expanded && (
-            <div className="player-dock-controls">
-              <button
-                className="player-dock-icon-btn"
-                onClick={onPrev}
-                disabled={!hasPrev}
-                aria-label="Previous"
-              >
-                <SkipBack size={18} fill="currentColor" />
-              </button>
-              <button
-                className="player-dock-icon-btn player-dock-play-btn"
+              <ActionIcon
+                variant="filled"
+                color="accent"
+                radius="xl"
+                size={expanded ? 48 : 34}
                 onClick={togglePlay}
                 aria-label={isPlaying ? 'Pause' : 'Play'}
+                title={isPlaying ? 'Pause (space)' : 'Play (space)'}
               >
-                {isPlaying ? (
-                  <Pause size={18} fill="currentColor" />
-                ) : (
-                  <Play size={18} fill="currentColor" />
-                )}
-              </button>
-              <button
-                className="player-dock-icon-btn"
-                onClick={onNext}
-                disabled={!hasNext}
-                aria-label="Next"
-              >
-                <SkipForward size={18} fill="currentColor" />
-              </button>
-            </div>
-          )}
+                {isPlaying ? <Pause size={iconSize} fill="currentColor" /> : <Play size={iconSize} fill="currentColor" />}
+              </ActionIcon>
+              {expanded && (
+                <ActionIcon variant="subtle" color="gray" radius="xl" size={btnSize} onClick={() => seekBy(10)} aria-label="Forward 10 seconds" title="Forward 10s (→)">
+                  <RotateCw size={iconSize} />
+                </ActionIcon>
+              )}
+              <ActionIcon variant="subtle" color="gray" radius="xl" size={btnSize} onClick={onNext} disabled={!hasNext} aria-label="Next" title="Next (l)">
+                <SkipForward size={iconSize} fill="currentColor" />
+              </ActionIcon>
+            </Group>
 
-          {!expanded && (
-            <div className="player-dock-secondary">
-              {availableTiers.length > 0 && !floating && (
+            <Group className="player-dock-secondary" gap={2} wrap="nowrap">
+              {availableTiers.length > 0 && mode === 'mini' && (
                 <Group gap={3} wrap="nowrap" mr={6} visibleFrom="sm">
                   {availableTiers.map((t, i) => (
                     <TierChip
@@ -489,123 +476,155 @@ export default function PlayerDock({
                   ))}
                 </Group>
               )}
-              <button
-                className="player-dock-icon-btn"
-                onClick={toggleMute}
-                aria-label={isMuted ? 'Unmute' : 'Mute'}
-              >
+              <ActionIcon variant="subtle" color="gray" radius="xl" size={30} onClick={toggleMute} aria-label={isMuted ? 'Unmute' : 'Mute'} title="Mute (m)">
                 {isMuted || volume === 0 ? <VolumeX size={17} /> : <Volume2 size={17} />}
-              </button>
+              </ActionIcon>
               <Slider
                 value={volume}
                 onChange={handleVolumeChange}
                 min={0}
                 max={100}
                 step={5}
-                w={80}
+                w={expanded ? 110 : 80}
                 size="xs"
                 color="accent"
                 label={null}
                 aria-label="Volume"
               />
-              <button
-                className={`player-dock-icon-btn${floating ? ' player-dock-icon-btn-active' : ''}`}
-                onClick={() => applyMode(floating ? 'mini' : 'floating')}
-                aria-label={floating ? 'Exit floating corner' : 'Floating corner'}
-                title="Floating corner"
-              >
-                <PictureInPicture2 size={17} />
-              </button>
-            </div>
+              {!expanded && (
+                <ActionIcon
+                  variant={floating ? 'light' : 'subtle'}
+                  color={floating ? 'accent' : 'gray'}
+                  radius="xl"
+                  size={30}
+                  onClick={() => applyMode(floating ? 'mini' : 'floating')}
+                  aria-label={floating ? 'Exit floating corner' : 'Floating corner'}
+                  title="Floating corner (j)"
+                >
+                  <PictureInPicture2 size={17} />
+                </ActionIcon>
+              )}
+            </Group>
+          </div>
+
+          {expanded && (
+            <Stack gap={10} mt="lg">
+              {isTriage && currentTier === TODO_TIER && availableTiers.length > 0 && (
+                <Text fz="xs" c="dimmed">
+                  From your TODO list - pick its tier and the next one starts
+                </Text>
+              )}
+              {availableTiers.length > 0 && (
+                <Group gap={8} wrap="wrap">
+                  <Text fz="xs" fw={700} c="dimmed" tt="uppercase" mr={4} style={{ letterSpacing: 1 }}>
+                    Rate
+                  </Text>
+                  {availableTiers.map((t, i) => (
+                    <TierChip
+                      key={t}
+                      tier={t}
+                      size={34}
+                      active={t === currentTier}
+                      kbd={`⇧${i + 1}`}
+                      onClick={t === currentTier ? undefined : () => onChangeTier(t)}
+                      title={`Move to ${t}`}
+                    />
+                  ))}
+                </Group>
+              )}
+              <Text fz={11} c="dimmed" opacity={0.75}>
+                esc/j minimize · ← → seek 10s · h l navigate · space play/pause · m mute · 0-9 seek %
+                {availableTiers.length > 0 && ` · shift+1-${availableTiers.length} set tier`}
+              </Text>
+            </Stack>
           )}
         </div>
 
-        {expanded && (
-          <>
-            {isTriage && currentTier === TODO_TIER && availableTiers.length > 0 && (
-              <Text fz="xs" c="dimmed" mt="md">
-                From your TODO list - pick its tier and the next one starts
-              </Text>
-            )}
-            {availableTiers.length > 0 && (
-              <Group gap={8} mt="md" wrap="wrap">
-                <Text fz="xs" fw={700} c="dimmed" tt="uppercase" mr={4} style={{ letterSpacing: 1 }}>
-                  Rate
-                </Text>
-
-                {availableTiers.map((t, i) => (
-                  <TierChip
-                    key={t}
-                    tier={t}
-                    size={34}
-                    active={t === currentTier}
-                    kbd={`⇧${i + 1}`}
-                    onClick={t === currentTier ? undefined : () => onChangeTier(t)}
-                    title={`Move to ${t}`}
-                  />
-                ))}
-              </Group>
-            )}
-
-            <p className="focus-hint">
-              esc/j minimize · ← → seek 10s · h l navigate · space play/pause · m mute · 0-9 seek %
-              {availableTiers.length > 0 && ` · shift+1-${availableTiers.length} set tier`}
-            </p>
-          </>
-        )}
-
         {expanded && queue.length > 1 && (
           <aside className="player-queue">
-            <Group justify="space-between" mb={8}>
+            <Group h={30} gap={8} wrap="nowrap" className="player-queue-head">
               <Text fz={11} fw={800} tt="uppercase" c="dimmed" style={{ letterSpacing: 1 }}>
-                Up next
+                Queue
               </Text>
-              <Group gap={6}>
-                {(isShuffling || isTriage) && (
-                  <Badge size="xs" variant="light">
-                    {isTriage ? 'Triage' : 'Shuffle'}
-                  </Badge>
-                )}
-                <Text fz="xs" c="dimmed">
-                  {queueIndex + 1} / {queue.length}
-                </Text>
-              </Group>
+              <Text fz="xs" c="dimmed">
+                {queueIndex + 1} / {queue.length}
+              </Text>
             </Group>
-            <ScrollArea h="min(62vh, 560px)" type="auto" offsetScrollbars>
-              <Stack gap={2}>
-                {queue.slice(queueIndex, queueIndex + 60).map((entry, i) => {
-                  const idx = queueIndex + i;
-                  const isCurrent = i === 0;
-                  return (
-                    <UnstyledButton
-                      key={entry.video.videoId}
-                      onClick={() => onJump?.(idx)}
-                      className="queue-row"
-                      p={6}
-                      style={{
-                        borderRadius: 6,
-                        background: isCurrent ? 'color-mix(in srgb, var(--accent) 14%, transparent)' : undefined,
-                      }}
-                    >
-                      <Group gap={8} wrap="nowrap">
-                        <Image src={entry.video.thumbnail} w={36} h={36} radius={4} fit="cover" alt="" />
-                        <Box style={{ flex: 1, minWidth: 0 }}>
-                          <Text fz="sm" fw={isCurrent ? 700 : 500} c={isCurrent ? 'accent' : undefined} truncate="end">
-                            {entry.video.title}
-                          </Text>
-                          <Text fz="xs" c="dimmed" truncate="end">
-                            {entry.video.channelTitle}
-                          </Text>
-                        </Box>
-                        {(isCurrent ? currentTier ?? entry.tier : entry.tier) && (
-                          <TierChip tier={isCurrent ? currentTier ?? entry.tier : entry.tier} size={20} />
+
+            <Paper p={10} mt={12} radius="md" bg="color-mix(in srgb, var(--accent) 12%, transparent)" withBorder style={{ borderColor: 'color-mix(in srgb, var(--accent) 35%, transparent)' }}>
+              <Text fz={10} fw={800} tt="uppercase" c="accent" mb={6} style={{ letterSpacing: 1 }}>
+                Now playing
+              </Text>
+              <Group gap={10} wrap="nowrap">
+                <Image src={video.thumbnail} w={48} h={48} radius={6} fit="cover" alt="" />
+                <Box style={{ flex: 1, minWidth: 0 }}>
+                  <Text fz="sm" fw={700} lineClamp={2} lh={1.3}>
+                    {video.title}
+                  </Text>
+                  <Text fz="xs" c="dimmed" truncate="end">
+                    {video.channelTitle}
+                  </Text>
+                </Box>
+                {nowTier && <TierChip tier={nowTier} size={22} />}
+              </Group>
+            </Paper>
+
+            <Text fz={11} fw={800} tt="uppercase" c="dimmed" mt="md" mb={6} style={{ letterSpacing: 1 }}>
+              Up next
+            </Text>
+            {upcoming.length === 0 ? (
+              <Text fz="sm" c="dimmed">
+                End of the queue
+              </Text>
+            ) : (
+              <ScrollArea style={{ flex: 1, minHeight: 0 }} type="hover" scrollbarSize={6} offsetScrollbars>
+                <Stack gap={2}>
+                  {upcoming.map((entry, i) => {
+                    const idx = queueIndex + 1 + i;
+                    return (
+                      <Group key={entry.video.videoId} className="queue-row" gap={4} wrap="nowrap" pr={4} style={{ borderRadius: 8 }}>
+                        <UnstyledButton onClick={() => onJump?.(idx)} px={6} py={6} style={{ flex: 1, minWidth: 0 }}>
+                          <Group gap={10} wrap="nowrap">
+                            <Text fz={11} c="dimmed" w={22} ta="right" style={{ flexShrink: 0, fontVariantNumeric: 'tabular-nums' }}>
+                              {idx + 1}
+                            </Text>
+                            <Image src={entry.video.thumbnail} w={40} h={40} radius={6} fit="cover" alt="" />
+                            <Box style={{ flex: 1, minWidth: 0 }}>
+                              <Text fz="sm" fw={500} truncate="end">
+                                {entry.video.title}
+                              </Text>
+                              <Text fz="xs" c="dimmed" truncate="end">
+                                {entry.video.channelTitle}
+                              </Text>
+                            </Box>
+                            {entry.tier && <TierChip tier={entry.tier} size={20} />}
+                          </Group>
+                        </UnstyledButton>
+                        {onRemove && (
+                          <ActionIcon
+                            className="queue-row-remove"
+                            variant="subtle"
+                            color="gray"
+                            radius="xl"
+                            size={26}
+                            onClick={() => onRemove(entry.video.videoId)}
+                            aria-label="Remove from queue"
+                            title="Remove from queue"
+                          >
+                            <X size={14} />
+                          </ActionIcon>
                         )}
                       </Group>
-                    </UnstyledButton>
-                  );
-                })}
-              </Stack>
-            </ScrollArea>
+                    );
+                  })}
+                  {moreCount > 0 && (
+                    <Text fz="xs" c="dimmed" ta="center" py={8}>
+                      + {moreCount} more
+                    </Text>
+                  )}
+                </Stack>
+              </ScrollArea>
+            )}
           </aside>
         )}
       </div>

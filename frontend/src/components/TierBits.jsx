@@ -1,5 +1,7 @@
 import { ActionIcon, Box, Group, Image, Menu, Progress, Text, Tooltip, UnstyledButton } from '@mantine/core';
-import { ArrowDownToLine, ArrowUpRight, ArrowUpToLine, MoreHorizontal, Play } from 'lucide-react';
+import { ArrowDownToLine, ArrowUpRight, ArrowUpToLine, ListEnd, ListStart, MoreHorizontal, Play } from 'lucide-react';
+import { useDispatch } from 'react-redux';
+import { queueSong } from '../queueActions';
 import { TIER_COLORS } from '../tiers';
 import { TIER_INK, songLabel, youtubeUrl } from '../tierUtils';
 
@@ -90,10 +92,18 @@ export function TierMixBar({ tiers, counts, size = 8, onSegmentClick, labels = f
 
 // "Move to" menu shared by board tiles and list rows.
 export function MoveMenu({ video, tier, tiers, onMove, target }) {
+  const dispatch = useDispatch();
   return (
     <Menu position="bottom-end" withinPortal shadow="md" width={210}>
       <Menu.Target>{target}</Menu.Target>
       <Menu.Dropdown onClick={(e) => e.stopPropagation()}>
+        <Menu.Item leftSection={<ListStart size={14} />} onClick={() => dispatch(queueSong(tier, video, 'next'))}>
+          Play next
+        </Menu.Item>
+        <Menu.Item leftSection={<ListEnd size={14} />} onClick={() => dispatch(queueSong(tier, video, 'end'))}>
+          Add to queue
+        </Menu.Item>
+        <Menu.Divider />
         <Menu.Label>Move to</Menu.Label>
         {tiers
           .filter((t) => t !== tier)

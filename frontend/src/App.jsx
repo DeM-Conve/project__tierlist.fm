@@ -55,6 +55,7 @@ import {
 } from './store/tiersSlice';
 import {
   openFocus as openFocusAction,
+  removeFromQueue,
   closeFocus as closeFocusAction,
   minimizePlayer,
   expandPlayer,
@@ -566,6 +567,7 @@ function Layout() {
           queue={activeSequence}
           queueIndex={focusedSeqIndex}
           onJump={jumpToQueueIndex}
+          onRemove={(id) => dispatch(removeFromQueue(id))}
         />
       )}
 

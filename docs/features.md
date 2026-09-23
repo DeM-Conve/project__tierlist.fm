@@ -88,7 +88,8 @@
 ## Video focus modal
 - Click any thumbnail to open a modal with a real, playable embedded YouTube player (via the official IFrame Player API — not a raw iframe), so playback failures (embedding disabled) are detected and shown with a clear fallback + "Open on YouTube" link.
 - Keyboard shortcuts: `Esc` close, `←`/`→` or `h`/`l` (vim-style) to move prev/next, `Shift+1`–`Shift+N` to re-rate the current video (in every player mode - expanded, mini bar or floating - while you're on its board).
-- Expanded view: an **"Up next" queue** beside the video (click any entry to jump to it; shows position and a Shuffle badge), and a backdrop glow in the playing song's tier color.
+- Expanded view: a **queue panel** beside the video, as tall as the player - a pinned "Now playing" card, then the numbered "Up next" list (click any entry to jump to it, hover × to remove it from the queue; shows position and a Shuffle badge) - plus on-screen transport controls (prev, back 10s, play/pause, forward 10s, next, volume) and a backdrop glow in the playing song's tier color.
+- **Play next / Add to queue** (YouTube-Music-style) in every song's "…" menu: puts the song right after the playing one, or at the end of the queue (a song already queued is moved, not duplicated). With nothing playing, it just starts playing in the mini bar.
 - Mini bar: tier chips for the playing song (click to re-rate), next to the volume controls.
 - Navigation walks the whole board in tier order — reaching the end of one tier's videos rolls straight into the next tier instead of stopping.
 - The browsing order is frozen the moment the modal opens, so reassigning a video's tier mid-browse never disturbs where "next" takes you.
