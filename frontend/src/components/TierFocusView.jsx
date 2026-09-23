@@ -17,8 +17,8 @@ import {
   Title,
   UnstyledButton,
 } from '@mantine/core';
-import { ArrowLeft, MoreHorizontal, Play, Search, Shuffle } from 'lucide-react';
-import { TIER_COLORS } from '../tiers';
+import { ArrowLeft, ListTodo, MoreHorizontal, Play, Search, Shuffle } from 'lucide-react';
+import { TIER_COLORS, TODO_TIER } from '../tiers';
 import { moveWithFeedback, useTierDnd } from '../tierActions';
 import { EqualizerMark, MoveMenu, TierChip } from './TierBits';
 import { TIER_INK, indexForPointInList, songLabel, videoMatches } from '../tierUtils';
@@ -130,6 +130,9 @@ export default function TierFocusView({
   const filterRef = useRef(null);
   const items = tierItems[tier] ?? NO_ITEMS;
   const color = TIER_COLORS[tier];
+  // The TODO list is unranked: its page is where songs get their tier
+  // (row chips), and "Play" is a triage session.
+  const isTodo = tier === TODO_TIER;
 
   const q = filter.trim();
   const visible = useMemo(() => items.filter((v) => videoMatches(v, q)), [items, q]);
@@ -178,7 +181,7 @@ export default function TierFocusView({
       <Group justify="space-between" align="flex-end" wrap="wrap" gap="md" mb="md">
         <Group gap="md" wrap="nowrap">
           <Box w={72} h={72} bg={color} style={{ borderRadius: 12, display: 'grid', placeItems: 'center', flexShrink: 0 }}>
-            <Text ff="var(--font-display)" fw={900} fz={30} c={TIER_INK}>
+            <Text ff="var(--font-display)" fw={900} fz={isTodo ? 20 : 30} c={TIER_INK}>
               {tier}
             </Text>
           </Box>
@@ -187,7 +190,9 @@ export default function TierFocusView({
               {tier} <Text span inherit c="dimmed" fw={700}>in {category}</Text>
             </Title>
             <Text c="dimmed" fz="sm">
-              {loading ? 'Loading…' : `${items.length} video${items.length === 1 ? '' : 's'} · ranked top to bottom`}
+              {loading
+                ? 'Loading…'
+                : `${items.length} video${items.length === 1 ? '' : 's'} · ${isTodo ? 'waiting for a tier' : 'ranked top to bottom'}`}
             </Text>
           </Stack>
         </Group>
@@ -195,8 +200,13 @@ export default function TierFocusView({
           <Button variant="default" leftSection={<Shuffle size={15} />} onClick={() => onShuffle(tier)} disabled={!items.length}>
             Shuffle
           </Button>
-          <Button leftSection={<Play size={15} fill="currentColor" />} onClick={() => onPlayFrom(tier)} disabled={!items.length}>
-            Play {tier}
+          <Button
+            leftSection={isTodo ? <ListTodo size={15} /> : <Play size={15} fill="currentColor" />}
+            onClick={() => onPlayFrom(tier)}
+            disabled={!items.length}
+            title={isTodo ? 'Play each song and give it a tier - rating one moves on to the next' : undefined}
+          >
+            {isTodo ? 'Triage' : `Play ${tier}`}
           </Button>
         </Group>
       </Group>
@@ -221,7 +231,11 @@ export default function TierFocusView({
 
       <Group justify="space-between" mb={6} px="sm" wrap="nowrap" gap="sm">
         <Text fz="xs" c="dimmed">
-          {q ? `${visible.length} of ${items.length} shown` : 'Drag to reorder · tier chips move a song'}
+          {q
+            ? `${visible.length} of ${items.length} shown`
+            : isTodo
+              ? 'Click a tier chip to rate a song · click a row to listen first'
+              : 'Drag to reorder · tier chips move a song'}
         </Text>
         <TextInput
           ref={filterRef}

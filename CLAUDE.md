@@ -182,6 +182,11 @@ auto-grouped into a tier board per category.
 - **The tier list is the product's moat** (see `PRODUCT.md`): the Tier Rail
   (`TierRail.jsx`) is always on board pages; board pages render inside `BoardShell`
   in `App.jsx` (rail + shared `PendingChanges` bar, which also owns Shift+P).
+- **TODO is a special, unranked tier** (`tiers.js`: `TODO_TIER`, `BOARD_TIERS` =
+  `TIER_ORDER` + TODO). Use `BOARD_TIERS` for what a board holds/loads/plays/moves
+  between, `TIER_ORDER` for ranking only (duels, dedupe priority, "missing tiers",
+  player Shift+digit rating). Triage (`focusSlice.isTriage`) auto-advances in
+  `tierActions.moveWithFeedback` when the playing to-do song is rated.
 - **Duel ranking uses the Strategy pattern** (`frontend/src/duel/`): multiple
   interchangeable ranking algorithms (`tierAwareMerge` default, `mergeSort`, `elo`)
   behind a common interface, swappable at runtime from the duel screen or persisted as a

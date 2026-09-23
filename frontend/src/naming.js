@@ -1,5 +1,5 @@
 import escapeStringRegexp from 'escape-string-regexp';
-import { TIER_ORDER } from './tiers';
+import { BOARD_TIERS, TODO_TIER } from './tiers';
 
 // Playlist naming template (Settings -> Playlist naming), in the spirit of
 // Immich's storage template: ONE definition that is both
@@ -14,7 +14,7 @@ import { TIER_ORDER } from './tiers';
 
 export const TOKENS = [
   { token: '{category}', label: 'Category', description: 'The board name, e.g. Rap', required: true },
-  { token: '{tier}', label: 'Tier', description: 'T1, T2, T3, TE or TZ', required: true },
+  { token: '{tier}', label: 'Tier', description: 'T1, T2, T3, TE, TZ - or TODO for the board\'s to-do list', required: true },
   { token: '{tag}', label: 'Tag', description: "Optional label, e.g. G in \"[G] Rap T1\" - leave it out if you don't use one", required: false },
 ];
 
@@ -36,7 +36,9 @@ export function normalizeTemplate(template) {
 const TOKEN_PATTERNS = {
   tag: '(?<bracket>\\w+)',
   category: '(?<category>.+?)',
-  tier: `(?<tier>${TIER_ORDER.join('|')})`,
+  // TODO is matched in any case ("Rap todo", "Rap ToDo") - it's a word
+  // people type, unlike the tier codes.
+  tier: `(?<tier>${BOARD_TIERS.filter((t) => t !== TODO_TIER).join('|')}|[Tt][Oo][Dd][Oo])`,
 };
 
 const compiled = new Map();
@@ -78,7 +80,7 @@ export function parseTitle(title, templates) {
   for (const template of templates) {
     const m = compileTemplate(template).exec(title);
     if (m?.groups?.category?.trim()) {
-      return { bracket: m.groups.bracket ?? null, category: m.groups.category.trim(), tier: m.groups.tier, template };
+      return { bracket: m.groups.bracket ?? null, category: m.groups.category.trim(), tier: m.groups.tier.toUpperCase(), template };
     }
   }
   return null;

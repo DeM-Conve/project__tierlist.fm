@@ -1,6 +1,7 @@
 import { Link, useLocation } from 'react-router-dom';
 import {
   ActionIcon,
+  Badge,
   Button,
   CloseButton,
   Group,
@@ -16,7 +17,7 @@ import {
   UnstyledButton,
 } from '@mantine/core';
 import { Home, Keyboard, ListOrdered, LogOut, Search, Settings } from 'lucide-react';
-import { TIER_ORDER } from '../tiers';
+import { TIER_ORDER, TODO_TIER } from '../tiers';
 
 // Each board shows its song total straight from the playlists' own item
 // counts - no per-board fetch needed just to draw the sidebar.
@@ -118,6 +119,7 @@ export default function Sidebar({
               const tiers = tierGroups[category] || {};
               const counts = boardCounts(tiers);
               const total = Object.values(counts).reduce((a, b) => a + b, 0);
+              const todo = tiers[TODO_TIER]?.itemCount ?? 0;
               return (
                 <NavLink
                   key={category}
@@ -130,9 +132,18 @@ export default function Sidebar({
                       <Text size="sm" truncate="end">
                         {category}
                       </Text>
-                      <Text size="xs" c="dimmed">
-                        {total}
-                      </Text>
+                      <Group gap={6} wrap="nowrap">
+                        {todo > 0 && (
+                          <Tooltip label={`${todo} to do - not rated yet`} withArrow>
+                            <Badge size="xs" variant="light" color="gray">
+                              {todo}
+                            </Badge>
+                          </Tooltip>
+                        )}
+                        <Text size="xs" c="dimmed">
+                          {total}
+                        </Text>
+                      </Group>
                     </Group>
                   }
                 />

@@ -1,7 +1,7 @@
 import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
 import { Box, Image, Stack, Text, Tooltip, UnstyledButton } from '@mantine/core';
-import { TIER_COLORS, TIER_ORDER } from '../tiers';
+import { BOARD_TIERS, TIER_COLORS, TODO_TIER } from '../tiers';
 import { selectFocusedVideoData, selectTierGroups } from '../store/selectors';
 import { moveWithFeedback, useTierDnd } from '../tierActions';
 import { EqualizerMark } from './TierBits';
@@ -16,6 +16,8 @@ export const RAIL_WIDTH = 84;
 //   1. a song from this board is playing -> re-rate the playing song
 //   2. otherwise                        -> open that tier
 // It's also a drop target for any dragged tile or row (append to that tier).
+// The board's TODO list, if any, sits at the bottom as a small slot: drop a
+// song there to rate it later, or click it to send the playing song back.
 export default function TierRail({ category, activeTier }) {
   const dispatch = useDispatch();
   const navigate = useNavigate();
@@ -28,7 +30,7 @@ export default function TierRail({ category, activeTier }) {
   const dnd = useTierDnd();
 
   if (!category || !tierGroups[category]) return null;
-  const tiers = TIER_ORDER.filter((t) => tierGroups[category][t]);
+  const tiers = BOARD_TIERS.filter((t) => tierGroups[category][t]);
   // Rating writes into tierItems, so it needs this board to be the loaded one
   // (it still is after leaving it for Home/Settings; not after opening another).
   const loaded = loadedCategory === category;
@@ -80,6 +82,7 @@ export default function TierRail({ category, activeTier }) {
           const isPlayingTier = playingHere?.tier === tier;
           const isOver = dnd.dragOverTier === `rail:${tier}`;
           const isActive = activeTier === tier;
+          const isTodo = tier === TODO_TIER;
           return (
             <Tooltip key={tier} label={action.label} position="left" withArrow multiline maw={240}>
               <UnstyledButton
@@ -91,9 +94,10 @@ export default function TierRail({ category, activeTier }) {
                 className="rail-tier"
                 bg={TIER_COLORS[tier]}
                 style={{
-                  flex: 1,
-                  minHeight: 52,
+                  flex: isTodo ? '0 0 44px' : 1,
+                  minHeight: isTodo ? 44 : 52,
                   maxHeight: 132,
+                  marginTop: isTodo ? 6 : undefined,
                   borderRadius: 8,
                   display: 'flex',
                   flexDirection: 'column',
@@ -108,13 +112,13 @@ export default function TierRail({ category, activeTier }) {
                   opacity: dnd.draggedVideoId && !isOver ? 0.85 : 1,
                 }}
               >
-                <Text ff="var(--font-display)" fw={900} fz={20} lh={1} c={TIER_INK}>
+                <Text ff="var(--font-display)" fw={900} fz={isTodo ? 13 : 20} lh={1} c={TIER_INK}>
                   {tier}
                 </Text>
                 <Text fz={11} fw={700} c={TIER_INK} opacity={0.7} lh={1}>
                   {count}
                 </Text>
-                {playingHere && (
+                {playingHere && !isTodo && (
                   <Text fz={9} fw={700} c={TIER_INK} opacity={0.55} lh={1}>
                     ⇧{i + 1}
                   </Text>

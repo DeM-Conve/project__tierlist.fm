@@ -1,5 +1,5 @@
 import { createSelector } from '@reduxjs/toolkit';
-import { TIER_ORDER, groupByTier } from '../tiers';
+import { BOARD_TIERS, TIER_ORDER, groupByTier } from '../tiers';
 import { parseTitle } from '../naming';
 
 const selectPlaylists = (state) => state.auth.playlists;
@@ -47,13 +47,13 @@ export const selectPendingMoves = createSelector(
   [selectTierItems, selectOriginalTierOf],
   (tierItems, originalTierOf) => {
     const moves = [];
-    for (const tier of TIER_ORDER) {
+    for (const tier of BOARD_TIERS) {
       for (const video of tierItems[tier] || []) {
         const originalTiers = originalTierOf[video.videoId];
         if (!originalTiers) continue;
 
         if (originalTiers.length > 1) {
-          const keepTier = TIER_ORDER.find((t) => originalTiers.includes(t));
+          const keepTier = BOARD_TIERS.find((t) => originalTiers.includes(t));
           if (tier !== keepTier) {
             moves.push({ kind: 'dedupe', video, tier, keptTier: keepTier });
           }
@@ -83,9 +83,10 @@ export const selectDuelTierSizes = createSelector([selectTierItems], (tierItems)
 
 // Flattened across every tier of the current board, in tier order, so
 // "next" can walk off the end of one tier straight into the start of the
-// next one instead of stopping dead at each tier's own boundary.
+// next one instead of stopping dead at each tier's own boundary. TODO comes
+// last. (Duels above stay on TIER_ORDER: a to-do list isn't ranked.)
 export const selectFocusSequence = createSelector([selectTierItems], (tierItems) =>
-  TIER_ORDER.flatMap((t) => (tierItems[t] || []).map((video) => ({ tier: t, video })))
+  BOARD_TIERS.flatMap((t) => (tierItems[t] || []).map((video) => ({ tier: t, video })))
 );
 
 // Looked up by videoId only (not tier) so a shuffle order stays valid even
@@ -132,6 +133,8 @@ export const selectFocusedVideoData = createSelector(
   (index, activeSequence) => (index >= 0 ? activeSequence[index].video : null)
 );
 
+// Rating targets are the ranked tiers only (Shift+1-5 stay T1..TZ); a song
+// goes back to TODO via the Tier Rail, a menu or a drag.
 // Tier reassignment only works while the playing video's board is the one
 // loaded in `tiersSlice.tierItems` (the pills/shift+digit shortcut write
 // there). That stays true on Home / Settings / playlist pages after leaving

@@ -14,7 +14,7 @@ import {
   VolumeX,
   X,
 } from 'lucide-react';
-import { TIER_COLORS } from '../tiers';
+import { TIER_COLORS, TODO_TIER } from '../tiers';
 import { TierChip } from './TierBits';
 import EmbeddedPlayer from './EmbeddedPlayer';
 
@@ -45,6 +45,7 @@ export default function PlayerDock({
   hasPrev,
   hasNext,
   isShuffling,
+  isTriage,
   onStop,
   onMinimize,
   onExpand,
@@ -431,9 +432,9 @@ export default function PlayerDock({
           <div className="focus-info" onClick={!expanded ? onExpand : undefined}>
             <h2>
               {video.title}
-              {isShuffling && expanded && (
+              {(isShuffling || isTriage) && expanded && (
                 <Badge ml="sm" variant="light" size="sm" style={{ verticalAlign: 'middle' }}>
-                  Shuffle
+                  {isTriage ? 'Triage' : 'Shuffle'}
                 </Badge>
               )}
             </h2>
@@ -521,11 +522,17 @@ export default function PlayerDock({
 
         {expanded && (
           <>
+            {isTriage && currentTier === TODO_TIER && availableTiers.length > 0 && (
+              <Text fz="xs" c="dimmed" mt="md">
+                From your TODO list - pick its tier and the next one starts
+              </Text>
+            )}
             {availableTiers.length > 0 && (
               <Group gap={8} mt="md" wrap="wrap">
                 <Text fz="xs" fw={700} c="dimmed" tt="uppercase" mr={4} style={{ letterSpacing: 1 }}>
                   Rate
                 </Text>
+
                 {availableTiers.map((t, i) => (
                   <TierChip
                     key={t}
@@ -554,9 +561,9 @@ export default function PlayerDock({
                 Up next
               </Text>
               <Group gap={6}>
-                {isShuffling && (
+                {(isShuffling || isTriage) && (
                   <Badge size="xs" variant="light">
-                    Shuffle
+                    {isTriage ? 'Triage' : 'Shuffle'}
                   </Badge>
                 )}
                 <Text fz="xs" c="dimmed">

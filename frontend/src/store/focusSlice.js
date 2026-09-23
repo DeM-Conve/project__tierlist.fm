@@ -31,6 +31,9 @@ const focusSlice = createSlice({
     // those controls when this matches the board you're actually viewing.
     focusedCategory: null,
     isShuffling: false,
+    // Working through a board's TODO list: the queue is just the to-do
+    // songs, and rating the playing one moves straight on to the next.
+    isTriage: false,
     // 'expanded' (full-screen), 'mini' (bottom bar), or 'floating' (small
     // corner box) - the three views the dock cycles through, in that order,
     // via the vim-style j/k shortcut (see PlayerDock).
@@ -43,6 +46,7 @@ const focusSlice = createSlice({
       state.focusEntries = entries;
       state.focusedCategory = category;
       state.isShuffling = false;
+      state.isTriage = !!action.payload.triage;
       state.playerMode = 'expanded';
       state.focusedVideo = { tier, videoId };
     },
@@ -52,6 +56,7 @@ const focusSlice = createSlice({
       state.focusEntries = null;
       state.focusedCategory = null;
       state.isShuffling = false;
+      state.isTriage = false;
       state.playerMode = 'expanded';
     },
     minimizePlayer: (state) => {
@@ -69,6 +74,7 @@ const focusSlice = createSlice({
       state.focusEntries = entries;
       state.focusedCategory = category;
       state.isShuffling = true;
+      state.isTriage = false;
       state.playerMode = 'expanded';
       state.focusedVideo = { tier, videoId };
     },

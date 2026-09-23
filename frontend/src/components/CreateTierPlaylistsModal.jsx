@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { useSelector } from 'react-redux';
 import { Alert, Autocomplete, Button, Chip, Group, Modal, SegmentedControl, Stack, Text, TextInput } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
-import { TIER_ORDER } from '../tiers';
+import { BOARD_TIERS } from '../tiers';
 import { normalizeTemplate, parseTitle, renderTitle } from '../naming';
 import { selectTierGroups, selectTierPlaylists } from '../store/selectors';
 import { useCreatePlaylistsMutation } from '../api/queries';
@@ -10,8 +10,9 @@ import { TierChip } from './TierBits';
 
 // Creates tier playlists on YouTube, named by the naming template:
 //   - from Home: a brand-new tier list (category + any tiers)
-//   - from a board: just its missing tiers (category fixed)
-export default function CreateTierPlaylistsModal({ opened, onClose, category: fixedCategory, onCreated }) {
+//   - from a board: just its missing tiers, or its TODO list (category
+//     fixed; `initialTiers` = what to preselect)
+export default function CreateTierPlaylistsModal({ opened, onClose, category: fixedCategory, initialTiers, onCreated }) {
   const template = useSelector((s) => s.naming.template);
   const tierGroups = useSelector(selectTierGroups);
   const tierPlaylists = useSelector(selectTierPlaylists);
@@ -28,14 +29,16 @@ export default function CreateTierPlaylistsModal({ opened, onClose, category: fi
 
   const [category, setCategory] = useState('');
   const [bracket, setBracket] = useState(boardBracket || brackets[0] || '');
-  const [tiers, setTiers] = useState(() => TIER_ORDER.filter((t) => !existingTiers.includes(t)));
+  const [tiers, setTiers] = useState(() =>
+    (initialTiers ?? BOARD_TIERS).filter((t) => !existingTiers.includes(t))
+  );
   const [privacy, setPrivacy] = useState('private');
 
   const name = (fixedCategory ?? category).trim();
   const usesBracket = normalizeTemplate(template).includes('{tag}');
   const titles = tiers
     .filter((t) => !existingTiers.includes(t))
-    .sort((a, b) => TIER_ORDER.indexOf(a) - TIER_ORDER.indexOf(b))
+    .sort((a, b) => BOARD_TIERS.indexOf(a) - BOARD_TIERS.indexOf(b))
     .map((tier) => ({ tier, title: renderTitle(template, { bracket: bracket.trim() || null, category: name, tier }) }));
   const exists = !fixedCategory && name && tierGroups[name];
   // Safety net: every name we create must be recognised by the template
@@ -63,7 +66,7 @@ export default function CreateTierPlaylistsModal({ opened, onClose, category: fi
       opened={opened}
       onClose={onClose}
       centered
-      title={<Text fw={800}>{fixedCategory ? `Add tiers to ${fixedCategory}` : 'New tier list'}</Text>}
+      title={<Text fw={800}>{fixedCategory ? `Add to ${fixedCategory}` : 'New tier list'}</Text>}
     >
       <Stack gap="md">
         {!fixedCategory && (
@@ -92,7 +95,7 @@ export default function CreateTierPlaylistsModal({ opened, onClose, category: fi
           </Text>
           <Chip.Group multiple value={tiers} onChange={setTiers}>
             <Group gap={6}>
-              {TIER_ORDER.map((t) => (
+              {BOARD_TIERS.map((t) => (
                 <Chip key={t} value={t} disabled={existingTiers.includes(t)} size="sm">
                   {t}
                   {existingTiers.includes(t) ? ' (exists)' : ''}

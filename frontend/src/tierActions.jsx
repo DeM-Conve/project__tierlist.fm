@@ -9,6 +9,7 @@ import {
   setDragOverTier,
 } from './store/tiersSlice';
 import { setFocusedVideo } from './store/focusSlice';
+import { TODO_TIER } from './tiers';
 
 // Every tier edit in the app (drag, tile menu, row chips, bulk bar, Tier
 // Rail, player tier pills/Shift+digit, duel) goes through these
@@ -30,6 +31,22 @@ function resyncFocusedTier(dispatch, getState) {
   if (!fv || focus.focusedCategory !== view.currentCategory) return;
   const tier = findTierOf(tiers.tierItems, fv.videoId);
   if (tier && tier !== fv.tier) dispatch(setFocusedVideo({ tier, videoId: fv.videoId }));
+}
+
+// Triage session (see focusSlice.isTriage): once the playing to-do song has
+// been given a tier - from the player, the rail, a menu, anywhere - move on
+// to the next song in the TODO queue.
+function advanceTriage(dispatch, getState, moves) {
+  const { focus } = getState();
+  const fv = focus.focusedVideo;
+  if (!focus.isTriage || !fv) return;
+  const rated = moves.some((m) => m.videoId === fv.videoId && m.fromTier === TODO_TIER && m.toTier !== TODO_TIER);
+  if (!rated) return;
+  // Skip songs already rated some other way (e.g. dragged on the board).
+  const todo = new Set((getState().tiers.tierItems[TODO_TIER] || []).map((v) => v.videoId));
+  const queue = focus.focusQueue || [];
+  const nextId = queue.slice(queue.indexOf(fv.videoId) + 1).find((id) => todo.has(id));
+  if (nextId) dispatch(setFocusedVideo({ tier: TODO_TIER, videoId: nextId }));
 }
 
 function showToast(dispatch, message) {
@@ -84,6 +101,7 @@ export const moveWithFeedback = (moves, { quiet = false } = {}) => (dispatch, ge
   const message = describe(real, getState().tiers.tierItems);
   dispatch(moveVideos({ moves: real }));
   resyncFocusedTier(dispatch, getState);
+  advanceTriage(dispatch, getState, real);
   if (!quiet) showToast(dispatch, message);
 };
 

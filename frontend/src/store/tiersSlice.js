@@ -128,6 +128,22 @@ const tiersSlice = createSlice({
         }
       });
     },
+    // A song filed from the Inbox is already on YouTube, so it joins the
+    // loaded board's draft *and* its baseline - it's not a pending change.
+    addSyncedVideo: (state, action) => {
+      const { tier, video } = action.payload;
+      state.tierItems[tier] = [...(state.tierItems[tier] || []), video];
+      state.originalTierItems[tier] = [...(state.originalTierItems[tier] || []), video];
+      state.originalTierOf[video.videoId] = [...(state.originalTierOf[video.videoId] || []), tier];
+    },
+    // Undo of addSyncedVideo (the playlist item was deleted again).
+    removeSyncedVideo: (state, action) => {
+      const { tier, videoId } = action.payload;
+      state.tierItems[tier] = (state.tierItems[tier] || []).filter((v) => v.videoId !== videoId);
+      state.originalTierItems[tier] = (state.originalTierItems[tier] || []).filter((v) => v.videoId !== videoId);
+      state.originalTierOf[videoId] = (state.originalTierOf[videoId] || []).filter((t) => t !== tier);
+      if (!state.originalTierOf[videoId].length) delete state.originalTierOf[videoId];
+    },
     discardTierChanges: (state) => {
       state.tierItems = JSON.parse(JSON.stringify(state.originalTierItems));
       state.syncStatus = 'idle';
@@ -151,10 +167,11 @@ const tiersSlice = createSlice({
       pushUndo(state);
       action.payload.moves.forEach((m) => applyMove(state, m));
     },
-    // Replaces the whole draft as one undoable edit (a finished duel run).
+    // Refills the ranked tiers as one undoable edit (a finished duel run).
+    // Merged, not replaced: the result doesn't include the unranked TODO.
     applyTierOrder: (state, action) => {
       pushUndo(state);
-      state.tierItems = action.payload;
+      state.tierItems = { ...state.tierItems, ...action.payload };
     },
     undoLastEdit: (state) => {
       const previous = state.undoStack.pop();
@@ -169,6 +186,8 @@ export const {
   setTierForCategory,
   setTierItems,
   applySyncedMoves,
+  addSyncedVideo,
+  removeSyncedVideo,
   discardTierChanges,
   setSyncStatus,
   setDraggedVideoId,

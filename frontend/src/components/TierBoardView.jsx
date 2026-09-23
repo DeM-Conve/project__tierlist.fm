@@ -17,8 +17,8 @@ import {
   UnstyledButton,
 } from '@mantine/core';
 import { useElementSize, useMediaQuery } from '@mantine/hooks';
-import { ChevronRight, Play, Plus, Search, Shuffle, Swords } from 'lucide-react';
-import { TIER_COLORS, TIER_ORDER } from '../tiers';
+import { ChevronRight, ListTodo, Play, Plus, Search, Shuffle, Swords } from 'lucide-react';
+import { BOARD_TIERS, TIER_COLORS, TIER_ORDER, TODO_TIER } from '../tiers';
 import { moveWithFeedback, useTierDnd } from '../tierActions';
 import { TierMixBar, TierTile } from './TierBits';
 import { TIER_INK, indexForPointInFlow, videoMatches } from '../tierUtils';
@@ -55,6 +55,8 @@ function TierRow({
   const [overIndex, setOverIndex] = useState(null);
   const isOver = dnd.dragOverTier === tier;
   const color = TIER_COLORS[tier];
+  const isTodo = tier === TODO_TIER;
+  const playLabel = isTodo ? 'Triage: play and rate one by one' : `Play from ${tier}`;
 
   const shown = searchActive ? items?.filter((v) => matchedKeys.has(`${tier}:${v.videoId}`)) : items;
   const total = shown?.length ?? 0;
@@ -109,7 +111,7 @@ function TierRow({
           padding: '6px 0',
         }}
       >
-        <Text ff="var(--font-display)" fw={900} fz={size < 64 ? 18 : 22} lh={1} c={TIER_INK}>
+        <Text ff="var(--font-display)" fw={900} fz={(size < 64 ? 18 : 22) * (isTodo ? 0.7 : 1)} lh={1} c={TIER_INK}>
           {tier}
         </Text>
         {!loading && (
@@ -119,7 +121,7 @@ function TierRow({
         )}
         {!loading && items?.length > 0 && (
           <Group gap={0} mt={2} wrap="nowrap">
-            <Tooltip label={`Play from ${tier}`} withArrow>
+            <Tooltip label={playLabel} withArrow>
               <ActionIcon
                 component="span"
                 variant="transparent"
@@ -129,7 +131,7 @@ function TierRow({
                   e.stopPropagation();
                   onPlayFrom(tier);
                 }}
-                aria-label={`Play from ${tier}`}
+                aria-label={playLabel}
               >
                 <Play size={13} fill="currentColor" />
               </ActionIcon>
@@ -169,7 +171,11 @@ function TierRow({
               }}
             >
               <Text fz="xs" c="dimmed">
-                {searchActive ? 'No matches in this tier' : 'Empty - drop videos here'}
+                {searchActive
+                  ? 'No matches in this tier'
+                  : isTodo
+                    ? 'Nothing to do - drop songs here to rate them later'
+                    : 'Empty - drop videos here'}
               </Text>
             </Box>
           )}
@@ -261,14 +267,19 @@ export default function TierBoardView({
   const isNarrow = useMediaQuery('(max-width: 62em)');
   const tileSize = isNarrow ? 64 : 88; // square; big enough to print the song name on
 
+  // `tiers` = the ranked rows; `boardTiers` adds the TODO list when the
+  // board has one (it's a move target everywhere, but not ranked/counted).
   const tiers = TIER_ORDER.filter((t) => tierGroups[category]?.[t]);
-  const anyLoading = boardLoading || tiers.some((t) => tierLoading[t]);
+  const hasTodo = !!tierGroups[category]?.[TODO_TIER];
+  const boardTiers = BOARD_TIERS.filter((t) => tierGroups[category]?.[t]);
+  const anyLoading = boardLoading || boardTiers.some((t) => tierLoading[t]);
   // Before the playlists list itself has loaded we don't even know which
   // tiers this board has - show a neutral placeholder board, not "0 tiers".
   const unknownTiers = tiers.length === 0 && anyLoading;
   const counts = Object.fromEntries(tiers.map((t) => [t, tierItems[t]?.length ?? 0]));
   const total = tiers.reduce((sum, t) => sum + counts[t], 0);
-  const hasVideos = total > 0;
+  const todoCount = tierItems[TODO_TIER]?.length ?? 0;
+  const hasVideos = total + todoCount > 0;
   const pendingRemovalKeys = useMemo(
     () => new Set(pendingMoves.filter((m) => m.kind === 'dedupe').map((m) => `${m.tier}:${m.video.videoId}`)),
     [pendingMoves]
@@ -291,7 +302,7 @@ export default function TierBoardView({
 
   const searchableEntries = useMemo(() => {
     const list = [];
-    TIER_ORDER.forEach((t) => {
+    BOARD_TIERS.forEach((t) => {
       if (!tierGroups[category]?.[t]) return;
       (tierItems[t] || []).forEach((video) => list.push({ tier: t, video }));
     });
@@ -397,11 +408,20 @@ export default function TierBoardView({
             {category}
           </Title>
           <Text c="dimmed" fz="sm">
-            {anyLoading ? 'Loading videos…' : `${total} videos · ${tiers.length} tiers`}
+            {anyLoading
+              ? 'Loading videos…'
+              : `${total} videos · ${tiers.length} tiers${hasTodo ? ` · ${todoCount} to do` : ''}`}
           </Text>
         </Stack>
 
         <Group gap="xs" wrap="wrap">
+          {todoCount > 0 && (
+            <Tooltip label="Play the TODO list and give each song a tier - rating one moves on to the next" withArrow multiline maw={260}>
+              <Button variant="light" leftSection={<ListTodo size={15} />} onClick={() => onPlayFrom(TODO_TIER)}>
+                Triage {todoCount}
+              </Button>
+            </Tooltip>
+          )}
           <Tooltip label="Search this board" withArrow>
             <Button
               variant="default"
@@ -419,7 +439,7 @@ export default function TierBoardView({
             </Button>
           </Tooltip>
           <Button.Group>
-            <Button leftSection={<Play size={15} fill="currentColor" />} onClick={() => onPlayFrom(tiers[0])} disabled={!hasVideos}>
+            <Button leftSection={<Play size={15} fill="currentColor" />} onClick={() => onPlayFrom(boardTiers[0])} disabled={!hasVideos}>
               Play
             </Button>
             <Tooltip label="Shuffle the whole board" withArrow>
@@ -450,12 +470,34 @@ export default function TierBoardView({
         </Paper>
       )}
 
+      {hasTodo && !unknownTiers && (
+        <Paper withBorder radius="md" mb="md" style={{ overflow: 'hidden', borderTop: 'none' }} bg="var(--surface)">
+          <TierRow
+            tier={TODO_TIER}
+            tiers={boardTiers}
+            items={tierItems[TODO_TIER]}
+            loading={tierLoading[TODO_TIER]}
+            size={tileSize}
+            searchActive={searchActive}
+            matchedKeys={matchedKeys}
+            activeMatchKey={activeMatchKey}
+            playingVideoId={playingVideoId}
+            pendingRemovalKeys={pendingRemovalKeys}
+            onPlay={onPlay}
+            onPlayFrom={onPlayFrom}
+            onShuffle={onShufflePlay}
+            onOpenTier={onOpenTier}
+            onMove={move}
+          />
+        </Paper>
+      )}
+
       <Paper withBorder radius="md" style={{ overflow: 'hidden', borderTop: 'none', display: unknownTiers ? 'none' : undefined }} bg="var(--surface)">
         {tiers.map((t) => (
           <TierRow
             key={t}
             tier={t}
-            tiers={tiers}
+            tiers={boardTiers}
             items={tierItems[t]}
             loading={tierLoading[t]}
             size={tileSize}
@@ -473,11 +515,32 @@ export default function TierBoardView({
         ))}
       </Paper>
 
-      {!anyLoading && tiers.length > 0 && tiers.length < TIER_ORDER.length && (
-        <Group justify="center" mt="sm">
-          <Button variant="subtle" color="gray" size="compact-sm" leftSection={<Plus size={14} />} onClick={onAddMissingTiers}>
-            Add missing tiers ({TIER_ORDER.filter((t) => !tiers.includes(t)).join(', ')})
-          </Button>
+      {!anyLoading && tiers.length > 0 && (tiers.length < TIER_ORDER.length || !hasTodo) && (
+        <Group justify="center" mt="sm" gap="xs">
+          {tiers.length < TIER_ORDER.length && (
+            <Button
+              variant="subtle"
+              color="gray"
+              size="compact-sm"
+              leftSection={<Plus size={14} />}
+              onClick={() => onAddMissingTiers(TIER_ORDER.filter((t) => !tiers.includes(t)))}
+            >
+              Add missing tiers ({TIER_ORDER.filter((t) => !tiers.includes(t)).join(', ')})
+            </Button>
+          )}
+          {!hasTodo && (
+            <Tooltip label="A playlist for songs you haven't given a tier yet" withArrow>
+              <Button
+                variant="subtle"
+                color="gray"
+                size="compact-sm"
+                leftSection={<ListTodo size={14} />}
+                onClick={() => onAddMissingTiers([TODO_TIER])}
+              >
+                Add a TODO list
+              </Button>
+            </Tooltip>
+          )}
         </Group>
       )}
 

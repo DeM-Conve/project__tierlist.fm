@@ -1,6 +1,6 @@
 import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from './client';
-import { TIER_ORDER } from '../tiers';
+import { BOARD_TIERS } from '../tiers';
 
 export function useAuthStatusQuery() {
   return useQuery({
@@ -32,7 +32,7 @@ export function usePlaylistItemsQuery(playlistId) {
 // Each is cached by playlist id, so re-visiting a board (or a duel) that's
 // still fresh serves instantly from cache instead of refetching.
 export function useTierBoardQueries(category, tiers) {
-  const presentTiers = tiers ? TIER_ORDER.filter((t) => tiers[t]) : [];
+  const presentTiers = tiers ? BOARD_TIERS.filter((t) => tiers[t]) : [];
 
   const results = useQueries({
     queries: presentTiers.map((t) => ({
@@ -117,5 +117,100 @@ export function useSaveSettingsMutation() {
       const res = await api.put('/api/settings', settings, { headers });
       return { settings: res.data, etag: res.headers.etag ?? null };
     },
+  });
+}
+
+// ---- Inbox ---------------------------------------------------------------
+
+// The account's ~200 most recent likes (newest first) - the Inbox's source.
+export function useLikesQuery(enabled) {
+  return useQuery({
+    queryKey: ['likes'],
+    queryFn: async () => (await api.get('/api/likes')).data,
+    enabled,
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
+// Video ids the user marked "Not a song" (Postgres `inbox_dismissal`).
+export function useDismissedQuery(enabled) {
+  return useQuery({
+    queryKey: ['inbox-dismissed'],
+    queryFn: async () => (await api.get('/api/inbox/dismissed')).data,
+    enabled,
+    staleTime: Infinity,
+  });
+}
+
+// Every tier playlist's items, across all boards - what the Inbox checks a
+// like against ("already filed somewhere?") and learns artist -> board from.
+// Same query keys as the boards' own, so opening a board afterwards is instant.
+export function useAllTierItemsQueries(tierPlaylists) {
+  const results = useQueries({
+    queries: (tierPlaylists ?? []).map((p) => ({
+      queryKey: ['playlist-items', p.id],
+      queryFn: async () => (await api.get(`/api/playlists/${p.id}/items`)).data,
+      staleTime: 5 * 60 * 1000,
+    })),
+  });
+  const loaded = results.filter((r) => r.data).length;
+  return {
+    total: tierPlaylists?.length ?? 0,
+    loaded,
+    isLoading: !tierPlaylists || loaded < tierPlaylists.length,
+    itemsByPlaylist: Object.fromEntries((tierPlaylists ?? []).map((p, i) => [p.id, results[i]?.data])),
+  };
+}
+
+// One video's details for a pasted link; cached per id.
+export function useFetchVideo() {
+  const queryClient = useQueryClient();
+  return (videoId) =>
+    queryClient.fetchQuery({
+      queryKey: ['video', videoId],
+      queryFn: async () => (await api.get(`/api/videos/${videoId}`)).data,
+      staleTime: Infinity,
+    });
+}
+
+// Files a video straight into a tier playlist on YouTube; resolves to the new
+// item (with its playlistItem `id`, which undo deletes). Patches that
+// playlist's cached items in place instead of refetching all of it.
+export function useAddToPlaylistMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ playlistId, videoId }) =>
+      (await api.post(`/api/playlists/${playlistId}/items`, { videoId })).data,
+    onSuccess: (item, { playlistId, video }) => {
+      queryClient.setQueryData(['playlist-items', playlistId], (old) =>
+        old ? [...old, { ...video, ...item, channelTitle: item.channelTitle ?? video.channelTitle }] : old
+      );
+      queryClient.invalidateQueries({ queryKey: ['playlists'] }); // item counts
+    },
+  });
+}
+
+export function useRemovePlaylistItemMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ itemId }) => (await api.delete(`/api/playlist-items/${itemId}`)).data,
+    onSuccess: (_, { playlistId, itemId }) => {
+      queryClient.setQueryData(['playlist-items', playlistId], (old) => old?.filter((v) => v.id !== itemId));
+      queryClient.invalidateQueries({ queryKey: ['playlists'] });
+    },
+  });
+}
+
+// "Not a song" / its undo - optimistic, so the card leaves instantly.
+export function useDismissMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ videoId, restore }) =>
+      restore ? api.delete(`/api/inbox/dismissed/${videoId}`) : api.put(`/api/inbox/dismissed/${videoId}`),
+    onMutate: ({ videoId, restore }) =>
+      queryClient.setQueryData(['inbox-dismissed'], (old = []) =>
+        restore ? old.filter((id) => id !== videoId) : [videoId, ...old]
+      ),
+    onError: () => queryClient.invalidateQueries({ queryKey: ['inbox-dismissed'] }),
   });
 }

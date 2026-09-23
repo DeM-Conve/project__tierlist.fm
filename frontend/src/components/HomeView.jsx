@@ -18,7 +18,7 @@ import {
 } from '@mantine/core';
 import { EyeOff, Plus, Search, Swords } from 'lucide-react';
 import CreateTierPlaylistsModal from './CreateTierPlaylistsModal';
-import { TIER_COLORS, TIER_ORDER } from '../tiers';
+import { BOARD_TIERS, TIER_COLORS } from '../tiers';
 import { EqualizerMark, TierChip } from './TierBits';
 import { TIER_INK } from '../tierUtils';
 
@@ -26,7 +26,7 @@ import { TIER_INK } from '../tierUtils';
 // videos it holds - recognisably "a tier list" at a glance, built only from
 // the playlists' own metadata (no per-board fetch).
 function BoardCard({ category, tiers, onOpen, onDuel }) {
-  const present = TIER_ORDER.filter((t) => tiers[t]);
+  const present = BOARD_TIERS.filter((t) => tiers[t]);
   const counts = Object.fromEntries(present.map((t) => [t, tiers[t].itemCount ?? 0]));
   const total = present.reduce((n, t) => n + counts[t], 0);
   const max = Math.max(1, ...present.map((t) => counts[t]));

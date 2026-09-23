@@ -6,6 +6,7 @@ import focusReducer from './focusSlice';
 import appearanceReducer from './appearanceSlice';
 import namingReducer from './namingSlice';
 import prefsReducer from './prefsSlice';
+import inboxReducer from './inboxSlice';
 import { SETTINGS, setSetting } from '../settings';
 
 export const store = configureStore({
@@ -17,6 +18,7 @@ export const store = configureStore({
     appearance: appearanceReducer,
     naming: namingReducer,
     prefs: prefsReducer,
+    inbox: inboxReducer,
   },
 });
 

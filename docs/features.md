@@ -27,7 +27,7 @@
 - Footer: Settings, Keyboard shortcuts (`?`), Log out. On narrow screens the sidebar is a drawer opened from a burger button.
 
 ## Tier boards (the tier list)
-- Playlists named `[G]/[GA]/[OG] <Category> T1/T2/T3/TE/TZ` are auto-grouped into a per-category tier board.
+- Playlists named `[G]/[GA]/[OG] <Category> T1/T2/T3/TE/TZ` are auto-grouped into a per-category tier board (plus an optional `<Category> TODO` list - see below).
 - **Whole board on one screen**: one compact row per tier; each row shows as many square album-art tiles as fit on one line and folds the rest into a **"+N show all"** tile - so a tier of hundreds never pushes the rest of the board off screen.
 - Every tile prints its **song name** (and the artist, on desktop) over the bottom of the cover, so songs sharing one album cover are tellable apart without hovering. Names come from the video title with the "(Official Video)"/"[Lyrics]"/"| Album" noise stripped; "Artist - Song" titles are split into song + artist, otherwise the channel is the artist. Tiles stay square (88px desktop, 64px phone; one-line name on phones).
 - Each row's colored label shows the tier, its count (or `matches/total` while searching), **Play from this tier** and **Shuffle this tier**; clicking the label, the "+N" tile, or the row's `›` opens that tier's full list.
@@ -37,6 +37,14 @@
 - Loading rows show Mantine `Skeleton`s; empty rows show a drop target.
 - While the playlists list itself is still loading (right after login / a refresh), the sidebar and the board show skeleton placeholders instead of "0 tier lists" / "0 videos · 0 tiers".
 - Vim-style `/` search (also the Find button): `/` opens a find box at the top of the screen (the `/` is part of the box's text - deleting it cancels), each row filters to its matches (and wraps to show all of them), `Enter`/`n` next match, `Shift+Enter`/`N` previous, `Enter` on a single match plays it, `Esc` closes. The active match is scrolled into view and highlighted. Matches song title, channel **and artist name**; every word must match, in any order, ignoring case and accents (`krsna makasam`, `beyonce`).
+
+## TODO list (songs waiting for a tier)
+- A board can have a **TODO playlist** named by the template with `TODO` as the tier (`[G] Rap TODO`, `Rap TODO`; `todo`/`ToDo` also match). It's the board's inbox: save songs there on YouTube, then decide their tier here.
+- On the board it's its own row **above the tiers** (neutral grey, "N to do" in the header); it's excluded from the tier-mix bar, the "N videos" total and duels (it isn't ranked). Every move menu, row chip set, tier tab and the Tier Rail (a small TODO slot at the bottom) include it, so a song can be sent back to TODO too.
+- **Triage** (header button, the TODO row's play button, the TODO page's button, or the palette's "Triage the <board> TODO list"): plays the TODO songs in order; giving the playing song a tier - player chips / `Shift+1-5`, the rail, a menu, a drag - moves it and starts the next to-do song (songs already rated some other way are skipped). The player shows a "Triage" badge.
+- The TODO tier page (`/tier/<board>/t/TODO`) is the list view of the same thing: click a row's tier chip to rate it.
+- If a song is both in TODO and a real tier, the rated copy wins and the TODO copy is staged as a duplicate removal.
+- A board without one shows **Add a TODO list** (creates the playlist, named by the template); New tier list can create it too. The sidebar shows each board's to-do count as a small grey badge.
 
 ## Tier Rail
 - A permanent strip of the board's tiers down the right edge of the tier list and tier pages (desktop), with live counts. **Global like the player:** while a song plays, the rail stays on Home, Settings and playlist pages too, showing the playing song's board so you can still rate it there (hidden only on the duel screen). One click does the most useful thing available: **re-rate the playing song** into that tier (when it's from this board; the playing song's art sits on its current tier, with `⇧1-5` hints) → otherwise **open that tier**. The header says which mode it's in ("Rate" / "Tiers").

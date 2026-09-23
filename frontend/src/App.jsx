@@ -17,7 +17,7 @@ import { Menu as MenuIcon } from 'lucide-react';
 import { useDisclosure, useHotkeys } from '@mantine/hooks';
 import { useProgress } from '@bprogress/react';
 import './App.css';
-import { TIER_ORDER } from './tiers';
+import { BOARD_TIERS, TODO_TIER } from './tiers';
 import Sidebar from './components/Sidebar';
 import HomeView from './components/HomeView';
 import TierFocusView from './components/TierFocusView';
@@ -201,6 +201,7 @@ function Layout() {
   const tierPlaylists = useSelector(selectTierPlaylists);
   const focusedVideo = useSelector((s) => s.focus.focusedVideo);
   const isShuffling = useSelector((s) => s.focus.isShuffling);
+  const isTriage = useSelector((s) => s.focus.isTriage);
   const playerMode = useSelector((s) => s.focus.playerMode);
 
   const tierGroups = useSelector(selectTierGroups);
@@ -287,8 +288,10 @@ function Layout() {
   }
 
   // "Play from T2": opens the dock on that tier's first video, with the
-  // normal whole-board order, so it rolls on into the next tiers.
+  // normal whole-board order, so it rolls on into the next tiers. Playing
+  // the TODO list is always a triage session.
   function playFrom(tier) {
+    if (tier === TODO_TIER) return startTriage();
     const first = focusSequence.find((e) => e.tier === tier);
     if (first) openFocus(first.tier, first.video.videoId);
   }
@@ -309,6 +312,23 @@ function Layout() {
         queue: focusSequence.map((e) => e.video.videoId),
         entries: focusSequence,
         category: currentCategory,
+      })
+    );
+  }
+
+  // Triage: play the board's TODO list in order; rating the playing song
+  // (rail, chips, Shift+digit) moves it out of TODO and on to the next one.
+  function startTriage() {
+    const todo = focusSequence.filter((e) => e.tier === TODO_TIER);
+    if (todo.length === 0) return;
+    dispatch(
+      openFocusAction({
+        tier: TODO_TIER,
+        videoId: todo[0].video.videoId,
+        queue: todo.map((e) => e.video.videoId),
+        entries: focusSequence,
+        category: currentCategory,
+        triage: true,
       })
     );
   }
@@ -390,7 +410,15 @@ function Layout() {
       action: () => navigate('/'),
     });
     if (currentCategory) {
-      for (const t of TIER_ORDER.filter((x) => tierGroups[currentCategory]?.[x])) {
+      if (tierGroups[currentCategory]?.[TODO_TIER]) {
+        list.push({
+          id: 'action-triage',
+          section: 'Actions',
+          label: `Triage the ${currentCategory} TODO list`,
+          action: () => startTriage(),
+        });
+      }
+      for (const t of BOARD_TIERS.filter((x) => tierGroups[currentCategory]?.[x])) {
         list.push({
           id: `open-tier-${t}`,
           section: 'Tiers',
@@ -421,7 +449,7 @@ function Layout() {
     }
     return list;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tierCategories, tierPlaylists, currentCategory, pendingMoves, tierGroups]);
+  }, [tierCategories, tierPlaylists, currentCategory, pendingMoves, tierGroups, focusSequence]);
 
   return (
     <div className="app-shell">
@@ -476,6 +504,7 @@ function Layout() {
           hasPrev={focusedSeqIndex > 0}
           hasNext={focusedSeqIndex < activeSequence.length - 1}
           isShuffling={isShuffling}
+          isTriage={isTriage}
           onStop={() => dispatch(closeFocusAction())}
           onMinimize={() => dispatch(minimizePlayer())}
           onExpand={() => dispatch(expandPlayer())}
@@ -521,7 +550,7 @@ function useBoardPage(category) {
   }, [category, playlists, tierGroups, navigate]);
 
   const { isLoading } = useLoadTierBoard(category, tierGroups[category]);
-  const tiers = TIER_ORDER.filter((t) => tierGroups[category]?.[t]);
+  const tiers = BOARD_TIERS.filter((t) => tierGroups[category]?.[t]);
   const tierLoading = useMemo(
     () => (isLoading ? Object.fromEntries(tiers.map((t) => [t, true])) : {}),
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -622,13 +651,19 @@ function TierBoardPage() {
   const pendingMoves = useSelector(selectPendingMoves);
   const playingVideoId = useSelector(selectPlayingVideoIdOnBoard);
   const { tierGroups, tierLoading, isLoading } = useBoardPage(category);
-  const [addingTiers, setAddingTiers] = useState(false);
+  // null, or which tiers the "create playlists" modal should preselect.
+  const [addingTiers, setAddingTiers] = useState(null);
   const base = `/tier/${encodeURIComponent(category)}`;
 
   return (
     <BoardShell>
       {addingTiers && (
-        <CreateTierPlaylistsModal opened category={category} onClose={() => setAddingTiers(false)} />
+        <CreateTierPlaylistsModal
+          opened
+          category={category}
+          initialTiers={addingTiers}
+          onClose={() => setAddingTiers(null)}
+        />
       )}
       <TierBoardView
         category={category}
@@ -643,7 +678,7 @@ function TierBoardPage() {
         onShufflePlay={startShufflePlay}
         onStartDuel={() => navigate(`${base}/duel`)}
         onOpenTier={(t) => navigate(`${base}/t/${t}`)}
-        onAddMissingTiers={() => setAddingTiers(true)}
+        onAddMissingTiers={(tiers) => setAddingTiers(tiers)}
       />
     </BoardShell>
   );

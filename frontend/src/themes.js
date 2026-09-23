@@ -9,7 +9,7 @@ extend([mixPlugin]);
 // A look is three independent choices, all picked in Settings -> Appearance:
 //   THEMES        - the chrome (backgrounds, surfaces, borders, text), dark or light
 //   ACCENTS       - buttons / active states / rings (works with any theme)
-//   TIER_PALETTES - the T1..TZ colors
+//   TIER_PALETTES - the T1..TZ colors (+ a neutral TODO)
 //
 // buildAppearance() turns a choice into (a) CSS variables set on <html>
 // (--bg, --surface, --accent, --tier-t1, ...) that every component and
@@ -106,15 +106,15 @@ export const ACCENTS = {
 export const TIER_PALETTES = {
   vivid: {
     label: 'Vivid',
-    colors: { T1: '#ff5a5f', T2: '#ff9f43', T3: '#ffd43b', TE: '#7bd88f', TZ: '#4dabf7' },
+    colors: { T1: '#ff5a5f', T2: '#ff9f43', T3: '#ffd43b', TE: '#7bd88f', TZ: '#4dabf7', TODO: '#c3c8d2' },
   },
   classic: {
     label: 'TierMaker classic',
-    colors: { T1: '#ff7f7f', T2: '#ffbf7f', T3: '#ffdf7f', TE: '#bfff7f', TZ: '#7fdfff' },
+    colors: { T1: '#ff7f7f', T2: '#ffbf7f', T3: '#ffdf7f', TE: '#bfff7f', TZ: '#7fdfff', TODO: '#d4d4d4' },
   },
   heat: {
     label: 'Heat',
-    colors: { T1: '#e8503a', T2: '#e8823a', T3: '#e8b93a', TE: '#b9c93a', TZ: '#4caf6e' },
+    colors: { T1: '#e8503a', T2: '#e8823a', T3: '#e8b93a', TE: '#b9c93a', TZ: '#4caf6e', TODO: '#c8c2b8' },
   },
 };
 
@@ -196,6 +196,7 @@ export function buildAppearance(choice) {
     '--tier-t3': tiers.T3,
     '--tier-te': tiers.TE,
     '--tier-tz': tiers.TZ,
+    '--tier-todo': tiers.TODO, // neutral: not rated yet
     // Text/icons drawn on top of a tier color - every palette is bright.
     '--tier-ink': '#101114',
     ...MEDIA,
