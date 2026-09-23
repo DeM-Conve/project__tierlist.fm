@@ -9,7 +9,7 @@ import {
   setDragOverTier,
 } from './store/tiersSlice';
 import { setFocusedVideo } from './store/focusSlice';
-import { TODO_TIER } from './tiers';
+import { REMOVED_TIER, TODO_TIER } from './tiers';
 
 // Every tier edit in the app (drag, tile menu, row chips, bulk bar, Tier
 // Rail, player tier pills/Shift+digit, duel) goes through these
@@ -88,8 +88,10 @@ function describe(moves, tierItems) {
     const m = moves[0];
     const video = tierItems[m.fromTier]?.find((v) => v.videoId === m.videoId);
     const title = video ? `"${video.title}"` : 'Video';
+    if (m.toTier === REMOVED_TIER) return `${title} will be removed on push`;
     return m.fromTier === m.toTier ? `Reordered ${title}` : `${title} → ${m.toTier}`;
   }
+  if (moves.every((m) => m.toTier === REMOVED_TIER)) return `${moves.length} videos will be removed on push`;
   const targets = [...new Set(moves.map((m) => m.toTier))];
   return `Moved ${moves.length} videos → ${targets.join(', ')}`;
 }

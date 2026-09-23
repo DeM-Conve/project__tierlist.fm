@@ -1,7 +1,8 @@
 import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
 import { Box, Image, Stack, Text, Tooltip, UnstyledButton } from '@mantine/core';
-import { BOARD_TIERS, TIER_COLORS, TODO_TIER } from '../tiers';
+import { Trash2 } from 'lucide-react';
+import { BOARD_TIERS, REMOVED_TIER, TIER_COLORS, TODO_TIER } from '../tiers';
 import { selectFocusedVideoData, selectTierGroups } from '../store/selectors';
 import { moveWithFeedback, useTierDnd } from '../tierActions';
 import { EqualizerMark } from './TierBits';
@@ -18,6 +19,8 @@ export const RAIL_WIDTH = 84;
 // It's also a drop target for any dragged tile or row (append to that tier).
 // The board's TODO list, if any, sits at the bottom as a small slot: drop a
 // song there to rate it later, or click it to send the playing song back.
+// Under it, the Remove slot: drop (or click, for the playing song) to stage
+// a song for deletion from its playlist.
 export default function TierRail({ category, activeTier }) {
   const dispatch = useDispatch();
   const navigate = useNavigate();
@@ -140,6 +143,51 @@ export default function TierRail({ category, activeTier }) {
             </Tooltip>
           );
         })}
+        {loaded && (
+          <Tooltip
+            label={playingHere && playingVideo ? `Remove "${playingVideo.title}" from its playlist` : 'Drop a song here to remove it from its playlist'}
+            position="left"
+            withArrow
+            multiline
+            maw={240}
+          >
+            <UnstyledButton
+              onClick={
+                playingHere && playingHere.tier !== REMOVED_TIER
+                  ? () =>
+                      dispatch(
+                        moveWithFeedback([{ fromTier: playingHere.tier, toTier: REMOVED_TIER, videoId: playingHere.videoId }])
+                      )
+                  : undefined
+              }
+              onDragOver={(e) => dnd.onDragOver(e, `rail:${REMOVED_TIER}`)}
+              onDragLeave={(e) => dnd.onDragLeave(e, `rail:${REMOVED_TIER}`)}
+              onDrop={(e) => dnd.onDrop(e, REMOVED_TIER)}
+              aria-label="Remove from playlist"
+              className="rail-tier"
+              bg="var(--surface-2)"
+              c={dnd.dragOverTier === `rail:${REMOVED_TIER}` ? 'red' : 'dimmed'}
+              style={{
+                flex: '0 0 40px',
+                borderRadius: 8,
+                border: '1px dashed var(--border)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 4,
+                outline: dnd.dragOverTier === `rail:${REMOVED_TIER}` ? '3px solid var(--text)' : undefined,
+                outlineOffset: 2,
+              }}
+            >
+              <Trash2 size={15} />
+              {tierItems[REMOVED_TIER]?.length > 0 && (
+                <Text fz={11} fw={700} lh={1} inherit>
+                  {tierItems[REMOVED_TIER].length}
+                </Text>
+              )}
+            </UnstyledButton>
+          </Tooltip>
+        )}
       </Stack>
     </Box>
   );

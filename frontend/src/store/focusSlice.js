@@ -83,6 +83,29 @@ const focusSlice = createSlice({
     setFocusedVideo: (state, action) => {
       state.focusedVideo = action.payload;
     },
+    // YouTube-Music-style queue edits on the frozen queue. `entry` is a
+    // { tier, video } snapshot (added to focusEntries if new). The queue is
+    // id-based (see selectFocusedSeqIndex), so a song already queued is
+    // moved rather than duplicated; the playing song itself never moves.
+    // 'next' = right after the playing song, 'end' = the end of the queue.
+    enqueue: (state, action) => {
+      const { entry, position } = action.payload;
+      const id = entry.video.videoId;
+      if (!state.focusQueue || !state.focusedVideo || state.focusedVideo.videoId === id) return;
+      if (!state.focusEntries.some((e) => e.video.videoId === id)) state.focusEntries.push(entry);
+      state.focusQueue = state.focusQueue.filter((q) => q !== id);
+      if (position === 'next') {
+        const at = state.focusQueue.indexOf(state.focusedVideo.videoId);
+        state.focusQueue.splice(at + 1, 0, id);
+      } else {
+        state.focusQueue.push(id);
+      }
+    },
+    removeFromQueue: (state, action) => {
+      const id = action.payload;
+      if (!state.focusQueue || state.focusedVideo?.videoId === id) return;
+      state.focusQueue = state.focusQueue.filter((q) => q !== id);
+    },
   },
 });
 
@@ -94,5 +117,7 @@ export const {
   floatPlayer,
   startShuffle,
   setFocusedVideo,
+  enqueue,
+  removeFromQueue,
 } = focusSlice.actions;
 export default focusSlice.reducer;

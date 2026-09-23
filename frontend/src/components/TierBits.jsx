@@ -1,6 +1,8 @@
 import { ActionIcon, Box, Group, Image, Menu, Progress, Text, Tooltip, UnstyledButton } from '@mantine/core';
-import { ArrowDownToLine, ArrowUpRight, ArrowUpToLine, MoreHorizontal, Play } from 'lucide-react';
-import { TIER_COLORS } from '../tiers';
+import { ArrowDownToLine, ArrowUpRight, ArrowUpToLine, ListEnd, ListStart, MoreHorizontal, Play, Trash2 } from 'lucide-react';
+import { useDispatch } from 'react-redux';
+import { queueSong } from '../queueActions';
+import { REMOVED_TIER, TIER_COLORS } from '../tiers';
 import { TIER_INK, songLabel, youtubeUrl } from '../tierUtils';
 
 export function EqualizerMark({ color = TIER_INK, height = 12 }) {
@@ -88,12 +90,26 @@ export function TierMixBar({ tiers, counts, size = 8, onSegmentClick, labels = f
   );
 }
 
-// "Move to" menu shared by board tiles and list rows.
+// "Move to" menu shared by board tiles and list rows. For a song in the
+// Remove bin, "Move to" is how it's put back.
 export function MoveMenu({ video, tier, tiers, onMove, target }) {
+  const dispatch = useDispatch();
+  const inBin = tier === REMOVED_TIER;
   return (
     <Menu position="bottom-end" withinPortal shadow="md" width={210}>
       <Menu.Target>{target}</Menu.Target>
       <Menu.Dropdown onClick={(e) => e.stopPropagation()}>
+        {!inBin && (
+          <>
+            <Menu.Item leftSection={<ListStart size={14} />} onClick={() => dispatch(queueSong(tier, video, 'next'))}>
+              Play next
+            </Menu.Item>
+            <Menu.Item leftSection={<ListEnd size={14} />} onClick={() => dispatch(queueSong(tier, video, 'end'))}>
+              Add to queue
+            </Menu.Item>
+            <Menu.Divider />
+          </>
+        )}
         <Menu.Label>Move to</Menu.Label>
         {tiers
           .filter((t) => t !== tier)
@@ -106,16 +122,27 @@ export function MoveMenu({ video, tier, tiers, onMove, target }) {
               {t}
             </Menu.Item>
           ))}
-        <Menu.Divider />
-        <Menu.Item leftSection={<ArrowUpToLine size={14} />} onClick={() => onMove(tier, tier, video.videoId, 0)}>
-          Top of {tier}
-        </Menu.Item>
-        <Menu.Item
-          leftSection={<ArrowDownToLine size={14} />}
-          onClick={() => onMove(tier, tier, video.videoId, Number.MAX_SAFE_INTEGER)}
-        >
-          Bottom of {tier}
-        </Menu.Item>
+        {!inBin && (
+          <>
+            <Menu.Divider />
+            <Menu.Item leftSection={<ArrowUpToLine size={14} />} onClick={() => onMove(tier, tier, video.videoId, 0)}>
+              Top of {tier}
+            </Menu.Item>
+            <Menu.Item
+              leftSection={<ArrowDownToLine size={14} />}
+              onClick={() => onMove(tier, tier, video.videoId, Number.MAX_SAFE_INTEGER)}
+            >
+              Bottom of {tier}
+            </Menu.Item>
+            <Menu.Item
+              color="red"
+              leftSection={<Trash2 size={14} />}
+              onClick={() => onMove(tier, REMOVED_TIER, video.videoId, null)}
+            >
+              Remove from playlist
+            </Menu.Item>
+          </>
+        )}
         <Menu.Divider />
         <Menu.Item
           component="a"

@@ -19,6 +19,7 @@ import { Play, Square } from 'lucide-react';
 import { useDispatch, useSelector } from 'react-redux';
 import { DUEL_STRATEGIES, DUEL_STRATEGY_LABELS } from '../duel';
 import { setDuelStrategy } from '../store/prefsSlice';
+import { selectPlayerCoversPage } from '../store/selectors';
 import { TIER_COLORS } from '../tiers';
 import { TIER_INK } from '../tierUtils';
 import EmbeddedPlayer from './EmbeddedPlayer';
@@ -81,6 +82,7 @@ function DuelCard({ video, tier, arrowKey, isPreviewing, onTogglePreview, onChoo
 export default function DuelView({ videos, runs, tierSizes, onComplete, onCancel }) {
   const dispatch = useDispatch();
   const defaultStrategy = useSelector((s) => s.prefs.duelStrategy);
+  const playerCoversPage = useSelector(selectPlayerCoversPage);
   const [strategyKey, setStrategyKeyState] = useState(defaultStrategy);
   const [currentPair, setCurrentPair] = useState(null);
   const [progress, setProgress] = useState({ completed: 0, total: 0 });
@@ -152,7 +154,7 @@ export default function DuelView({ videos, runs, tierSizes, onComplete, onCancel
 
   useEffect(() => {
     function onKeyDown(e) {
-      if (spine || !currentPair) return;
+      if (spine || !currentPair || playerCoversPage) return;
       if (e.key === 'ArrowLeft') {
         e.preventDefault();
         chooseWinner(currentPair.a);
@@ -170,7 +172,7 @@ export default function DuelView({ videos, runs, tierSizes, onComplete, onCancel
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentPair, spine]);
+  }, [currentPair, spine, playerCoversPage]);
 
   function finish() {
     if (!spine) return;

@@ -23,6 +23,7 @@ import Sidebar from './components/Sidebar';
 import HomeView from './components/HomeView';
 import TierFocusView from './components/TierFocusView';
 import CreateTierPlaylistsModal from './components/CreateTierPlaylistsModal';
+import TodoListModal from './components/TodoListModal';
 import TierRail, { RAIL_WIDTH } from './components/TierRail';
 import PendingChanges from './components/PendingChanges';
 import { applyOrderWithFeedback, moveWithFeedback, undoEdit } from './tierActions';
@@ -57,6 +58,7 @@ import {
 } from './store/tiersSlice';
 import {
   openFocus as openFocusAction,
+  removeFromQueue,
   closeFocus as closeFocusAction,
   minimizePlayer,
   expandPlayer,
@@ -300,9 +302,9 @@ function Layout() {
       videoId: m.video.videoId,
       title: m.video.title,
       fromItemId: m.video.id,
-      // A dedupe entry has nothing to insert - it's just removing the
-      // redundant copy, so toPlaylistId is left out entirely.
-      toPlaylistId: m.kind === 'dedupe' ? null : tiers[m.to]?.id,
+      // A dedupe or a Remove-bin entry has nothing to insert - it only
+      // deletes that playlist item, so toPlaylistId is left out entirely.
+      toPlaylistId: m.kind === 'move' ? tiers[m.to]?.id : null,
     }));
 
     try {
@@ -577,6 +579,7 @@ function Layout() {
           queue={activeSequence}
           queueIndex={focusedSeqIndex}
           onJump={jumpToQueueIndex}
+          onRemove={(id) => dispatch(removeFromQueue(id))}
         />
       )}
 
@@ -719,10 +722,22 @@ function TierBoardPage() {
   const { tierGroups, tierLoading, isLoading } = useBoardPage(category);
   // null, or which tiers the "create playlists" modal should preselect.
   const [addingTiers, setAddingTiers] = useState(null);
+  // "Add a TODO list": link an existing playlist first, create as a fallback.
+  const [addingTodo, setAddingTodo] = useState(false);
   const base = `/tier/${encodeURIComponent(category)}`;
 
   return (
     <BoardShell>
+      {addingTodo && (
+        <TodoListModal
+          category={category}
+          onClose={() => setAddingTodo(false)}
+          onCreateNew={() => {
+            setAddingTodo(false);
+            setAddingTiers([TODO_TIER]);
+          }}
+        />
+      )}
       {addingTiers && (
         <CreateTierPlaylistsModal
           opened
@@ -744,7 +759,9 @@ function TierBoardPage() {
         onShufflePlay={startShufflePlay}
         onStartDuel={() => navigate(`${base}/duel`)}
         onOpenTier={(t) => navigate(`${base}/t/${t}`)}
-        onAddMissingTiers={(tiers) => setAddingTiers(tiers)}
+        onAddMissingTiers={(tiers) =>
+          tiers.length === 1 && tiers[0] === TODO_TIER ? setAddingTodo(true) : setAddingTiers(tiers)
+        }
       />
     </BoardShell>
   );

@@ -1,6 +1,7 @@
 import { createSlice } from '@reduxjs/toolkit';
 import { SETTINGS, getSetting } from '../settings';
 import { DEFAULT_TEMPLATE, normalizeTemplate, validateTemplate } from '../naming';
+import { DEFAULT_TODO_KEYWORD, validateTodoKeyword } from '../todoLists';
 import { settingsLoaded } from './settingsActions';
 
 // The playlist naming template (see naming.js). `migratingFrom` is set while
@@ -10,12 +11,19 @@ import { settingsLoaded } from './settingsActions';
 // `needsDetection`: nobody has chosen a template yet on this browser, so the
 // first playlist load picks the preset that fits the user's existing names
 // (detectTemplate) instead of assuming everyone uses one convention.
+// To-do lists (todoLists.js): `todoKeyword` marks a playlist as one,
+// `todoLinks` = { [playlistId]: category } for ones assigned by hand.
 function fromSaved(saved) {
   return saved && typeof saved.template === 'string' && validateTemplate(saved.template).length === 0
     ? {
         template: normalizeTemplate(saved.template),
         migratingFrom: saved.migratingFrom ? normalizeTemplate(saved.migratingFrom) : null,
         needsDetection: !!saved.needsDetection,
+        todoKeyword:
+          typeof saved.todoKeyword === 'string' && validateTodoKeyword(saved.todoKeyword).length === 0
+            ? saved.todoKeyword
+            : DEFAULT_TODO_KEYWORD,
+        todoLinks: saved.todoLinks && typeof saved.todoLinks === 'object' ? saved.todoLinks : {},
       }
     : null;
 }
@@ -23,6 +31,8 @@ const initialState = fromSaved(getSetting(SETTINGS.naming, null)) ?? {
   template: DEFAULT_TEMPLATE,
   migratingFrom: null,
   needsDetection: true,
+  todoKeyword: DEFAULT_TODO_KEYWORD,
+  todoLinks: {},
 };
 
 const namingSlice = createSlice({
@@ -49,6 +59,15 @@ const namingSlice = createSlice({
     finishMigration: (state) => {
       state.migratingFrom = null;
     },
+    setTodoKeyword: (state, action) => {
+      state.todoKeyword = action.payload;
+    },
+    // { playlistId, category } - category null = back to automatic.
+    linkTodoList: (state, action) => {
+      const { playlistId, category } = action.payload;
+      if (category) state.todoLinks[playlistId] = category;
+      else delete state.todoLinks[playlistId];
+    },
   },
   extraReducers: (builder) => {
     // The account already has a template -> use it (no detection needed).
@@ -59,5 +78,6 @@ const namingSlice = createSlice({
   },
 });
 
-export const { setTemplate, detectedTemplate, startMigration, finishMigration } = namingSlice.actions;
+export const { setTemplate, detectedTemplate, startMigration, finishMigration, setTodoKeyword, linkTodoList } =
+  namingSlice.actions;
 export default namingSlice.reducer;

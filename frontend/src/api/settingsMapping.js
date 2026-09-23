@@ -5,9 +5,18 @@ import { normalizeTemplate } from '../naming';
 // merging, so a new setting is one entry here (+ its column/enum backend-side).
 const SCHEMA = {
   appearance: ['theme', 'accent', 'tierPalette'],
-  naming: ['template', 'migratingFrom'],
+  naming: ['template', 'migratingFrom', 'todoKeyword', 'todoLinks'],
   prefs: ['duelStrategy'],
 };
+
+// Fields are primitives except todoLinks ({ playlistId: category }), so
+// compare by value: a copy that came back from the server is still "same".
+function sameValue(a, b) {
+  if (a === b) return true;
+  if (!a || !b || typeof a !== 'object' || typeof b !== 'object') return false;
+  const keys = Object.keys(a);
+  return keys.length === Object.keys(b).length && keys.every((k) => a[k] === b[k]);
+}
 
 function mapFields(fn) {
   return Object.fromEntries(
@@ -26,7 +35,7 @@ export function toServer(state) {
 
 export function sameSettings(a, b) {
   if (!a || !b) return a === b;
-  return Object.entries(SCHEMA).every(([group, fields]) => fields.every((f) => a[group]?.[f] === b[group]?.[f]));
+  return Object.entries(SCHEMA).every(([group, fields]) => fields.every((f) => sameValue(a[group]?.[f], b[group]?.[f])));
 }
 
 // Three-way merge after a 412 (another device saved first): every field this
@@ -36,6 +45,6 @@ export function sameSettings(a, b) {
 export function rebase(local, base, fresh) {
   if (!base || !fresh) return fresh ?? local;
   return mapFields((group, field) =>
-    local[group][field] !== base[group][field] ? local[group][field] : fresh[group][field]
+    !sameValue(local[group][field], base[group][field]) ? local[group][field] : fresh[group][field]
   );
 }

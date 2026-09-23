@@ -2,7 +2,8 @@ import { useMemo, useState } from 'react';
 import { useSelector } from 'react-redux';
 import { Alert, Autocomplete, Button, Chip, Group, Modal, SegmentedControl, Stack, Text, TextInput } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
-import { BOARD_TIERS } from '../tiers';
+import { BOARD_TIERS, TODO_TIER } from '../tiers';
+import { boardFromName, boardsOf } from '../todoLists';
 import { normalizeTemplate, parseTitle, renderTitle } from '../naming';
 import { selectTierGroups, selectTierPlaylists } from '../store/selectors';
 import { useCreatePlaylistsMutation } from '../api/queries';
@@ -14,6 +15,7 @@ import { TierChip } from './TierBits';
 //     fixed; `initialTiers` = what to preselect)
 export default function CreateTierPlaylistsModal({ opened, onClose, category: fixedCategory, initialTiers, onCreated }) {
   const template = useSelector((s) => s.naming.template);
+  const todoKeyword = useSelector((s) => s.naming.todoKeyword);
   const tierGroups = useSelector(selectTierGroups);
   const tierPlaylists = useSelector(selectTierPlaylists);
   const createMutation = useCreatePlaylistsMutation();
@@ -39,11 +41,23 @@ export default function CreateTierPlaylistsModal({ opened, onClose, category: fi
   const titles = tiers
     .filter((t) => !existingTiers.includes(t))
     .sort((a, b) => BOARD_TIERS.indexOf(a) - BOARD_TIERS.indexOf(b))
-    .map((tier) => ({ tier, title: renderTitle(template, { bracket: bracket.trim() || null, category: name, tier }) }));
+    .map((tier) => ({
+      tier,
+      // A to-do list is the template with the keyword in the tier's place.
+      title: renderTitle(template, { bracket: bracket.trim() || null, category: name, tier: tier === TODO_TIER ? todoKeyword : tier }),
+    }));
   const exists = !fixedCategory && name && tierGroups[name];
   // Safety net: every name we create must be recognised by the template
   // again, or the new playlist would be invisible in the app.
-  const unrecognised = titles.filter((t) => parseTitle(t.title, [template])?.tier !== t.tier);
+  const boards = [
+    ...boardsOf((tierPlaylists || []).filter((p) => p.parsed.tier !== TODO_TIER && p.parsed.category !== name)),
+    { category: name, tags: bracket.trim() ? [bracket.trim()] : [] },
+  ];
+  const unrecognised = titles.filter((t) =>
+    t.tier === TODO_TIER
+      ? boardFromName(t.title, todoKeyword, boards) !== name
+      : parseTitle(t.title, [template])?.tier !== t.tier
+  );
   const canCreate = name && titles.length > 0 && !exists && unrecognised.length === 0 && !createMutation.isPending;
 
   async function create() {

@@ -40,7 +40,7 @@ class SettingsControllerIT {
 
     private static final String BODY = """
         {"appearance": {"theme": "%s", "accent": "violet", "tierPalette": "heat"},
-         "naming": {"template": "%s", "migratingFrom": null},
+         "naming": {"template": "%s", "migratingFrom": null, "todoKeyword": "%s", "todoLinks": %s},
          "prefs": {"duelStrategy": "elo"}}""";
 
     @Autowired
@@ -57,8 +57,12 @@ class SettingsControllerIT {
     }
 
     private MockHttpServletRequestBuilder save(String theme, String template) {
+        return save(theme, template, "TODO", "{}");
+    }
+
+    private MockHttpServletRequestBuilder save(String theme, String template, String todoKeyword, String todoLinks) {
         return put("/api/settings").with(alice).contentType(MediaType.APPLICATION_JSON)
-            .content(BODY.formatted(theme, template));
+            .content(BODY.formatted(theme, template, todoKeyword, todoLinks));
     }
 
     @Test
@@ -105,6 +109,43 @@ class SettingsControllerIT {
         mvc.perform(save("neon", "{category} {tier}").header(HttpHeaders.IF_NONE_MATCH, "*"))
             .andExpect(status().isBadRequest());
         mvc.perform(save("tokyo", "{category} only").header(HttpHeaders.IF_NONE_MATCH, "*"))
+            .andExpect(status().isBadRequest());
+        mvc.perform(get("/api/settings").with(alice)).andExpect(status().isNoContent());
+    }
+
+    @Test
+    void todoKeywordAndLinksRoundTripAndShareTheRowVersion() throws Exception {
+        mvc.perform(save("tokyo", "{category} {tier}", "To do", "{\"PLabc_123\": \"Rap\"}")
+                .header(HttpHeaders.IF_NONE_MATCH, "*"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.naming.todoKeyword").value("To do"))
+            .andExpect(jsonPath("$.naming.todoLinks.PLabc_123").value("Rap"))
+            .andExpect(header().string(HttpHeaders.ETAG, "\"0\""));
+        assertThat(jdbc.queryForObject("SELECT version FROM user_settings", Long.class)).isZero();
+
+        // Changing only the links is still a new version (the ETag moves).
+        mvc.perform(save("tokyo", "{category} {tier}", "To do", "{\"PLabc_123\": \"Jazz_Cozy\", \"PLxyz\": \"Rap\"}")
+                .header(HttpHeaders.IF_MATCH, "\"0\""))
+            .andExpect(status().isOk())
+            .andExpect(header().string(HttpHeaders.ETAG, "\"1\""));
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM todo_list_link", Integer.class)).isEqualTo(2);
+        assertThat(jdbc.queryForObject("SELECT version FROM user_settings", Long.class)).isEqualTo(1L);
+
+        mvc.perform(save("tokyo", "{category} {tier}", "To do", "{}").header(HttpHeaders.IF_MATCH, "\"1\""))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.naming.todoLinks").isEmpty());
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM todo_list_link", Integer.class)).isZero();
+    }
+
+    @Test
+    void badTodoKeywordsAndLinksAreRejected() throws Exception {
+        for (String keyword : new String[] {"T1", "tz", "to-do", "", "a  b", "averyveryverylongkeyword"}) {
+            mvc.perform(save("tokyo", "{category} {tier}", keyword, "{}").header(HttpHeaders.IF_NONE_MATCH, "*"))
+                .andExpect(status().isBadRequest());
+        }
+        mvc.perform(save("tokyo", "{category} {tier}", "TODO", "{\"bad id!\": \"Rap\"}").header(HttpHeaders.IF_NONE_MATCH, "*"))
+            .andExpect(status().isBadRequest());
+        mvc.perform(save("tokyo", "{category} {tier}", "TODO", "{\"PLabc\": \" \"}").header(HttpHeaders.IF_NONE_MATCH, "*"))
             .andExpect(status().isBadRequest());
         mvc.perform(get("/api/settings").with(alice)).andExpect(status().isNoContent());
     }

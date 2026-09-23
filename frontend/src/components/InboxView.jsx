@@ -22,7 +22,7 @@ import {
 } from '@mantine/core';
 import { CheckCheck, ExternalLink, Link2, Play, SkipForward, Undo2, EyeOff } from 'lucide-react';
 import { TIER_COLORS, TIER_ORDER, TODO_TIER } from '../tiers';
-import { selectTierCategories, selectTierGroups } from '../store/selectors';
+import { selectPlayerCoversPage, selectTierCategories, selectTierGroups } from '../store/selectors';
 import { chooseBoard, setCurrent } from '../store/inboxSlice';
 import { songLabel, TIER_INK, youtubeUrl } from '../tierUtils';
 import { EqualizerMark } from './TierBits';
@@ -97,6 +97,7 @@ export default function InboxView({ inbox, actions, onPasteLink }) {
   const categories = useSelector(selectTierCategories);
   const tierGroups = useSelector(selectTierGroups);
   const playingId = useSelector((s) => s.focus.focusedVideo?.videoId);
+  const playerCoversPage = useSelector(selectPlayerCoversPage);
   const boardRef = useRef(null);
 
   const { current, list, loading, progress } = inbox;
@@ -115,11 +116,12 @@ export default function InboxView({ inbox, actions, onPasteLink }) {
 
   // Capture phase + stopImmediatePropagation: on this page 1-5 file a song
   // instead of the player's seek-to-percent, and u / Ctrl+Z undo Inbox
-  // actions instead of board edits.
+  // actions instead of board edits. Not while the full-screen player covers
+  // the page - then the keys are the player's (digits seek, as elsewhere).
   useEffect(() => {
     function onKeyDown(e) {
       if (isSequenceKey(e)) return;
-      if (isTyping() || e.altKey) return;
+      if (playerCoversPage || isTyping() || e.altKey) return;
       const mod = e.ctrlKey || e.metaKey;
       const claim = () => {
         e.preventDefault();
@@ -179,15 +181,15 @@ export default function InboxView({ inbox, actions, onPasteLink }) {
           </Title>
           <Text c="dimmed" fz="sm">
             {loading
-              ? 'Looking for new likes…'
+              ? 'Looking for songs you liked…'
               : list.length
-                ? `${list.length} liked ${list.length === 1 ? 'song isn’t' : 'songs aren’t'} on a board yet`
-                : 'Everything you liked is on a board'}
+                ? `${list.length} ${list.length === 1 ? 'song' : 'songs'} you liked on YouTube, not in a tier yet`
+                : 'Every song you liked is in a tier'}
           </Text>
         </Stack>
         <TextInput
-          w={320}
-          placeholder="Paste a YouTube link…"
+          w={360}
+          placeholder="Add a song: paste its YouTube link"
           leftSection={<Link2 size={15} />}
           rightSection={<Kbd size="xs">Ctrl V</Kbd>}
           rightSectionWidth={64}
@@ -261,7 +263,7 @@ export default function InboxView({ inbox, actions, onPasteLink }) {
             <Stack gap="md" style={{ flex: 1, minWidth: 0 }}>
               <Stack gap={4}>
                 <Text fz="xs" c="dimmed">
-                  {current.addedAt ? `Liked ${ago(current.addedAt)}` : 'Pasted link'}
+                  {current.addedAt ? `You liked this on YouTube ${ago(current.addedAt)}` : 'Added from a pasted link'}
                 </Text>
                 <Title order={2} fz={{ base: 24, sm: 30 }} lh={1.15} lineClamp={2} title={current.title}>
                   {label.song}

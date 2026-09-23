@@ -24,6 +24,8 @@ import { TEMPLATE_PRESET_GROUPS, TOKENS, detectTemplate, normalizeTemplate, pars
 import { finishMigration, setTemplate, startMigration } from '../store/namingSlice';
 import { selectTierPlaylists } from '../store/selectors';
 import { useInvalidatePlaylists, useRenamePlaylistsMutation } from '../api/queries';
+import { TODO_TIER } from '../tiers';
+import TodoListSettings from './TodoListSettings';
 
 const BATCH = 10;
 const QUOTA_PER_RENAME = 51; // playlists.list (1) + playlists.update (50)
@@ -51,7 +53,9 @@ export default function PlaylistNamingSettings() {
 
   const plan = useMemo(
     () =>
-      (tierPlaylists || []).map((p) => ({
+      // To-do lists keep whatever name they have (they're found by keyword,
+      // not by this template - see TodoListSettings).
+      (tierPlaylists || []).filter((p) => p.parsed.tier !== TODO_TIER).map((p) => ({
         id: p.id,
         from: p.title,
         to: errors.length ? p.title : renderTitle(draft, p.parsed),
@@ -374,6 +378,8 @@ export default function PlaylistNamingSettings() {
       <Text fz="xs" c="dimmed">
         Active template: <Code>{activeTemplate}</Code>
       </Text>
+
+      <TodoListSettings />
     </Stack>
   );
 }

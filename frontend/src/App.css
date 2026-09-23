@@ -112,8 +112,6 @@
     z-index: 35;
   }
   .canvas { padding: 72px 20px calc(32px + var(--player-dock-height)); }
-  .player-dock-expanded .player-dock-card { width: 94vw; }
-  .focus-nav { display: none; }
   .player-dock-mini .focus-info .hint-text { display: none; }
 }
 
@@ -153,20 +151,49 @@
 }
 .player-dock-card:focus { outline: none; }
 
-/* Expanded player with its "Up next" queue as a second column. A CSS grid
-   (no Mantine prop for this) so the queue is appended as a sibling while
-   the player subtree itself never moves or remounts. */
+/* Expanded player: main column (video, info, controls, rating) + the
+   queue panel. CSS grid - no Mantine prop for a two-column shape whose
+   children must stay siblings so the player subtree never remounts.
+   The width is capped so video + controls always fit the viewport height
+   (16:9 video in the leftover height, plus the fixed queue column). */
 .player-dock-expanded .player-dock-card {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 320px;
-  column-gap: 24px;
-  max-width: 1360px;
+  grid-template-columns: minmax(0, 1fr) 360px;
+  column-gap: 28px;
+  width: min(1480px, 100%, calc((90vh - 250px) * 16 / 9 + 440px));
+  max-width: none;
+  max-height: 94vh;
+  padding: 24px 24px 20px;
+  border-radius: 14px;
 }
-.player-dock-expanded .player-dock-card > * { grid-column: 1; }
-.player-dock-expanded .player-queue { grid-column: 2; grid-row: 1 / span 20; min-width: 0; padding-top: 36px; }
+.player-dock-expanded .player-dock-toolbar { top: 22px; right: 24px; }
+.player-dock-main { min-width: 0; }
+.player-dock-mini .player-dock-main { display: contents; }
+.player-dock-expanded .player-dock-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 20px;
+}
+.player-dock-expanded .focus-info h2 { font-size: 22px; line-height: 1.25; }
+/* `contain: size` keeps the (long) queue from growing the grid row, so
+   the panel is exactly as tall as the main column and scrolls inside. */
+.player-queue {
+  contain: size;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  padding-left: 24px;
+  border-left: 1px solid var(--border-soft);
+}
+.player-queue-head { padding-right: 84px; } /* room for the toolbar */
+.queue-row-remove { opacity: 0; transition: opacity 0.1s ease; }
+.queue-row:hover .queue-row-remove, .queue-row-remove:focus-visible { opacity: 1; }
 @media (max-width: 61.99em) {
-  .player-dock-expanded .player-dock-card { grid-template-columns: minmax(0, 1fr); }
-  .player-dock-expanded .player-queue { grid-column: 1; grid-row: auto; margin-top: 16px; }
+  .player-dock-expanded .player-dock-card { grid-template-columns: minmax(0, 1fr); width: 100%; overflow-y: auto; }
+  .player-dock-expanded .player-dock-body { grid-template-columns: minmax(0, 1fr); gap: 12px; }
+  .player-queue { contain: none; height: 420px; padding-left: 0; border-left: 0; margin-top: 20px; }
+  .player-queue-head { padding-right: 0; }
 }
 
 .player-dock-mini {
@@ -220,19 +247,6 @@
   z-index: 2;
 }
 .player-dock-mini .player-dock-toolbar { position: static; order: 3; }
-.player-dock-mini .player-dock-toolbar .modal-close { width: 26px; height: 26px; }
-
-.modal-close {
-  background: var(--surface-2);
-  border: 1px solid var(--border);
-  color: var(--text-dim);
-  width: 30px;
-  height: 30px;
-  border-radius: 50%;
-  cursor: pointer;
-  font-size: 14px;
-}
-.modal-close:hover { color: var(--text); }
 
 .player-dock-mini .focus-media {
   flex: 0 0 44px;
@@ -241,7 +255,6 @@
   cursor: pointer;
 }
 .player-dock-mini .focus-embed { aspect-ratio: 1 / 1; border-radius: 4px; }
-.player-dock-mini .focus-nav { display: none; }
 
 .player-dock-body { min-width: 0; }
 /* Three regions (title | controls | mute) so the controls sit centered
@@ -276,21 +289,6 @@
   gap: 2px;
 }
 .player-dock-secondary { grid-column: 3; display: flex; align-items: center; gap: 2px; }
-.player-dock-icon-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 30px;
-  height: 30px;
-  border-radius: 50%;
-  border: none;
-  background: none;
-  color: var(--text-dim);
-  cursor: pointer;
-}
-.player-dock-icon-btn:hover:not(:disabled) { color: var(--text); background: var(--surface-2); }
-.player-dock-icon-btn:disabled { opacity: 0.3; cursor: not-allowed; }
-.player-dock-icon-btn-active { color: var(--accent); }
 
 /* Floating corner mode: an in-page floating box pinned to the bottom-right
    corner, the way YouTube Music's own in-app miniplayer works - a CSS-only
@@ -330,42 +328,10 @@
 .player-dock-floating .player-dock-body { padding: 8px 10px; }
 
 .focus-media-slot { position: relative; }
-.player-dock-play-btn {
-  width: 34px;
-  height: 34px;
-  color: var(--text);
-  background: var(--surface-2);
-}
-.player-dock-play-btn:hover { background: var(--surface-3); }
 .focus-media {
   position: relative;
   margin-bottom: 16px;
 }
-.focus-nav {
-  position: absolute;
-  top: 50%;
-  transform: translateY(-50%);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: var(--media-control-bg);
-  border: 1px solid var(--media-control-border);
-  box-shadow: 0 2px 10px var(--media-control-shadow);
-  color: var(--media-fg);
-  width: 44px;
-  height: 44px;
-  border-radius: 50%;
-  font-size: 24px;
-  line-height: 1;
-  cursor: pointer;
-  z-index: 2;
-}
-/* Sit fully outside the video frame (in the card's own padding gutter)
-   rather than on top of it - the embed overlaps YouTube's own native UI
-   (title card, suggested-video overlay) near its edges, so a nav button
-   placed inside the frame visually collides with that. */
-.focus-nav-prev { left: -24px; }
-.focus-nav-next { right: -24px; }
 .focus-embed {
   position: relative;
   aspect-ratio: 16/9;

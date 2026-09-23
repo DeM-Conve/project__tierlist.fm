@@ -3,7 +3,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import { useOutletContext } from 'react-router-dom';
 import { ActionIcon, Badge, Box, Button, Group, Image, Kbd, Modal, Paper, ScrollArea, Stack, Text, Tooltip } from '@mantine/core';
 import { useMediaQuery } from '@mantine/hooks';
-import { ArrowRight, Undo2 } from 'lucide-react';
+import { ArrowRight, Trash2, Undo2 } from 'lucide-react';
 import { selectPendingMoves } from '../store/selectors';
 import { moveWithFeedback } from '../tierActions';
 import { songLabel } from '../tierUtils';
@@ -12,7 +12,8 @@ import { TierChip } from './TierBits';
 const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
 
 // One staged change: cover, song, and "from -> to" in tier chips. Moves can
-// be put back individually; auto-resolved duplicates can't (by design).
+// (and removals) can be put back individually; auto-resolved duplicates
+// can't (by design).
 function ChangeRow({ move, first, onRevert }) {
   const { song, artist } = songLabel(move.video);
   return (
@@ -23,22 +24,47 @@ function ChangeRow({ move, first, onRevert }) {
           {song}
         </Text>
         <Text fz="xs" c="dimmed" truncate="end">
-          {artist}
+          {move.kind === 'dedupe' ? `${artist} · duplicate` : artist}
         </Text>
       </Box>
-      <Group gap={6} wrap="nowrap" flex="none">
-        <TierChip tier={move.kind === 'move' ? move.from : move.tier} size={20} />
-        <ArrowRight size={13} color="var(--text-faint)" />
-        {move.kind === 'move' ? (
+      {move.kind === 'move' ? (
+        <Group gap={6} wrap="nowrap" flex="none">
+          <TierChip tier={move.from} size={20} />
+          <ArrowRight size={13} color="var(--text-faint)" />
           <TierChip tier={move.to} size={20} />
-        ) : (
-          <Badge size="sm" variant="light" color="red">
-            Duplicate removed
-          </Badge>
-        )}
-      </Group>
+        </Group>
+      ) : (
+        // A deletion names the exact copy going away (outlined chip) and,
+        // for a duplicate, the tier that keeps the song (solid chip) - so
+        // it's obvious nothing is lost.
+        <Tooltip
+          label={
+            move.kind === 'dedupe'
+              ? `On YouTube this song is in both ${move.tier} and ${move.keptTier}. Pushing deletes the ${move.tier} copy; it stays in ${move.keptTier}.`
+              : `Pushing deletes this song from ${move.from}.`
+          }
+          withArrow
+          multiline
+          maw={260}
+        >
+          <Group gap={6} wrap="nowrap" flex="none">
+            <Badge size="sm" variant="light" color="red" leftSection={<Trash2 size={11} />}>
+              Delete
+            </Badge>
+            <TierChip tier={move.kind === 'dedupe' ? move.tier : move.from} size={20} active={false} />
+            {move.kind === 'dedupe' && (
+              <>
+                <Text fz="xs" c="dimmed" ml={4}>
+                  kept in
+                </Text>
+                <TierChip tier={move.keptTier} size={20} />
+              </>
+            )}
+          </Group>
+        </Tooltip>
+      )}
       <Box w={28} flex="none">
-        {move.kind === 'move' && (
+        {move.kind !== 'dedupe' && (
           <Tooltip label={`Put back in ${move.from}`} withArrow>
             <ActionIcon variant="subtle" color="gray" onClick={onRevert} aria-label={`Put back in ${move.from}`}>
               <Undo2 size={15} />
