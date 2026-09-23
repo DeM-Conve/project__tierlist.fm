@@ -12,7 +12,7 @@ import {
   useOutletContext,
 } from 'react-router-dom';
 import { spotlight } from '@mantine/spotlight';
-import { ActionIcon, Affix, Box, Center, Loader } from '@mantine/core';
+import { ActionIcon, Affix, Center, Loader } from '@mantine/core';
 import { Menu as MenuIcon } from 'lucide-react';
 import { useDisclosure, useHotkeys } from '@mantine/hooks';
 import { useProgress } from '@bprogress/react';
@@ -22,7 +22,7 @@ import Sidebar from './components/Sidebar';
 import HomeView from './components/HomeView';
 import TierFocusView from './components/TierFocusView';
 import CreateTierPlaylistsModal from './components/CreateTierPlaylistsModal';
-import TierRail, { RAIL_WIDTH } from './components/TierRail';
+import TierRail from './components/TierRail';
 import PendingChanges from './components/PendingChanges';
 import { applyOrderWithFeedback, moveWithFeedback, undoEdit } from './tierActions';
 import ItemsView from './components/ItemsView';
@@ -523,7 +523,7 @@ function useBoardPage(category) {
 function BoardShell({ children, rail = true, activeTier, selection }) {
   return (
     <>
-      <Box pr={rail ? { base: 0, md: RAIL_WIDTH - 16 } : 0}>{children}</Box>
+      {children}
       {rail && <TierRail activeTier={activeTier} selection={selection} />}
       <PendingChanges />
     </>

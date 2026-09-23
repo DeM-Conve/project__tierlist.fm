@@ -6,7 +6,7 @@ import { normalizeTemplate } from '../naming';
 const SCHEMA = {
   appearance: ['theme', 'accent', 'tierPalette'],
   naming: ['template', 'migratingFrom'],
-  prefs: ['duelStrategy'],
+  prefs: ['duelStrategy', 'boardDensity'],
 };
 
 function mapFields(fn) {

@@ -41,7 +41,7 @@ class SettingsControllerIT {
     private static final String BODY = """
         {"appearance": {"theme": "%s", "accent": "violet", "tierPalette": "heat"},
          "naming": {"template": "%s", "migratingFrom": null},
-         "prefs": {"duelStrategy": "elo"}}""";
+         "prefs": {"duelStrategy": "elo", "boardDensity": "compact"}}""";
 
     @Autowired
     MockMvc mvc;
@@ -69,7 +69,8 @@ class SettingsControllerIT {
             .andExpect(status().isOk())
             .andExpect(header().string(HttpHeaders.ETAG, "\"0\""))
             .andExpect(jsonPath("$.appearance.theme").value("dracula"))
-            .andExpect(jsonPath("$.prefs.duelStrategy").value("elo"));
+            .andExpect(jsonPath("$.prefs.duelStrategy").value("elo"))
+            .andExpect(jsonPath("$.prefs.boardDensity").value("compact"));
 
         mvc.perform(get("/api/settings").with(alice))
             .andExpect(status().isOk())

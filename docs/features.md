@@ -28,9 +28,12 @@
 
 ## Tier boards (the tier list)
 - Playlists named `[G]/[GA]/[OG] <Category> T1/T2/T3/TE/TZ` are auto-grouped into a per-category tier board.
-- **Whole board on one screen**: one compact row per tier; each row shows as many square album-art tiles as fit on one line and folds the rest into a **"+N show all"** tile - so a tier of hundreds never pushes the rest of the board off screen.
+- **Layout switch** in the header - **All songs** (default) / **Compact**, saved to your account:
+  - *All songs*: every tier shows every song, rows wrapping onto as many lines as they need - the whole tier list on one page, just scroll.
+  - *Compact*: one line per tier, the rest folded into a **"+N show all"** tile. Clicking "+N" expands **that tier in place** (a **"show less"** tile collapses it again) - no page change.
+- **Hover a tile and press `1`-`5`** to move it to the board's 1st-5th tier (undo toast, `Ctrl+Z`). While a tile is hovered, digits move it instead of seeking the player.
 - Every tile prints its **song name** (and the artist, on desktop) over the bottom of the cover, so songs sharing one album cover are tellable apart without hovering. Names come from the video title with the "(Official Video)"/"[Lyrics]"/"| Album" noise stripped; "Artist - Song" titles are split into song + artist, otherwise the channel is the artist. Tiles stay square (88px desktop, 64px phone; one-line name on phones).
-- Each row's colored label shows the tier, its count (or `matches/total` while searching), **Play from this tier** and **Shuffle this tier**; clicking the label, the "+N" tile, or the row's `›` opens that tier's full list.
+- Each row's colored label shows the tier, its count (or `matches/total` while searching), **Play from this tier** and **Shuffle this tier**; clicking the label or the row's `›` opens that tier's full list (the tier page).
 - Header: board name, "N videos · M tiers", a labelled **tier-mix bar** (segment per tier, hover for count, click to open that tier), and actions: Find (`/`), Duel, Play (from the top tier) and Shuffle (whole board).
 - Tiles: click plays, drag moves, hover/focus reveals a play affordance and a `⋯` menu (**Move to** any tier, **Top / Bottom of** this tier, **Open on YouTube**). Full title on hover tooltip.
 - The playing video is marked (accent ring + animated equalizer) - only on the board it was opened from.
@@ -39,7 +42,7 @@
 - Vim-style `/` search (also the Find button): `/` opens a find box at the top of the screen (the `/` is part of the box's text - deleting it cancels), each row filters to its matches (and wraps to show all of them), `Enter`/`n` next match, `Shift+Enter`/`N` previous, `Enter` on a single match plays it, `Esc` closes. The active match is scrolled into view and highlighted. Matches song title, channel **and artist name**; every word must match, in any order, ignoring case and accents (`krsna makasam`, `beyonce`).
 
 ## Tier Rail
-- A permanent strip of the board's tiers down the right edge of the tier list and tier pages (desktop), with live counts. One click does the most useful thing available: **move the selected rows there** (when rows are selected) → otherwise **re-rate the playing song** into that tier (when it's from this board; the playing song's art sits on its current tier, with `⇧1-5` hints) → otherwise **open that tier**. The header says which mode it's in ("Move N to" / "Rate" / "Tiers").
+- A strip of the board's tiers down the right edge (desktop), with live counts - **shown only while it's useful**: it slides in while you drag a tile or row (so you can drop onto any tier, even one scrolled off screen) and while rows are selected on a tier page; the rest of the time it's tucked away and the board uses the full width. One click does the most useful thing available: **move the selected rows there** (when rows are selected) → otherwise **re-rate the playing song** into that tier (when it's from this board; the playing song's art sits on its current tier, with `⇧1-5` hints) → otherwise **open that tier**. The header says which mode it's in ("Move N to" / "Rate" / "Tiers").
 - Every rail tier is a drop target: drag any tile or row onto it to move it there.
 
 ## Tier page (full list for big tiers)

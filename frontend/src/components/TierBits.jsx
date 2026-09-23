@@ -148,6 +148,7 @@ export function TierTile({
   onDragEnd,
   onPlay,
   onMove,
+  onHover,
 }) {
   const ring = isPlaying || searchState;
   const { song, artist } = songLabel(video);
@@ -163,6 +164,8 @@ export function TierTile({
         draggable
         onDragStart={(e) => onDragStart(e, video, tier)}
         onDragEnd={onDragEnd}
+        onMouseEnter={() => onHover?.({ tier, videoId: video.videoId })}
+        onMouseLeave={() => onHover?.(null)}
         onClick={() => onPlay(tier, video.videoId)}
         onKeyDown={(e) => {
           if (e.key === 'Enter' || e.key === ' ') {

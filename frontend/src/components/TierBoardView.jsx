@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useDispatch } from 'react-redux';
+import { useDispatch, useSelector } from 'react-redux';
 import {
   ActionIcon,
   Badge,
@@ -8,6 +8,7 @@ import {
   Group,
   Kbd,
   Paper,
+  SegmentedControl,
   Skeleton,
   Stack,
   Text,
@@ -17,9 +18,10 @@ import {
   UnstyledButton,
 } from '@mantine/core';
 import { useElementSize, useMediaQuery } from '@mantine/hooks';
-import { ChevronRight, Play, Plus, Search, Shuffle, Swords } from 'lucide-react';
+import { ChevronRight, ChevronUp, Play, Plus, Search, Shuffle, Swords } from 'lucide-react';
 import { TIER_COLORS, TIER_ORDER } from '../tiers';
 import { moveWithFeedback, useTierDnd } from '../tierActions';
+import { setBoardDensity } from '../store/prefsSlice';
 import { TierMixBar, TierTile } from './TierBits';
 import { TIER_INK, indexForPointInFlow, videoMatches } from '../tierUtils';
 
@@ -29,15 +31,20 @@ function DropIndicator({ size }) {
   return <Box w={3} h={size} bg="accent" style={{ borderRadius: 2, flexShrink: 0 }} />;
 }
 
-// One compact tier row. Shows as many tiles as fit on ONE line and folds the
-// rest into a "+N" tile that opens the tier on its own page - so the whole
-// board always fits on one screen, however big a tier gets.
+// One tier row. `showAll`: every tile, wrapping onto as many lines as it
+// needs (the "All songs" layout, a row expanded from Compact, or a search).
+// Otherwise ONE line, the rest folded into a "+N" tile that expands the row
+// in place; an expanded Compact row ends with a "Show less" tile.
 function TierRow({
   tier,
   tiers,
   items,
   loading,
   size,
+  showAll,
+  canCollapse,
+  onToggleExpand,
+  onHoverTile,
   searchActive,
   matchedKeys,
   activeMatchKey,
@@ -60,8 +67,7 @@ function TierRow({
   const total = shown?.length ?? 0;
   // (width - 8): the inner row keeps 4px each side so focus/search rings aren't clipped.
   const fit = Math.max(1, Math.floor((width - 8 + GAP) / (size + GAP)));
-  // While searching, show every match (wrapping) so n/N can always reach it.
-  const truncated = !searchActive && total > fit;
+  const truncated = !showAll && total > fit;
   const visible = truncated ? shown.slice(0, fit - 1) : shown || [];
   const hiddenCount = total - visible.length;
 
@@ -154,7 +160,7 @@ function TierRow({
       </UnstyledButton>
 
       <Box ref={sizeRef} style={{ flex: 1, minWidth: 0 }} p={GAP - 4}>
-        <Group ref={contentRef} gap={GAP} wrap={searchActive ? 'wrap' : 'nowrap'} mih={size} p={4} style={{ overflow: 'hidden' }}>
+        <Group ref={contentRef} gap={GAP} wrap={showAll ? 'wrap' : 'nowrap'} mih={size} p={4} style={{ overflow: 'hidden' }}>
           {loading &&
             Array.from({ length: Math.min(fit, 8) }).map((_, i) => <Skeleton key={i} w={size} h={size} radius={6} />)}
           {!loading && total === 0 && (
@@ -192,18 +198,19 @@ function TierRow({
                     onDragEnd={dnd.onDragEnd}
                     onPlay={onPlay}
                     onMove={onMove}
+                    onHover={onHoverTile}
                   />
                 </Group>
               );
             })}
           {!loading && isOver && overIndex === visible.length && visible.length > 0 && <DropIndicator size={size} />}
-          {!loading && hiddenCount > 0 && (
+          {!loading && (hiddenCount > 0 || canCollapse) && (
             <UnstyledButton
               data-more
               w={size}
               h={size}
-              onClick={() => onOpenTier(tier)}
-              aria-label={`Show all ${items.length} in ${tier}`}
+              onClick={() => onToggleExpand(tier)}
+              aria-label={hiddenCount > 0 ? `Show all ${items.length} in ${tier}` : `Show ${tier} on one line`}
               className="more-tile"
               style={{
                 flexShrink: 0,
@@ -216,12 +223,23 @@ function TierRow({
                 justifyContent: 'center',
               }}
             >
-              <Text ff="var(--font-display)" fw={900} fz={size < 64 ? 15 : 19} lh={1} c={`color-mix(in srgb, ${color} 60%, var(--text))`}>
-                +{hiddenCount}
-              </Text>
-              <Text fz={10} c="dimmed" mt={3}>
-                show all
-              </Text>
+              {hiddenCount > 0 ? (
+                <>
+                  <Text ff="var(--font-display)" fw={900} fz={size < 64 ? 15 : 19} lh={1} c={`color-mix(in srgb, ${color} 60%, var(--text))`}>
+                    +{hiddenCount}
+                  </Text>
+                  <Text fz={10} c="dimmed" mt={3}>
+                    show all
+                  </Text>
+                </>
+              ) : (
+                <>
+                  <ChevronUp size={18} color={`color-mix(in srgb, ${color} 60%, var(--text))`} />
+                  <Text fz={10} c="dimmed" mt={3}>
+                    show less
+                  </Text>
+                </>
+              )}
             </UnstyledButton>
           )}
         </Group>
@@ -261,7 +279,7 @@ export default function TierBoardView({
   const isNarrow = useMediaQuery('(max-width: 62em)');
   const tileSize = isNarrow ? 64 : 88; // square; big enough to print the song name on
 
-  const tiers = TIER_ORDER.filter((t) => tierGroups[category]?.[t]);
+  const tiers = useMemo(() => TIER_ORDER.filter((t) => tierGroups[category]?.[t]), [tierGroups, category]);
   const anyLoading = boardLoading || tiers.some((t) => tierLoading[t]);
   // Before the playlists list itself has loaded we don't even know which
   // tiers this board has - show a neutral placeholder board, not "0 tiers".
@@ -277,6 +295,40 @@ export default function TierBoardView({
   function move(fromTier, toTier, videoId, dropIndex) {
     dispatch(moveWithFeedback([{ fromTier, toTier, videoId, dropIndex }]));
   }
+
+  // Layout (saved to the account): "all" wraps every row; "compact" is one
+  // line per tier, where "+N" expands just that row (for this visit).
+  const density = useSelector((s) => s.prefs.boardDensity);
+  const [expanded, setExpanded] = useState(() => new Set());
+  const toggleExpand = (tier) =>
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (!next.delete(tier)) next.add(tier);
+      return next;
+    });
+
+  // Hover a tile + press 1-5 (the board's Nth tier) to move it there - the
+  // fastest way to re-rank without dragging. Listens in the capture phase and
+  // stops the event, so while a tile is hovered the digit moves it instead of
+  // doing the player's "jump to N0%" seek.
+  const hovered = useRef(null);
+  useEffect(() => {
+    function onKeyDown(e) {
+      const tile = hovered.current;
+      const a = document.activeElement;
+      const isTyping = a?.tagName === 'INPUT' || a?.tagName === 'TEXTAREA' || a?.isContentEditable;
+      if (!tile || isTyping || e.ctrlKey || e.metaKey || e.altKey || e.shiftKey || !/^Digit[1-9]$/.test(e.code)) return;
+      const toTier = tiers[Number(e.code.slice(5)) - 1];
+      if (!toTier) return;
+      e.preventDefault();
+      e.stopPropagation();
+      if (toTier === tile.tier) return;
+      dispatch(moveWithFeedback([{ fromTier: tile.tier, toTier, videoId: tile.videoId }]));
+      hovered.current = null; // the tile has moved away from under the pointer
+    }
+    window.addEventListener('keydown', onKeyDown, true);
+    return () => window.removeEventListener('keydown', onKeyDown, true);
+  }, [tiers, dispatch]);
 
   // Vim-style "/" find: "/" opens it and is typed straight into the box as
   // the literal command-line prefix, the way vim's own "/" shows up in its
@@ -413,6 +465,15 @@ export default function TierBoardView({
               Find
             </Button>
           </Tooltip>
+          <SegmentedControl
+            value={density}
+            onChange={(v) => dispatch(setBoardDensity(v))}
+            data={[
+              { value: 'all', label: 'All songs' },
+              { value: 'compact', label: 'Compact' },
+            ]}
+            aria-label="Board layout"
+          />
           <Tooltip label="Pick the better of two until it's ranked" withArrow>
             <Button variant="default" leftSection={<Swords size={15} />} onClick={onStartDuel} disabled={!hasVideos}>
               Duel
@@ -459,6 +520,11 @@ export default function TierBoardView({
             items={tierItems[t]}
             loading={tierLoading[t]}
             size={tileSize}
+            // While searching, every match shows so n/N can always reach it.
+            showAll={searchActive || density === 'all' || expanded.has(t)}
+            canCollapse={!searchActive && density === 'compact' && expanded.has(t)}
+            onToggleExpand={toggleExpand}
+            onHoverTile={(tile) => (hovered.current = tile)}
             searchActive={searchActive}
             matchedKeys={matchedKeys}
             activeMatchKey={activeMatchKey}
@@ -483,7 +549,7 @@ export default function TierBoardView({
 
       {!anyLoading && hasVideos && (
         <Text fz="xs" c="dimmed" mt="sm" ta="center">
-          Drag tiles between tiers (or onto the rail) · click a tile to play · click a tier to see all of it · Ctrl+Z undoes
+          Drag a tile to another tier, or hover it and press 1-{tiers.length} · click a tile to play · Ctrl+Z undoes
         </Text>
       )}
 

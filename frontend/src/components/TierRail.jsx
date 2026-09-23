@@ -7,15 +7,18 @@ import { moveWithFeedback, useTierDnd } from '../tierActions';
 import { EqualizerMark } from './TierBits';
 import { TIER_INK } from '../tierUtils';
 
-export const RAIL_WIDTH = 84;
+const RAIL_WIDTH = 84;
 
-// The Tier Rail: the board's tiers as a permanent strip down the right edge
-// of every board page - the "tier list is always in reach" surface.
+// The Tier Rail: the board's tiers as a strip down the right edge of board
+// pages, shown only while it's useful - while a tile/row is being dragged
+// (drop it on any tier, even one scrolled off screen) or while rows are
+// selected on a tier page (click a tier to move them). The rest of the time
+// it's tucked away and the board gets the width. It slides in over the page
+// rather than resizing it, so nothing shifts under a drag in progress.
 // One click on a tier does the most useful thing available, in this order:
 //   1. rows are selected (tier focus)  -> move the selection there
 //   2. a song from this board is playing -> re-rate the playing song
 //   3. otherwise                        -> open that tier
-// It's also a drop target for any dragged tile or row (append to that tier).
 export default function TierRail({ activeTier, selection }) {
   const dispatch = useDispatch();
   const navigate = useNavigate();
@@ -31,6 +34,7 @@ export default function TierRail({ activeTier, selection }) {
   const tiers = TIER_ORDER.filter((t) => tierGroups[category][t]);
   const playingHere = focusedVideo && focusedCategory === category ? focusedVideo : null;
   const selectedCount = selection?.count ?? 0;
+  const shown = !!dnd.draggedVideoId || selectedCount > 0;
 
   function actionFor(tier) {
     if (selectedCount > 0) {
@@ -64,9 +68,14 @@ export default function TierRail({ activeTier, selection }) {
       w={RAIL_WIDTH}
       p={8}
       bg="var(--surface)"
+      aria-hidden={!shown}
       style={{
         bottom: 'var(--player-dock-height)',
         borderLeft: '1px solid var(--border-soft)',
+        boxShadow: shown ? '-8px 0 24px var(--shadow)' : 'none',
+        transform: shown ? 'none' : 'translateX(100%)',
+        visibility: shown ? 'visible' : 'hidden',
+        transition: 'transform 160ms ease, visibility 160ms',
         zIndex: 20,
         display: 'flex',
         flexDirection: 'column',
