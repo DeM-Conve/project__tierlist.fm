@@ -11,7 +11,6 @@ import {
   Kbd,
   Loader,
   Paper,
-  Progress,
   ScrollArea,
   Select,
   Skeleton,
@@ -144,11 +143,13 @@ function SongInput({ inputRef, onAddLinks, placed, onPick }) {
           }
         }}
         onKeyDown={onKeyDown}
-        placeholder="Paste a YouTube link, or type a song and press Enter"
+        placeholder="Paste a YouTube link, or type a song and press Enter to search"
         leftSection={looksLikeLink ? <Link2 size={18} /> : <Search size={18} />}
         rightSection={search.isFetching ? <Loader size="xs" /> : <Kbd size="xs">Enter</Kbd>}
         rightSectionWidth={64}
         aria-label="Paste a YouTube link or search for a song"
+        description="A pasted link costs 1 unit of YouTube's daily quota; a search costs 100, so pasting is best when you have the link."
+        inputWrapperOrder={['input', 'description']}
       />
 
       {submitted && (
@@ -233,7 +234,7 @@ export default function AddSongsView({ addSongs, actions, onAddLinks }) {
   const inputRef = useRef(null);
   const boardRef = useRef(null);
 
-  const { current, list, loading, progress, placed } = addSongs;
+  const { current, list, placed } = addSongs;
   const guess = addSongs.guessBoard(current);
   const board = guess ? tierGroups[guess.category] ?? {} : {};
   const hasTodo = !!board[TODO_TIER];
@@ -334,18 +335,7 @@ export default function AddSongsView({ addSongs, actions, onAddLinks }) {
         onPick={(video) => dispatch(addVideos([video]))}
       />
 
-      {loading && current && (
-        <Paper withBorder radius="lg" p="lg">
-          <Stack gap="xs">
-            <Text fz="sm" c="dimmed">
-              Checking your {progress.total} tier playlists for where this fits… {progress.loaded}/{progress.total}
-            </Text>
-            <Progress value={progress.total ? (progress.loaded / progress.total) * 100 : 0} animated />
-          </Stack>
-        </Paper>
-      )}
-
-      {!loading && current && (
+      {current && (
         <Paper withBorder radius="lg" p={{ base: 'md', sm: 'xl' }} bg="var(--surface)">
           <Flex gap="xl" direction={{ base: 'column', sm: 'row' }}>
             <UnstyledButton

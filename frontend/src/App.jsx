@@ -243,10 +243,8 @@ function Layout() {
     : currentCategory ?? (focusedVideoData ? focusedCategory : null);
 
   // Add songs lives up here: the sidebar count and paste-a-link-anywhere
-  // need it, not just its page. Where songs already are is only fetched once
-  // the page is open or something was picked (one request per playlist).
-  const waitingCount = useSelector((s) => s.addSongs.queue.length - s.addSongs.hidden.length);
-  const addSongs = useAddSongs(!!addMatch || waitingCount > 0);
+  // need it, not just its page.
+  const addSongs = useAddSongs();
   const addSongsActions = useAddSongsActions(addSongs);
   const fetchVideo = useFetchVideo();
 

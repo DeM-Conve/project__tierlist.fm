@@ -16,6 +16,11 @@ const queryClient = new QueryClient({
     queries: {
       retry: 1,
       refetchOnWindowFocus: false,
+      // Every YouTube read costs API quota (10,000 units/day for the whole
+      // app), so data is never refetched just because a page remounted:
+      // it stays until this app changes it (each write invalidates or
+      // patches the queries it touched) or the page is reloaded.
+      staleTime: Infinity,
     },
   },
 })

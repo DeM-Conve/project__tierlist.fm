@@ -1,20 +1,20 @@
 import { useMemo } from 'react';
 import { useSelector } from 'react-redux';
-import { useAllTierItemsQueries } from '../api/queries';
+import { useCachedTierItems } from '../api/queries';
 import { selectTierCategories, selectTierPlaylists } from '../store/selectors';
 import { TODO_TIER } from '../tiers';
 import { artistKey } from '../tierUtils';
 
 // "Add songs": the songs you picked (pasted links, search results) that are
-// waiting for a tier, plus what's needed to file them - where each song
-// already is and which board its artist lives on, learnt from every tier
-// playlist's items. Those are only fetched once `enabled` (the page is open
-// or something was picked), since that's one request per tier playlist.
-export function useAddSongs(enabled) {
+// waiting for a tier, plus hints for filing them - where a song already is
+// and which board its artist lives on - learnt only from boards already
+// loaded this session (no extra YouTube quota; a duplicate that slips
+// through is auto-resolved when its board is opened).
+export function useAddSongs() {
   const tierPlaylists = useSelector(selectTierPlaylists);
   const categories = useSelector(selectTierCategories);
   const session = useSelector((s) => s.addSongs);
-  const all = useAllTierItemsQueries(enabled ? tierPlaylists : null);
+  const itemsByPlaylist = useCachedTierItems(tierPlaylists);
 
   const index = useMemo(() => {
     // videoId -> [{ category, tier }]: where a song already is.
@@ -23,7 +23,7 @@ export function useAddSongs(enabled) {
     const artistBoards = new Map();
     for (const p of tierPlaylists ?? []) {
       const { category, tier } = p.parsed;
-      for (const v of all.itemsByPlaylist[p.id] ?? []) {
+      for (const v of itemsByPlaylist[p.id] ?? []) {
         placed.set(v.videoId, [...(placed.get(v.videoId) ?? []), { category, tier }]);
         if (tier === TODO_TIER) continue;
         const key = artistKey(v);
@@ -34,7 +34,7 @@ export function useAddSongs(enabled) {
       }
     }
     return { placed, artistBoards };
-  }, [tierPlaylists, all.itemsByPlaylist]);
+  }, [tierPlaylists, itemsByPlaylist]);
 
   return useMemo(() => {
     const { placed, artistBoards } = index;
@@ -76,8 +76,6 @@ export function useAddSongs(enabled) {
     }
 
     return {
-      loading: enabled && all.isLoading,
-      progress: { loaded: all.loaded, total: all.total },
       list,
       current,
       placed,
@@ -85,5 +83,5 @@ export function useAddSongs(enabled) {
       nextAfter,
       history: session.history,
     };
-  }, [index, session, categories, enabled, all.isLoading, all.loaded, all.total]);
+  }, [index, session, categories]);
 }

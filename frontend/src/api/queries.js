@@ -134,25 +134,19 @@ export function useSongSearchQuery(q) {
   });
 }
 
-// Every tier playlist's items, across all boards - what "Add songs" checks a
-// song against ("already in a tier?") and learns artist -> board from. Same
-// query keys as the boards' own, so opening a board afterwards is instant.
-// Pass null to hold off (it's ~one request per tier playlist).
-export function useAllTierItemsQueries(tierPlaylists) {
+// Every tier playlist's items that are *already cached* (boards opened this
+// session) - never fetched from here: scanning every playlist would cost
+// ~1 quota unit per 50 songs across all boards. "Add songs" uses this to
+// guess a board from the artist and to spot songs it knows are placed.
+export function useCachedTierItems(tierPlaylists) {
   const results = useQueries({
     queries: (tierPlaylists ?? []).map((p) => ({
       queryKey: ['playlist-items', p.id],
       queryFn: async () => (await api.get(`/api/playlists/${p.id}/items`)).data,
-      staleTime: 5 * 60 * 1000,
+      enabled: false,
     })),
   });
-  const loaded = results.filter((r) => r.data).length;
-  return {
-    total: tierPlaylists?.length ?? 0,
-    loaded,
-    isLoading: !tierPlaylists || loaded < tierPlaylists.length,
-    itemsByPlaylist: Object.fromEntries((tierPlaylists ?? []).map((p, i) => [p.id, results[i]?.data])),
-  };
+  return Object.fromEntries((tierPlaylists ?? []).map((p, i) => [p.id, results[i]?.data]));
 }
 
 // One video's details for a pasted link; cached per id.
