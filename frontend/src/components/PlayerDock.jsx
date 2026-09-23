@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { ActionIcon, Slider } from '@mantine/core';
+import { ActionIcon, Badge, Box, Group, Image, ScrollArea, Slider, Stack, Text, UnstyledButton } from '@mantine/core';
 import {
   ChevronDown,
   ChevronUp,
@@ -15,6 +15,7 @@ import {
   X,
 } from 'lucide-react';
 import { TIER_COLORS } from '../tiers';
+import { TierChip } from './TierBits';
 import EmbeddedPlayer from './EmbeddedPlayer';
 
 // Renders in 'expanded' (full-screen modal), 'mini' (YouTube-Music-style
@@ -51,6 +52,9 @@ export default function PlayerDock({
   onPrev,
   onNext,
   onChangeTier,
+  queue = [],
+  queueIndex = -1,
+  onJump,
 }) {
   const cardRef = useRef(null);
   const playerRef = useRef(null);
@@ -194,7 +198,7 @@ export default function PlayerDock({
       } else if (e.key === 'm') {
         e.preventDefault();
         toggleMute();
-      } else if (expanded && e.shiftKey && e.code.startsWith('Digit')) {
+      } else if (e.shiftKey && e.code.startsWith('Digit')) {
         // Shift+digit, not a plain digit - plain 0-9 is the seek-to-percent
         // shortcut below, so tier-reassignment needs a modifier to stay
         // unambiguous. e.code (not e.key) is used because e.key turns into a
@@ -318,7 +322,15 @@ export default function PlayerDock({
         floating ? ' player-dock-floating' : ''
       }`}
     >
-      <div className="player-dock-backdrop" onClick={onMinimize} />
+      <div
+        className="player-dock-backdrop"
+        onClick={onMinimize}
+        style={
+          currentTier
+            ? { backgroundImage: `radial-gradient(900px 500px at 30% 40%, color-mix(in srgb, ${TIER_COLORS[currentTier]} 22%, transparent), transparent 70%)` }
+            : undefined
+        }
+      />
       <div
         className="player-dock-card"
         tabIndex={-1}
@@ -420,7 +432,9 @@ export default function PlayerDock({
             <h2>
               {video.title}
               {isShuffling && expanded && (
-                <span className="shuffle-badge" title="Shuffle play is active">🔀 Shuffle</span>
+                <Badge ml="sm" variant="light" size="sm" style={{ verticalAlign: 'middle' }}>
+                  Shuffle
+                </Badge>
               )}
             </h2>
             <p className="hint-text">{video.channelTitle}</p>
@@ -460,6 +474,20 @@ export default function PlayerDock({
 
           {!expanded && (
             <div className="player-dock-secondary">
+              {availableTiers.length > 0 && !floating && (
+                <Group gap={3} wrap="nowrap" mr={6} visibleFrom="sm">
+                  {availableTiers.map((t, i) => (
+                    <TierChip
+                      key={t}
+                      tier={t}
+                      size={24}
+                      active={t === currentTier}
+                      onClick={t === currentTier ? undefined : () => onChangeTier(t)}
+                      title={`Rate → ${t} (Shift+${i + 1})`}
+                    />
+                  ))}
+                </Group>
+              )}
               <button
                 className="player-dock-icon-btn"
                 onClick={toggleMute}
@@ -494,19 +522,22 @@ export default function PlayerDock({
         {expanded && (
           <>
             {availableTiers.length > 0 && (
-              <div className="focus-tiers">
+              <Group gap={8} mt="md" wrap="wrap">
+                <Text fz="xs" fw={700} c="dimmed" tt="uppercase" mr={4} style={{ letterSpacing: 1 }}>
+                  Rate
+                </Text>
                 {availableTiers.map((t, i) => (
-                  <button
+                  <TierChip
                     key={t}
-                    className={`tier-pill${t === currentTier ? ' tier-pill-active' : ''}`}
-                    style={{ background: TIER_COLORS[t] }}
-                    onClick={() => onChangeTier(t)}
-                  >
-                    {t}
-                    <span className="tier-pill-key">⇧{i + 1}</span>
-                  </button>
+                    tier={t}
+                    size={34}
+                    active={t === currentTier}
+                    kbd={`⇧${i + 1}`}
+                    onClick={t === currentTier ? undefined : () => onChangeTier(t)}
+                    title={`Move to ${t}`}
+                  />
                 ))}
-              </div>
+              </Group>
             )}
 
             <p className="focus-hint">
@@ -514,6 +545,59 @@ export default function PlayerDock({
               {availableTiers.length > 0 && ` · shift+1-${availableTiers.length} set tier`}
             </p>
           </>
+        )}
+
+        {expanded && queue.length > 1 && (
+          <aside className="player-queue">
+            <Group justify="space-between" mb={8}>
+              <Text fz={11} fw={800} tt="uppercase" c="dimmed" style={{ letterSpacing: 1 }}>
+                Up next
+              </Text>
+              <Group gap={6}>
+                {isShuffling && (
+                  <Badge size="xs" variant="light">
+                    Shuffle
+                  </Badge>
+                )}
+                <Text fz="xs" c="dimmed">
+                  {queueIndex + 1} / {queue.length}
+                </Text>
+              </Group>
+            </Group>
+            <ScrollArea h="min(62vh, 560px)" type="auto" offsetScrollbars>
+              <Stack gap={2}>
+                {queue.slice(queueIndex, queueIndex + 60).map((entry, i) => {
+                  const idx = queueIndex + i;
+                  const isCurrent = i === 0;
+                  return (
+                    <UnstyledButton
+                      key={entry.video.videoId}
+                      onClick={() => onJump?.(idx)}
+                      className="queue-row"
+                      p={6}
+                      style={{
+                        borderRadius: 6,
+                        background: isCurrent ? 'color-mix(in srgb, var(--accent) 14%, transparent)' : undefined,
+                      }}
+                    >
+                      <Group gap={8} wrap="nowrap">
+                        <Image src={entry.video.thumbnail} w={36} h={36} radius={4} fit="cover" alt="" />
+                        <Box style={{ flex: 1, minWidth: 0 }}>
+                          <Text fz="sm" fw={isCurrent ? 700 : 500} c={isCurrent ? 'accent' : undefined} truncate="end">
+                            {entry.video.title}
+                          </Text>
+                          <Text fz="xs" c="dimmed" truncate="end">
+                            {entry.video.channelTitle}
+                          </Text>
+                        </Box>
+                        <TierChip tier={isCurrent ? currentTier ?? entry.tier : entry.tier} size={20} />
+                      </Group>
+                    </UnstyledButton>
+                  );
+                })}
+              </Stack>
+            </ScrollArea>
+          </aside>
         )}
       </div>
     </div>

@@ -139,6 +139,100 @@ public class PlaylistController {
         return response;
     }
 
+    /**
+     * Renames playlists (the naming-template migration job). YouTube's
+     * playlists.update replaces the whole snippet, so each playlist's current
+     * snippet is read first and only the title is changed - otherwise its
+     * description / language would be wiped. Body: [{ "id", "title" }].
+     * Per-item results; one failure never aborts the batch.
+     * Quota: ~51 units per playlist (list 1 + update 50).
+     */
+    @PostMapping("/api/playlists/rename")
+    public Map<String, Object> renamePlaylists(
+            @RequestBody List<Map<String, Object>> renames,
+            @RegisteredOAuth2AuthorizedClient("google") OAuth2AuthorizedClient client
+    ) {
+        List<Map<String, Object>> results = new ArrayList<>();
+        int applied = 0;
+        for (Map<String, Object> rename : renames) {
+            String id = (String) rename.get("id");
+            String title = (String) rename.get("title");
+            Map<String, Object> result = new LinkedHashMap<>();
+            result.put("id", id);
+            result.put("title", title);
+            try {
+                Map<String, Object> body = callYoutubeApi(client, YOUTUBE_API_BASE + "/playlists?part=snippet&id=" + id);
+                List<Map<String, Object>> items = (List<Map<String, Object>>) body.get("items");
+                if (items == null || items.isEmpty()) throw new IllegalStateException("Playlist not found");
+                Map<String, Object> snippet = new LinkedHashMap<>((Map<String, Object>) items.get(0).get("snippet"));
+                Map<String, Object> newSnippet = new LinkedHashMap<>();
+                newSnippet.put("title", title);
+                if (snippet.get("description") != null) newSnippet.put("description", snippet.get("description"));
+                if (snippet.get("defaultLanguage") != null) newSnippet.put("defaultLanguage", snippet.get("defaultLanguage"));
+                sendJson(client, HttpMethod.PUT, YOUTUBE_API_BASE + "/playlists?part=snippet", Map.of("id", id, "snippet", newSnippet));
+                result.put("success", true);
+                applied++;
+            } catch (Exception e) {
+                result.put("success", false);
+                result.put("error", e.getMessage());
+            }
+            results.add(result);
+        }
+        Map<String, Object> response = new LinkedHashMap<>();
+        response.put("applied", applied);
+        response.put("total", renames.size());
+        response.put("results", results);
+        return response;
+    }
+
+    /**
+     * Creates playlists (new tier list / missing tiers). Body:
+     * [{ "title", "privacyStatus"? }] - privacy defaults to private.
+     * Quota: 50 units per playlist.
+     */
+    @PostMapping("/api/playlists/create")
+    public Map<String, Object> createPlaylists(
+            @RequestBody List<Map<String, Object>> playlists,
+            @RegisteredOAuth2AuthorizedClient("google") OAuth2AuthorizedClient client
+    ) {
+        List<Map<String, Object>> results = new ArrayList<>();
+        int applied = 0;
+        for (Map<String, Object> playlist : playlists) {
+            String title = (String) playlist.get("title");
+            Object privacy = playlist.getOrDefault("privacyStatus", "private");
+            Map<String, Object> result = new LinkedHashMap<>();
+            result.put("title", title);
+            try {
+                Map<String, Object> created = sendJson(
+                    client,
+                    HttpMethod.POST,
+                    YOUTUBE_API_BASE + "/playlists?part=snippet,status",
+                    Map.of("snippet", Map.of("title", title), "status", Map.of("privacyStatus", privacy))
+                );
+                result.put("id", created != null ? created.get("id") : null);
+                result.put("success", true);
+                applied++;
+            } catch (Exception e) {
+                result.put("success", false);
+                result.put("error", e.getMessage());
+            }
+            results.add(result);
+        }
+        Map<String, Object> response = new LinkedHashMap<>();
+        response.put("applied", applied);
+        response.put("total", playlists.size());
+        response.put("results", results);
+        return response;
+    }
+
+    private Map<String, Object> sendJson(OAuth2AuthorizedClient client, HttpMethod method, String url, Map<String, Object> body) {
+        HttpHeaders headers = new HttpHeaders();
+        headers.setBearerAuth(client.getAccessToken().getTokenValue());
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        ResponseEntity<Map> response = restTemplate.exchange(url, method, new HttpEntity<>(body, headers), Map.class);
+        return response.getBody();
+    }
+
     private void insertPlaylistItem(OAuth2AuthorizedClient client, String playlistId, String videoId) {
         HttpHeaders headers = new HttpHeaders();
         headers.setBearerAuth(client.getAccessToken().getTokenValue());

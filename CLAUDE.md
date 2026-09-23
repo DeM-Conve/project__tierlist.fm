@@ -14,14 +14,26 @@ auto-grouped into a tier board per category.
     single full component library rather than utility CSS + headless primitives). Use
     Mantine's own components (`Tabs`, `Modal`, `Select`, etc.) for anything new/touched
     instead of hand-rolling equivalents.
-  - The app's palette is themed into Mantine via `src/mantineTheme.js` (`createTheme`,
-    `colors.dark` / `colors.accent` as 10-shade scales, `primaryColor: 'accent'`) so
-    every Mantine component inherits the warm-charcoal look instead of Mantine's
-    defaults. `MantineProvider` is mounted once in `main.jsx` with
-    `forceColorScheme="dark"` (this app has no light mode).
-  - `src/index.css` still holds the same palette as plain CSS variables (`--bg`,
-    `--surface`, `--accent`, etc.) for the pre-Mantine hand-written `App.css`, which
-    most existing components still use directly. Don't add new hand-written CSS classes
+  - **Every color is a variable, defined in exactly one place: `src/themes.js`.** It
+    holds the `THEMES` (3 dark + 3 light chromes), `ACCENTS` (8 most popular, usable with any theme; most reuse Mantine's own default palettes),
+    `TIER_PALETTES` (3), `MEDIA` (colors drawn over art/video) and `DEMO_ART`. The user
+    picks theme/accent/tier palette in Settings -> Appearance (`appearanceSlice`,
+    persisted per account in Postgres - see the Database bullet). `buildAppearance()` turns the choice into CSS variables
+    on `<html>` (`--bg`, `--surface*`, `--border*`, `--text*`, `--accent*`, `--shadow`,
+    `--overlay`, `--tier-t1..tz`, `--tier-ink`, `--media-*`) plus the Mantine theme;
+    `AppearanceRoot.jsx` wraps `MantineProvider` and re-applies both live.
+    `cssVariablesResolver` points Mantine's own color variables at ours and
+    `variantColorResolver` picks readable text on filled accent/tier colors - so there
+    is one set of color variables, and Mantine reads it.
+  - **Never hard-code a color** in a component or `App.css` - use `var(--token)`,
+    `TIER_COLORS` / `TIER_INK` (which are themselves `var(--tier-*)`), or Mantine color
+    props (`c="dimmed"`, `color="gray"` - never `dark.N`, which breaks light themes).
+    A genuinely new color means a new token in `themes.js` (+ its fallback in
+    `index.css :root`), not a literal. SVG icon props (`fill`/`color`) can't read CSS
+    variables - use `currentColor` and set `color` via `style`.
+  - `src/index.css :root` only holds *fallback* values for those tokens (the default
+    Graphite theme, for the instant before `themes.js` runs) plus font/radius tokens;
+    the pre-Mantine hand-written `App.css` reads the same variables. Don't add new hand-written CSS classes
     there for anything a Mantine component could do instead; convert an existing class
     to Mantine opportunistically when already touching that component, but there's no
     standing task to rewrite all of `App.css` at once.
@@ -61,12 +73,62 @@ auto-grouped into a tier board per category.
     loading indicator.
 - **Backend**: Spring Boot 3 (Java 21, Maven), in `backend/`. Session-based Google OAuth2
   login; talks to the YouTube Data API v3 directly (no separate token DB).
+- **Database**: **Postgres 17** (the `db` compose service, data in the `pgdata`
+  volume), accessed via **Spring Data JPA**, schema owned by **Flyway**
+  (`backend/src/main/resources/db/migration/V*__*.sql`; Hibernate is `ddl-auto:
+  validate` only). **Proper typed schemas, no JSON/`jsonb` blob columns, and every
+  closed option set is a native Postgres `ENUM`, never a free VARCHAR** (the user's
+  explicit calls). **Not in production yet**: while that's true, change `V1` in place
+  and reset the dev volume (`docker compose down && docker volume rm
+  project__yt_pgdata`) instead of stacking migrations; once it ships, never edit an
+  applied migration.
+  Tables: `app_user` (Google `sub` as id, recorded on every login by the success
+  handler in `SecurityConfig`) and `user_settings` (one row per user: `theme_option`,
+  `accent_option`, `tier_palette_option`, `duel_strategy_option` enums, the naming
+  template (+ CHECK constraints) and a `version`). Backend package
+  `fm.tierlist.settings`, layered and SOLID:
+  - enums `Theme`/`Accent`/`TierPalette`/`DuelStrategy`: constant name = Postgres
+    enum label (Hibernate `@JdbcTypeCode(SqlTypes.NAMED_ENUM)` + `columnDefinition`
+    naming the type so `validate` matches), `@JsonValue key()` = the frontend's id
+    (`tokyo`, `tierAwareMerge`) - the API speaks frontend keys, the DB its labels;
+  - `@Embeddable` records `Appearance`/`Naming`/`Prefs` (same grouping as the Redux
+    slices) inside the `UserSettings` entity; `SettingsDto` is the separate wire
+    contract with `from()`/`toX()` conversions (the DTO depends on the domain, never
+    the reverse);
+  - `@NamingTemplate` is a Bean Validation constraint mirroring `naming.js`
+    `validateTemplate` - keep the two grammars in step;
+  - `SettingsController` (thin, HTTP only) -> `SettingsService` (transactions, rules)
+    -> `UserSettingsRepository`;
+  - **conditional writes** (RFC 9110): the row's `@Version` is its `ETag`; a PUT must
+    send `If-Match: "<version>"` or `If-None-Match: *` (first save) - the sealed
+    `WritePrecondition` - else 428; stale -> 412 (`SettingsConflictException`, also
+    for lost `@Version`/insert races via `SettingsExceptionHandler`). Errors are
+    RFC 9457 ProblemDetail (`spring.mvc.problemdetails.enabled`).
+  Adding a setting: column (or enum type + column) in the migration, field in the
+  right embeddable + `SettingsDto`, one entry in the frontend's
+  `api/settingsMapping.js` `SCHEMA`. Adding an *option* (new theme etc.): enum label
+  in the migration, Java constant, and the frontend catalogue entry - the three
+  must match or the API rejects it (400).
+  Frontend side: `api/useSettingsSync.js` (called in `App()`) loads the row into the
+  `appearance`/`naming`/`prefs` slices via the `settingsLoaded` action, uploads this
+  browser's settings when the account has no row yet, PUTs changes (debounced, one
+  in flight) and on 412 refetches and `rebase()`s (three-way merge: this browser's
+  edits on top of the newer row). localStorage (`settings.js`) is only a boot cache
+  so the theme applies before first paint - the account's row wins.
+- **Backend tests**: `mvn verify` - unit tests (`*Test`, surefire) plus
+  Testcontainers integration tests (`*IT`, failsafe) against a real `postgres:17-alpine`
+  (needs Docker; `testcontainers.version` is pinned in `pom.xml` because Boot 3.3's
+  is too old for current Docker engines). New persistence/API behaviour gets an IT,
+  not a mock. The Docker image build skips tests.
 - **Deploy**: Docker Compose. `docker-compose.yml` (prod-style multi-stage builds) and
   `docker-compose.local.yml` (dev, volume-mounted). Rebuilding either container clears
   the backend's in-memory session, so you'll need to log in again after a redeploy.
 
 ## Conventions / decisions worth knowing
 
+- **Default look: Tokyo Night theme + Blue accent + Vivid tiers**, user-switchable in
+  Settings -> Appearance (see the themes.js bullet above). Accents offered by default
+  stay outside the tiers' red -> blue ramp so buttons don't read as tiers.
 - **No MUI, no Tailwind, no shadcn/ui, no bare Radix.** All considered and explicitly
   rejected in favor of Mantine as a single, final UI library choice - see git history
   around the frontend stack migration for the reasoning behind each.
@@ -103,12 +165,31 @@ auto-grouped into a tier board per category.
   returning from a duel) - removing that guard would silently discard an unsynced duel
   result or drag on every board/duel round-trip. Don't refetch tier-board data on mount
   without checking `loadedCategory` first.
+- **Playlist names follow the user's naming template (`src/naming.js`, `namingSlice`).**
+  The default is generic (`{category} {tier}`); the `[G]`/`[GA]`/`[GO]` tag prefix is the
+  user's personal convention, not something to assume for everyone - it's the optional
+  `{tag}` token, auto-detected on first run (`detectTemplate`).
+  Never parse playlist titles with an ad-hoc regex - use `parseTitle`/`renderTitle`,
+  and read playlists through `selectTierPlaylists` (template-matching only, each with
+  `.parsed`), never `state.auth.playlists` directly in UI: non-matching playlists are
+  deliberately invisible everywhere (privacy). Renames/creates go through
+  `/api/playlists/rename` / `/api/playlists/create` (per-item results).
+- **Every tier edit goes through `src/tierActions.jsx`** (`moveWithFeedback`,
+  `applyOrderWithFeedback`, `undoEdit`, `useTierDnd`) - never dispatch
+  `moveVideoToTier`/`moveVideos` directly from a component. That's what gives every
+  surface the same undo toast, the same Ctrl+Z step (`tiersSlice.undoStack`), and keeps
+  the player's `focusedVideo.tier` in sync after a move.
+- **The tier list is the product's moat** (see `PRODUCT.md`): the Tier Rail
+  (`TierRail.jsx`) is always on board pages; board pages render inside `BoardShell`
+  in `App.jsx` (rail + shared `PendingChanges` bar, which also owns Shift+P).
 - **Duel ranking uses the Strategy pattern** (`frontend/src/duel/`): multiple
   interchangeable ranking algorithms (`tierAwareMerge` default, `mergeSort`, `elo`)
   behind a common interface, swappable at runtime from the duel screen or persisted as a
   default from Settings.
 - Full feature list: `docs/features.md`. Keep it updated when you add a user-facing
-  feature.
+  feature. It doubles as the no-regression checklist (the user asked for this) -
+  before redesigning/rewriting any page, check every item listed for it (and the
+  "Keyboard shortcuts" section) still works afterwards, and update the entries.
 
 ## Pending work (frontend stack migration, in progress)
 
@@ -149,16 +230,25 @@ The user asked for these on top of the Mantine/Redux migration above. Tracked he
   duel view to Mantine `Container`/`Group`/`Stack`/`Progress`/`Card`/`Card.Section`/
   `Badge`/`Text`/`Title` (only card-hover-lift and absolute-overlay positioning for
   the tier badge/preview button stayed as CSS - Mantine has no prop for either).
-  Still
-  hand-rolled CSS in `App.css`: the tier board's own grid/row layout (`.tier-row`,
-  `.tier-content`, drag-and-drop positioning), `PlayerDock`'s expanded/mini/floating
-  layouts, and the duel cards. Convert opportunistically whenever one of those is
+  The tier board, tier page, rail, home, sidebar, playlist page and duel are all Mantine now (only hover states / keyframes stay as CSS).
+  Still hand-rolled CSS in `App.css`: `PlayerDock`'s expanded/mini/floating layouts
+  (plus its queue-column grid) and the duel card hover. Convert opportunistically whenever one of those is
   next touched, rather than in one big-bang rewrite - and when a hand-rolled class's
   last usage is removed, delete its now-dead CSS rule in the same pass (don't leave
   it orphaned "just in case").
 
 ## Housekeeping
 
+- **Prefer popular, well-tested libraries over hand-written code - the user's standing
+  preference.** If a mainstream library (high download count, actively maintained)
+  solves the problem, use it rather than writing and debugging it ourselves: installing
+  one is preferred over hand-rolling. Examples already in the codebase: `colord` for
+  color math (not hex arithmetic), Mantine's
+  `Radio.Card`/`ColorSwatch`/`Notifications`/`Spotlight`/`useElementSize`/`useHotkeys`
+  instead of custom pickers, toasts, palettes or listeners, Mantine's
+  `variantColorResolver`/`cssVariablesResolver` for theming. Only popular libraries -
+  no obscure or unmaintained packages. Extensible, quick-to-write code built on those
+  beats clever custom code.
 - **Library-first, every time, no exceptions.** Before writing a single line of
   hand-rolled CSS or plain-DOM/manual state code, check whether an already-installed
   library does the job: Mantine's own component props (`style`/`styles`, `gap`, `radius`,

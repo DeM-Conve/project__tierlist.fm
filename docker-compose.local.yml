@@ -1,4 +1,20 @@
 services:
+  # Per-user app state (settings). Data lives in the pgdata volume, so it
+  # survives rebuilds; schema is created by the backend's Flyway migrations.
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-yt}
+      POSTGRES_USER: ${POSTGRES_USER:-yt}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-yt}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
   backend:
     image: maven:3.9-eclipse-temurin-21
     working_dir: /app
@@ -10,6 +26,13 @@ services:
       - "${SERVER_PORT:-48123}:${SERVER_PORT:-48123}"
     env_file:
       - .env
+    environment:
+      DB_URL: jdbc:postgresql://db:5432/${POSTGRES_DB:-yt}
+      DB_USER: ${POSTGRES_USER:-yt}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-yt}
+    depends_on:
+      db:
+        condition: service_healthy
 
   frontend:
     image: node:22-alpine
@@ -26,5 +49,6 @@ services:
       - backend
 
 volumes:
+  pgdata:
   maven-repo:
   frontend-node-modules:

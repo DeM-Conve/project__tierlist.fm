@@ -13,18 +13,8 @@ import {
 } from '@mantine/core';
 import { LayoutGrid, ListOrdered, Radio, Swords } from 'lucide-react';
 import { TIER_ORDER, TIER_COLORS } from '../tiers';
-
-// Muted warm gradients standing in for video thumbnails in the board mock.
-const THUMBS = [
-  ['#5a3a2a', '#c4703c'],
-  ['#2e3a3f', '#6f8f8a'],
-  ['#3f2a3a', '#a0587a'],
-  ['#3a3522', '#b39a4c'],
-  ['#23303f', '#5a78a8'],
-  ['#3f2b22', '#8f5a3c'],
-  ['#2a3a2c', '#6f9a5c'],
-  ['#3a2230', '#c45a5a'],
-];
+import { TIER_INK } from '../tierUtils';
+import { DEMO_ART } from '../themes';
 
 const BOARD = {
   T1: [0, 4, 7],
@@ -55,7 +45,7 @@ const FEATURES = [
 ];
 
 function Thumb({ index, w = 72, lifted = false }) {
-  const [from, to] = THUMBS[index % THUMBS.length];
+  const [from, to] = DEMO_ART[index % DEMO_ART.length];
   return (
     <Box
       pos="relative"
@@ -68,7 +58,7 @@ function Thumb({ index, w = 72, lifted = false }) {
         ...(lifted && {
           outline: '2px solid var(--accent)',
           outlineOffset: 2,
-          boxShadow: '0 18px 40px rgba(0, 0, 0, 0.55)',
+          boxShadow: '0 18px 40px var(--shadow)',
           transform: 'rotate(-4deg) translateY(-6px)',
         }),
       }}
@@ -82,8 +72,8 @@ function Thumb({ index, w = 72, lifted = false }) {
         fz={8}
         fw={600}
         lh="12px"
-        c="dark.0"
-        bg="rgba(0, 0, 0, 0.7)"
+        c="var(--media-fg)"
+        bg="var(--media-control-bg)"
         style={{ borderRadius: 2 }}
       >
         {DURATIONS[index % DURATIONS.length]}
@@ -94,7 +84,7 @@ function Thumb({ index, w = 72, lifted = false }) {
 
 function BoardMock() {
   return (
-    <Box pos="relative" className="landing-rise" style={{ animationDelay: '180ms' }}>
+    <Box pos="relative" className="anim-rise" style={{ animationDelay: '180ms' }}>
       <Paper
         withBorder
         radius="md"
@@ -102,7 +92,7 @@ function BoardMock() {
         bg="var(--surface)"
         style={{
           transform: 'perspective(1400px) rotateY(-9deg) rotateX(4deg)',
-          boxShadow: '0 40px 80px -20px rgba(0, 0, 0, 0.7)',
+          boxShadow: '0 40px 80px -20px var(--shadow)',
         }}
       >
         <Group justify="space-between" mb="sm">
@@ -114,7 +104,7 @@ function BoardMock() {
               13 videos
             </Badge>
           </Group>
-          <Badge size="xs" variant="outline" color="dark.2">
+          <Badge size="xs" variant="outline" color="gray">
             2 pending
           </Badge>
         </Group>
@@ -132,7 +122,7 @@ function BoardMock() {
                 bg={TIER_COLORS[tier]}
                 style={{ display: 'grid', placeItems: 'center', flexShrink: 0 }}
               >
-                <Text ff="var(--font-display)" fw={900} fz="md" c="#1a1509">
+                <Text ff="var(--font-display)" fw={900} fz="md" c={TIER_INK}>
                   {tier}
                 </Text>
               </Box>
@@ -142,7 +132,7 @@ function BoardMock() {
                 wrap="nowrap"
                 style={{
                   flex: 1,
-                  background: tier === 'T1' ? 'rgba(214, 162, 76, 0.08)' : undefined,
+                  background: tier === 'T1' ? 'color-mix(in srgb, var(--accent) 10%, transparent)' : undefined,
                 }}
               >
                 {BOARD[tier].map((thumb, i) => (
@@ -166,7 +156,7 @@ function BoardMock() {
       </Paper>
 
       {/* A thumbnail mid-drag from T2 up into T1's drop slot. */}
-      <Box pos="absolute" top={72} right={34} className="landing-float" style={{ animationDelay: '0.6s' }}>
+      <Box pos="absolute" top={72} right={34} className="anim-float" style={{ animationDelay: '0.6s' }}>
         <Thumb index={3} w={84} lifted />
       </Box>
 
@@ -179,8 +169,8 @@ function BoardMock() {
         bottom={-80}
         left={-36}
         bg="var(--surface-2)"
-        className="landing-float"
-        style={{ boxShadow: '0 24px 50px rgba(0, 0, 0, 0.6)' }}
+        className="anim-float"
+        style={{ boxShadow: '0 24px 50px var(--shadow)' }}
       >
         <Text fz={10} fw={700} tt="uppercase" c="dimmed" mb={6} style={{ letterSpacing: 1 }}>
           Which is better?
@@ -217,15 +207,15 @@ export default function LoginView({ onLogin }) {
         flexDirection: 'column',
         overflow: 'hidden',
         background:
-          'radial-gradient(900px 600px at 85% 30%, rgba(214, 162, 76, 0.13), transparent 60%),' +
-          'radial-gradient(700px 500px at 10% 100%, rgba(232, 80, 58, 0.07), transparent 60%),' +
+          'radial-gradient(900px 600px at 85% 30%, color-mix(in srgb, var(--accent) 16%, transparent), transparent 60%),' +
+          'radial-gradient(700px 500px at 10% 100%, color-mix(in srgb, var(--tier-tz) 8%, transparent), transparent 60%),' +
           'var(--bg)',
       }}
     >
       <Container size="lg" w="100%" py="lg">
         <Group gap={10}>
           <ThemeIcon size={30} radius="sm" variant="filled">
-            <ListOrdered size={18} color="#1a1509" />
+            <ListOrdered size={18} />
           </ThemeIcon>
           <Text fw={800} fz={17}>
             Playlist Tiers
@@ -235,7 +225,7 @@ export default function LoginView({ onLogin }) {
 
       <Container size="lg" w="100%" style={{ flex: 1, display: 'flex', alignItems: 'center' }}>
         <SimpleGrid cols={{ base: 1, md: 2 }} spacing={72} py={48} w="100%" style={{ alignItems: 'center' }}>
-          <Stack gap="xl" className="landing-rise">
+          <Stack gap="xl" className="anim-rise">
             <Badge variant="light" size="lg" radius="sm" w="fit-content">
               Your own YouTube account
             </Badge>
@@ -254,7 +244,7 @@ export default function LoginView({ onLogin }) {
               </Text>
             </Title>
 
-            <Text fz="lg" c="dark.2" maw={470} lh={1.55}>
+            <Text fz="lg" c="var(--text-dim)" maw={470} lh={1.55}>
               Sort every video into tiers, settle close calls head-to-head, and keep listening while
               you do it.
             </Text>

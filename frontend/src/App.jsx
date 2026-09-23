@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useQueryClient } from '@tanstack/react-query';
 import {
@@ -12,13 +12,19 @@ import {
   useOutletContext,
 } from 'react-router-dom';
 import { spotlight } from '@mantine/spotlight';
-import { Center, Loader } from '@mantine/core';
+import { ActionIcon, Affix, Box, Center, Loader } from '@mantine/core';
+import { Menu as MenuIcon } from 'lucide-react';
 import { useDisclosure, useHotkeys } from '@mantine/hooks';
 import { useProgress } from '@bprogress/react';
 import './App.css';
 import { TIER_ORDER } from './tiers';
 import Sidebar from './components/Sidebar';
-import PlaylistsView from './components/PlaylistsView';
+import HomeView from './components/HomeView';
+import TierFocusView from './components/TierFocusView';
+import CreateTierPlaylistsModal from './components/CreateTierPlaylistsModal';
+import TierRail, { RAIL_WIDTH } from './components/TierRail';
+import PendingChanges from './components/PendingChanges';
+import { applyOrderWithFeedback, moveWithFeedback, undoEdit } from './tierActions';
 import ItemsView from './components/ItemsView';
 import TierBoardView from './components/TierBoardView';
 import PlayerDock from './components/PlayerDock';
@@ -28,6 +34,9 @@ import SettingsView from './components/SettingsView';
 import ShortcutsModal from './components/ShortcutsModal';
 import LoginView from './components/LoginView';
 import { setLoggedIn, setPlaylists } from './store/authSlice';
+import { detectedTemplate } from './store/namingSlice';
+import { useSettingsSync } from './api/useSettingsSync';
+import { detectTemplate } from './naming';
 import { setCurrentCategory, setQuery, setMobileSidebarOpen } from './store/viewSlice';
 import {
   resetTierBoard,
@@ -37,9 +46,6 @@ import {
   applySyncedMoves,
   discardTierChanges,
   setSyncStatus,
-  setDraggedVideoId,
-  setDragOverTier,
-  moveVideoToTier as moveVideoToTierAction,
 } from './store/tiersSlice';
 import {
   openFocus as openFocusAction,
@@ -52,8 +58,10 @@ import {
 } from './store/focusSlice';
 import {
   selectTierGroups,
+  selectTierPlaylists,
   selectTierCategories,
   selectPendingMoves,
+  selectPlayingVideoIdOnBoard,
   selectDuelPool,
   selectDuelRuns,
   selectDuelTierSizes,
@@ -74,12 +82,6 @@ import {
   useInvalidatePlaylistItems,
 } from './api/queries';
 
-// Module-level (not component state) so it survives route component
-// remounts but resets on an actual page reload - "redirect to the first
-// tier board on the very first landing at '/', but not on every later
-// visit to Playlists via the sidebar" only makes sense as a one-time,
-// whole-session flag, not per-mount state.
-let hasAutoRedirected = false;
 
 // Fetches a board's tiers via TanStack Query (one query per tier's
 // underlying playlist, cached by playlist id) and mirrors the result into
@@ -92,15 +94,19 @@ function useLoadTierBoard(category, tiers) {
   const dispatch = useDispatch();
   const loadedCategory = useSelector((s) => s.tiers.loadedCategory);
   const { data, isLoading } = useTierBoardQueries(category, tiers);
-  const boardLoading = isLoading || loadedCategory !== category;
+  const boardLoading = !tiers || isLoading || loadedCategory !== category;
 
   useEffect(() => {
-    if (!data || loadedCategory === category) return;
+    // `tiers` is undefined until the playlists list itself has loaded (e.g.
+    // a refresh / deep link straight onto a board). Without this guard the
+    // empty result from "no tiers yet" got marked as this board's loaded
+    // data, and the board stayed blank until you navigated away and back.
+    if (!tiers || !data || loadedCategory === category) return;
     const presentTiers = Object.keys(data);
     dispatch(resetTierBoard({ category, presentTiers }));
     presentTiers.forEach((tier) => dispatch(setTierForCategory({ tier, videos: data[tier] })));
     dispatch(setLoadedCategory(category));
-  }, [data, category, loadedCategory, dispatch]);
+  }, [data, tiers, category, loadedCategory, dispatch]);
 
   // Drives the top-of-page progress bar (@bprogress/react) while switching
   // between tier boards - the actual "stale items still showing" bug this
@@ -134,6 +140,19 @@ export default function App() {
     if (playlistsData) dispatch(setPlaylists(playlistsData));
   }, [playlistsData, dispatch]);
 
+  // Settings live in Postgres per account; localStorage is only a cache.
+  const { ready: settingsReady } = useSettingsSync(authData?.loggedIn === true);
+
+  // First run for this account: adopt the naming template that fits the
+  // user's existing playlists (no-op once a template has been chosen - wait
+  // for the account's saved settings, which may already have one).
+  const needsTemplateDetection = useSelector((s) => s.naming.needsDetection);
+  useEffect(() => {
+    if (playlistsData && settingsReady && needsTemplateDetection) {
+      dispatch(detectedTemplate(detectTemplate(playlistsData.map((p) => p.title))));
+    }
+  }, [playlistsData, settingsReady, needsTemplateDetection, dispatch]);
+
   function login() {
     window.location.href = `${API_BASE}/oauth2/authorization/google`;
   }
@@ -155,9 +174,10 @@ export default function App() {
   return (
     <Routes>
       <Route path="/" element={<Layout />}>
-        <Route index element={<PlaylistsPage />} />
+        <Route index element={<HomePage />} />
         <Route path="playlist/:id" element={<ItemsPage />} />
         <Route path="tier/:category" element={<TierBoardPage />} />
+        <Route path="tier/:category/t/:tier" element={<TierFocusPage />} />
         <Route path="tier/:category/duel" element={<DuelPage />} />
         <Route path="settings" element={<SettingsPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
@@ -178,7 +198,7 @@ function Layout() {
 
   const query = useSelector((s) => s.view.query);
   const mobileSidebarOpen = useSelector((s) => s.view.mobileSidebarOpen);
-  const playlists = useSelector((s) => s.auth.playlists);
+  const tierPlaylists = useSelector(selectTierPlaylists);
   const focusedVideo = useSelector((s) => s.focus.focusedVideo);
   const isShuffling = useSelector((s) => s.focus.isShuffling);
   const playerMode = useSelector((s) => s.focus.playerMode);
@@ -193,8 +213,18 @@ function Layout() {
   const focusedVideoData = useSelector(selectFocusedVideoData);
   const focusedAvailableTiers = useSelector(selectFocusedAvailableTiers);
 
-  const tierMatch = useMatch('/tier/:category');
+  const tierMatch = useMatch('/tier/:category/*');
   const currentCategory = tierMatch ? decodeURIComponent(tierMatch.params.category) : null;
+  const tierPageMatch = useMatch('/tier/:category/t/:tier');
+  const duelMatch = useMatch('/tier/:category/duel');
+  const focusedCategory = useSelector((s) => s.focus.focusedCategory);
+  // The Tier Rail is global like the player: on a board page it shows that
+  // board; anywhere else it follows the playing song's board, so the song
+  // can still be rated from Home / Settings / a playlist page. The duel
+  // screen keeps the whole width to itself.
+  const railCategory = duelMatch
+    ? null
+    : currentCategory ?? (focusedVideoData ? focusedCategory : null);
 
   const tierSyncMutation = useTierSyncMutation();
   const invalidatePlaylistItems = useInvalidatePlaylistItems();
@@ -204,7 +234,11 @@ function Layout() {
   // of its own (see shortcuts.js's header comment for why the others still
   // have bespoke handlers) - a flat, always-on binding is exactly what
   // useHotkeys is for, and it already ignores keydowns while typing.
-  useHotkeys([['shift+?', () => shortcutsHandlers.open()]]);
+  useHotkeys([
+    ['shift+?', () => shortcutsHandlers.open()],
+    // Every tier edit is one undo step (see tierActions.jsx).
+    ['mod+Z', () => dispatch(undoEdit())],
+  ]);
 
   async function syncChanges(category) {
     dispatch(setSyncStatus('syncing'));
@@ -249,7 +283,20 @@ function Layout() {
   }
 
   function moveVideoToTier(fromTier, toTier, videoId, dropIndex) {
-    dispatch(moveVideoToTierAction({ fromTier, toTier, videoId, dropIndex }));
+    dispatch(moveWithFeedback([{ fromTier, toTier, videoId, dropIndex }]));
+  }
+
+  // "Play from T2": opens the dock on that tier's first video, with the
+  // normal whole-board order, so it rolls on into the next tiers.
+  function playFrom(tier) {
+    const first = focusSequence.find((e) => e.tier === tier);
+    if (first) openFocus(first.tier, first.video.videoId);
+  }
+
+  function jumpToQueueIndex(index) {
+    const entry = activeSequence[index];
+    if (!entry) return;
+    dispatch(setFocusedVideo({ tier: videoLookup.get(entry.video.videoId)?.tier ?? entry.tier, videoId: entry.video.videoId }));
   }
 
   function openFocus(tier, videoId) {
@@ -302,8 +349,8 @@ function Layout() {
 
   function changeFocusedTier(newTier) {
     if (!focusedVideo || newTier === focusedVideo.tier) return;
+    // moveWithFeedback also re-points focusedVideo.tier at the new tier.
     moveVideoToTier(focusedVideo.tier, newTier, focusedVideo.videoId, null);
-    dispatch(setFocusedVideo({ tier: newTier, videoId: focusedVideo.videoId }));
   }
 
   async function logout() {
@@ -315,7 +362,6 @@ function Layout() {
     dispatch(setSyncStatus('idle'));
     dispatch(closeFocusAction());
     spotlight.close();
-    hasAutoRedirected = false;
     navigate('/', { replace: true });
   }
 
@@ -329,7 +375,7 @@ function Layout() {
         action: () => navigate(`/tier/${encodeURIComponent(category)}`),
       });
     }
-    for (const p of playlists || []) {
+    for (const p of tierPlaylists || []) {
       list.push({
         id: `playlist-${p.id}`,
         section: 'Playlists',
@@ -340,10 +386,18 @@ function Layout() {
     list.push({
       id: 'action-playlists',
       section: 'Actions',
-      label: 'Go to Playlists',
+      label: 'Go to Home (boards & playlists)',
       action: () => navigate('/'),
     });
     if (currentCategory) {
+      for (const t of TIER_ORDER.filter((x) => tierGroups[currentCategory]?.[x])) {
+        list.push({
+          id: `open-tier-${t}`,
+          section: 'Tiers',
+          label: `Open ${t} of ${currentCategory}`,
+          action: () => navigate(`/tier/${encodeURIComponent(currentCategory)}/t/${t}`),
+        });
+      }
       list.push({
         id: 'action-duel',
         section: 'Actions',
@@ -367,20 +421,30 @@ function Layout() {
     }
     return list;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tierCategories, playlists, currentCategory, pendingMoves]);
+  }, [tierCategories, tierPlaylists, currentCategory, pendingMoves, tierGroups]);
 
   return (
     <div className="app-shell">
-      <button className="mobile-menu-btn" onClick={() => dispatch(setMobileSidebarOpen(true))}>
-        Menu
-      </button>
+      <Affix position={{ top: 14, left: 14 }} hiddenFrom="md" zIndex={30}>
+        <ActionIcon
+          size="lg"
+          variant="default"
+          onClick={() => dispatch(setMobileSidebarOpen(true))}
+          aria-label="Open menu"
+        >
+          <MenuIcon size={18} />
+        </ActionIcon>
+      </Affix>
 
       <Sidebar
         query={query}
         onQueryChange={(q) => dispatch(setQuery(q))}
         tierCategories={tierCategories}
-        playlistCount={playlists?.length ?? 0}
+        tierGroups={tierGroups}
+        playlistCount={tierPlaylists?.length ?? 0}
+        loading={tierPlaylists === null}
         onSelectSettings={() => navigate('/settings')}
+        onOpenShortcuts={shortcutsHandlers.open}
         onLogout={logout}
         onOpenPalette={() => spotlight.open()}
         mobileOpen={mobileSidebarOpen}
@@ -388,6 +452,8 @@ function Layout() {
       />
 
       <main className="canvas">
+        {railCategory && <TierRail category={railCategory} activeTier={tierPageMatch?.params.tier} />}
+        <Box pr={railCategory ? { base: 0, md: RAIL_WIDTH - 16 } : 0}>
         <Outlet
           context={{
             syncChanges,
@@ -395,8 +461,10 @@ function Layout() {
             moveVideoToTier,
             openFocus,
             startShufflePlay,
+            playFrom,
           }}
         />
+        </Box>
       </main>
 
       {focusedVideoData && (
@@ -415,6 +483,9 @@ function Layout() {
           onPrev={() => navigateFocus(-1)}
           onNext={() => navigateFocus(1)}
           onChangeTier={changeFocusedTier}
+          queue={activeSequence}
+          queueIndex={focusedSeqIndex}
+          onJump={jumpToQueueIndex}
         />
       )}
 
@@ -424,70 +495,20 @@ function Layout() {
   );
 }
 
-function PlaylistsPage() {
-  const dispatch = useDispatch();
-  const navigate = useNavigate();
-  const playlists = useSelector((s) => s.auth.playlists);
-  const query = useSelector((s) => s.view.query);
-  const tierCategories = useSelector(selectTierCategories);
 
-  useEffect(() => {
-    dispatch(setCurrentCategory(null));
-    dispatch(setMobileSidebarOpen(false));
-  }, [dispatch]);
-
-  // Land on the first tier board on the very first visit to "/" (so a fresh
-  // login doesn't just show an empty playlists grid when boards exist), but
-  // never again afterwards - clicking "Playlists" later should show
-  // Playlists, not bounce back to a board.
-  useEffect(() => {
-    if (playlists && !hasAutoRedirected) {
-      hasAutoRedirected = true;
-      if (tierCategories.length > 0) {
-        navigate(`/tier/${encodeURIComponent(tierCategories[0])}`, { replace: true });
-      }
-    }
-  }, [playlists, tierCategories, navigate]);
-
-  return (
-    <PlaylistsView
-      playlists={playlists}
-      query={query}
-      onOpenPlaylist={(p) => navigate(`/playlist/${encodeURIComponent(p.id)}`)}
-    />
-  );
-}
-
-function ItemsPage() {
-  const { id } = useParams();
-  const playlistId = decodeURIComponent(id);
-  const dispatch = useDispatch();
-  const playlists = useSelector((s) => s.auth.playlists);
-  const playlist = playlists?.find((p) => p.id === playlistId);
-  const { data: items, isLoading } = usePlaylistItemsQuery(playlistId);
-
-  useEffect(() => {
-    dispatch(setCurrentCategory(null));
-    dispatch(setMobileSidebarOpen(false));
-  }, [dispatch]);
-
-  return <ItemsView playlist={playlist} items={items ?? null} loading={isLoading} />;
-}
-
-function TierBoardPage() {
+function useCategoryParam() {
   const { category: rawCategory } = useParams();
-  const category = decodeURIComponent(rawCategory);
+  return decodeURIComponent(rawCategory);
+}
+
+// Shared by every page of a board (tier list, tier focus, duel):
+// marks it as the current board, bounces unknown boards home, and loads
+// (or reuses - see loadedCategory) its tiers.
+function useBoardPage(category) {
   const dispatch = useDispatch();
   const navigate = useNavigate();
-  const { syncChanges, discardChanges, openFocus, startShufflePlay } = useOutletContext();
-
   const playlists = useSelector((s) => s.auth.playlists);
   const tierGroups = useSelector(selectTierGroups);
-  const tierItems = useSelector((s) => s.tiers.tierItems);
-  const dragOverTier = useSelector((s) => s.tiers.dragOverTier);
-  const draggedVideoId = useSelector((s) => s.tiers.draggedVideoId);
-  const syncStatus = useSelector((s) => s.tiers.syncStatus);
-  const pendingMoves = useSelector(selectPendingMoves);
 
   useEffect(() => {
     dispatch(setCurrentCategory(category));
@@ -500,100 +521,184 @@ function TierBoardPage() {
   }, [category, playlists, tierGroups, navigate]);
 
   const { isLoading } = useLoadTierBoard(category, tierGroups[category]);
-  const tierLoading = useMemo(() => {
-    if (!isLoading) return {};
-    const tiers = tierGroups[category];
-    return Object.fromEntries(TIER_ORDER.filter((t) => tiers?.[t]).map((t) => [t, true]));
-  }, [isLoading, tierGroups, category]);
+  const tiers = TIER_ORDER.filter((t) => tierGroups[category]?.[t]);
+  const tierLoading = useMemo(
+    () => (isLoading ? Object.fromEntries(tiers.map((t) => [t, true])) : {}),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [isLoading, tiers.join()]
+  );
+  return { tierGroups, tiers, isLoading, tierLoading };
+}
 
-  function handleThumbDragStart(e, video, fromTier) {
-    e.dataTransfer.setData('application/json', JSON.stringify({ videoId: video.videoId, fromTier }));
-    e.dataTransfer.effectAllowed = 'move';
-    dispatch(setDraggedVideoId(video.videoId));
-  }
+// Board pages sit beside the Tier Rail (desktop) and above the shared
+// staged-changes bar.
+// (The Tier Rail itself is global - mounted in Layout, see railCategory.)
+function BoardShell({ children }) {
+  return (
+    <>
+      {children}
+      <PendingChanges />
+    </>
+  );
+}
 
-  function handleThumbDragEnd() {
-    dispatch(setDraggedVideoId(null));
-    dispatch(setDragOverTier(null));
-  }
+function usePendingRemovalKeys() {
+  const pendingMoves = useSelector(selectPendingMoves);
+  return useMemo(
+    () => new Set(pendingMoves.filter((m) => m.kind === 'dedupe').map((m) => `${m.tier}:${m.video.videoId}`)),
+    [pendingMoves]
+  );
+}
 
-  function handleRowDragOver(e, tier) {
-    e.preventDefault();
-    if (dragOverTier !== tier) dispatch(setDragOverTier(tier));
-  }
+function HomePage() {
+  const dispatch = useDispatch();
+  const navigate = useNavigate();
+  const allPlaylists = useSelector((s) => s.auth.playlists);
+  const tierPlaylists = useSelector(selectTierPlaylists);
+  const query = useSelector((s) => s.view.query);
+  const tierGroups = useSelector(selectTierGroups);
+  const tierCategories = useSelector(selectTierCategories);
+  const focusedCategory = useSelector((s) => s.focus.focusedCategory);
+  const playingVideo = useSelector(selectFocusedVideoData);
 
-  function handleRowDragLeave(tier) {
-    if (dragOverTier === tier) dispatch(setDragOverTier(null));
-  }
-
-  function handleRowDrop(e, toTier, dropIndex) {
-    e.preventDefault();
-    let data;
-    try {
-      data = JSON.parse(e.dataTransfer.getData('application/json') || '{}');
-    } catch {
-      data = {};
-    }
-    const { videoId, fromTier } = data;
-    dispatch(setDragOverTier(null));
-    dispatch(setDraggedVideoId(null));
-    if (!videoId) return;
-    dispatch(moveVideoToTierAction({ fromTier, toTier, videoId, dropIndex }));
-  }
+  useEffect(() => {
+    dispatch(setCurrentCategory(null));
+    dispatch(setMobileSidebarOpen(false));
+  }, [dispatch]);
 
   return (
-    <TierBoardView
-      category={category}
+    <HomeView
+      playlists={tierPlaylists}
+      hiddenCount={allPlaylists && tierPlaylists ? allPlaylists.length - tierPlaylists.length : 0}
+      onOpenNaming={() => navigate('/settings?tab=naming')}
       tierGroups={tierGroups}
-      tierItems={tierItems}
-      tierLoading={tierLoading}
-      dragOverTier={dragOverTier}
-      draggedVideoId={draggedVideoId}
-      onRowDragOver={handleRowDragOver}
-      onRowDragLeave={handleRowDragLeave}
-      onRowDrop={handleRowDrop}
-      onThumbDragStart={handleThumbDragStart}
-      onThumbDragEnd={handleThumbDragEnd}
-      onThumbClick={openFocus}
-      pendingMoves={pendingMoves}
-      syncStatus={syncStatus}
-      onDiscard={discardChanges}
-      onSync={() => syncChanges(category)}
-      onStartDuel={() => navigate(`/tier/${encodeURIComponent(category)}/duel`)}
-      onShufflePlay={startShufflePlay}
+      tierCategories={tierCategories}
+      query={query}
+      onQueryChange={(q) => dispatch(setQuery(q))}
+      nowPlaying={playingVideo ? { video: playingVideo, category: focusedCategory } : null}
+      onOpenBoard={(c) => navigate(`/tier/${encodeURIComponent(c)}`)}
+      onDuel={(c) => navigate(`/tier/${encodeURIComponent(c)}/duel`)}
+      onOpenPlaylist={(p) => navigate(`/playlist/${encodeURIComponent(p.id)}`)}
     />
   );
 }
 
-function DuelPage() {
-  const { category: rawCategory } = useParams();
-  const category = decodeURIComponent(rawCategory);
+function ItemsPage() {
+  const { id } = useParams();
+  const playlistId = decodeURIComponent(id);
   const dispatch = useDispatch();
   const navigate = useNavigate();
+  // Only template-matching playlists are reachable - a hidden playlist's URL
+  // just goes home rather than exposing its contents.
+  const tierPlaylists = useSelector(selectTierPlaylists);
+  const playlist = tierPlaylists?.find((p) => p.id === playlistId);
+  const { data: items, isLoading } = usePlaylistItemsQuery(playlist ? playlistId : null);
 
-  const playlists = useSelector((s) => s.auth.playlists);
-  const tierGroups = useSelector(selectTierGroups);
+  useEffect(() => {
+    if (tierPlaylists && !playlist) navigate('/', { replace: true });
+  }, [tierPlaylists, playlist, navigate]);
+
+  useEffect(() => {
+    dispatch(setCurrentCategory(null));
+    dispatch(setMobileSidebarOpen(false));
+  }, [dispatch]);
+
+  return (
+    <ItemsView
+      playlist={playlist}
+      items={items ?? null}
+      loading={isLoading}
+      onOpenBoard={(c) => navigate(`/tier/${encodeURIComponent(c)}`)}
+      onBack={() => navigate('/')}
+    />
+  );
+}
+
+function TierBoardPage() {
+  const category = useCategoryParam();
+  const navigate = useNavigate();
+  const { openFocus, startShufflePlay, playFrom } = useOutletContext();
+  const tierItems = useSelector((s) => s.tiers.tierItems);
+  const pendingMoves = useSelector(selectPendingMoves);
+  const playingVideoId = useSelector(selectPlayingVideoIdOnBoard);
+  const { tierGroups, tierLoading, isLoading } = useBoardPage(category);
+  const [addingTiers, setAddingTiers] = useState(false);
+  const base = `/tier/${encodeURIComponent(category)}`;
+
+  return (
+    <BoardShell>
+      {addingTiers && (
+        <CreateTierPlaylistsModal opened category={category} onClose={() => setAddingTiers(false)} />
+      )}
+      <TierBoardView
+        category={category}
+        tierGroups={tierGroups}
+        tierItems={tierItems}
+        tierLoading={tierLoading}
+        boardLoading={isLoading}
+        playingVideoId={playingVideoId}
+        pendingMoves={pendingMoves}
+        onPlay={openFocus}
+        onPlayFrom={playFrom}
+        onShufflePlay={startShufflePlay}
+        onStartDuel={() => navigate(`${base}/duel`)}
+        onOpenTier={(t) => navigate(`${base}/t/${t}`)}
+        onAddMissingTiers={() => setAddingTiers(true)}
+      />
+    </BoardShell>
+  );
+}
+
+function TierFocusPage() {
+  const category = useCategoryParam();
+  const { tier } = useParams();
+  const navigate = useNavigate();
+  const { openFocus, startShufflePlay, playFrom } = useOutletContext();
+  const tierItems = useSelector((s) => s.tiers.tierItems);
+  const playingVideoId = useSelector(selectPlayingVideoIdOnBoard);
+  const pendingRemovalKeys = usePendingRemovalKeys();
+  const { tiers, isLoading } = useBoardPage(category);
+  const base = `/tier/${encodeURIComponent(category)}`;
+
+  useEffect(() => {
+    if (!isLoading && tiers.length && !tiers.includes(tier)) navigate(base, { replace: true });
+  }, [isLoading, tiers, tier, base, navigate]);
+
+  return (
+    <BoardShell>
+      <TierFocusView
+        category={category}
+        tier={tier}
+        tiers={tiers}
+        tierItems={tierItems}
+        loading={isLoading}
+        playingVideoId={playingVideoId}
+        pendingRemovalKeys={pendingRemovalKeys}
+        onPlay={openFocus}
+        onPlayFrom={playFrom}
+        onShuffle={startShufflePlay}
+        onBack={() => navigate(base)}
+        onSwitchTier={(t) => navigate(`${base}/t/${t}`, { replace: true })}
+      />
+    </BoardShell>
+  );
+}
+
+function DuelPage() {
+  const category = useCategoryParam();
+  const dispatch = useDispatch();
+  const navigate = useNavigate();
   const duelPool = useSelector(selectDuelPool);
   const duelRuns = useSelector(selectDuelRuns);
   const duelTierSizes = useSelector(selectDuelTierSizes);
 
-  useEffect(() => {
-    dispatch(setCurrentCategory(category));
-    dispatch(setMobileSidebarOpen(false));
-  }, [dispatch, category]);
-
-  useEffect(() => {
-    if (!playlists) return;
-    if (!tierGroups[category]) navigate('/', { replace: true });
-  }, [category, playlists, tierGroups, navigate]);
-
   // Supports deep-linking straight to a duel: fetches (and caches) the
-  // board's data the same way TierBoardPage does. Coming from "Start duel"
+  // board's data the same way the tier list does. Coming from "Rank → Duel"
   // on an already-open board serves straight from the query cache.
-  useLoadTierBoard(category, tierGroups[category]);
+  useBoardPage(category);
 
   function applyDuelResult(result) {
-    dispatch(setTierItems(result));
+    dispatch(applyOrderWithFeedback(result));
     navigate(`/tier/${encodeURIComponent(category)}`);
   }
 

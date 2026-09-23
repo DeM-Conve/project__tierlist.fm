@@ -1,4 +1,39 @@
-import { createSlice } from '@reduxjs/toolkit';
+import { createSlice, original } from '@reduxjs/toolkit';
+
+const UNDO_LIMIT = 50;
+
+// dropIndex omitted (null/undefined) means "append to the end of the target tier".
+function applyMove(state, { fromTier, toTier, videoId, dropIndex }) {
+  const sourceArr = state.tierItems[fromTier] || [];
+  const video = sourceArr.find((v) => v.videoId === videoId);
+  if (!video) return;
+
+  if (fromTier === toTier) {
+    if (dropIndex == null) return;
+    const originalIndex = sourceArr.findIndex((v) => v.videoId === videoId);
+    const withoutVideo = sourceArr.filter((v) => v.videoId !== videoId);
+    let index = originalIndex < dropIndex ? dropIndex - 1 : dropIndex;
+    index = Math.max(0, Math.min(index, withoutVideo.length));
+    withoutVideo.splice(index, 0, video);
+    state.tierItems[fromTier] = withoutVideo;
+    return;
+  }
+
+  const targetArr = [...(state.tierItems[toTier] || [])];
+  const index = dropIndex == null ? targetArr.length : Math.max(0, Math.min(dropIndex, targetArr.length));
+  targetArr.splice(index, 0, video);
+  state.tierItems[fromTier] = sourceArr.filter((v) => v.videoId !== videoId);
+  state.tierItems[toTier] = targetArr;
+}
+
+// Every user edit snapshots the pre-edit tierItems first, so Ctrl+Z / a
+// toast's "Undo" can restore it exactly (positions included). `original`
+// hands back Immer's frozen base object, so this is structural sharing,
+// not a deep copy per edit.
+function pushUndo(state) {
+  state.undoStack.push(original(state.tierItems));
+  if (state.undoStack.length > UNDO_LIMIT) state.undoStack.shift();
+}
 
 const tiersSlice = createSlice({
   name: 'tiers',
@@ -22,6 +57,10 @@ const tiersSlice = createSlice({
     // tier board page every time you navigate back to it (e.g. after a
     // duel), which must NOT re-trigger a fetch for the same category.
     loadedCategory: null,
+    // Snapshots of tierItems before each local edit (drag, menu move, bulk
+    // move, rating, duel result) - newest last. Cleared when the board is
+    // reloaded or discarded, since those replace the baseline itself.
+    undoStack: [],
   },
   reducers: {
     resetTierBoard: (state, action) => {
@@ -30,6 +69,7 @@ const tiersSlice = createSlice({
       state.tierLoading = Object.fromEntries(presentTiers.map((t) => [t, true]));
       state.originalTierItems = {};
       state.originalTierOf = {};
+      state.undoStack = [];
     },
     // Deliberately separate from resetTierBoard: this marks "the mirror
     // effect has finished applying fresh query data for this category" and
@@ -91,6 +131,7 @@ const tiersSlice = createSlice({
     discardTierChanges: (state) => {
       state.tierItems = JSON.parse(JSON.stringify(state.originalTierItems));
       state.syncStatus = 'idle';
+      state.undoStack = [];
     },
     setSyncStatus: (state, action) => {
       state.syncStatus = action.payload;
@@ -101,29 +142,23 @@ const tiersSlice = createSlice({
     setDragOverTier: (state, action) => {
       state.dragOverTier = action.payload;
     },
-    // dropIndex omitted (null/undefined) means "append to the end of the target tier".
     moveVideoToTier: (state, action) => {
-      const { fromTier, toTier, videoId, dropIndex } = action.payload;
-      const sourceArr = state.tierItems[fromTier] || [];
-      const video = sourceArr.find((v) => v.videoId === videoId);
-      if (!video) return;
-
-      if (fromTier === toTier) {
-        if (dropIndex == null) return;
-        const originalIndex = sourceArr.findIndex((v) => v.videoId === videoId);
-        const withoutVideo = sourceArr.filter((v) => v.videoId !== videoId);
-        let index = originalIndex < dropIndex ? dropIndex - 1 : dropIndex;
-        index = Math.max(0, Math.min(index, withoutVideo.length));
-        withoutVideo.splice(index, 0, video);
-        state.tierItems[fromTier] = withoutVideo;
-        return;
-      }
-
-      const targetArr = [...(state.tierItems[toTier] || [])];
-      const index = dropIndex == null ? targetArr.length : Math.max(0, Math.min(dropIndex, targetArr.length));
-      targetArr.splice(index, 0, video);
-      state.tierItems[fromTier] = sourceArr.filter((v) => v.videoId !== videoId);
-      state.tierItems[toTier] = targetArr;
+      pushUndo(state);
+      applyMove(state, action.payload);
+    },
+    // A batch (bulk "Move to", a duel result, ...) is one undo step.
+    moveVideos: (state, action) => {
+      pushUndo(state);
+      action.payload.moves.forEach((m) => applyMove(state, m));
+    },
+    // Replaces the whole draft as one undoable edit (a finished duel run).
+    applyTierOrder: (state, action) => {
+      pushUndo(state);
+      state.tierItems = action.payload;
+    },
+    undoLastEdit: (state) => {
+      const previous = state.undoStack.pop();
+      if (previous) state.tierItems = previous;
     },
   },
 });
@@ -139,5 +174,8 @@ export const {
   setDraggedVideoId,
   setDragOverTier,
   moveVideoToTier,
+  moveVideos,
+  applyTierOrder,
+  undoLastEdit,
 } = tiersSlice.actions;
 export default tiersSlice.reducer;

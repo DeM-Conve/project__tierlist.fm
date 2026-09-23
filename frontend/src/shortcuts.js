@@ -11,6 +11,7 @@
 export const SHORTCUTS = [
   { id: 'palette', keys: ['Ctrl', 'K'], description: 'Open command palette', category: 'Global' },
   { id: 'help', keys: ['?'], description: 'Show this shortcut list', category: 'Global' },
+  { id: 'undo', keys: ['Ctrl', 'Z'], description: 'Undo the last tier edit (drag, move, rating, bulk, duel result)', category: 'Global' },
 
   { id: 'search', keys: ['/'], description: 'Search this tier board', category: 'Tier board' },
   { id: 'search-next', keys: ['n'], description: 'Jump to next match', category: 'Tier board' },
@@ -22,6 +23,9 @@ export const SHORTCUTS = [
     category: 'Tier board',
   },
   { id: 'search-close', keys: ['Esc'], description: 'Close search', category: 'Tier board' },
+
+  { id: 'focus-filter', keys: ['/'], description: 'Filter this tier', category: 'Tier (full list)' },
+  { id: 'focus-clear', keys: ['Esc'], description: 'Clear the filter', category: 'Tier (full list)' },
   {
     id: 'push',
     keys: ['Shift', 'P'],
@@ -45,7 +49,7 @@ export const SHORTCUTS = [
   {
     id: 'player-seek-percent',
     keys: ['0-9'],
-    description: 'Jump to that 10% of the video (0 = start, 9 = 90%) - works anywhere, not just expanded',
+    description: 'Jump to that 10% of the video (0 = start, 9 = 90%)',
     category: 'Player',
   },
   {
@@ -64,7 +68,7 @@ export const SHORTCUTS = [
   {
     id: 'player-tier',
     keys: ['Shift', '1-9'],
-    description: "Move the playing video to that tier",
+    description: 'Rate the playing video into that tier (any player mode, on its own board)',
     category: 'Player',
   },
 

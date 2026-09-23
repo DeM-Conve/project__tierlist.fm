@@ -1,9 +1,18 @@
-import { useState } from 'react';
-import { Group, Radio, Stack, Tabs, Text } from '@mantine/core';
-import { DUEL_STRATEGIES, DUEL_STRATEGY_LABELS, DEFAULT_DUEL_STRATEGY } from '../duel';
-import { SETTINGS, getSetting, setSetting } from '../settings';
+import { useDispatch, useSelector } from 'react-redux';
+import { Box, Group, Radio, Stack, Tabs, Text, Title } from '@mantine/core';
+import { ShortcutsList } from './ShortcutsModal';
+import AppearanceSettings from './AppearanceSettings';
+import PlaylistNamingSettings from './PlaylistNamingSettings';
+import { useSearchParams } from 'react-router-dom';
+import { DUEL_STRATEGIES, DUEL_STRATEGY_LABELS } from '../duel';
+import { setDuelStrategy } from '../store/prefsSlice';
 
-const CATEGORIES = [{ key: 'duels', label: 'Duels' }];
+const CATEGORIES = [
+  { key: 'appearance', label: 'Appearance' },
+  { key: 'naming', label: 'Playlist naming' },
+  { key: 'duels', label: 'Duels' },
+  { key: 'keyboard', label: 'Keyboard shortcuts' },
+];
 
 const STRATEGY_DESCRIPTIONS = {
   tierAwareMerge:
@@ -14,22 +23,23 @@ const STRATEGY_DESCRIPTIONS = {
 };
 
 export default function SettingsView() {
-  const [duelStrategy, setDuelStrategy] = useState(() =>
-    getSetting(SETTINGS.duelStrategy, DEFAULT_DUEL_STRATEGY)
-  );
+  // ?tab=naming etc. deep-links to a tab (and the tab you're on stays in the URL).
+  const [searchParams, setSearchParams] = useSearchParams();
+  const tab = CATEGORIES.some((c) => c.key === searchParams.get('tab')) ? searchParams.get('tab') : 'appearance';
+  const dispatch = useDispatch();
+  const duelStrategy = useSelector((s) => s.prefs.duelStrategy);
 
   function chooseStrategy(key) {
-    setDuelStrategy(key);
-    setSetting(SETTINGS.duelStrategy, key);
+    dispatch(setDuelStrategy(key));
   }
 
   return (
-    <section className="settings-view">
-      <div className="canvas-header">
-        <h1>Settings</h1>
-      </div>
+    <Box component="section">
+      <Title order={1} fz={{ base: 30, sm: 40 }} fw={900} mb="lg">
+        Settings
+      </Title>
 
-      <Tabs defaultValue="duels" orientation="vertical" className="settings-layout">
+      <Tabs value={tab} onChange={(v) => v && setSearchParams({ tab: v }, { replace: true })} orientation="vertical">
         <Tabs.List>
           {CATEGORIES.map((c) => (
             <Tabs.Tab key={c.key} value={c.key}>
@@ -38,13 +48,23 @@ export default function SettingsView() {
           ))}
         </Tabs.List>
 
-        <Tabs.Panel value="duels" className="settings-content">
-          <div className="settings-section">
-            <h2>Duel ranking algorithm</h2>
-            <p className="hint-text">
+        <Tabs.Panel value="appearance" pl="xl" maw={980}>
+          <AppearanceSettings />
+        </Tabs.Panel>
+
+        <Tabs.Panel value="naming" pl="xl" maw={980}>
+          <PlaylistNamingSettings />
+        </Tabs.Panel>
+
+        <Tabs.Panel value="duels" pl="xl" maw={680}>
+          <div>
+            <Title order={2} fz={18} mb={6}>
+              Duel ranking algorithm
+            </Title>
+            <Text c="dimmed" fz="sm" mb="lg">
               Used as the default whenever you start a new duel session. You can still switch
               strategies for a single session from the duel screen itself.
-            </p>
+            </Text>
 
             <Radio.Group value={duelStrategy} onChange={chooseStrategy}>
               <Stack gap="sm">
@@ -67,7 +87,11 @@ export default function SettingsView() {
             </Radio.Group>
           </div>
         </Tabs.Panel>
+
+        <Tabs.Panel value="keyboard" pl="xl" maw={680}>
+          <ShortcutsList />
+        </Tabs.Panel>
       </Tabs>
-    </section>
+    </Box>
   );
 }

@@ -1,18 +1,18 @@
 /* Palette variables now live in index.css, alongside the Mantine theme
    built from the same values (src/mantineTheme.js). */
 
-/* Login landing entrance/float motion - Mantine has no keyframe animation
+/* Entrance/float motion (login landing, floating bars) - Mantine has no keyframe animation
    prop, so these two stay as CSS. */
-@keyframes landing-rise {
+@keyframes anim-rise {
   from { opacity: 0; transform: translateY(16px); }
   to { opacity: 1; transform: none; }
 }
-@keyframes landing-float {
+@keyframes anim-float {
   0%, 100% { translate: 0 0; }
   50% { translate: 0 -8px; }
 }
-.landing-rise { animation: landing-rise 0.7s cubic-bezier(0.2, 0.7, 0.2, 1) both; }
-.landing-float { animation: landing-float 5s ease-in-out infinite; }
+.anim-rise { animation: anim-rise 0.7s cubic-bezier(0.2, 0.7, 0.2, 1) both; }
+.anim-float { animation: anim-float 5s ease-in-out infinite; }
 
 /* App shell: fixed sidebar + scrolling canvas */
 .app-shell {
@@ -37,8 +37,6 @@
 }
 .sidebar-scrim { display: none; }
 
-.mobile-menu-btn { display: none; }
-
 /* Canvas */
 .canvas {
   flex: 1;
@@ -46,281 +44,46 @@
   padding: 14px 40px calc(32px + var(--player-dock-height));
 }
 
-.canvas-header { margin-bottom: 12px; }
-.canvas-header h1 {
-  font-family: var(--font-display);
-  font-size: 32px;
-  font-weight: 800;
-  margin: 0 0 6px;
-  letter-spacing: -0.4px;
-}
 .hint-text {
   color: var(--text-dim);
   font-size: 14px;
   margin: 4px 0 0;
 }
 
-/* Media grid (playlists / raw videos) */
-.grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
-  gap: 16px;
-  margin-top: 4px;
-}
-.card {
-  background: var(--surface);
-  border: 1px solid var(--border-soft);
-  border-radius: var(--radius);
-  overflow: hidden;
-  cursor: pointer;
-  position: relative;
-  transition: border-color 0.15s ease;
-}
-.card::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 2px;
-  background: var(--accent);
-  transform: scaleX(0);
-  transform-origin: left;
-  transition: transform 0.18s ease;
-}
-.card:hover { border-color: var(--text-faint); }
-.card:hover::before { transform: scaleX(1); }
-.card img {
-  width: 100%;
-  aspect-ratio: 16/9;
-  object-fit: cover;
-  display: block;
-  background: var(--surface-2);
-}
-.card .card-body { padding: 12px 14px; }
-.card .card-title {
-  font-size: 14px;
-  font-weight: 600;
-  margin: 0 0 4px 0;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-.card .card-meta {
-  font-size: 12px;
-  color: var(--text-dim);
-  margin: 0;
-}
-.video-card a { text-decoration: none; color: inherit; }
-
-/* Skeleton loading - animation/shimmer is Mantine's own <Skeleton>, these
-   are just the layout-specific sizing it has no prop for. */
-.skeleton-card { cursor: default; }
-.skeleton-card .card-body { display: flex; flex-direction: column; gap: 8px; }
-.skeleton-line { height: 12px; }
-
-/* Tier board detail */
-.tier-board {
-  margin-top: 8px;
-  border: 1px solid var(--border-soft);
-  border-radius: var(--radius);
-  overflow: hidden;
-}
-.tier-row {
-  display: flex;
-  border-bottom: 1px solid var(--border-soft);
-  transition: background 0.12s ease;
-}
-.tier-row:last-child { border-bottom: none; }
-.tier-row-dragover { background: rgba(214, 162, 76, 0.08); }
-.tier-label {
-  flex: 0 0 60px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 3px;
-  font-family: var(--font-display);
-  color: #1a1509;
-  font-weight: 900;
-  font-size: 15px;
-}
-.tier-count {
-  font-family: var(--font-body);
-  font-weight: 600;
-  font-size: 10px;
-  opacity: 0.7;
-}
-.tier-content {
-  flex: 1;
-  display: grid;
-  /* Each of the two explicit rows sizes to its own "auto" content, not a
-     fixed height - a 1-item tier only ever puts something in row 1, so
-     row 2 naturally collapses to 0 instead of reserving dead space for a
-     row that has nothing in it. Only a tier with enough items to actually
-     fill both rows grows to two rows tall. */
-  grid-template-rows: repeat(2, auto);
-  grid-auto-flow: column;
-  /* Without this, implicit "auto" column tracks split any leftover
-     container width evenly between themselves, spreading a handful of
-     140px-wide cards across the full row with huge gaps instead of
-     packing them tightly - max-content pins each column to its actual
-     card width so only `gap` separates them. */
-  grid-auto-columns: max-content;
-  gap: 8px;
-  padding: 10px;
-  overflow-x: auto;
-  background: var(--surface);
-  /* Matches one thumbnail row (140*9/16 image + title caption) so an
-     empty/no-matches row renders at that same height instead of
-     collapsing to nothing. */
-  min-height: 128px;
-  align-items: start;
-}
-/* While the "/" find bar is active, collapse back to a single row: matches
-   change on every keystroke, and a two-row column-flow grid would
-   redistribute which items land in which row/column as they do, which
-   reads far worse mid-search than just a single scrolling line whose
-   scroll position is the only thing that moves. */
-.tier-content-search {
-  grid-template-rows: none;
-  grid-auto-flow: row;
-  display: flex;
-  flex-wrap: nowrap;
-  min-height: 128px;
-  align-items: center;
-}
-.tier-thumb-wrap {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex: 0 0 auto;
-}
-.drop-indicator {
-  flex: 0 0 auto;
-  width: 3px;
-  align-self: stretch;
-  background: var(--accent);
-  border-radius: 2px;
-}
-/* The card's own look (border, background, radius) and its title text
-   (truncation) come from Mantine's Card/Text - these rules are only the
-   drag-and-drop-specific behavior Mantine has no concept of: fixed
-   thumbnail width, grab cursor, and the dim-while-dragging state. */
-.tier-thumb {
-  flex: 0 0 auto;
-  width: 140px;
-  cursor: grab;
-  transition: opacity 0.15s ease, transform 0.1s ease;
-}
-.tier-thumb:active { cursor: grabbing; }
-.tier-thumb-dragging { opacity: 0.35; }
-/* The "/" find bar's result highlighting - a tier's row filters down to
-   just its matches (not just dimmed) so a row of hundreds of videos doesn't
-   need horizontal scrolling to find a hit; the current match (n/N steps
-   through these) gets a stronger halo so it's easy to spot after
-   scrollIntoView. */
-.tier-thumb-search-match { outline: 2px solid var(--accent); outline-offset: -2px; }
-.tier-thumb-search-active {
-  outline: 2px solid var(--accent);
-  box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 35%, transparent);
-}
-.tier-thumb img {
-  width: 100%;
-  aspect-ratio: 16/9;
-  object-fit: cover;
-  display: block;
-  background: var(--surface-2);
-  pointer-events: none;
-}
-/* Positioning only - ActionIcon/Badge supply their own visual styling. */
-.tier-thumb-link {
-  position: absolute;
-  top: 6px;
-  right: 6px;
+/* Tier board lanes - layout/visuals are Mantine props; only what Mantine
+   has no prop for stays here: hover/focus-reveal of a tile's overlay
+   controls (a :hover/:focus-within pseudo-class) and the now-playing
+   equalizer keyframes. */
+.tile { transition: transform 0.12s ease, opacity 0.15s ease; }
+.tile:hover { transform: translateY(-2px); }
+.tile:active { cursor: grabbing; }
+.tile-overlay {
   opacity: 0;
+  background: linear-gradient(180deg, var(--media-scrim), transparent 45%, var(--media-scrim-soft));
   transition: opacity 0.15s ease;
 }
-.tier-thumb:hover .tier-thumb-link { opacity: 1; }
-.tier-thumb-duplicate-tag {
-  position: absolute;
-  bottom: 6px;
-  left: 6px;
+.tile:hover .tile-overlay,
+.tile:focus-within .tile-overlay { opacity: 1; }
+@keyframes eq-bounce {
+  0%, 100% { transform: scaleY(0.3); }
+  50% { transform: scaleY(1); }
 }
-.tier-thumb-skeleton {
-  flex: 0 0 auto;
-  width: 140px;
-  aspect-ratio: 16/9;
-}
-.tier-empty {
-  color: var(--text-faint);
-  font-size: 13px;
-  margin: 0;
-  padding: 0 8px;
-}
+.eq-bar { transform-origin: bottom; animation: eq-bounce 0.9s ease-in-out infinite; border-radius: 1px; }
 
-/* Pending-moves popup, opened by clicking the "N pending" button */
-.pending-modal {
-  width: 100%;
-  max-width: 560px;
-  max-height: 70vh;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.5);
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
+/* Hover/active feedback for the tier-list surfaces - Mantine has no
+   :hover styling prop, so these interaction states stay as CSS. */
+.tier-label-btn, .more-tile, .row-open-btn, .rail-tier, .sort-tier-btn, .tier-chip-btn {
+  transition: filter 0.12s ease, transform 0.12s ease, background 0.12s ease;
 }
-.pending-panel-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 16px 18px;
-  border-bottom: 1px solid var(--border-soft);
-  flex-shrink: 0;
-}
-.pending-panel-header h2 { margin: 0; }
-.pending-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  overflow-y: auto;
-}
-.pending-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  padding: 9px 16px;
-  border-bottom: 1px dashed var(--border-soft);
-  font-size: 13.5px;
-}
-.pending-row:last-child { border-bottom: none; }
-.pending-title {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  color: var(--text);
-}
-.pending-tiers {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  flex-shrink: 0;
-}
-.tier-chip {
-  font-family: var(--font-display);
-  font-weight: 800;
-  font-size: 11px;
-  color: #1a1509;
-  padding: 2px 7px;
-  border-radius: 4px;
-}
-.pending-arrow { color: var(--text-faint); font-size: 12px; }
-.pending-remove-label { color: var(--danger); font-size: 12px; font-weight: 600; }
+.tier-label-btn:hover, .rail-tier:hover, .sort-tier-btn:hover, .tier-chip-btn:hover { filter: brightness(1.12); }
+.sort-tier-btn:hover { transform: translateY(-3px); }
+.sort-tier-btn:active, .tier-chip-btn:active, .rail-tier:active { transform: scale(0.96); }
+.more-tile:hover { filter: brightness(1.25); }
+.row-open-btn:hover { background: var(--surface-2); }
+.track-row, .queue-row { transition: background 0.1s ease; }
+.track-row:hover, .queue-row:hover { background: var(--surface-2); }
+.board-card, .playlist-card { transition: border-color 0.15s ease, transform 0.15s ease; }
+.board-card:hover, .playlist-card:hover { border-color: var(--text-faint); transform: translateY(-2px); }
 
 /* Duel view - everything (layout, card width, card media positioning, the
    VS badge, thumbnail, responsive width) is Mantine components/props or
@@ -331,56 +94,27 @@
 .duel-card { transition: border-color 0.15s ease, transform 0.15s ease; }
 .duel-card:hover { border-color: var(--accent); transform: translateY(-2px); }
 
-@media (max-width: 900px) {
-  .mobile-menu-btn {
-    display: block;
-    position: fixed;
-    top: 16px;
-    left: 16px;
-    z-index: 30;
-    background: var(--surface-2);
-    color: var(--text);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: 8px 14px;
-    font-family: var(--font-body);
-    font-size: 13px;
-    font-weight: 600;
-  }
+@media (max-width: 61.99em) {
   .sidebar {
     position: fixed;
     left: -100%;
     top: 0;
     z-index: 40;
     transition: left 0.2s ease;
-    box-shadow: 0 0 32px rgba(0, 0, 0, 0.5);
+    box-shadow: 0 0 32px var(--shadow);
   }
   .sidebar-open { left: 0; }
   .sidebar-scrim {
     display: block;
     position: fixed;
     inset: 0;
-    background: rgba(0, 0, 0, 0.5);
+    background: var(--overlay);
     z-index: 35;
   }
   .canvas { padding: 72px 20px calc(32px + var(--player-dock-height)); }
-  .tier-thumb, .tier-thumb-skeleton { width: 112px; }
   .player-dock-expanded .player-dock-card { width: 94vw; }
   .focus-nav { display: none; }
   .player-dock-mini .focus-info .hint-text { display: none; }
-}
-
-/* Shared modal overlay (focus card + command palette) */
-.modal-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(8, 7, 6, 0.75);
-  backdrop-filter: blur(4px);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 50;
-  padding: 20px;
 }
 
 /* Player dock: expanded (full-screen, blocks the app underneath) vs mini
@@ -399,7 +133,7 @@
 .player-dock-expanded .player-dock-backdrop {
   position: absolute;
   inset: 0;
-  background: rgba(8, 7, 6, 0.75);
+  background: var(--overlay);
   backdrop-filter: blur(4px);
 }
 .player-dock-mini .player-dock-backdrop { display: none; }
@@ -415,9 +149,25 @@
   border: 1px solid var(--border);
   border-radius: 8px;
   padding: 24px;
-  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 24px 64px var(--shadow);
 }
 .player-dock-card:focus { outline: none; }
+
+/* Expanded player with its "Up next" queue as a second column. A CSS grid
+   (no Mantine prop for this) so the queue is appended as a sibling while
+   the player subtree itself never moves or remounts. */
+.player-dock-expanded .player-dock-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  column-gap: 24px;
+  max-width: 1360px;
+}
+.player-dock-expanded .player-dock-card > * { grid-column: 1; }
+.player-dock-expanded .player-queue { grid-column: 2; grid-row: 1 / span 20; min-width: 0; padding-top: 36px; }
+@media (max-width: 61.99em) {
+  .player-dock-expanded .player-dock-card { grid-template-columns: minmax(0, 1fr); }
+  .player-dock-expanded .player-queue { grid-column: 1; grid-row: auto; margin-top: 16px; }
+}
 
 .player-dock-mini {
   position: fixed;
@@ -440,7 +190,7 @@
   padding: 6px 12px;
   border-width: 1px 0 0;
   border-radius: 0;
-  box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.4);
+  box-shadow: 0 -8px 24px var(--shadow);
 }
 .player-dock-progress-track {
   position: absolute;
@@ -562,7 +312,7 @@
   border-width: 1px;
   border-radius: 12px;
   overflow: hidden;
-  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.6);
+  box-shadow: 0 16px 40px var(--shadow);
 }
 .player-dock-floating .player-dock-progress-track { top: auto; bottom: 0; margin-top: 0; }
 .player-dock-floating .player-dock-toolbar {
@@ -598,10 +348,10 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(0, 0, 0, 0.75);
-  border: 1px solid rgba(255, 255, 255, 0.3);
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.6);
-  color: #fff;
+  background: var(--media-control-bg);
+  border: 1px solid var(--media-control-border);
+  box-shadow: 0 2px 10px var(--media-control-shadow);
+  color: var(--media-fg);
   width: 44px;
   height: 44px;
   border-radius: 50%;
@@ -619,7 +369,7 @@
 .focus-embed {
   position: relative;
   aspect-ratio: 16/9;
-  background: #000;
+  background: var(--media-bg);
   border-radius: 4px;
   overflow: hidden;
 }
@@ -656,149 +406,8 @@
   font-size: 19px;
   margin: 0 0 4px;
 }
-.shuffle-badge {
-  margin-left: 10px;
-  padding: 2px 8px;
-  font-family: var(--font-body);
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--text-dim);
-  background: var(--surface-2);
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  vertical-align: middle;
-}
-.focus-tiers {
-  display: flex;
-  gap: 8px;
-  margin-top: 16px;
-  flex-wrap: wrap;
-}
-.tier-pill {
-  font-family: var(--font-display);
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  border: 2px solid transparent;
-  color: #1a1509;
-  font-weight: 800;
-  font-size: 14px;
-  padding: 7px 12px;
-  border-radius: 6px;
-  cursor: pointer;
-  opacity: 0.55;
-  transition: opacity 0.12s ease, transform 0.1s ease;
-}
-.tier-pill:hover { opacity: 0.8; }
-.tier-pill-active {
-  opacity: 1;
-  border-color: var(--text);
-  transform: scale(1.05);
-}
-.tier-pill-key {
-  font-family: var(--font-body);
-  font-size: 10px;
-  font-weight: 600;
-  background: rgba(26, 21, 9, 0.3);
-  padding: 1px 5px;
-  border-radius: 3px;
-}
 .focus-hint {
   margin: 14px 2px 0;
   color: var(--text-faint);
   font-size: 12px;
-}
-
-/* Command palette - Dialog.Overlay and Dialog.Content render as siblings
-   (not nested) under Radix's Portal, so Content needs its own centering
-   instead of relying on .modal-overlay's flex-center like before. */
-.palette-center-wrapper {
-  position: fixed;
-  inset: 0;
-  z-index: 50;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 20px;
-}
-.palette-center-wrapper:focus { outline: none; }
-.palette {
-  width: 100%;
-  max-width: 560px;
-  max-height: 70vh;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.5);
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-.palette-input {
-  font-family: var(--font-body);
-  background: none;
-  border: none;
-  border-bottom: 1px solid var(--border-soft);
-  color: var(--text);
-  padding: 16px 18px;
-  font-size: 15px;
-}
-.palette-input:focus { outline: none; }
-.palette-input::placeholder { color: var(--text-faint); }
-.palette-list {
-  overflow-y: auto;
-  padding: 8px;
-}
-.palette-empty {
-  color: var(--text-faint);
-  font-size: 13px;
-  padding: 12px;
-  margin: 0;
-}
-.palette-section-label {
-  font-family: var(--font-body);
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--text-faint);
-  margin: 10px 8px 4px;
-}
-.palette-item {
-  display: block;
-  width: 100%;
-  text-align: left;
-  background: none;
-  border: none;
-  color: var(--text-dim);
-  font-family: var(--font-body);
-  font-size: 13.5px;
-  padding: 9px 10px;
-  border-radius: var(--radius);
-  cursor: pointer;
-}
-.palette-item-active {
-  background: var(--surface-3);
-  color: var(--text);
-}
-.palette-footer {
-  display: flex;
-  gap: 16px;
-  padding: 10px 18px;
-  border-top: 1px solid var(--border-soft);
-  color: var(--text-faint);
-  font-size: 12px;
-}
-
-/* Settings page: Mantine's Tabs (orientation="vertical") owns the sub-nav
-   itself - styling, active state, keyboard roving, focus - so there's no
-   hand-rolled nav-item CSS here anymore. This just constrains the panel's
-   reading width the same way GitHub's settings pages do. */
-.settings-content { max-width: 640px; }
-.settings-section h2 {
-  font-size: 17px;
-  margin: 0 0 6px;
-}
-.settings-section .hint-text { margin-bottom: 20px; }
-
-@media (max-width: 640px) {
-  .settings-layout { flex-direction: column; gap: 16px; }
 }

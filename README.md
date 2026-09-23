@@ -29,7 +29,9 @@ Edit `.env` and paste in your `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`.
 docker compose -f docker-compose.yml up --build
 ```
 
-This builds both images (backend jar + nginx-served frontend build) and runs them:
+This builds both images (backend jar + nginx-served frontend build) and runs them
+alongside Postgres (your settings are stored there, per Google account, in the
+`pgdata` volume; the backend creates the schema itself on startup via Flyway):
 - Backend: http://localhost:48123
 - Frontend: http://localhost:80
 
@@ -41,9 +43,16 @@ docker compose -f docker-compose.local.yml up
 
 This mounts your source code into containers running `mvn spring-boot:run` and `npm run dev` directly.
 
+Backend tests (unit + integration against a throwaway Postgres; needs Docker):
+
+```bash
+cd backend && mvn verify
+```
+
 ## 4. Run without Docker (alternative)
 
-Backend:
+Backend (needs a Postgres at `localhost:5432`, db/user/password `yt` by default -
+override with `DB_URL`, `DB_USER`, `DB_PASSWORD`):
 ```bash
 cd backend
 export $(grep -v '^#' ../.env | xargs)

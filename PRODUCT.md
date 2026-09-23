@@ -32,6 +32,13 @@ spreadsheets or manually reordering playlists.
 
 ## Positioning
 
+**The tier list is the moat.** Plain listening/browsing is what YouTube Music is for - this
+app only earns its place through the tier list, so every surface should feel like (and be
+driven by) the tier list rather than treating it as one page among many: a persistent Tier
+Rail on board pages, a whole-board-at-a-glance tier view, tier-native ranking (Duel). (Direction set by the user, 2026-09-23; Quick sort and the
+share image were removed later the same day - the user found them not good.)
+
+
 Turns a user's own existing YouTube playlist naming convention directly into a live,
 editable tier-list board with drag-and-drop and head-to-head "duel" ranking - a
 neighboring tool would need users to re-enter/re-tag their catalog by hand instead of

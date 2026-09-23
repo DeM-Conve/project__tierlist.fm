@@ -1,5 +1,6 @@
 import { createSelector } from '@reduxjs/toolkit';
 import { TIER_ORDER, groupByTier } from '../tiers';
+import { parseTitle } from '../naming';
 
 const selectPlaylists = (state) => state.auth.playlists;
 const selectTierItems = (state) => state.tiers.tierItems;
@@ -9,9 +10,28 @@ const selectFocusedVideo = (state) => state.focus.focusedVideo;
 const selectFocusQueue = (state) => state.focus.focusQueue;
 const selectFocusEntries = (state) => state.focus.focusEntries;
 const selectFocusedCategory = (state) => state.focus.focusedCategory;
+const selectLoadedCategory = (state) => state.tiers.loadedCategory;
 
-export const selectTierGroups = createSelector([selectPlaylists], (playlists) =>
-  playlists ? groupByTier(playlists) : {}
+const selectNamingTemplate = (state) => state.naming.template;
+const selectMigratingFrom = (state) => state.naming.migratingFrom;
+
+// The only playlists the app ever shows: those whose title follows the
+// naming template (anything else - e.g. a private playlist - stays hidden
+// everywhere). Each gets `.parsed` = { bracket, category, tier, template }.
+export const selectTierPlaylists = createSelector(
+  [selectPlaylists, selectNamingTemplate, selectMigratingFrom],
+  (playlists, template, migratingFrom) => {
+    if (!playlists) return null;
+    const templates = migratingFrom ? [template, migratingFrom] : [template];
+    return playlists.flatMap((p) => {
+      const parsed = parseTitle(p.title, templates);
+      return parsed ? [{ ...p, parsed }] : [];
+    });
+  }
+);
+
+export const selectTierGroups = createSelector([selectTierPlaylists], (tierPlaylists) =>
+  tierPlaylists ? groupByTier(tierPlaylists) : {}
 );
 
 export const selectTierCategories = createSelector([selectTierGroups], (groups) =>
@@ -35,7 +55,7 @@ export const selectPendingMoves = createSelector(
         if (originalTiers.length > 1) {
           const keepTier = TIER_ORDER.find((t) => originalTiers.includes(t));
           if (tier !== keepTier) {
-            moves.push({ kind: 'dedupe', video, tier });
+            moves.push({ kind: 'dedupe', video, tier, keptTier: keepTier });
           }
           continue;
         }
@@ -112,16 +132,24 @@ export const selectFocusedVideoData = createSelector(
   (index, activeSequence) => (index >= 0 ? activeSequence[index].video : null)
 );
 
-// Tier reassignment only makes sense - and only actually works - while
-// you're viewing the same board the playing video was opened from: the
-// pills/shift+digit shortcut write into `tiersSlice.tierItems`, which only
-// ever holds the currently loaded category. If you've since navigated to a
-// different tier board while the video keeps playing in the background,
-// hide the controls entirely rather than let them silently no-op.
+// Tier reassignment only works while the playing video's board is the one
+// loaded in `tiersSlice.tierItems` (the pills/shift+digit shortcut write
+// there). That stays true on Home / Settings / playlist pages after leaving
+// the board - only opening a *different* board replaces it, and then the
+// controls hide rather than silently no-op.
 export const selectFocusedAvailableTiers = createSelector(
-  [selectFocusedVideo, selectFocusedCategory, selectCurrentCategory, selectTierGroups],
-  (focusedVideo, focusedCategory, currentCategory, tierGroups) =>
-    focusedVideo && focusedCategory && focusedCategory === currentCategory
+  [selectFocusedVideo, selectFocusedCategory, selectLoadedCategory, selectTierGroups],
+  (focusedVideo, focusedCategory, loadedCategory, tierGroups) =>
+    focusedVideo && focusedCategory && focusedCategory === loadedCategory
       ? TIER_ORDER.filter((t) => tierGroups[focusedCategory]?.[t])
       : []
+);
+
+// The dock's current video, but only while this board is the one it was
+// opened from - lets the board mark the playing tile without the marker
+// leaking onto a different board that happens to share a video.
+export const selectPlayingVideoIdOnBoard = createSelector(
+  [selectFocusedVideo, selectFocusedCategory, selectCurrentCategory],
+  (focusedVideo, focusedCategory, currentCategory) =>
+    focusedVideo && focusedCategory === currentCategory ? focusedVideo.videoId : null
 );
