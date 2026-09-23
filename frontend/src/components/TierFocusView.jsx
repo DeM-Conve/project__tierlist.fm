@@ -20,7 +20,7 @@ import {
 import { ArrowLeft, ListTodo, MoreHorizontal, Play, Search, Shuffle } from 'lucide-react';
 import { TIER_COLORS, TODO_TIER } from '../tiers';
 import { moveWithFeedback, useTierDnd } from '../tierActions';
-import { selectPlayerCoversPage } from '../store/selectors';
+import { selectPendingMoves, selectPlayerCoversPage } from '../store/selectors';
 import { EqualizerMark, MoveMenu, TierChip } from './TierBits';
 import { TIER_INK, indexForPointInList, songLabel, videoMatches } from '../tierUtils';
 
@@ -159,6 +159,9 @@ export default function TierFocusView({
   // "/" focuses the filter; Esc clears it. Both stand down while the
   // full-screen player covers the page.
   const playerCoversPage = useSelector(selectPlayerCoversPage);
+  // Room under the list only while the floating "N changes staged" bar is up,
+  // so it never covers the last rows - not a permanent empty band.
+  const hasPendingBar = useSelector((s) => selectPendingMoves(s).length > 0 || ['done', 'partial', 'error'].includes(s.tiers.syncStatus));
   useEffect(() => {
     function onKeyDown(e) {
       if (playerCoversPage) return;
@@ -187,7 +190,7 @@ export default function TierFocusView({
   const counts = (t) => tierItems[t]?.length ?? 0;
 
   return (
-    <Box component="section" pb={140}>
+    <Box component="section" pb={hasPendingBar ? 96 : 0}>
       <UnstyledButton onClick={onBack} mb="sm" className="crumb">
         <Group gap={6} c="dimmed">
           <ArrowLeft size={14} />
