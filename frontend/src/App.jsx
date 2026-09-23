@@ -290,9 +290,9 @@ function Layout() {
       videoId: m.video.videoId,
       title: m.video.title,
       fromItemId: m.video.id,
-      // A dedupe entry has nothing to insert - it's just removing the
-      // redundant copy, so toPlaylistId is left out entirely.
-      toPlaylistId: m.kind === 'dedupe' ? null : tiers[m.to]?.id,
+      // A dedupe or a Remove-bin entry has nothing to insert - it only
+      // deletes that playlist item, so toPlaylistId is left out entirely.
+      toPlaylistId: m.kind === 'move' ? tiers[m.to]?.id : null,
     }));
 
     try {

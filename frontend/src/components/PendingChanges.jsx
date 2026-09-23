@@ -12,7 +12,8 @@ import { TierChip } from './TierBits';
 const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
 
 // One staged change: cover, song, and "from -> to" in tier chips. Moves can
-// be put back individually; auto-resolved duplicates can't (by design).
+// (and removals) can be put back individually; auto-resolved duplicates
+// can't (by design).
 function ChangeRow({ move, first, onRevert }) {
   const { song, artist } = songLabel(move.video);
   return (
@@ -27,10 +28,14 @@ function ChangeRow({ move, first, onRevert }) {
         </Text>
       </Box>
       <Group gap={6} wrap="nowrap" flex="none">
-        <TierChip tier={move.kind === 'move' ? move.from : move.tier} size={20} />
+        <TierChip tier={move.kind === 'dedupe' ? move.tier : move.from} size={20} />
         <ArrowRight size={13} color="var(--text-faint)" />
         {move.kind === 'move' ? (
           <TierChip tier={move.to} size={20} />
+        ) : move.kind === 'remove' ? (
+          <Badge size="sm" variant="light" color="red">
+            Removed
+          </Badge>
         ) : (
           <Badge size="sm" variant="light" color="red">
             Duplicate removed
@@ -38,7 +43,7 @@ function ChangeRow({ move, first, onRevert }) {
         )}
       </Group>
       <Box w={28} flex="none">
-        {move.kind === 'move' && (
+        {move.kind !== 'dedupe' && (
           <Tooltip label={`Put back in ${move.from}`} withArrow>
             <ActionIcon variant="subtle" color="gray" onClick={onRevert} aria-label={`Put back in ${move.from}`}>
               <Undo2 size={15} />
