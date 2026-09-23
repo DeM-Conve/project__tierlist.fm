@@ -122,18 +122,6 @@ export function useSaveSettingsMutation() {
 
 // ---- Add songs -----------------------------------------------------------
 
-// Music-only YouTube search. Each query is cached for the session - a search
-// costs 100 quota units, so the same words never hit YouTube twice.
-export function useSongSearchQuery(q) {
-  return useQuery({
-    queryKey: ['song-search', q],
-    queryFn: async () => (await api.get('/api/search', { params: { q } })).data,
-    enabled: !!q,
-    staleTime: Infinity,
-    retry: false,
-  });
-}
-
 // Every tier playlist's items that are *already cached* (boards opened this
 // session) - never fetched from here: scanning every playlist would cost
 // ~1 quota unit per 50 songs across all boards. "Add songs" uses this to

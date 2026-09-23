@@ -14,35 +14,19 @@
 .anim-rise { animation: anim-rise 0.7s cubic-bezier(0.2, 0.7, 0.2, 1) both; }
 .anim-float { animation: anim-float 5s ease-in-out infinite; }
 
-/* App shell: fixed sidebar + scrolling canvas */
-.app-shell {
-  display: flex;
-  min-height: 100vh;
-}
-
+/* Sidebar: a column of the Layout's body row (App.jsx), so it ends where
+   the player dock begins. Stays CSS for the mobile drawer's @media
+   positioning/transition, which Mantine has no prop for. */
 .sidebar {
   width: var(--sidebar-w);
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
-  padding: 14px 16px;
-  /* Reserves space for the mini player bar (0px when it isn't showing) so
-     the footer - Settings/Log out - never ends up sitting underneath it. */
-  padding-bottom: calc(24px + var(--player-dock-height));
+  padding: 14px 16px 24px;
   background: var(--surface);
   border-right: 1px solid var(--border-soft);
-  position: sticky;
-  top: 0;
-  height: 100vh;
 }
 .sidebar-scrim { display: none; }
-
-/* Canvas */
-.canvas {
-  flex: 1;
-  min-width: 0;
-  padding: 14px 40px calc(32px + var(--player-dock-height));
-}
 
 .hint-text {
   color: var(--text-dim);
@@ -80,8 +64,6 @@
 .add-tier:active, .tier-chip-btn:active, .rail-tier:active { transform: scale(0.96); }
 .more-tile:hover { filter: brightness(1.25); }
 .row-open-btn:hover { background: var(--surface-2); }
-/* Add songs search results: hover + the keyboard-highlighted row (Mantine has no hover/active-row prop). */
-.search-result:hover, .search-result[data-active] { background: var(--surface-2); }
 .track-row, .queue-row { transition: background 0.1s ease; }
 .track-row:hover, .queue-row:hover { background: var(--surface-2); }
 .board-card, .playlist-card { transition: border-color 0.15s ease, transform 0.15s ease; }
@@ -97,10 +79,13 @@
 .duel-card:hover { border-color: var(--accent); transform: translateY(-2px); }
 
 @media (max-width: 61.99em) {
+  /* Drawer over the body row (its positioned parent) - above the dock,
+     never covering it. */
   .sidebar {
-    position: fixed;
+    position: absolute;
     left: -100%;
     top: 0;
+    bottom: 0;
     z-index: 40;
     transition: left 0.2s ease;
     box-shadow: 0 0 32px var(--shadow);
@@ -108,12 +93,11 @@
   .sidebar-open { left: 0; }
   .sidebar-scrim {
     display: block;
-    position: fixed;
+    position: absolute;
     inset: 0;
     background: var(--overlay);
     z-index: 35;
   }
-  .canvas { padding: 72px 20px calc(32px + var(--player-dock-height)); }
   .player-dock-mini .focus-info .hint-text { display: none; }
 }
 
@@ -198,11 +182,12 @@
   .player-queue-head { padding-right: 0; }
 }
 
+/* Mini bar: in normal flow - the last row of the Layout's column shell, so
+   it takes real space and the page above simply ends where it begins.
+   (relative + z-index only so its top shadow draws over the page.) */
 .player-dock-mini {
-  position: fixed;
-  left: 0;
-  right: 0;
-  bottom: 0;
+  flex-shrink: 0;
+  position: relative;
   z-index: 40;
 }
 /* Slim, YouTube-Music-style strip - not a shrunken version of the
@@ -298,6 +283,7 @@
    (moving the YouTube iframe into a separate top-level browsing context
    makes YouTube's embed reject it as an unauthorized origin). */
 .player-dock-mini.player-dock-floating {
+  position: fixed;
   left: auto;
   right: 24px;
   bottom: 24px;
