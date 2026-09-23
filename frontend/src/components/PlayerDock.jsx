@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { ActionIcon, Badge, Group, HoverCard, Slider, Stack, Text } from '@mantine/core';
 import {
   ChevronDown,
@@ -349,8 +349,21 @@ export default function PlayerDock({
   const iconSize = expanded ? 20 : 18;
   const btnSize = expanded ? 38 : 30;
 
+  // The expanded view is a fixed overlay, so it leaves the layout - which
+  // would hand the mini bar's row back to the page and make the tier board
+  // re-fit (visibly jump) behind the modal, then jump back on close. A
+  // spacer the mini bar's last measured height holds that row instead.
+  const rootRef = useRef(null);
+  const miniHeightRef = useRef(57); // 6+6px padding + 44px art + 1px border
+  useLayoutEffect(() => {
+    if (mode === 'mini' && rootRef.current) miniHeightRef.current = rootRef.current.offsetHeight;
+  }, [mode]);
+
   return (
+    <>
+    {expanded && <div aria-hidden style={{ height: miniHeightRef.current, flexShrink: 0 }} />}
     <div
+      ref={rootRef}
       className={`player-dock ${expanded ? 'player-dock-expanded' : 'player-dock-mini'}${
         floating ? ' player-dock-floating' : ''
       }`}
@@ -612,5 +625,6 @@ export default function PlayerDock({
         )}
       </div>
     </div>
+    </>
   );
 }
