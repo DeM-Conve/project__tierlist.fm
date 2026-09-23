@@ -6,6 +6,7 @@ import {
   CloseButton,
   Group,
   Kbd,
+  Skeleton,
   NavLink,
   ScrollArea,
   Stack,
@@ -31,6 +32,7 @@ export default function Sidebar({
   tierCategories,
   tierGroups,
   playlistCount,
+  loading,
   onSelectSettings,
   onOpenShortcuts,
   onLogout,
@@ -77,7 +79,7 @@ export default function Sidebar({
           component={Link}
           to="/"
           label="Home"
-          description={`Boards & ${playlistCount} playlists`}
+          description={loading ? 'Loading your playlists…' : `Boards & ${playlistCount} playlists`}
           leftSection={<Home size={16} />}
           variant="light"
           active={location.pathname === '/' || location.pathname.startsWith('/playlist/')}
@@ -88,9 +90,13 @@ export default function Sidebar({
           <Text size="xs" fw={700} c="dimmed" tt="uppercase" style={{ letterSpacing: 1 }}>
             Tier lists
           </Text>
-          <Text size="xs" c="dimmed">
-            {tierCategories.length}
-          </Text>
+          {loading ? (
+            <Skeleton h={10} w={14} />
+          ) : (
+            <Text size="xs" c="dimmed">
+              {tierCategories.length}
+            </Text>
+          )}
         </Group>
         <TextInput
           placeholder="Filter…"
@@ -139,7 +145,16 @@ export default function Sidebar({
                 />
               );
             })}
-            {tierCategories.length === 0 && (
+            {/* Until playlists arrive we don't know the boards yet - placeholders,
+                not "0 boards" and the naming-convention hint. */}
+            {loading &&
+              Array.from({ length: 7 }).map((_, i) => (
+                <Stack key={i} gap={7} px={12} py={9}>
+                  <Skeleton h={10} w={`${55 + ((i * 17) % 35)}%`} />
+                  <Skeleton h={4} />
+                </Stack>
+              ))}
+            {!loading && tierCategories.length === 0 && (
               <Text size="xs" c="dimmed" px={8}>
                 Name playlists like "[G] Rap T1" … "T3", "TE", "TZ" and they'll appear here as a tier list.
               </Text>

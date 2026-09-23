@@ -248,6 +248,7 @@ export default function TierBoardView({
   tierGroups,
   tierItems,
   tierLoading,
+  boardLoading,
   playingVideoId,
   pendingMoves,
   onPlay,
@@ -263,7 +264,10 @@ export default function TierBoardView({
   const tileSize = isNarrow ? 56 : 72;
 
   const tiers = TIER_ORDER.filter((t) => tierGroups[category]?.[t]);
-  const anyLoading = tiers.some((t) => tierLoading[t]);
+  const anyLoading = boardLoading || tiers.some((t) => tierLoading[t]);
+  // Before the playlists list itself has loaded we don't even know which
+  // tiers this board has - show a neutral placeholder board, not "0 tiers".
+  const unknownTiers = tiers.length === 0 && anyLoading;
   const counts = Object.fromEntries(tiers.map((t) => [t, tierItems[t]?.length ?? 0]));
   const total = tiers.reduce((sum, t) => sum + counts[t], 0);
   const hasVideos = total > 0;
@@ -451,7 +455,20 @@ export default function TierBoardView({
         </Box>
       )}
 
-      <Paper withBorder radius="md" style={{ overflow: 'hidden', borderTop: 'none' }} bg="var(--surface)">
+      {unknownTiers && (
+        <Paper withBorder radius="md" style={{ overflow: 'hidden' }} bg="var(--surface)">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <Group key={i} gap={GAP} p={GAP} wrap="nowrap" style={{ borderTop: i ? '1px solid var(--border-soft)' : undefined }}>
+              <Skeleton w={60} h={tileSize} radius={6} style={{ flexShrink: 0 }} />
+              {Array.from({ length: 8 }).map((__, j) => (
+                <Skeleton key={j} w={tileSize} h={tileSize} radius={6} style={{ flexShrink: 0 }} />
+              ))}
+            </Group>
+          ))}
+        </Paper>
+      )}
+
+      <Paper withBorder radius="md" style={{ overflow: 'hidden', borderTop: 'none', display: unknownTiers ? 'none' : undefined }} bg="var(--surface)">
         {tiers.map((t) => (
           <TierRow
             key={t}

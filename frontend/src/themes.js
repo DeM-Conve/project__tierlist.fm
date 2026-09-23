@@ -34,7 +34,7 @@ export const THEMES = {
   dracula: {
     label: 'Dracula',
     scheme: 'dark',
-    accent: 'dracula',
+    accent: 'violet',
     bg: '#21222c', surface: '#282a36', surface2: '#343746', surface3: '#44475a',
     border: '#4d5066', borderSoft: '#383a4a',
     text: '#f8f8f2', textDim: '#c3c6de', textFaint: '#6272a4',
@@ -76,54 +76,30 @@ export const THEMES = {
 // 10-shade scales (0 = lightest). `onDark` / `onLight` = which shade is used
 // for filled buttons in a dark / light theme; `text*` = the shade used for
 // accent-colored text and focus rings (var(--accent)).
+// The 8 most common accent choices. Most reuse Mantine's own tested default
+// palettes; Violet and Amber are custom scales (Amber = the app's original).
+const mantineAccent = (key, label) => ({
+  label,
+  scale: [...DEFAULT_THEME.colors[key]],
+  onDark: 7, onLight: 6, textDark: 4, textLight: 7,
+});
+
 export const ACCENTS = {
-  // Dracula's purple (#bd93f9) as a scale.
-  dracula: {
-    label: 'Dracula purple',
-    scale: ['#f6efff', '#ebdcff', '#dcc4fd', '#cdaefb', '#c39ffa', '#bd93f9', '#a77cf0', '#8e63dd', '#744cc0', '#5b3a9a'],
-    onDark: 5, onLight: 7, textDark: 5, textLight: 8,
-  },
+  blue: mantineAccent('blue', 'Blue'),
   violet: {
     label: 'Violet',
     scale: ['#f1efff', '#e2ddff', '#c6bcff', '#a999fb', '#9585f8', '#8b7cf6', '#7a69ee', '#6856d9', '#5646b8', '#443893'],
     onDark: 6, onLight: 7, textDark: 5, textLight: 7,
   },
-  fuchsia: {
-    label: 'Fuchsia',
-    scale: ['#fdf0ff', '#f8d9fd', '#f0b0fa', '#e785f5', '#de5ff0', '#d946ef', '#c026d3', '#a21caf', '#86198f', '#701a75'],
-    onDark: 6, onLight: 7, textDark: 4, textLight: 7,
-  },
-  cyan: {
-    label: 'Cyan',
-    scale: ['#e3fafc', '#c5f6fa', '#99e9f2', '#66d9e8', '#3bc9db', '#22b8cf', '#15aabf', '#1098ad', '#0c8599', '#0b7285'],
-    onDark: 5, onLight: 8, textDark: 4, textLight: 8,
-  },
-  // The original accent (amber) - sits between T2 and T3, so it's opt-in.
+  teal: mantineAccent('teal', 'Teal'),
+  green: mantineAccent('green', 'Green'),
+  pink: mantineAccent('pink', 'Pink'),
+  red: mantineAccent('red', 'Red'),
+  orange: mantineAccent('orange', 'Orange'),
   amber: {
     label: 'Amber',
     scale: ['#fdf3e0', '#f7e6c2', '#f0d5a0', '#e9c37d', '#e2b15c', '#d6a24c', '#c48f3a', '#a97a2f', '#8a6326', '#6b4c1d'],
     onDark: 5, onLight: 7, textDark: 5, textLight: 8,
-  },
-  // Popular accents straight from Mantine's own tested default palettes
-  // (same shade conventions Mantine uses: filled 6 light / 8 dark).
-  ...Object.fromEntries(
-    [
-      ['blue', 'Blue'],
-      ['indigo', 'Indigo'],
-      ['teal', 'Teal'],
-      ['green', 'Green'],
-      ['pink', 'Pink'],
-      ['red', 'Red'],
-      ['orange', 'Orange'],
-    ].map(([key, label]) => [
-      key,
-      { label, scale: [...DEFAULT_THEME.colors[key]], onDark: 7, onLight: 6, textDark: 4, textLight: 7 },
-    ])
-  ),
-  mono: {
-    label: 'Mono',
-    scale: ['#fafafa', '#f4f4f5', '#e4e4e7', '#d4d4d8', '#a1a1aa', '#71717a', '#52525b', '#3f3f46', '#27272a', '#18181b'],
-    onDark: 1, onLight: 9, textDark: 2, textLight: 9,
   },
 };
 

@@ -424,6 +424,7 @@ function Layout() {
         tierCategories={tierCategories}
         tierGroups={tierGroups}
         playlistCount={playlists?.length ?? 0}
+        loading={playlists === null}
         onSelectSettings={() => navigate('/settings')}
         onOpenShortcuts={shortcutsHandlers.open}
         onLogout={logout}
@@ -592,7 +593,7 @@ function TierBoardPage() {
   const tierItems = useSelector((s) => s.tiers.tierItems);
   const pendingMoves = useSelector(selectPendingMoves);
   const playingVideoId = useSelector(selectPlayingVideoIdOnBoard);
-  const { tierGroups, tiers, tierLoading } = useBoardPage(category);
+  const { tierGroups, tiers, tierLoading, isLoading } = useBoardPage(category);
   const [shareOpen, setShareOpen] = useState(false);
   const base = `/tier/${encodeURIComponent(category)}`;
 
@@ -603,6 +604,7 @@ function TierBoardPage() {
         tierGroups={tierGroups}
         tierItems={tierItems}
         tierLoading={tierLoading}
+        boardLoading={isLoading}
         playingVideoId={playingVideoId}
         pendingMoves={pendingMoves}
         onPlay={openFocus}

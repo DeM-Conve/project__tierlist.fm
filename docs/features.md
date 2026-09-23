@@ -24,6 +24,7 @@
 - Tiles: click plays, drag moves, hover/focus reveals a play affordance and a `⋯` menu (**Move to** any tier, **Top / Bottom of** this tier, **Open on YouTube**). Full title on hover tooltip.
 - The playing video is marked (accent ring + animated equalizer) - only on the board it was opened from.
 - Loading rows show Mantine `Skeleton`s; empty rows show a drop target.
+- While the playlists list itself is still loading (right after login / a refresh), the sidebar and the board show skeleton placeholders instead of "0 tier lists" / "0 videos · 0 tiers".
 - Vim-style `/` search (also the Find button): `/` opens a find box at the top of the screen (the `/` is part of the box's text - deleting it cancels), each row filters to its matches (and wraps to show all of them), `Enter`/`n` next match, `Shift+Enter`/`N` previous, `Enter` on a single match plays it, `Esc` closes. The active match is scrolled into view and highlighted.
 
 ## Tier Rail
@@ -94,7 +95,7 @@ Swappable at runtime via a dropdown on the duel screen (and persisted as a defau
 - **Elo** — rates videos via random pairwise duels using an Elo rating system; supports skip.
 
 ## Settings
-- **Appearance** tab (default): pick a **theme** (Tokyo Night, Dracula, Warm charcoal - dark; Paper, Sand, Solarized Light - light; picking one also applies its signature accent), an **accent** (Dracula purple, Violet, Fuchsia, Cyan, Amber, Blue, Indigo, Teal, Green, Pink, Red, Orange, Mono - works with any theme; Warm charcoal + Amber is the original look) and a **tier palette** (Vivid, TierMaker classic, Heat). Each option shows a live mini preview, changes apply instantly across the whole app (including the share image) and are remembered in this browser. All colors come from one file, `frontend/src/themes.js`.
+- **Appearance** tab (default): pick a **theme** (Tokyo Night, Dracula, Warm charcoal - dark; Paper, Sand, Solarized Light - light; picking one also applies its signature accent), an **accent** (Blue, Violet, Teal, Green, Pink, Red, Orange, Amber - works with any theme; Warm charcoal + Amber is the original look) and a **tier palette** (Vivid, TierMaker classic, Heat). Each option shows a live mini preview, changes apply instantly across the whole app (including the share image) and are remembered in this browser. All colors come from one file, `frontend/src/themes.js`.
 - Dedicated, persistent Settings page (GitHub-style layout: side nav + content), reachable via a gear icon in the sidebar or the `/settings` route.
 - Choose the default duel strategy from here; the choice is shared with the in-duel dropdown and persisted in `localStorage`.
 - "Keyboard shortcuts" tab: the full shortcut list (same source as the `?` modal).
