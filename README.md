@@ -1,4 +1,4 @@
-# project__yt
+# Tierlist.fm
 
 Login with your Google account, see all your YouTube playlists, click one to see its videos.
 

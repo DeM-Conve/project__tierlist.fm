@@ -69,8 +69,9 @@ are the source of truth.
 
 ## Brand Commitments
 
-None established yet - no fixed name/logo/voice beyond the working project name
-`project__yt`.
+- **Name: Tierlist.fm** (chosen 2026-09-24; the repo stays `project__yt`). Use it
+  everywhere the product names itself - tab title, sidebar and login logo.
+  No fixed logo/voice yet.
 
 ## Evidence on Hand
 

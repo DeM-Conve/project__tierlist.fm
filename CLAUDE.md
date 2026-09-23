@@ -1,4 +1,4 @@
-# project__yt
+# project__yt - Tierlist.fm
 
 A personal tool to log into your own YouTube account, browse playlists, and manage a
 custom tier-list system. Playlists named `[G]/[GA]/[OG] <Category> T1/T2/T3/TE/TZ` are

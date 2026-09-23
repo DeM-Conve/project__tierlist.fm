@@ -55,7 +55,7 @@ export default function Sidebar({
             <ListOrdered size={18} />
           </ThemeIcon>
           <Text fw={800} fz={17}>
-            Playlist Tiers
+            Tierlist.fm
           </Text>
         </Group>
 

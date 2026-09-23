@@ -218,7 +218,7 @@ export default function LoginView({ onLogin }) {
             <ListOrdered size={18} />
           </ThemeIcon>
           <Text fw={800} fz={17}>
-            Playlist Tiers
+            Tierlist.fm
           </Text>
         </Group>
       </Container>
