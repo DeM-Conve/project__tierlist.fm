@@ -97,7 +97,7 @@ function TierRow({
   const isOver = dnd.dragOverTier === tier;
   const color = TIER_COLORS[tier];
   const isTodo = tier === TODO_TIER;
-  const playLabel = isTodo ? 'Triage: play and rate one by one' : `Play from ${tier}`;
+  const playLabel = isTodo ? 'Triage: play and rate one by one' : `Play ${tier}`;
 
   const shown = searchActive ? items?.filter((v) => matchedKeys.has(`${tier}:${v.videoId}`)) : items;
   const total = shown?.length ?? 0;
@@ -526,7 +526,7 @@ export default function TierBoardView({
             </Button>
           </Tooltip>
           <Button.Group>
-            <Button leftSection={<Play size={15} fill="currentColor" />} onClick={() => onPlayFrom(boardTiers[0])} disabled={!hasVideos}>
+            <Button leftSection={<Play size={15} fill="currentColor" />} onClick={() => onPlayFrom(null)} disabled={!hasVideos}>
               Play
             </Button>
             <Tooltip label="Shuffle the whole board" withArrow>

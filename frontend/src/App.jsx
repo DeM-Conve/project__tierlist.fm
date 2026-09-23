@@ -358,13 +358,24 @@ function Layout() {
     dispatch(moveWithFeedback([{ fromTier, toTier, videoId, dropIndex }]));
   }
 
-  // "Play from T2": opens the dock on that tier's first video, with the
-  // normal whole-board order, so it rolls on into the next tiers. Playing
-  // the TODO list is always a triage session.
+  // A tier's own Play button plays just that tier, like playing one
+  // playlist ("Playing from Rap · T2"); with no tier (the board header's
+  // Play) it plays the whole board in tier order. Playing the TODO list is
+  // always a triage session.
   function playFrom(tier) {
     if (tier === TODO_TIER) return startTriage();
-    const first = focusSequence.find((e) => e.tier === tier);
-    if (first) openFocus(first.tier, first.video.videoId);
+    const pool = tier ? focusSequence.filter((e) => e.tier === tier) : focusSequence;
+    if (pool.length === 0) return;
+    dispatch(
+      openFocusAction({
+        tier: pool[0].tier,
+        videoId: pool[0].video.videoId,
+        queue: pool.map((e) => e.video.videoId),
+        entries: focusSequence,
+        category: currentCategory,
+        label: tier ? `${currentCategory} · ${tier}` : currentCategory,
+      })
+    );
   }
 
 
