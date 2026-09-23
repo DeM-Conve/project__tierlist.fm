@@ -26,6 +26,7 @@ import { selectTierCategories, selectTierGroups } from '../store/selectors';
 import { chooseBoard, setCurrent } from '../store/inboxSlice';
 import { songLabel, TIER_INK, youtubeUrl } from '../tierUtils';
 import { EqualizerMark } from './TierBits';
+import { isSequenceKey } from '../keyboard/sequence';
 
 const RELATIVE = new Intl.RelativeTimeFormat(undefined, { numeric: 'auto' });
 const STEPS = [
@@ -117,6 +118,7 @@ export default function InboxView({ inbox, actions, onPasteLink }) {
   // actions instead of board edits.
   useEffect(() => {
     function onKeyDown(e) {
+      if (isSequenceKey(e)) return;
       if (isTyping() || e.altKey) return;
       const mod = e.ctrlKey || e.metaKey;
       const claim = () => {

@@ -127,7 +127,9 @@ Swappable at runtime via a dropdown on the duel screen (and persisted as a defau
 
 ## Keyboard shortcuts (full list)
 Source of truth is `frontend/src/shortcuts.js` (rendered by the `?` modal and Settings → Keyboard shortcuts) - keep this list in sync with it.
-- Global: `Ctrl/Cmd+K` command palette, `?` shortcut help, `Ctrl/Cmd+Z` undo last tier edit.
+- Global: `Ctrl/Cmd+K` command palette, `?` shortcut help, `Ctrl/Cmd+Z` undo last tier edit, `Ctrl+V` paste a YouTube link (outside a text box) to add it via the Inbox.
+- Navigation (Vimium-style, anywhere outside a text box): `f` **link hints** - every visible clickable (tiles, buttons, tabs, inputs, sidebar links) gets a yellow letter label, type it to click/focus, `Backspace` edits, `Esc`/scroll/click cancels; `o` command palette; `g h` Home, `g i` Inbox, `g s` Settings, `g p` playing song's board, `g b` this board, `g t` its TODO list, `g d` duel; `[` / `]` previous/next board; `H` / `L` back/forward; `g g` / `G` top/bottom; `y y` copy the playing song's YouTube link. The key after a `g`/`y` prefix is never also taken by a page shortcut (e.g. `g h` doesn't also skip to the previous track).
+- Inbox: `1`-`5` file into T1…TZ, `t` save to TODO, `Enter` listen, `s` skip, `x` not a song, `b` pick board, `u` / `Ctrl+Z` undo.
 - Tier board: `/` search, `n` / `N` next/previous match, `Enter` play match (or step), `Esc` close search, `Shift+P` push to YouTube (any board page).
 - Tier page: `/` filter, `Esc` clear the filter.
 - Player: `h` / `l` prev/next track, `←`/`→` seek 10s (expanded), `Space` play/pause, `m` mute, `0`-`9` jump to that 10%, `j` minimize (expanded → mini → floating), `k` expand, `Esc` minimize from expanded, `Shift+1`-`9` rate the playing video (any mode, on its board).

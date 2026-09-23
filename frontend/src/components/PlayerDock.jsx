@@ -17,6 +17,7 @@ import {
 import { TIER_COLORS, TODO_TIER } from '../tiers';
 import { TierChip } from './TierBits';
 import EmbeddedPlayer from './EmbeddedPlayer';
+import { isSequenceKey } from '../keyboard/sequence';
 
 // Renders in 'expanded' (full-screen modal), 'mini' (YouTube-Music-style
 // bottom bar) or 'floating' (small bottom-right corner box) modes.
@@ -147,6 +148,7 @@ export default function PlayerDock({
   // winner.
   useEffect(() => {
     function onKeyDown(e) {
+      if (isSequenceKey(e)) return;
       const active = document.activeElement;
       const isTyping =
         active?.tagName === 'INPUT' || active?.tagName === 'TEXTAREA' || active?.isContentEditable;

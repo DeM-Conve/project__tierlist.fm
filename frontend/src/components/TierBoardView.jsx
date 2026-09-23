@@ -22,6 +22,7 @@ import { BOARD_TIERS, TIER_COLORS, TIER_ORDER, TODO_TIER } from '../tiers';
 import { moveWithFeedback, useTierDnd } from '../tierActions';
 import { TierMixBar, TierTile } from './TierBits';
 import { TIER_INK, indexForPointInFlow, videoMatches } from '../tierUtils';
+import { isSequenceKey } from '../keyboard/sequence';
 
 const GAP = 8;
 // A row's fixed vertical chrome around its tile lines: 2 x (4px box padding
@@ -423,6 +424,7 @@ export default function TierBoardView({
 
   useEffect(() => {
     function onKeyDown(e) {
+      if (isSequenceKey(e)) return;
       const active = document.activeElement;
       const inSearchBox = active === searchInputRef.current;
       const isTyping =

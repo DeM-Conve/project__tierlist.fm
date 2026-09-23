@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useQueryClient } from '@tanstack/react-query';
 import {
@@ -36,6 +36,8 @@ import { useInbox } from './inbox/useInbox';
 import { useInboxActions } from './inbox/useInboxActions';
 import { videoIdFromText } from './inbox/youtubeLink';
 import { pasteVideo } from './store/inboxSlice';
+import LinkHints from './keyboard/LinkHints';
+import { useVimKeys } from './keyboard/useVimKeys';
 import SettingsView from './components/SettingsView';
 import ShortcutsModal from './components/ShortcutsModal';
 import LoginView from './components/LoginView';
@@ -272,6 +274,15 @@ function Layout() {
   const invalidatePlaylistItems = useInvalidatePlaylistItems();
 
   const [shortcutsOpened, shortcutsHandlers] = useDisclosure(false);
+  const hintsRef = useRef(null);
+  useVimKeys({
+    hintsRef,
+    categories: tierCategories,
+    currentCategory,
+    playingCategory: focusedVideoData ? focusedCategory : null,
+    playingVideoId: focusedVideoData?.videoId ?? null,
+    hasTodo: !!tierGroups[currentCategory]?.[TODO_TIER],
+  });
   // "?" is the one shortcut in the app with no state-machine/scoping needs
   // of its own (see shortcuts.js's header comment for why the others still
   // have bespoke handlers) - a flat, always-on binding is exactly what
@@ -570,6 +581,7 @@ function Layout() {
       )}
 
       <CommandPalette items={commandItems} />
+      <LinkHints ref={hintsRef} />
       <ShortcutsModal opened={shortcutsOpened} onClose={shortcutsHandlers.close} />
     </div>
   );

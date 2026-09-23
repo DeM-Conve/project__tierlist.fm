@@ -71,14 +71,22 @@ export default function Sidebar({
                 Jump to…
               </Text>
             </Group>
-            <Kbd size="xs">⌘K</Kbd>
+            <Group gap={4} wrap="nowrap">
+              <Kbd size="xs">o</Kbd>
+              <Kbd size="xs">⌘K</Kbd>
+            </Group>
           </Group>
         </UnstyledButton>
 
         <NavLink
           component={Link}
           to="/"
-          label="Home"
+          label={
+            <Group justify="space-between" wrap="nowrap">
+              Home
+              <Kbd size="xs" visibleFrom="md">g h</Kbd>
+            </Group>
+          }
           description={loading ? 'Loading your playlists…' : `Boards & ${playlistCount} playlists`}
           leftSection={<Home size={16} />}
           variant="light"
@@ -87,7 +95,12 @@ export default function Sidebar({
         <NavLink
           component={Link}
           to="/inbox"
-          label="Inbox"
+          label={
+            <Group justify="space-between" wrap="nowrap">
+              Inbox
+              <Kbd size="xs" visibleFrom="md">g i</Kbd>
+            </Group>
+          }
           description="Liked songs to rate"
           leftSection={<Inbox size={16} />}
           rightSection={
@@ -185,7 +198,7 @@ export default function Sidebar({
         </ScrollArea>
 
         <Group gap="xs" mt="md" wrap="nowrap">
-          <Tooltip label="Settings" withArrow>
+          <Tooltip label="Settings (g s)" withArrow>
             <ActionIcon variant="default" size="lg" onClick={onSelectSettings} aria-label="Settings">
               <Settings size={16} />
             </ActionIcon>
