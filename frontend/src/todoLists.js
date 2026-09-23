@@ -20,6 +20,12 @@ import { TIER_ORDER } from './tiers';
 export const DEFAULT_TODO_KEYWORD = 'TODO';
 export const TODO_KEYWORD_MAX = 20;
 
+// What was typed -> the keyword's words: symbols dropped, spaces collapsed
+// ("(**TODO**)" -> "TODO"). Matching ignores symbols anyway (normalizeName).
+export function keywordWords(text) {
+  return text.replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
+}
+
 // Mirrors the backend's @TodoKeyword - keep the two in step.
 export function validateTodoKeyword(keyword) {
   const errors = [];
