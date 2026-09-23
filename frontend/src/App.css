@@ -22,7 +22,7 @@
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
-  padding: 14px 16px 24px;
+  padding: 14px 16px 16px;
   background: var(--surface);
   border-right: 1px solid var(--border-soft);
 }
