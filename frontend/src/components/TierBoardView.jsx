@@ -25,6 +25,7 @@ import { TierMixBar, TierTile } from './TierBits';
 import { TIER_INK, indexForPointInFlow, videoMatches } from '../tierUtils';
 import { isSequenceKey } from '../keyboard/sequence';
 import { useCanvas } from '../layout/canvas';
+import { SHELL_Y, spacingPx } from '../layout/spacing';
 
 const GAP = 8;
 // Smallest tile the board shrinks to when fitting every row on screen.
@@ -348,9 +349,9 @@ export default function TierBoardView({
   // the staged-changes review (Put back).
   const rowTiers = [...tiers, ...(hasTodo ? [TODO_TIER] : [])];
   const pendingPad = pendingMoves.length > 0 ? 80 : 0;
-  // 32 = the canvas's own bottom padding; the TODO row is a separate card
-  // (16px margin + its 2px of borders).
-  const available = viewportHeight - rowsTop - footerHeight - pendingPad - 32 - (hasTodo ? 18 : 0) - 1;
+  // Minus the canvas's own bottom padding (the shell standard); the TODO row
+  // is a separate card (16px margin + its 2px of borders).
+  const available = viewportHeight - rowsTop - footerHeight - pendingPad - spacingPx(SHELL_Y) - (hasTodo ? 18 : 0) - 1;
   // When even one line per row at the full tile size doesn't fit (a board
   // with every tier + TODO on a short screen), shrink the tiles until it
   // does - down to MIN_TILE, below which the song names stop being legible

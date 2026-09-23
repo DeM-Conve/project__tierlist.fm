@@ -7,6 +7,7 @@ import { selectFocusedVideoData, selectTierGroups } from '../store/selectors';
 import { moveWithFeedback, useTierDnd } from '../tierActions';
 import { EqualizerMark } from './TierBits';
 import { TIER_INK } from '../tierUtils';
+import { RAIL_X, SHELL_Y } from '../layout/spacing';
 
 const RAIL_WIDTH = 84;
 // TODO and Remove - the two rail slots that aren't ranked tiers.
@@ -130,7 +131,8 @@ export default function TierRail({ category, activeTier }) {
     <Box
       visibleFrom="md"
       w={RAIL_WIDTH}
-      p={8}
+      px={RAIL_X}
+      py={SHELL_Y}
       bg="var(--surface)"
       style={{
         flexShrink: 0,

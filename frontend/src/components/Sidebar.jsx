@@ -1,5 +1,6 @@
 import { Link, useLocation } from 'react-router-dom';
 import {
+  Box,
   ActionIcon,
   Badge,
   Button,
@@ -18,6 +19,7 @@ import {
 } from '@mantine/core';
 import { Home, Keyboard, ListOrdered, ListPlus, LogOut, Search, Settings } from 'lucide-react';
 import { TIER_ORDER, TODO_TIER } from '../tiers';
+import { SHELL_Y, SIDEBAR_X } from '../layout/spacing';
 
 // Each board shows its song total straight from the playlists' own item
 // counts - no per-board fetch needed just to draw the sidebar.
@@ -47,7 +49,7 @@ export default function Sidebar({
   return (
     <>
       {mobileOpen && <div className="sidebar-scrim" onClick={onCloseMobile} />}
-      <aside className={`sidebar${mobileOpen ? ' sidebar-open' : ''}`}>
+      <Box component="aside" className={`sidebar${mobileOpen ? ' sidebar-open' : ''}`} px={SIDEBAR_X} py={SHELL_Y}>
         <Group gap={10} px={6} mb="md" wrap="nowrap">
           <ThemeIcon size={30} radius="sm" variant="filled">
             <ListOrdered size={18} />
@@ -199,7 +201,7 @@ export default function Sidebar({
           </Stack>
         </ScrollArea>
 
-        <Group gap="xs" pt="sm" mt={4} wrap="nowrap" style={{ borderTop: '1px solid var(--border-soft)' }}>
+        <Group gap="xs" pt="sm" mt="xs" wrap="nowrap" style={{ borderTop: '1px solid var(--border-soft)' }}>
           <Tooltip label="Settings (g s)" withArrow>
             <ActionIcon variant="default" size="lg" onClick={onSelectSettings} aria-label="Settings">
               <Settings size={16} />
@@ -214,7 +216,7 @@ export default function Sidebar({
             Log out
           </Button>
         </Group>
-      </aside>
+      </Box>
     </>
   );
 }

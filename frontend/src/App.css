@@ -22,7 +22,7 @@
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
-  padding: 14px 16px 16px;
+  /* padding: the shell spacing standard, as Mantine props (layout/spacing.js). */
   background: var(--surface);
   border-right: 1px solid var(--border-soft);
 }
@@ -195,7 +195,9 @@
   max-width: none;
   max-height: none;
   overflow: visible;
-  padding: 6px 12px;
+  /* Sides on the shell standard (layout/spacing.js SIDEBAR_X = md), so the
+     cover art lines up with the sidebar's content above it. */
+  padding: 6px var(--mantine-spacing-md);
   border-width: 1px 0 0;
   border-radius: 0;
   /* In flow (not overlaying the page), so the top border is the only

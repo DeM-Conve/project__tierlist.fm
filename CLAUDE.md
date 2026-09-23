@@ -60,6 +60,11 @@ auto-grouped into a tier board per category.
     in this app for it to manage (login is a plain OAuth redirect; filter/search/settings
     inputs are simple controlled inputs with no validation need). Don't force it in
     somewhere it doesn't fit; use it if/when a real form with validation appears.
+  - **Shell spacing is one standard: `src/layout/spacing.js`** (Mantine spacing
+    keys - `SHELL_Y` top/bottom of every shell column, `SIDEBAR_X`/`CANVAS_X`/
+    `RAIL_X` sides). Sidebar, canvas and rail pass these to Mantine `p*` props;
+    layout maths reads them via `spacingPx()`. Don't hand-pick a padding number
+    for a shell column - change the token.
   - `lucide-react` is available for icons - prefer it over new unicode/emoji glyphs
     where a component is otherwise being touched.
   - **Mantine's `Skeleton`** for loading placeholders (tier board thumbnails, playlist
