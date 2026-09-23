@@ -30,3 +30,19 @@ export function indexForPointInList(container, clientY) {
   return rows.length;
 }
 
+
+// Bracketed noise YouTube titles carry: "(Official Music Video)", "[Lyrics]",
+// "(Audio)", "(prod. X)", "| Album name" ...
+const TITLE_NOISE =
+  /\s*[([{][^)\]}]*\b(official|video|audio|lyrics?|lyrical|visuali[sz]er|mv|m\/v|hd|4k|prod\.?|full song|explicit)\b[^)\]}]*[)\]}]/gi;
+const CHANNEL_NOISE = /\s*(-\s*topic|vevo|official)\s*$/i;
+
+// What a tile shows: the song name and who it's by, from the video's own
+// metadata. Handles the common "Artist - Song (Official Video)" shape; any
+// other title is the song, with the channel as the artist.
+export function songLabel(video) {
+  const clean = (video.title || '').replace(TITLE_NOISE, '').split(/\s[|｜]\s/)[0].trim();
+  const dash = clean.match(/^(.+?)\s[-–—]\s(.+)$/);
+  if (dash) return { song: dash[2].trim(), artist: dash[1].trim() };
+  return { song: clean || video.title || '', artist: (video.channelTitle || '').replace(CHANNEL_NOISE, '').trim() };
+}

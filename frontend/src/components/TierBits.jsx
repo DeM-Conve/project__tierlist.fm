@@ -1,7 +1,7 @@
 import { ActionIcon, Box, Group, Image, Menu, Progress, Text, Tooltip, UnstyledButton } from '@mantine/core';
 import { ArrowDownToLine, ArrowUpRight, ArrowUpToLine, MoreHorizontal, Play } from 'lucide-react';
 import { TIER_COLORS } from '../tiers';
-import { TIER_INK, youtubeUrl } from '../tierUtils';
+import { TIER_INK, songLabel, youtubeUrl } from '../tierUtils';
 
 export function EqualizerMark({ color = TIER_INK, height = 12 }) {
   return (
@@ -132,7 +132,9 @@ export function MoveMenu({ video, tier, tiers, onMove, target }) {
 }
 
 // Square album-art tile used on the tier list. Click plays, drag moves,
-// hover reveals the "..." move menu.
+// hover reveals the "..." move menu. The song name (+ artist, when there's
+// room) is always printed over the bottom of the art, so an album cover
+// shared by many songs is still tellable apart without hovering.
 export function TierTile({
   video,
   tier,
@@ -148,6 +150,7 @@ export function TierTile({
   onMove,
 }) {
   const ring = isPlaying || searchState;
+  const { song, artist } = songLabel(video);
   return (
     <Tooltip label={video.title} openDelay={450} withArrow multiline maw={260}>
       <Box
@@ -192,15 +195,48 @@ export function TierTile({
           draggable={false}
           style={{ pointerEvents: 'none', filter: isPendingRemoval ? 'grayscale(1)' : undefined }}
         />
+        <Box
+          pos="absolute"
+          inset={0}
+          p={5}
+          style={{
+            borderRadius: 6,
+            pointerEvents: 'none',
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'flex-end',
+            background: 'linear-gradient(180deg, transparent 30%, var(--media-scrim) 62%, var(--media-control-bg))',
+            textShadow: '0 1px 2px var(--media-control-shadow)',
+          }}
+        >
+          {/* Big tiles: up to two lines. Small (phone) tiles: one line with an
+              ellipsis - two lines there would split words mid-way. */}
+          <Text
+            fz={size >= 80 ? 11 : 10}
+            fw={700}
+            lh={1.15}
+            c="var(--media-fg)"
+            lineClamp={size >= 80 ? 2 : undefined}
+            truncate={size >= 80 ? undefined : 'end'}
+            style={{ overflowWrap: 'anywhere' }}
+          >
+            {song}
+          </Text>
+          {artist && size >= 80 && (
+            <Text fz={9.5} lh={1.2} c="var(--media-fg)" opacity={0.75} truncate="end">
+              {artist}
+            </Text>
+          )}
+        </Box>
         {isPlaying && (
-          <Box pos="absolute" bottom={4} left={4} bg="accent" px={4} py={3} style={{ borderRadius: 3 }}>
+          <Box pos="absolute" top={4} left={4} bg="accent" px={4} py={3} style={{ borderRadius: 3 }}>
             <EqualizerMark height={9} />
           </Box>
         )}
         {isPendingRemoval && (
           <Text
             pos="absolute"
-            bottom={3}
+            top={3}
             left={3}
             right={3}
             ta="center"

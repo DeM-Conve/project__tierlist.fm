@@ -259,7 +259,7 @@ export default function TierBoardView({
 }) {
   const dispatch = useDispatch();
   const isNarrow = useMediaQuery('(max-width: 62em)');
-  const tileSize = isNarrow ? 56 : 72;
+  const tileSize = isNarrow ? 64 : 88; // square; big enough to print the song name on
 
   const tiers = TIER_ORDER.filter((t) => tierGroups[category]?.[t]);
   const anyLoading = boardLoading || tiers.some((t) => tierLoading[t]);
