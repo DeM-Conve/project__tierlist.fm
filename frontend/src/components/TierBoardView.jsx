@@ -21,7 +21,7 @@ import { ChevronRight, Play, Plus, Search, Shuffle, Swords } from 'lucide-react'
 import { TIER_COLORS, TIER_ORDER } from '../tiers';
 import { moveWithFeedback, useTierDnd } from '../tierActions';
 import { TierMixBar, TierTile } from './TierBits';
-import { TIER_INK, indexForPointInFlow } from '../tierUtils';
+import { TIER_INK, indexForPointInFlow, videoMatches } from '../tierUtils';
 
 const GAP = 8;
 
@@ -300,9 +300,8 @@ export default function TierBoardView({
 
   const queryText = searchQuery.slice(1);
   const matches = useMemo(() => {
-    const q = queryText.trim().toLowerCase();
-    if (!q) return [];
-    return searchableEntries.filter((e) => e.video.title.toLowerCase().includes(q));
+    if (!queryText.trim()) return [];
+    return searchableEntries.filter((e) => videoMatches(e.video, queryText));
   }, [searchableEntries, queryText]);
 
   function openSearch() {

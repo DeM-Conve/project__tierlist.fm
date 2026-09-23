@@ -23,7 +23,7 @@ import { ArrowLeft, ArrowUpToLine, MoreHorizontal, Play, Search, Shuffle } from 
 import { TIER_COLORS } from '../tiers';
 import { moveWithFeedback, useTierDnd } from '../tierActions';
 import { EqualizerMark, MoveMenu, TierChip } from './TierBits';
-import { TIER_INK, indexForPointInList } from '../tierUtils';
+import { TIER_INK, indexForPointInList, videoMatches } from '../tierUtils';
 
 const NO_ITEMS = [];
 
@@ -149,11 +149,8 @@ export default function TierFocusView({
   const items = tierItems[tier] ?? NO_ITEMS;
   const color = TIER_COLORS[tier];
 
-  const q = filter.trim().toLowerCase();
-  const visible = useMemo(
-    () => (q ? items.filter((v) => v.title.toLowerCase().includes(q) || v.channelTitle?.toLowerCase().includes(q)) : items),
-    [items, q]
-  );
+  const q = filter.trim();
+  const visible = useMemo(() => items.filter((v) => videoMatches(v, q)), [items, q]);
   const rankOf = useMemo(() => new Map(items.map((v, i) => [v.videoId, i + 1])), [items]);
   const allVisibleSelected = visible.length > 0 && visible.every((v) => selected.has(v.videoId));
   const someSelected = visible.some((v) => selected.has(v.videoId));

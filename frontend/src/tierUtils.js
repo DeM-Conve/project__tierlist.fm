@@ -46,3 +46,16 @@ export function songLabel(video) {
   if (dash) return { song: dash[2].trim(), artist: dash[1].trim() };
   return { song: clean || video.title || '', artist: (video.channelTitle || '').replace(CHANNEL_NOISE, '').trim() };
 }
+
+const fold = (text) => text.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase();
+
+// Search used by the board's Find and the tier page's filter: every word of
+// the query must appear (any order) in the video's title, channel or the
+// artist shown on its tile. Case- and accent-insensitive ("beyonce" finds
+// "Beyoncé").
+export function videoMatches(video, query) {
+  const words = fold(query).split(/\s+/).filter(Boolean);
+  if (!words.length) return true;
+  const haystack = fold([video.title, video.channelTitle, songLabel(video).artist].filter(Boolean).join(' '));
+  return words.every((w) => haystack.includes(w));
+}

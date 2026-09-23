@@ -36,7 +36,7 @@
 - The playing video is marked (accent ring + animated equalizer) - only on the board it was opened from.
 - Loading rows show Mantine `Skeleton`s; empty rows show a drop target.
 - While the playlists list itself is still loading (right after login / a refresh), the sidebar and the board show skeleton placeholders instead of "0 tier lists" / "0 videos · 0 tiers".
-- Vim-style `/` search (also the Find button): `/` opens a find box at the top of the screen (the `/` is part of the box's text - deleting it cancels), each row filters to its matches (and wraps to show all of them), `Enter`/`n` next match, `Shift+Enter`/`N` previous, `Enter` on a single match plays it, `Esc` closes. The active match is scrolled into view and highlighted.
+- Vim-style `/` search (also the Find button): `/` opens a find box at the top of the screen (the `/` is part of the box's text - deleting it cancels), each row filters to its matches (and wraps to show all of them), `Enter`/`n` next match, `Shift+Enter`/`N` previous, `Enter` on a single match plays it, `Esc` closes. The active match is scrolled into view and highlighted. Matches song title, channel **and artist name**; every word must match, in any order, ignoring case and accents (`krsna makasam`, `beyonce`).
 
 ## Tier Rail
 - A permanent strip of the board's tiers down the right edge of the tier list and tier pages (desktop), with live counts. One click does the most useful thing available: **move the selected rows there** (when rows are selected) → otherwise **re-rate the playing song** into that tier (when it's from this board; the playing song's art sits on its current tier, with `⇧1-5` hints) → otherwise **open that tier**. The header says which mode it's in ("Move N to" / "Rate" / "Tiers").
@@ -46,7 +46,7 @@
 - `/tier/<board>/t/<tier>`: a big tier header (Play / Shuffle this tier), tabs for every tier with counts (tabs are drop targets too), and the whole tier as a dense numbered list (rank, cover, title, channel).
 - Every row has **one-click tier chips** (current tier filled) and a `⋯` menu (Top / Bottom / Open on YouTube). Click a row to play it.
 - **Multi-select**: checkboxes, Shift-click for a range, header checkbox for all shown, `Ctrl+A` for all shown, `Esc` to clear. A floating bulk bar moves the selection to any tier or to the top of this one; the Tier Rail does the same.
-- Filter box (`/` focuses it, `Esc` clears) filters by title or channel; drag rows to reorder (drop position maps back to the real position even while filtered).
+- Filter box (`/` focuses it, `Esc` clears) filters by title, channel or artist (same matching as the board's `/` search); drag rows to reorder (drop position maps back to the real position even while filtered).
 
 ## Instant feedback & undo
 - Every tier edit - drag, menu, chip, bulk move, rail, player rating, duel result - shows a toast (""Song" → T1", "Moved 5 videos → T2") with **Undo**, and `Ctrl/Cmd+Z` undoes the last edit anywhere (up to 50 steps; a bulk move or a whole duel result is one step). Undo history resets when the board is reloaded or discarded.
@@ -58,7 +58,7 @@
 
 ## Sync to YouTube
 - A floating **staged-changes bar** (bottom-center, above the mini player) appears on every page of a board (tier list, tier page) whenever there are staged changes: "N changes staged · review" / "Discard" / "Push to YouTube ⇧P". Compact on phones. After a push it briefly reports "Synced to YouTube" / "Some changes failed" / "Sync failed".
-- **Review changes** (click "N changes staged · review"): the board's changes grouped by destination tier (tier-coloured edge + chip), each with its cover, channel, where it came from and an up/down arrow; totals for moved up / moved down / duplicates; a **Put back** button per change (restores its original tier, undoable); roughly how much of the daily YouTube API quota a push will use; and Discard all / Push to YouTube (`Shift+P`) right there. It closes itself once nothing is left.
+- **Review changes** (click "N changes staged · review"): a simple list - cover, song and artist, `from → to` tier chips (or "Duplicate removed"), and a **Put back** button per move (undoable); Discard all / Push to YouTube (`Shift+P`) at the bottom. Closes itself once nothing is left.
 - Clicking "N changes staged" opens a popup (Mantine `Modal`) itemizing every staged change (video, from tier → to tier, or a duplicate removal - see below).
 - "Push to YouTube" calls the backend, which inserts each video into its new playlist before removing it from the old one (so a failed delete never loses a video). Partial failures are reported per item.
 - "Discard" reverts the board back to what's actually on YouTube.
