@@ -23,7 +23,6 @@ export const queueSong = (tier, video, position) => (dispatch, getState) => {
     );
     return;
   }
-  if (focus.focusedVideo.videoId === video.videoId) return;
   dispatch(enqueue({ entry, position }));
   notifications.hide(TOAST_ID);
   notifications.show({

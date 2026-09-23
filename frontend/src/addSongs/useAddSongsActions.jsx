@@ -72,6 +72,7 @@ export function useAddSongsActions(addSongs) {
         queue: queue.map((v) => v.videoId),
         entries: queue.map((v) => ({ tier: null, video: v })),
         category: null,
+        label: 'Add songs',
         mode: mode === 'floating' ? 'floating' : 'mini',
       })
     );

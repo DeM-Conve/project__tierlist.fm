@@ -65,7 +65,13 @@ import {
   expandPlayer,
   floatPlayer,
   startShuffle,
-  setFocusedVideo,
+  playNextInQueue,
+  playPrevInQueue,
+  jumpInQueue,
+  moveInQueue,
+  clearUpNext,
+  reorderContext,
+  cycleRepeat,
 } from './store/focusSlice';
 import {
   selectTierGroups,
@@ -78,8 +84,6 @@ import {
   selectDuelTierSizes,
   selectFocusSequence,
   selectVideoLookup,
-  selectActiveSequence,
-  selectFocusedSeqIndex,
   selectFocusedVideoData,
   selectFocusedAvailableTiers,
 } from './store/selectors';
@@ -222,8 +226,12 @@ function Layout() {
   const pendingMoves = useSelector(selectPendingMoves);
   const focusSequence = useSelector(selectFocusSequence);
   const videoLookup = useSelector(selectVideoLookup);
-  const activeSequence = useSelector(selectActiveSequence);
-  const focusedSeqIndex = useSelector(selectFocusedSeqIndex);
+  const queueHistory = useSelector((s) => s.focus.history);
+  const upNext = useSelector((s) => s.focus.upNext);
+  const queueContext = useSelector((s) => s.focus.context);
+  const contextLabel = useSelector((s) => s.focus.contextLabel);
+  const queueCurrent = useSelector((s) => s.focus.current);
+  const repeatMode = useSelector((s) => s.focus.repeatMode);
   const focusedVideoData = useSelector(selectFocusedVideoData);
   const focusedAvailableTiers = useSelector(selectFocusedAvailableTiers);
 
@@ -361,11 +369,6 @@ function Layout() {
     if (first) openFocus(first.tier, first.video.videoId);
   }
 
-  function jumpToQueueIndex(index) {
-    const entry = activeSequence[index];
-    if (!entry) return;
-    dispatch(setFocusedVideo({ tier: videoLookup.get(entry.video.videoId)?.tier ?? entry.tier, videoId: entry.video.videoId }));
-  }
 
   function openFocus(tier, videoId) {
     // Freeze the current tier-order sequence as this session's browsing
@@ -377,6 +380,7 @@ function Layout() {
         queue: focusSequence.map((e) => e.video.videoId),
         entries: focusSequence,
         category: currentCategory,
+        label: currentCategory,
       })
     );
   }
@@ -393,6 +397,7 @@ function Layout() {
         queue: todo.map((e) => e.video.videoId),
         entries: focusSequence,
         category: currentCategory,
+        label: `${currentCategory} · ${TODO_TIER}`,
         triage: true,
       })
     );
@@ -420,16 +425,9 @@ function Layout() {
         videoId: first.video.videoId,
         entries: focusSequence,
         category: currentCategory,
+        label: `${currentCategory}${tier ? ` · ${tier}` : ''} · shuffle`,
       })
     );
-  }
-
-  function navigateFocus(delta) {
-    if (focusedSeqIndex < 0) return;
-    const nextIndex = focusedSeqIndex + delta;
-    if (nextIndex < 0 || nextIndex >= activeSequence.length) return;
-    const entry = activeSequence[nextIndex];
-    dispatch(setFocusedVideo({ tier: entry.tier, videoId: entry.video.videoId }));
   }
 
   function changeFocusedTier(newTier) {
@@ -615,21 +613,32 @@ function Layout() {
           video={focusedVideoData}
           currentTier={focusedVideo.tier}
           availableTiers={focusedAvailableTiers}
-          hasPrev={focusedSeqIndex > 0}
-          hasNext={focusedSeqIndex < activeSequence.length - 1}
+          hasPrev={queueHistory.length > 0}
+          hasNext={upNext.length + queueContext.length > 0}
+          repeatMode={repeatMode}
+          onCycleRepeat={() => dispatch(cycleRepeat())}
           isShuffling={isShuffling}
           isTriage={isTriage}
           onStop={() => dispatch(closeFocusAction())}
           onMinimize={() => dispatch(minimizePlayer())}
           onExpand={() => dispatch(expandPlayer())}
           onFloat={() => dispatch(floatPlayer())}
-          onPrev={() => navigateFocus(-1)}
-          onNext={() => navigateFocus(1)}
+          onPrev={() => dispatch(playPrevInQueue())}
+          onNext={() => dispatch(playNextInQueue())}
           onChangeTier={changeFocusedTier}
-          queue={activeSequence}
-          queueIndex={focusedSeqIndex}
-          onJump={jumpToQueueIndex}
-          onRemove={(id) => dispatch(removeFromQueue(id))}
+          queue={{ history: queueHistory, current: queueCurrent, upNext, context: queueContext, contextLabel }}
+          onJump={(section, index) => dispatch(jumpInQueue({ section, index }))}
+          onRemove={(key) => dispatch(removeFromQueue(key))}
+          onMoveInQueue={(from, to) => dispatch(moveInQueue({ from, to }))}
+          onClearUpNext={() => dispatch(clearUpNext())}
+          onShuffleUpcoming={() => {
+            const keys = queueContext.map((e) => e.key);
+            for (let i = keys.length - 1; i > 0; i--) {
+              const j = Math.floor(Math.random() * (i + 1));
+              [keys[i], keys[j]] = [keys[j], keys[i]];
+            }
+            dispatch(reorderContext(keys));
+          }}
         />
       )}
 

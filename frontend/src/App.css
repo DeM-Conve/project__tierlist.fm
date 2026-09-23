@@ -175,6 +175,9 @@
 .player-queue-head { padding-right: 84px; } /* room for the toolbar */
 .queue-row-remove { opacity: 0; transition: opacity 0.1s ease; }
 .queue-row:hover .queue-row-remove, .queue-row-remove:focus-visible { opacity: 1; }
+/* Queue drag handle: faint until the row is hovered (a :hover state - Mantine has no prop for it). */
+.queue-row-grip { opacity: 0.35; transition: opacity 0.1s ease; }
+.queue-row:hover .queue-row-grip, .queue-row-grip:focus-visible { opacity: 1; }
 @media (max-width: 61.99em) {
   .player-dock-expanded .player-dock-card { grid-template-columns: minmax(0, 1fr); width: 100%; overflow-y: auto; }
   .player-dock-expanded .player-dock-body { grid-template-columns: minmax(0, 1fr); gap: 12px; }

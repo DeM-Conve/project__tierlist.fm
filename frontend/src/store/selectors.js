@@ -9,8 +9,6 @@ const selectTierItems = (state) => state.tiers.tierItems;
 const selectOriginalTierOf = (state) => state.tiers.originalTierOf;
 const selectCurrentCategory = (state) => state.view.currentCategory;
 const selectFocusedVideo = (state) => state.focus.focusedVideo;
-const selectFocusQueue = (state) => state.focus.focusQueue;
-const selectFocusEntries = (state) => state.focus.focusEntries;
 const selectFocusedCategory = (state) => state.focus.focusedCategory;
 const selectLoadedCategory = (state) => state.tiers.loadedCategory;
 
@@ -140,41 +138,10 @@ export const selectVideoLookup = createSelector([selectFocusSequence], (sequence
   return map;
 });
 
-// Looked up from the snapshot taken when the dock opened (`focusEntries`),
-// not the live per-category `tierItems` - see the comment on
-// `focusSlice.focusEntries` for why. `videoLookup` above is still used for
-// the brief moment a queue is first constructed, while still on that
-// board's own page.
-const selectSnapshotLookup = createSelector([selectFocusEntries], (entries) => {
-  const map = new Map();
-  (entries || []).forEach((e) => map.set(e.video.videoId, e));
-  return map;
-});
-
-export const selectActiveSequence = createSelector(
-  [selectFocusQueue, selectSnapshotLookup],
-  (focusQueue, snapshotLookup) =>
-    focusQueue ? focusQueue.map((id) => snapshotLookup.get(id)).filter(Boolean) : []
-);
-
-// Matched by videoId only, not tier - `focusEntries` is a snapshot frozen
-// when the dock opened, so its `.tier` for a given video stays whatever it
-// was at that moment. Reassigning the focused video's tier (the dock's
-// shift+digit shortcut) updates `focusedVideo.tier` but not the snapshot,
-// so matching on tier too would never find it again and silently kill the
-// dock the instant you reassigned a tier mid-playback.
-export const selectFocusedSeqIndex = createSelector(
-  [selectFocusedVideo, selectActiveSequence],
-  (focusedVideo, activeSequence) =>
-    focusedVideo
-      ? activeSequence.findIndex((e) => e.video.videoId === focusedVideo.videoId)
-      : -1
-);
-
-export const selectFocusedVideoData = createSelector(
-  [selectFocusedSeqIndex, selectActiveSequence],
-  (index, activeSequence) => (index >= 0 ? activeSequence[index].video : null)
-);
+// The playing song's { video } comes from the queue's own snapshot
+// (`focusSlice.current`), not the live per-board `tierItems` - so the dock
+// keeps playing while you browse other boards.
+export const selectFocusedVideoData = (state) => state.focus.current?.video ?? null;
 
 // Rating targets are the ranked tiers only (Shift+1-5 stay T1..TZ); a song
 // goes back to TODO via the Tier Rail, a menu or a drag.
