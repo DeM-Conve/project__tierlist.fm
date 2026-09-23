@@ -4,7 +4,7 @@ import { Badge, Code, Divider, Group, Paper, ScrollArea, Select, Stack, Table, T
 import { ListTodo } from 'lucide-react';
 import { linkTodoList, setTodoKeyword } from '../store/namingSlice';
 import { selectTierCategories, selectTodoRows } from '../store/selectors';
-import { validateTodoKeyword } from '../todoLists';
+import { keywordWords, validateTodoKeyword } from '../todoLists';
 
 const AUTO = '__auto';
 
@@ -25,13 +25,17 @@ export default function TodoListSettings() {
   const rows = useSelector(selectTodoRows);
   const categories = useSelector(selectTierCategories);
   // Typed text, committed only once it's valid (an invalid keyword would
-  // make every to-do list vanish mid-typing).
+  // make every to-do list vanish mid-typing). Punctuation is ignored when
+  // matching names anyway, so "(**TODO**)" is taken as "TODO" rather than
+  // rejected - people type the keyword the way it looks in their names.
   const [draft, setDraft] = useState(keyword);
-  const errors = validateTodoKeyword(draft);
+  const words = keywordWords(draft);
+  const errors = validateTodoKeyword(words);
 
   function changeKeyword(value) {
     setDraft(value);
-    if (validateTodoKeyword(value).length === 0) dispatch(setTodoKeyword(value));
+    const next = keywordWords(value);
+    if (validateTodoKeyword(next).length === 0) dispatch(setTodoKeyword(next));
   }
 
   return (
@@ -55,7 +59,13 @@ export default function TodoListSettings() {
         value={draft}
         onChange={(e) => changeKeyword(e.target.value)}
         error={errors[0]}
-        maw={260}
+        description={
+          !errors.length && words !== draft
+            ? `Matching on "${words}" - symbols around it are ignored, so names like "[G] Rap ${draft.trim()}" still count`
+            : 'Symbols in names are ignored: TODO also matches "(**TODO**)" or "[TODO]"'
+        }
+        inputWrapperOrder={['label', 'input', 'description', 'error']}
+        maw={420}
       />
 
       <Paper withBorder radius="md" p="md" bg="var(--surface)">

@@ -12,14 +12,13 @@ import {
   Stack,
   Text,
   TextInput,
-  ThemeIcon,
   Title,
   Tooltip,
   UnstyledButton,
 } from '@mantine/core';
 import { useElementSize, useMediaQuery } from '@mantine/hooks';
-import { ChevronRight, ListTodo, Play, Plus, Search, Shuffle, Swords, Trash2 } from 'lucide-react';
-import { BOARD_TIERS, REMOVED_TIER, TIER_COLORS, TIER_ORDER, TODO_TIER } from '../tiers';
+import { ChevronRight, ListTodo, Play, Plus, Search, Shuffle, Swords } from 'lucide-react';
+import { BOARD_TIERS, TIER_COLORS, TIER_ORDER, TODO_TIER } from '../tiers';
 import { moveWithFeedback, useTierDnd } from '../tierActions';
 import { selectPlayerCoversPage } from '../store/selectors';
 import { TierMixBar, TierTile } from './TierBits';
@@ -95,10 +94,7 @@ function TierRow({
   const contentRef = useRef(null);
   const [overIndex, setOverIndex] = useState(null);
   const isOver = dnd.dragOverTier === tier;
-  // The Remove bin (REMOVED_TIER) reuses the row: a drop target whose
-  // tiles are staged deletions - drag one back out to keep it.
-  const isBin = tier === REMOVED_TIER;
-  const color = isBin ? 'var(--surface-2)' : TIER_COLORS[tier];
+  const color = TIER_COLORS[tier];
   const isTodo = tier === TODO_TIER;
   const playLabel = isTodo ? 'Triage: play and rate one by one' : `Play from ${tier}`;
 
@@ -139,25 +135,6 @@ function TierRow({
         transition: 'background 120ms ease',
       }}
     >
-      {isBin ? (
-        <Tooltip label="Drop a song here to delete it from its playlist when you push" withArrow multiline maw={240}>
-          <Stack
-            w={size < 64 ? 54 : 68}
-            bg={color}
-            gap={4}
-            align="center"
-            justify="center"
-            style={{ flexShrink: 0, borderRight: '1px solid var(--border-soft)' }}
-          >
-            <ThemeIcon variant="light" color="red" size="md" radius="sm">
-              <Trash2 size={15} />
-            </ThemeIcon>
-            <Text fz={11} fw={700} c="dimmed" lh={1}>
-              Remove{total > 0 ? ` ${total}` : ''}
-            </Text>
-          </Stack>
-        </Tooltip>
-      ) : (
       <UnstyledButton
         onClick={() => onOpenTier(tier)}
         w={size < 64 ? 54 : 68}
@@ -217,7 +194,6 @@ function TierRow({
           </Group>
         )}
       </UnstyledButton>
-      )}
 
       <Box ref={sizeRef} style={{ flex: 1, minWidth: 0 }} p={GAP - 4}>
         <Group ref={contentRef} gap={GAP} wrap={searchActive || lines > 1 ? 'wrap' : 'nowrap'} mih={size} p={4} style={{ overflow: 'hidden' }}>
@@ -235,9 +211,7 @@ function TierRow({
               }}
             >
               <Text fz="xs" c="dimmed">
-                {isBin
-                  ? 'Drop songs here to remove them from their playlist (on push)'
-                  : searchActive
+                {searchActive
                   ? 'No matches in this tier'
                   : isTodo
                     ? 'Nothing to do - drop songs here to rate them later'
@@ -262,7 +236,7 @@ function TierRow({
                     searchState={activeMatchKey === key ? 'active' : searchActive ? 'match' : null}
                     onDragStart={dnd.onDragStart}
                     onDragEnd={dnd.onDragEnd}
-                    onPlay={isBin ? () => {} : onPlay}
+                    onPlay={onPlay}
                     onMove={onMove}
                   />
                 </Group>
@@ -274,10 +248,8 @@ function TierRow({
               data-more
               w={size}
               h={size}
-              // The bin has no page of its own - its full list is the
-              // pending-changes review.
-              onClick={isBin ? undefined : () => onOpenTier(tier)}
-              aria-label={isBin ? `${hiddenCount} more staged for removal` : `Show all ${items.length} in ${tier}`}
+              onClick={() => onOpenTier(tier)}
+              aria-label={`Show all ${items.length} in ${tier}`}
               className="more-tile"
               style={{
                 flexShrink: 0,
@@ -301,7 +273,6 @@ function TierRow({
         </Group>
       </Box>
 
-      {!isBin && (
       <Tooltip label={`Open ${tier} (${items?.length ?? 0})`} withArrow position="left">
         <UnstyledButton
           onClick={() => onOpenTier(tier)}
@@ -313,7 +284,6 @@ function TierRow({
           <ChevronRight size={16} color="var(--text-dim)" />
         </UnstyledButton>
       </Tooltip>
-      )}
     </Box>
   );
 }
@@ -370,7 +340,9 @@ export default function TierBoardView({
     if (el) setRowsTop(el.getBoundingClientRect().top + window.scrollY);
   }, [headerHeight, viewportHeight]);
 
-  const rowTiers = [...(hasTodo ? [TODO_TIER] : []), ...tiers, ...(tiers.length ? [REMOVED_TIER] : [])];
+  // Staged removals aren't a row: they live on the rail's Remove slot and in
+  // the staged-changes review (Put back).
+  const rowTiers = [...tiers, ...(hasTodo ? [TODO_TIER] : [])];
   const perLine = tilesPerLine(rowWidth, tileSize);
   const pendingPad = pendingMoves.length > 0 ? 80 : 0;
   // 32 = the canvas's own bottom padding; the TODO row is a separate card
@@ -593,30 +565,6 @@ export default function TierBoardView({
         </Paper>
       )}
 
-      {hasTodo && !unknownTiers && (
-        <Paper withBorder radius="md" mb="md" style={{ overflow: 'hidden', borderTop: 'none' }} bg="var(--surface)">
-          <TierRow
-            tier={TODO_TIER}
-            tiers={boardTiers}
-            items={tierItems[TODO_TIER]}
-            loading={tierLoading[TODO_TIER]}
-            size={tileSize}
-            lines={rowLines[TODO_TIER]}
-            onMeasure={setRowWidth}
-            searchActive={searchActive}
-            matchedKeys={matchedKeys}
-            activeMatchKey={activeMatchKey}
-            playingVideoId={playingVideoId}
-            pendingRemovalKeys={pendingRemovalKeys}
-            onPlay={onPlay}
-            onPlayFrom={onPlayFrom}
-            onShuffle={onShufflePlay}
-            onOpenTier={onOpenTier}
-            onMove={move}
-          />
-        </Paper>
-      )}
-
       <Paper withBorder radius="md" style={{ overflow: 'hidden', borderTop: 'none', display: unknownTiers ? 'none' : undefined }} bg="var(--surface)">
         {tiers.map((t) => (
           <TierRow
@@ -640,18 +588,22 @@ export default function TierBoardView({
             onMove={move}
           />
         ))}
-        {tiers.length > 0 && (
+      </Paper>
+      {/* The TODO list sits under the ranked tiers: songs waiting to be
+          rated, not a tier above T1. */}
+      {hasTodo && !unknownTiers && (
+        <Paper withBorder radius="md" mt="md" style={{ overflow: 'hidden', borderTop: 'none' }} bg="var(--surface)">
           <TierRow
-            tier={REMOVED_TIER}
+            tier={TODO_TIER}
             tiers={boardTiers}
-            items={tierItems[REMOVED_TIER] || []}
-            loading={false}
+            items={tierItems[TODO_TIER]}
+            loading={tierLoading[TODO_TIER]}
             size={tileSize}
-            lines={rowLines[REMOVED_TIER]}
+            lines={rowLines[TODO_TIER]}
             onMeasure={setRowWidth}
-            searchActive={false}
+            searchActive={searchActive}
             matchedKeys={matchedKeys}
-            activeMatchKey={null}
+            activeMatchKey={activeMatchKey}
             playingVideoId={playingVideoId}
             pendingRemovalKeys={pendingRemovalKeys}
             onPlay={onPlay}
@@ -660,8 +612,9 @@ export default function TierBoardView({
             onOpenTier={onOpenTier}
             onMove={move}
           />
-        )}
-      </Paper>
+        </Paper>
+      )}
+
       </Box>
 
       {/* flow-root so the children's top margins count toward the measured height. */}

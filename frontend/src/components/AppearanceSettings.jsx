@@ -9,7 +9,7 @@ import { setAccent, setTheme, setTierPalette } from '../store/appearanceSlice';
 function ThemePreview({ theme, accent, tierColors }) {
   const fill = accent.scale[theme.scheme === 'dark' ? accent.onDark : accent.onLight];
   return (
-    <Box h={92} bg={theme.bg} style={{ borderRadius: 6, border: `1px solid ${theme.border}`, display: 'flex', overflow: 'hidden' }}>
+    <Box h={64} bg={theme.bg} style={{ borderRadius: 6, border: `1px solid ${theme.border}`, display: 'flex', overflow: 'hidden' }}>
       <Box w={34} bg={theme.surface} style={{ borderRight: `1px solid ${theme.borderSoft}` }} p={6}>
         <Stack gap={4}>
           {[0, 1, 2].map((i) => (
@@ -17,15 +17,15 @@ function ThemePreview({ theme, accent, tierColors }) {
           ))}
         </Stack>
       </Box>
-      <Stack gap={5} p={8} style={{ flex: 1 }}>
+      <Stack gap={4} p={6} style={{ flex: 1 }}>
         <Group justify="space-between" wrap="nowrap">
           <Box h={6} w={46} bg={theme.text} style={{ borderRadius: 2 }} />
           <Box h={12} w={30} bg={fill} style={{ borderRadius: 3 }} />
         </Group>
-        {TIER_ORDER.slice(0, 4).map((t) => (
+        {TIER_ORDER.slice(0, 3).map((t) => (
           <Group key={t} gap={3} wrap="nowrap">
-            <Box w={10} h={9} bg={tierColors[t]} style={{ borderRadius: 2 }} />
-            <Box h={9} style={{ flex: 1, borderRadius: 2 }} bg={theme.surface2} />
+            <Box w={10} h={8} bg={tierColors[t]} style={{ borderRadius: 2 }} />
+            <Box h={8} style={{ flex: 1, borderRadius: 2 }} bg={theme.surface2} />
           </Group>
         ))}
       </Stack>
@@ -40,12 +40,13 @@ export default function AppearanceSettings() {
   const tierColors = TIER_PALETTES[appearance.tierPalette].colors;
 
   return (
-    <Stack gap={36}>
+    // Sized to fit one screen: all six themes in a row on wide screens.
+    <Stack gap={28}>
       <div>
         <Title order={2} fz={18} mb={6}>
           Theme
         </Title>
-        <Text c="dimmed" fz="sm" mb="md">
+        <Text c="dimmed" fz="sm" mb="sm">
           Backgrounds, surfaces and text - picking one also applies its signature accent. Changes apply instantly and are saved to your account.
         </Text>
         <Radio.Group
@@ -56,14 +57,14 @@ export default function AppearanceSettings() {
             if (THEMES[v].accent) dispatch(setAccent(THEMES[v].accent));
           }}
         >
-          <SimpleGrid cols={{ base: 1, xs: 2, lg: 3 }} spacing="sm">
+          <SimpleGrid cols={{ base: 2, sm: 3, xl: 6 }} spacing="xs">
             {Object.entries(THEMES).map(([key, theme]) => (
-              <Radio.Card key={key} value={key} radius="md" p="sm">
+              <Radio.Card key={key} value={key} radius="md" p={8}>
                 <ThemePreview theme={theme} accent={accent} tierColors={tierColors} />
-                <Group justify="space-between" mt="sm" wrap="nowrap">
-                  <Group gap={8} wrap="nowrap">
+                <Group justify="space-between" mt={8} wrap="nowrap" gap={4}>
+                  <Group gap={6} wrap="nowrap" miw={0}>
                     <Radio.Indicator size="xs" />
-                    <Text fw={600} fz="sm">
+                    <Text fw={600} fz="sm" truncate="end">
                       {theme.label}
                     </Text>
                   </Group>
@@ -81,7 +82,7 @@ export default function AppearanceSettings() {
         <Title order={2} fz={18} mb={6}>
           Accent
         </Title>
-        <Text c="dimmed" fz="sm" mb="md">
+        <Text c="dimmed" fz="sm" mb="sm">
           Buttons, selection and focus rings. Works with any theme.
         </Text>
         <Radio.Group value={appearance.accent} onChange={(v) => dispatch(setAccent(v))}>
@@ -106,16 +107,16 @@ export default function AppearanceSettings() {
         <Title order={2} fz={18} mb={6}>
           Tier colors
         </Title>
-        <Text c="dimmed" fz="sm" mb="md">
+        <Text c="dimmed" fz="sm" mb="sm">
           Used everywhere a tier appears - board rows, rail, chips and the player.
         </Text>
         <Radio.Group value={appearance.tierPalette} onChange={(v) => dispatch(setTierPalette(v))}>
           <SimpleGrid cols={{ base: 1, sm: 3 }} spacing="sm">
             {Object.entries(TIER_PALETTES).map(([key, p]) => (
               <Radio.Card key={key} value={key} radius="md" p="sm">
-                <Group gap={4} wrap="nowrap" mb="sm">
+                <Group gap={4} wrap="nowrap" mb={8}>
                   {TIER_ORDER.map((t) => (
-                    <Box key={t} h={28} bg={p.colors[t]} style={{ flex: 1, borderRadius: 4, display: 'grid', placeItems: 'center' }}>
+                    <Box key={t} h={24} bg={p.colors[t]} style={{ flex: 1, borderRadius: 4, display: 'grid', placeItems: 'center' }}>
                       <Text ff="var(--font-display)" fw={900} fz={11} c="var(--tier-ink)">
                         {t}
                       </Text>

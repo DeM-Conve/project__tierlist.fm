@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { ActionIcon, Badge, Box, Group, Image, Paper, ScrollArea, Slider, Stack, Text, UnstyledButton } from '@mantine/core';
+import { ActionIcon, Badge, Box, Button, Group, Image, ScrollArea, Slider, Stack, Text, UnstyledButton } from '@mantine/core';
 import {
   ChevronDown,
   ChevronUp,
@@ -12,12 +12,13 @@ import {
   RotateCw,
   SkipBack,
   SkipForward,
+  Trash2,
   Volume2,
   VolumeX,
   X,
 } from 'lucide-react';
-import { TIER_COLORS, TODO_TIER } from '../tiers';
-import { TierChip } from './TierBits';
+import { REMOVED_TIER, TIER_COLORS, TODO_TIER } from '../tiers';
+import { EqualizerMark, TierChip } from './TierBits';
 import EmbeddedPlayer from './EmbeddedPlayer';
 import { isSequenceKey } from '../keyboard/sequence';
 
@@ -34,8 +35,10 @@ import { isSequenceKey } from '../keyboard/sequence';
 // floating corner (both already "down", so j between them just swaps which
 // minimized view you're in) - it never wraps back up to expanded on its
 // own. k (up) always jumps straight back to expanded, from any state.
-// How many upcoming queue entries the expanded view renders at once.
+// How many upcoming / already-played queue entries the expanded view
+// renders at once around the current song.
 const QUEUE_PREVIEW = 80;
+const QUEUE_HISTORY = 30;
 
 const PLAYER_MODE_TRANSITIONS = {
   expanded: { down: 'mini', up: 'expanded' },
@@ -65,6 +68,10 @@ export default function PlayerDock({
   onRemove,
 }) {
   const cardRef = useRef(null);
+  // Keeps the current song pinned near the top of the queue panel as the
+  // queue advances - played songs stay one scroll up, like YouTube Music.
+  const queueViewportRef = useRef(null);
+  const currentRowRef = useRef(null);
   const playerRef = useRef(null);
   const [isPlaying, setIsPlaying] = useState(true);
   const [progressPct, setProgressPct] = useState(0);
@@ -98,6 +105,16 @@ export default function PlayerDock({
   useEffect(() => {
     if (expanded) cardRef.current?.focus();
   }, [expanded]);
+
+  // Scroll the queue so the current song sits just below the top edge,
+  // with a sliver of the last played song showing above it.
+  useEffect(() => {
+    const viewport = queueViewportRef.current;
+    const row = currentRowRef.current;
+    if (!expanded || !viewport || !row) return;
+    const top = row.getBoundingClientRect().top - viewport.getBoundingClientRect().top + viewport.scrollTop;
+    viewport.scrollTo({ top: Math.max(0, top - 28), behavior: 'smooth' });
+  }, [expanded, queueIndex, queue.length]);
 
   // The mini bar is fixed to the bottom of the viewport, so anything else
   // fixed/scrollable at the page's own bottom (the sidebar's footer, the
@@ -326,8 +343,12 @@ export default function PlayerDock({
 
   const iconSize = expanded ? 20 : 18;
   const btnSize = expanded ? 38 : 30;
-  const upcoming = queue.slice(queueIndex + 1, queueIndex + 1 + QUEUE_PREVIEW);
-  const moreCount = Math.max(0, queue.length - queueIndex - 1 - upcoming.length);
+  // One continuous list, YouTube-Music style: what's been played sits above
+  // the current song (dimmed), what's next below it.
+  const windowStart = Math.max(0, queueIndex - QUEUE_HISTORY);
+  const queueWindow = queue.slice(windowStart, queueIndex + 1 + QUEUE_PREVIEW);
+  const earlierCount = windowStart;
+  const moreCount = Math.max(0, queue.length - windowStart - queueWindow.length);
   const nowTier = currentTier ?? queue[queueIndex]?.tier;
 
   return (
@@ -476,6 +497,18 @@ export default function PlayerDock({
                       title={`Rate → ${t} (Shift+${i + 1})`}
                     />
                   ))}
+                  {currentTier !== REMOVED_TIER && (
+                    <ActionIcon
+                      variant="subtle"
+                      color="red"
+                      size={24}
+                      onClick={() => onChangeTier(REMOVED_TIER)}
+                      aria-label="Remove from playlist"
+                      title="Remove from its playlist (on push)"
+                    >
+                      <Trash2 size={14} />
+                    </ActionIcon>
+                  )}
                 </Group>
               )}
               <ActionIcon variant="subtle" color="gray" radius="xl" size={30} onClick={toggleMute} aria-label={isMuted ? 'Unmute' : 'Mute'} title="Mute (m)">
@@ -532,6 +565,19 @@ export default function PlayerDock({
                       title={`Move to ${t}`}
                     />
                   ))}
+                  {/* Staged like any move: nothing is deleted until you push,
+                      and the review's "Put back" (or Ctrl+Z) undoes it. */}
+                  <Button
+                    variant="subtle"
+                    color="red"
+                    size="compact-sm"
+                    ml="xs"
+                    leftSection={<Trash2 size={14} />}
+                    onClick={() => onChangeTier(REMOVED_TIER)}
+                    disabled={currentTier === REMOVED_TIER}
+                  >
+                    {currentTier === REMOVED_TIER ? 'Removed on push' : 'Remove from playlist'}
+                  </Button>
                 </Group>
               )}
               <Text fz={11} c="dimmed" opacity={0.75}>
@@ -553,80 +599,98 @@ export default function PlayerDock({
               </Text>
             </Group>
 
-            <Paper p={10} mt={12} radius="md" bg="color-mix(in srgb, var(--accent) 12%, transparent)" withBorder style={{ borderColor: 'color-mix(in srgb, var(--accent) 35%, transparent)' }}>
-              <Text fz={10} fw={800} tt="uppercase" c="accent" mb={6} style={{ letterSpacing: 1 }}>
-                Now playing
-              </Text>
-              <Group gap={10} wrap="nowrap">
-                <Image src={video.thumbnail} w={48} h={48} radius={6} fit="cover" alt="" />
-                <Box style={{ flex: 1, minWidth: 0 }}>
-                  <Text fz="sm" fw={700} lineClamp={2} lh={1.3}>
-                    {video.title}
+            <ScrollArea
+              viewportRef={queueViewportRef}
+              mt={12}
+              style={{ flex: 1, minHeight: 0 }}
+              type="hover"
+              scrollbarSize={6}
+              offsetScrollbars
+            >
+              <Stack gap={2}>
+                {earlierCount > 0 && (
+                  <Text fz="xs" c="dimmed" ta="center" py={6}>
+                    {earlierCount} earlier
                   </Text>
-                  <Text fz="xs" c="dimmed" truncate="end">
-                    {video.channelTitle}
-                  </Text>
-                </Box>
-                {nowTier && <TierChip tier={nowTier} size={22} />}
-              </Group>
-            </Paper>
-
-            <Text fz={11} fw={800} tt="uppercase" c="dimmed" mt="md" mb={6} style={{ letterSpacing: 1 }}>
-              Up next
-            </Text>
-            {upcoming.length === 0 ? (
-              <Text fz="sm" c="dimmed">
-                End of the queue
-              </Text>
-            ) : (
-              <ScrollArea style={{ flex: 1, minHeight: 0 }} type="hover" scrollbarSize={6} offsetScrollbars>
-                <Stack gap={2}>
-                  {upcoming.map((entry, i) => {
-                    const idx = queueIndex + 1 + i;
-                    return (
-                      <Group key={entry.video.videoId} className="queue-row" gap={4} wrap="nowrap" pr={4} style={{ borderRadius: 8 }}>
-                        <UnstyledButton onClick={() => onJump?.(idx)} px={6} py={6} style={{ flex: 1, minWidth: 0 }}>
-                          <Group gap={10} wrap="nowrap">
-                            <Text fz={11} c="dimmed" w={22} ta="right" style={{ flexShrink: 0, fontVariantNumeric: 'tabular-nums' }}>
-                              {idx + 1}
+                )}
+                {queueWindow.map((entry, i) => {
+                  const idx = windowStart + i;
+                  const isCurrent = idx === queueIndex;
+                  const played = idx < queueIndex;
+                  const tier = isCurrent ? nowTier : entry.tier;
+                  return (
+                    <Group
+                      key={entry.video.videoId}
+                      ref={isCurrent ? currentRowRef : undefined}
+                      className="queue-row"
+                      gap={4}
+                      wrap="nowrap"
+                      pr={4}
+                      bg={isCurrent ? 'color-mix(in srgb, var(--accent) 14%, transparent)' : undefined}
+                      opacity={played ? 0.55 : 1}
+                      aria-current={isCurrent ? 'true' : undefined}
+                      style={{ borderRadius: 8 }}
+                    >
+                      <UnstyledButton
+                        onClick={isCurrent ? undefined : () => onJump?.(idx)}
+                        px={6}
+                        py={6}
+                        style={{ flex: 1, minWidth: 0, cursor: isCurrent ? 'default' : undefined }}
+                      >
+                        <Group gap={10} wrap="nowrap">
+                          <Box w={22} style={{ flexShrink: 0, display: 'flex', justifyContent: 'flex-end' }}>
+                            {isCurrent ? (
+                              <EqualizerMark color="var(--accent)" height={11} />
+                            ) : (
+                              <Text fz={11} c="dimmed" style={{ fontVariantNumeric: 'tabular-nums' }}>
+                                {idx + 1}
+                              </Text>
+                            )}
+                          </Box>
+                          <Image src={entry.video.thumbnail} w={40} h={40} radius={6} fit="cover" alt="" />
+                          <Box style={{ flex: 1, minWidth: 0 }}>
+                            <Text fz="sm" fw={isCurrent ? 700 : 500} c={isCurrent ? 'accent' : undefined} truncate="end">
+                              {entry.video.title}
                             </Text>
-                            <Image src={entry.video.thumbnail} w={40} h={40} radius={6} fit="cover" alt="" />
-                            <Box style={{ flex: 1, minWidth: 0 }}>
-                              <Text fz="sm" fw={500} truncate="end">
-                                {entry.video.title}
-                              </Text>
-                              <Text fz="xs" c="dimmed" truncate="end">
-                                {entry.video.channelTitle}
-                              </Text>
-                            </Box>
-                            {entry.tier && <TierChip tier={entry.tier} size={20} />}
-                          </Group>
-                        </UnstyledButton>
-                        {onRemove && (
-                          <ActionIcon
-                            className="queue-row-remove"
-                            variant="subtle"
-                            color="gray"
-                            radius="xl"
-                            size={26}
-                            onClick={() => onRemove(entry.video.videoId)}
-                            aria-label="Remove from queue"
-                            title="Remove from queue"
-                          >
-                            <X size={14} />
-                          </ActionIcon>
-                        )}
-                      </Group>
-                    );
-                  })}
-                  {moreCount > 0 && (
+                            <Text fz="xs" c="dimmed" truncate="end">
+                              {entry.video.channelTitle}
+                            </Text>
+                          </Box>
+                          {tier && <TierChip tier={tier} size={20} />}
+                        </Group>
+                      </UnstyledButton>
+                      {onRemove && !isCurrent ? (
+                        <ActionIcon
+                          className="queue-row-remove"
+                          variant="subtle"
+                          color="gray"
+                          radius="xl"
+                          size={26}
+                          onClick={() => onRemove(entry.video.videoId)}
+                          aria-label="Remove from queue"
+                          title="Remove from queue"
+                        >
+                          <X size={14} />
+                        </ActionIcon>
+                      ) : (
+                        <Box w={26} style={{ flexShrink: 0 }} />
+                      )}
+                    </Group>
+                  );
+                })}
+                {moreCount > 0 ? (
+                  <Text fz="xs" c="dimmed" ta="center" py={8}>
+                    + {moreCount} more
+                  </Text>
+                ) : (
+                  queueIndex === queue.length - 1 && (
                     <Text fz="xs" c="dimmed" ta="center" py={8}>
-                      + {moreCount} more
+                      End of the queue
                     </Text>
-                  )}
-                </Stack>
-              </ScrollArea>
-            )}
+                  )
+                )}
+              </Stack>
+            </ScrollArea>
           </aside>
         )}
       </div>

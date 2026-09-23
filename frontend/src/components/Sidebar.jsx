@@ -139,7 +139,7 @@ export default function Sidebar({
         />
 
         <ScrollArea style={{ flex: 1 }} type="hover" offsetScrollbars>
-          <Stack gap={2}>
+          <Stack gap={0}>
             {tierCategories.length > 0 && filteredCategories.length === 0 && (
               <Text size="sm" c="dimmed" px={8}>
                 No boards match
@@ -157,6 +157,9 @@ export default function Sidebar({
                   component={Link}
                   to={base}
                   variant="light"
+                  // Compact rows so a typical library's boards all fit without
+                  // the list scrolling.
+                  py={4}
                   active={location.pathname === base || location.pathname.startsWith(`${base}/`)}
                   label={
                     <Group justify="space-between" wrap="nowrap" gap={6}>
