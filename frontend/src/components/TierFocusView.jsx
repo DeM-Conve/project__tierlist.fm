@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useDispatch } from 'react-redux';
+import { useDispatch, useSelector } from 'react-redux';
 import {
   ActionIcon,
   Box,
@@ -20,6 +20,7 @@ import {
 import { ArrowLeft, ListTodo, MoreHorizontal, Play, Search, Shuffle } from 'lucide-react';
 import { TIER_COLORS, TODO_TIER } from '../tiers';
 import { moveWithFeedback, useTierDnd } from '../tierActions';
+import { selectPlayerCoversPage } from '../store/selectors';
 import { EqualizerMark, MoveMenu, TierChip } from './TierBits';
 import { TIER_INK, indexForPointInList, songLabel, videoMatches } from '../tierUtils';
 
@@ -142,9 +143,12 @@ export default function TierFocusView({
     dispatch(moveWithFeedback([{ fromTier, toTier, videoId, dropIndex }]));
   }
 
-  // "/" focuses the filter; Esc clears it.
+  // "/" focuses the filter; Esc clears it. Both stand down while the
+  // full-screen player covers the page.
+  const playerCoversPage = useSelector(selectPlayerCoversPage);
   useEffect(() => {
     function onKeyDown(e) {
+      if (playerCoversPage) return;
       const a = document.activeElement;
       const isTyping = a?.tagName === 'INPUT' || a?.tagName === 'TEXTAREA' || a?.isContentEditable;
       if (e.key === '/' && !isTyping) {
@@ -157,7 +161,7 @@ export default function TierFocusView({
     }
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, []);
+  }, [playerCoversPage]);
 
   // Drop position in the (possibly filtered) list, mapped back to the real
   // index in the tier so reordering a filtered view lands where it looks.

@@ -156,3 +156,10 @@ export const selectPlayingVideoIdOnBoard = createSelector(
   (focusedVideo, focusedCategory, currentCategory) =>
     focusedVideo && focusedCategory === currentCategory ? focusedVideo.videoId : null
 );
+
+// True while the player dock is open full-screen. It covers the page like a
+// modal, so page-level shortcuts ("/" search, n/N, duel arrows, Inbox keys)
+// check this and stand down until it's minimized - only the player's own
+// keys act while it's up.
+export const selectPlayerCoversPage = (state) =>
+  !!state.focus.focusedVideo && state.focus.playerMode === 'expanded';

@@ -22,7 +22,7 @@ import {
 } from '@mantine/core';
 import { CheckCheck, ExternalLink, Link2, Play, SkipForward, Undo2, EyeOff } from 'lucide-react';
 import { TIER_COLORS, TIER_ORDER, TODO_TIER } from '../tiers';
-import { selectTierCategories, selectTierGroups } from '../store/selectors';
+import { selectPlayerCoversPage, selectTierCategories, selectTierGroups } from '../store/selectors';
 import { chooseBoard, setCurrent } from '../store/inboxSlice';
 import { songLabel, TIER_INK, youtubeUrl } from '../tierUtils';
 import { EqualizerMark } from './TierBits';
@@ -96,6 +96,7 @@ export default function InboxView({ inbox, actions, onPasteLink }) {
   const categories = useSelector(selectTierCategories);
   const tierGroups = useSelector(selectTierGroups);
   const playingId = useSelector((s) => s.focus.focusedVideo?.videoId);
+  const playerCoversPage = useSelector(selectPlayerCoversPage);
   const boardRef = useRef(null);
 
   const { current, list, loading, progress } = inbox;
@@ -114,10 +115,11 @@ export default function InboxView({ inbox, actions, onPasteLink }) {
 
   // Capture phase + stopImmediatePropagation: on this page 1-5 file a song
   // instead of the player's seek-to-percent, and u / Ctrl+Z undo Inbox
-  // actions instead of board edits.
+  // actions instead of board edits. Not while the full-screen player covers
+  // the page - then the keys are the player's (digits seek, as elsewhere).
   useEffect(() => {
     function onKeyDown(e) {
-      if (isTyping() || e.altKey) return;
+      if (playerCoversPage || isTyping() || e.altKey) return;
       const mod = e.ctrlKey || e.metaKey;
       const claim = () => {
         e.preventDefault();

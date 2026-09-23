@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { useDispatch } from 'react-redux';
+import { useDispatch, useSelector } from 'react-redux';
 import {
   ActionIcon,
   Badge,
@@ -20,6 +20,7 @@ import { useElementSize, useMediaQuery } from '@mantine/hooks';
 import { ChevronRight, ListTodo, Play, Plus, Search, Shuffle, Swords } from 'lucide-react';
 import { BOARD_TIERS, TIER_COLORS, TIER_ORDER, TODO_TIER } from '../tiers';
 import { moveWithFeedback, useTierDnd } from '../tierActions';
+import { selectPlayerCoversPage } from '../store/selectors';
 import { TierMixBar, TierTile } from './TierBits';
 import { TIER_INK, indexForPointInFlow, videoMatches } from '../tierUtils';
 
@@ -369,6 +370,7 @@ export default function TierBoardView({
   const [searchQuery, setSearchQuery] = useState('');
   const [matchIndex, setMatchIndex] = useState(0);
   const searchInputRef = useRef(null);
+  const playerCoversPage = useSelector(selectPlayerCoversPage);
 
   const searchableEntries = useMemo(() => {
     const list = [];
@@ -421,8 +423,16 @@ export default function TierBoardView({
     el?.scrollIntoView({ block: 'center', inline: 'center', behavior: 'smooth' });
   }, [matches, matchIndex]);
 
+  // The full-screen player sits over the board like a modal: close any open
+  // search when it comes up, and ignore the board's keys until it's minimized.
+  useEffect(() => {
+    if (playerCoversPage && searchOpen) closeSearch();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [playerCoversPage]);
+
   useEffect(() => {
     function onKeyDown(e) {
+      if (playerCoversPage) return;
       const active = document.activeElement;
       const inSearchBox = active === searchInputRef.current;
       const isTyping =
@@ -460,7 +470,7 @@ export default function TierBoardView({
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchOpen, matches, onPlay]);
+  }, [searchOpen, matches, onPlay, playerCoversPage]);
 
   const matchedKeys = useMemo(() => new Set(matches.map((e) => `${e.tier}:${e.video.videoId}`)), [matches]);
   const activeMatch = matches.length > 0 ? matches[matchIndex % matches.length] : null;
