@@ -115,13 +115,6 @@ export default function PlayerDock({
     viewport.scrollTo({ top: Math.max(0, top - 28), behavior: 'smooth' });
   }, [expanded, queueIndex, queue.length]);
 
-  // The mini bar is fixed to the bottom of the viewport, so anything else
-  // fixed/scrollable at the page's own bottom (the sidebar's footer, the
-  // last row of a tier board, ...) would otherwise render underneath it.
-  // Expose its real, measured height as a CSS variable so the rest of the
-  // layout can reserve exactly that much space - only while it's actually
-  // showing as a bar, and never a guessed/hardcoded pixel value.
-
   // The IFrame API doesn't push time-update events, so the mini bar's
   // progress line has to be polled from the player instead.
   useEffect(() => {

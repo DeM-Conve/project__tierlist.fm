@@ -168,9 +168,12 @@ export default function PendingChanges() {
           className="anim-rise"
           bg="var(--surface-2)"
           style={{
-            position: 'fixed',
+            // Anchored to the Layout's body row (its nearest positioned
+            // ancestor - the scrolling canvas isn't one), so it floats just
+            // above the player dock without scrolling with the page.
+            position: 'absolute',
             left: '50%',
-            bottom: 'calc(20px + var(--player-dock-height))',
+            bottom: 20,
             translate: '-50% 0',
             zIndex: 60,
             maxWidth: 'calc(100vw - 32px)',

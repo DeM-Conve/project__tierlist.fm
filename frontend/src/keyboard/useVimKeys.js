@@ -11,7 +11,7 @@ const board = (category, rest = '') => `/tier/${encodeURIComponent(category)}${r
 // App-wide Vimium-style keys (react-hotkeys-hook: `>` joins a sequence; form
 // fields are ignored by default). Page-level keys (board search, player,
 // Add songs, duel) stay in their own components - see shortcuts.js for the list.
-export function useVimKeys({ hintsRef, categories, currentCategory, playingCategory, playingVideoId, hasTodo }) {
+export function useVimKeys({ hintsRef, canvasRef, categories, currentCategory, playingCategory, playingVideoId, hasTodo }) {
   const navigate = useNavigate();
   const go = (path) => (e) => {
     e.preventDefault();
@@ -38,8 +38,11 @@ export function useVimKeys({ hintsRef, categories, currentCategory, playingCateg
   useHotkeys('g>b', (e) => currentCategory && go(board(currentCategory))(e), deps);
   useHotkeys('g>d', (e) => currentCategory && go(board(currentCategory, '/duel'))(e), deps);
   useHotkeys('g>t', (e) => currentCategory && hasTodo && go(board(currentCategory, `/t/${TODO_TIER}`))(e), deps);
-  useHotkeys('g>g', () => window.scrollTo({ top: 0, behavior: 'smooth' }));
-  useHotkeys('shift+g', () => window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' }));
+  // The page canvas scrolls, not the window (see layout/canvas.js).
+  useHotkeys('g>g', () => canvasRef.current?.scrollTo({ top: 0, behavior: 'smooth' }));
+  useHotkeys('shift+g', () =>
+    canvasRef.current?.scrollTo({ top: canvasRef.current.scrollHeight, behavior: 'smooth' })
+  );
 
   // Previous / next board, in sidebar order (from anywhere: the first/last).
   useHotkeys(
