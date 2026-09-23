@@ -27,7 +27,7 @@ createRoot(document.getElementById('root')).render(
         <BrowserRouter>
           <MantineProvider theme={theme} defaultColorScheme="dark" forceColorScheme="dark">
             <Notifications position="top-center" limit={3} zIndex={400} />
-            <ProgressProvider color="#d6a24c" height="3px" options={{ showSpinner: false }}>
+            <ProgressProvider color="#8b7cf6" height="3px" options={{ showSpinner: false }}>
               <App />
             </ProgressProvider>
           </MantineProvider>

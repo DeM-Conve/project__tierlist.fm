@@ -1,11 +1,13 @@
 export const TIER_ORDER = ['T1', 'T2', 'T3', 'TE', 'TZ'];
 
+// Classic hot -> cold ramp, with even steps so neighbours are easy to tell
+// apart (the old TE/TZ were two muddy greens); the bottom tier reads "cold".
 export const TIER_COLORS = {
-  T1: '#e8503a',
-  T2: '#e8823a',
-  T3: '#e8b93a',
-  TE: '#b9c93a',
-  TZ: '#4caf6e',
+  T1: '#ff5a5f',
+  T2: '#ff9f43',
+  T3: '#ffd43b',
+  TE: '#7bd88f',
+  TZ: '#4dabf7',
 };
 
 const TIER_SET = new Set(TIER_ORDER);

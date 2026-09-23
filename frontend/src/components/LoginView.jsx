@@ -16,14 +16,14 @@ import { TIER_ORDER, TIER_COLORS } from '../tiers';
 
 // Muted warm gradients standing in for video thumbnails in the board mock.
 const THUMBS = [
-  ['#5a3a2a', '#c4703c'],
-  ['#2e3a3f', '#6f8f8a'],
-  ['#3f2a3a', '#a0587a'],
-  ['#3a3522', '#b39a4c'],
-  ['#23303f', '#5a78a8'],
-  ['#3f2b22', '#8f5a3c'],
-  ['#2a3a2c', '#6f9a5c'],
-  ['#3a2230', '#c45a5a'],
+  ['#2b2350', '#8b7cf6'],
+  ['#1e3140', '#4dabf7'],
+  ['#3d1f33', '#e0609a'],
+  ['#1f3a2e', '#5cc98a'],
+  ['#3a2a1c', '#e89a4c'],
+  ['#232838', '#7d8bb0'],
+  ['#3a1f24', '#e0595f'],
+  ['#2f3320', '#c9c25a'],
 ];
 
 const BOARD = {
@@ -132,7 +132,7 @@ function BoardMock() {
                 bg={TIER_COLORS[tier]}
                 style={{ display: 'grid', placeItems: 'center', flexShrink: 0 }}
               >
-                <Text ff="var(--font-display)" fw={900} fz="md" c="#1a1509">
+                <Text ff="var(--font-display)" fw={900} fz="md" c="#101114">
                   {tier}
                 </Text>
               </Box>
@@ -142,7 +142,7 @@ function BoardMock() {
                 wrap="nowrap"
                 style={{
                   flex: 1,
-                  background: tier === 'T1' ? 'rgba(214, 162, 76, 0.08)' : undefined,
+                  background: tier === 'T1' ? 'rgba(139, 124, 246, 0.10)' : undefined,
                 }}
               >
                 {BOARD[tier].map((thumb, i) => (
@@ -217,15 +217,15 @@ export default function LoginView({ onLogin }) {
         flexDirection: 'column',
         overflow: 'hidden',
         background:
-          'radial-gradient(900px 600px at 85% 30%, rgba(214, 162, 76, 0.13), transparent 60%),' +
-          'radial-gradient(700px 500px at 10% 100%, rgba(232, 80, 58, 0.07), transparent 60%),' +
+          'radial-gradient(900px 600px at 85% 30%, rgba(139, 124, 246, 0.16), transparent 60%),' +
+          'radial-gradient(700px 500px at 10% 100%, rgba(77, 171, 247, 0.07), transparent 60%),' +
           'var(--bg)',
       }}
     >
       <Container size="lg" w="100%" py="lg">
         <Group gap={10}>
           <ThemeIcon size={30} radius="sm" variant="filled">
-            <ListOrdered size={18} color="#1a1509" />
+            <ListOrdered size={18} color="#fff" />
           </ThemeIcon>
           <Text fw={800} fz={17}>
             Playlist Tiers

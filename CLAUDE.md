@@ -16,7 +16,7 @@ auto-grouped into a tier board per category.
     instead of hand-rolling equivalents.
   - The app's palette is themed into Mantine via `src/mantineTheme.js` (`createTheme`,
     `colors.dark` / `colors.accent` as 10-shade scales, `primaryColor: 'accent'`) so
-    every Mantine component inherits the warm-charcoal look instead of Mantine's
+    every Mantine component inherits the graphite + violet look instead of Mantine's
     defaults. `MantineProvider` is mounted once in `main.jsx` with
     `forceColorScheme="dark"` (this app has no light mode).
   - `src/index.css` still holds the same palette as plain CSS variables (`--bg`,
@@ -67,6 +67,10 @@ auto-grouped into a tier board per category.
 
 ## Conventions / decisions worth knowing
 
+- **Palette: neutral graphite chrome + violet accent** (user's choice, replacing the
+  earlier warm charcoal + amber). The accent must stay outside the tiers' red -> blue
+  ramp (`TIER_COLORS` in `tiers.js`) so buttons never read as tiers - don't reintroduce
+  an orange/yellow/amber accent or tint the greys warm.
 - **No MUI, no Tailwind, no shadcn/ui, no bare Radix.** All considered and explicitly
   rejected in favor of Mantine as a single, final UI library choice - see git history
   around the frontend stack migration for the reasoning behind each.

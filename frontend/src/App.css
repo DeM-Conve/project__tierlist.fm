@@ -133,7 +133,7 @@
 .player-dock-expanded .player-dock-backdrop {
   position: absolute;
   inset: 0;
-  background: rgba(8, 7, 6, 0.75);
+  background: rgba(6, 7, 10, 0.78);
   backdrop-filter: blur(4px);
 }
 .player-dock-mini .player-dock-backdrop { display: none; }

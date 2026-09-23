@@ -20,12 +20,12 @@ function Poster({ category, tiers, tierItems, perTier }) {
       p={36}
       style={{
         background:
-          'radial-gradient(700px 300px at 100% 0%, rgba(214,162,76,0.18), transparent 70%), #131110',
-        color: '#f3efe8',
+          'radial-gradient(700px 300px at 100% 0%, rgba(139,124,246,0.2), transparent 70%), #0e0f12',
+        color: '#eceef3',
         fontFamily: "'Inter', sans-serif",
       }}
     >
-      <Text fz={13} fw={800} tt="uppercase" c="#d6a24c" style={{ letterSpacing: 3 }}>
+      <Text fz={13} fw={800} tt="uppercase" c="#a999fb" style={{ letterSpacing: 3 }}>
         My tier list
       </Text>
       <Text ff="'Archivo', sans-serif" fw={900} fz={54} lh={1} mb={24} style={{ letterSpacing: '-0.02em' }}>
@@ -37,7 +37,7 @@ function Poster({ category, tiers, tierItems, perTier }) {
           const shown = items.slice(0, perTier);
           const rest = items.length - shown.length;
           return (
-            <Box key={t} style={{ display: 'flex', background: '#1c1915', borderRadius: 8, overflow: 'hidden', minHeight: ART + 12 }}>
+            <Box key={t} style={{ display: 'flex', background: '#16181d', borderRadius: 8, overflow: 'hidden', minHeight: ART + 12 }}>
               <Box w={84} bg={TIER_COLORS[t]} style={{ display: 'grid', placeItems: 'center', flexShrink: 0 }}>
                 <Text ff="'Archivo', sans-serif" fw={900} fz={30} c={TIER_INK}>
                   {t}
@@ -56,12 +56,12 @@ function Poster({ category, tiers, tierItems, perTier }) {
                   />
                 ))}
                 {rest > 0 && (
-                  <Text fz={18} fw={800} c="#94897a" px={8}>
+                  <Text fz={18} fw={800} c="#9ba1ad" px={8}>
                     +{rest}
                   </Text>
                 )}
                 {items.length === 0 && (
-                  <Text fz={13} c="#5c5548" px={8}>
+                  <Text fz={13} c="#5f6573" px={8}>
                     —
                   </Text>
                 )}
@@ -70,7 +70,7 @@ function Poster({ category, tiers, tierItems, perTier }) {
           );
         })}
       </Stack>
-      <Text fz={12} c="#5c5548" mt={18} ta="right">
+      <Text fz={12} c="#5f6573" mt={18} ta="right">
         ranked with Playlist Tiers
       </Text>
     </Box>

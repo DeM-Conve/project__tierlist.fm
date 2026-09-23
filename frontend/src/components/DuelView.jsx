@@ -40,7 +40,7 @@ function DuelCard({ video, tier, arrowKey, isPreviewing, onTogglePreview, onChoo
               left: 8,
               zIndex: 2,
               background: TIER_COLORS[tier],
-              color: '#1a1509',
+              color: '#101114',
             }}
           >
             {tier}

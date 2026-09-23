@@ -21,7 +21,7 @@ body {
   background: var(--border);
   border-radius: 8px;
 }
-::-webkit-scrollbar-thumb:hover { background: #46392a; }
+::-webkit-scrollbar-thumb:hover { background: #3a3f4a; }
 
 :focus-visible {
   outline: 2px solid var(--accent);
@@ -36,18 +36,18 @@ body {
    hex values are also used to build the Mantine theme (src/mantineTheme.js),
    so this is the one place the palette itself is defined. */
 :root {
-  --bg: #131110;
-  --surface: #1c1915;
-  --surface-2: #241f1a;
-  --surface-3: #2c2620;
-  --border: #332c23;
-  --border-soft: #2a251e;
-  --text: #f3efe8;
-  --text-dim: #94897a;
-  --text-faint: #5c5548;
-  --accent: #d6a24c;
-  --accent-hover: #c48f3a;
-  --accent-text: #1a1509;
+  --bg: #0e0f12;
+  --surface: #15171c;
+  --surface-2: #1c1f26;
+  --surface-3: #252932;
+  --border: #2a2e38;
+  --border-soft: #20232b;
+  --text: #eceef3;
+  --text-dim: #9ba1ad;
+  --text-faint: #5f6573;
+  --accent: #8b7cf6;
+  --accent-hover: #7a69ee;
+  --accent-text: #ffffff;
   --success: #4caf6e;
   --danger: #e8503a;
   --radius: 4px;
