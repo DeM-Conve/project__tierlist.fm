@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { ActionIcon, Badge, Box, Group, Image, Paper, ScrollArea, Slider, Stack, Text, UnstyledButton } from '@mantine/core';
+import { ActionIcon, Badge, Box, Button, Group, Image, Paper, ScrollArea, Slider, Stack, Text, UnstyledButton } from '@mantine/core';
 import {
   ChevronDown,
   ChevronUp,
@@ -12,11 +12,12 @@ import {
   RotateCw,
   SkipBack,
   SkipForward,
+  Trash2,
   Volume2,
   VolumeX,
   X,
 } from 'lucide-react';
-import { TIER_COLORS, TODO_TIER } from '../tiers';
+import { REMOVED_TIER, TIER_COLORS, TODO_TIER } from '../tiers';
 import { TierChip } from './TierBits';
 import EmbeddedPlayer from './EmbeddedPlayer';
 
@@ -474,6 +475,18 @@ export default function PlayerDock({
                       title={`Rate → ${t} (Shift+${i + 1})`}
                     />
                   ))}
+                  {currentTier !== REMOVED_TIER && (
+                    <ActionIcon
+                      variant="subtle"
+                      color="red"
+                      size={24}
+                      onClick={() => onChangeTier(REMOVED_TIER)}
+                      aria-label="Remove from playlist"
+                      title="Remove from its playlist (on push)"
+                    >
+                      <Trash2 size={14} />
+                    </ActionIcon>
+                  )}
                 </Group>
               )}
               <ActionIcon variant="subtle" color="gray" radius="xl" size={30} onClick={toggleMute} aria-label={isMuted ? 'Unmute' : 'Mute'} title="Mute (m)">
@@ -530,6 +543,19 @@ export default function PlayerDock({
                       title={`Move to ${t}`}
                     />
                   ))}
+                  {/* Staged like any move: nothing is deleted until you push,
+                      and the review's "Put back" (or Ctrl+Z) undoes it. */}
+                  <Button
+                    variant="subtle"
+                    color="red"
+                    size="compact-sm"
+                    ml="xs"
+                    leftSection={<Trash2 size={14} />}
+                    onClick={() => onChangeTier(REMOVED_TIER)}
+                    disabled={currentTier === REMOVED_TIER}
+                  >
+                    {currentTier === REMOVED_TIER ? 'Removed on push' : 'Remove from playlist'}
+                  </Button>
                 </Group>
               )}
               <Text fz={11} c="dimmed" opacity={0.75}>
