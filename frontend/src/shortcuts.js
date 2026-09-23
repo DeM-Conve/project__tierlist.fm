@@ -11,6 +11,7 @@
 export const SHORTCUTS = [
   { id: 'palette', keys: ['Ctrl', 'K'], description: 'Open command palette', category: 'Global' },
   { id: 'help', keys: ['?'], description: 'Show this shortcut list', category: 'Global' },
+  { id: 'undo', keys: ['Ctrl', 'Z'], description: 'Undo the last tier edit (drag, move, rating, bulk, duel result)', category: 'Global' },
 
   { id: 'search', keys: ['/'], description: 'Search this tier board', category: 'Tier board' },
   { id: 'search-next', keys: ['n'], description: 'Jump to next match', category: 'Tier board' },
@@ -22,6 +23,11 @@ export const SHORTCUTS = [
     category: 'Tier board',
   },
   { id: 'search-close', keys: ['Esc'], description: 'Close search', category: 'Tier board' },
+
+  { id: 'focus-filter', keys: ['/'], description: 'Filter this tier', category: 'Tier (full list)' },
+  { id: 'focus-select-all', keys: ['Ctrl', 'A'], description: 'Select every row shown', category: 'Tier (full list)' },
+  { id: 'focus-range', keys: ['Shift', 'Click'], description: 'Select a range of rows', category: 'Tier (full list)' },
+  { id: 'focus-clear', keys: ['Esc'], description: 'Clear the selection (or the filter)', category: 'Tier (full list)' },
   {
     id: 'push',
     keys: ['Shift', 'P'],
@@ -45,7 +51,7 @@ export const SHORTCUTS = [
   {
     id: 'player-seek-percent',
     keys: ['0-9'],
-    description: 'Jump to that 10% of the video (0 = start, 9 = 90%) - works anywhere, not just expanded',
+    description: 'Jump to that 10% of the video (0 = start, 9 = 90%) - works anywhere except Quick sort, where digits rate',
     category: 'Player',
   },
   {
@@ -64,9 +70,14 @@ export const SHORTCUTS = [
   {
     id: 'player-tier',
     keys: ['Shift', '1-9'],
-    description: "Move the playing video to that tier",
+    description: 'Rate the playing video into that tier (any player mode, on its own board)',
     category: 'Player',
   },
+
+  { id: 'sort-rate', keys: ['1-9'], description: 'File the song into that tier and play the next', category: 'Quick sort' },
+  { id: 'sort-skip', keys: ['S'], description: 'Skip (keep its tier)', category: 'Quick sort' },
+  { id: 'sort-undo', keys: ['U'], description: 'Undo the last rating', category: 'Quick sort' },
+  { id: 'sort-start', keys: ['Enter'], description: 'Start sorting (setup screen)', category: 'Quick sort' },
 
   { id: 'duel-left', keys: ['←'], description: 'Pick the left video', category: 'Duel' },
   { id: 'duel-right', keys: ['→'], description: 'Pick the right video', category: 'Duel' },
