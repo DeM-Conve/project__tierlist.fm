@@ -42,8 +42,8 @@ Legend: `[x]` done · `[~]` in progress · `[ ]` to do
 - [x] Remove dead CSS in `App.css` for everything replaced
 - [x] Update `docs/features.md` + `shortcuts.js`; walk the checklist - no feature lost
 - [x] Build, lint, click-through test with a mock API (desktop + mobile)
-- [~] Deploy, verify bundle hash
-- [~] Commit on `feat/board-reimagine`
+- [x] Deploy, verify bundle hash (index-DdJmCDmt.js)
+- [x] Commit on `feat/board-reimagine`
 
 ## Found along the way
 - [x] Pre-existing bug: refreshing directly on a board URL left it blank (board loaded before playlists) - fixed in `useLoadTierBoard`
