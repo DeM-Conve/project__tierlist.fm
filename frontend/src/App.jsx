@@ -215,6 +215,16 @@ function Layout() {
 
   const tierMatch = useMatch('/tier/:category/*');
   const currentCategory = tierMatch ? decodeURIComponent(tierMatch.params.category) : null;
+  const tierPageMatch = useMatch('/tier/:category/t/:tier');
+  const duelMatch = useMatch('/tier/:category/duel');
+  const focusedCategory = useSelector((s) => s.focus.focusedCategory);
+  // The Tier Rail is global like the player: on a board page it shows that
+  // board; anywhere else it follows the playing song's board, so the song
+  // can still be rated from Home / Settings / a playlist page. The duel
+  // screen keeps the whole width to itself.
+  const railCategory = duelMatch
+    ? null
+    : currentCategory ?? (focusedVideoData ? focusedCategory : null);
 
   const tierSyncMutation = useTierSyncMutation();
   const invalidatePlaylistItems = useInvalidatePlaylistItems();
@@ -442,6 +452,8 @@ function Layout() {
       />
 
       <main className="canvas">
+        {railCategory && <TierRail category={railCategory} activeTier={tierPageMatch?.params.tier} />}
+        <Box pr={railCategory ? { base: 0, md: RAIL_WIDTH - 16 } : 0}>
         <Outlet
           context={{
             syncChanges,
@@ -452,6 +464,7 @@ function Layout() {
             playFrom,
           }}
         />
+        </Box>
       </main>
 
       {focusedVideoData && (
@@ -519,11 +532,11 @@ function useBoardPage(category) {
 
 // Board pages sit beside the Tier Rail (desktop) and above the shared
 // staged-changes bar.
-function BoardShell({ children, rail = true, activeTier }) {
+// (The Tier Rail itself is global - mounted in Layout, see railCategory.)
+function BoardShell({ children }) {
   return (
     <>
-      <Box pr={rail ? { base: 0, md: RAIL_WIDTH - 16 } : 0}>{children}</Box>
-      {rail && <TierRail activeTier={activeTier} />}
+      {children}
       <PendingChanges />
     </>
   );
@@ -652,7 +665,7 @@ function TierFocusPage() {
   }, [isLoading, tiers, tier, base, navigate]);
 
   return (
-    <BoardShell activeTier={tier}>
+    <BoardShell>
       <TierFocusView
         category={category}
         tier={tier}

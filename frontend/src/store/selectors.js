@@ -10,6 +10,7 @@ const selectFocusedVideo = (state) => state.focus.focusedVideo;
 const selectFocusQueue = (state) => state.focus.focusQueue;
 const selectFocusEntries = (state) => state.focus.focusEntries;
 const selectFocusedCategory = (state) => state.focus.focusedCategory;
+const selectLoadedCategory = (state) => state.tiers.loadedCategory;
 
 const selectNamingTemplate = (state) => state.naming.template;
 const selectMigratingFrom = (state) => state.naming.migratingFrom;
@@ -131,16 +132,15 @@ export const selectFocusedVideoData = createSelector(
   (index, activeSequence) => (index >= 0 ? activeSequence[index].video : null)
 );
 
-// Tier reassignment only makes sense - and only actually works - while
-// you're viewing the same board the playing video was opened from: the
-// pills/shift+digit shortcut write into `tiersSlice.tierItems`, which only
-// ever holds the currently loaded category. If you've since navigated to a
-// different tier board while the video keeps playing in the background,
-// hide the controls entirely rather than let them silently no-op.
+// Tier reassignment only works while the playing video's board is the one
+// loaded in `tiersSlice.tierItems` (the pills/shift+digit shortcut write
+// there). That stays true on Home / Settings / playlist pages after leaving
+// the board - only opening a *different* board replaces it, and then the
+// controls hide rather than silently no-op.
 export const selectFocusedAvailableTiers = createSelector(
-  [selectFocusedVideo, selectFocusedCategory, selectCurrentCategory, selectTierGroups],
-  (focusedVideo, focusedCategory, currentCategory, tierGroups) =>
-    focusedVideo && focusedCategory && focusedCategory === currentCategory
+  [selectFocusedVideo, selectFocusedCategory, selectLoadedCategory, selectTierGroups],
+  (focusedVideo, focusedCategory, loadedCategory, tierGroups) =>
+    focusedVideo && focusedCategory && focusedCategory === loadedCategory
       ? TIER_ORDER.filter((t) => tierGroups[focusedCategory]?.[t])
       : []
 );

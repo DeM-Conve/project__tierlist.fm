@@ -39,7 +39,7 @@
 - Vim-style `/` search (also the Find button): `/` opens a find box at the top of the screen (the `/` is part of the box's text - deleting it cancels), each row filters to its matches (and wraps to show all of them), `Enter`/`n` next match, `Shift+Enter`/`N` previous, `Enter` on a single match plays it, `Esc` closes. The active match is scrolled into view and highlighted. Matches song title, channel **and artist name**; every word must match, in any order, ignoring case and accents (`krsna makasam`, `beyonce`).
 
 ## Tier Rail
-- A permanent strip of the board's tiers down the right edge of the tier list and tier pages (desktop), with live counts. One click does the most useful thing available: **re-rate the playing song** into that tier (when it's from this board; the playing song's art sits on its current tier, with `⇧1-5` hints) → otherwise **open that tier**. The header says which mode it's in ("Rate" / "Tiers").
+- A permanent strip of the board's tiers down the right edge of the tier list and tier pages (desktop), with live counts. **Global like the player:** while a song plays, the rail stays on Home, Settings and playlist pages too, showing the playing song's board so you can still rate it there (hidden only on the duel screen). One click does the most useful thing available: **re-rate the playing song** into that tier (when it's from this board; the playing song's art sits on its current tier, with `⇧1-5` hints) → otherwise **open that tier**. The header says which mode it's in ("Rate" / "Tiers").
 - Every rail tier is a drop target: drag any tile or row onto it to move it there.
 
 ## Tier page (full list for big tiers)

@@ -9,16 +9,17 @@ import { TIER_INK } from '../tierUtils';
 
 export const RAIL_WIDTH = 84;
 
-// The Tier Rail: the board's tiers as a permanent strip down the right edge
-// of every board page - the "tier list is always in reach" surface.
+// The Tier Rail: a board's tiers as a permanent strip down the right edge -
+// the "tier list is always in reach" surface. Global like the player: Layout
+// passes the board being viewed, or off board pages the playing song's board.
 // One click on a tier does the most useful thing available:
 //   1. a song from this board is playing -> re-rate the playing song
 //   2. otherwise                        -> open that tier
 // It's also a drop target for any dragged tile or row (append to that tier).
-export default function TierRail({ activeTier }) {
+export default function TierRail({ category, activeTier }) {
   const dispatch = useDispatch();
   const navigate = useNavigate();
-  const category = useSelector((s) => s.view.currentCategory);
+  const loadedCategory = useSelector((s) => s.tiers.loadedCategory);
   const tierGroups = useSelector(selectTierGroups);
   const tierItems = useSelector((s) => s.tiers.tierItems);
   const focusedVideo = useSelector((s) => s.focus.focusedVideo);
@@ -28,7 +29,10 @@ export default function TierRail({ activeTier }) {
 
   if (!category || !tierGroups[category]) return null;
   const tiers = TIER_ORDER.filter((t) => tierGroups[category][t]);
-  const playingHere = focusedVideo && focusedCategory === category ? focusedVideo : null;
+  // Rating writes into tierItems, so it needs this board to be the loaded one
+  // (it still is after leaving it for Home/Settings; not after opening another).
+  const loaded = loadedCategory === category;
+  const playingHere = focusedVideo && focusedCategory === category && loaded ? focusedVideo : null;
 
   function actionFor(tier) {
     if (playingHere && playingVideo) {
@@ -71,7 +75,7 @@ export default function TierRail({ activeTier }) {
 
       <Stack gap={6} style={{ flex: 1, minHeight: 0 }}>
         {tiers.map((tier, i) => {
-          const count = tierItems[tier]?.length ?? 0;
+          const count = loaded ? (tierItems[tier]?.length ?? 0) : (tierGroups[category][tier].itemCount ?? 0);
           const action = actionFor(tier);
           const isPlayingTier = playingHere?.tier === tier;
           const isOver = dnd.dragOverTier === `rail:${tier}`;
