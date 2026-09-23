@@ -1,60 +1,218 @@
-import { useEffect, useState } from 'react';
-import { useSelector } from 'react-redux';
+import { useCallback, useEffect, useState } from 'react';
+import { useDispatch, useSelector } from 'react-redux';
 import { useOutletContext } from 'react-router-dom';
-import { Badge, Box, Button, Group, Kbd, Modal, Paper, ScrollArea, Stack, Text } from '@mantine/core';
+import {
+  ActionIcon,
+  Badge,
+  Box,
+  Button,
+  Divider,
+  Group,
+  Image,
+  Kbd,
+  Modal,
+  Paper,
+  ScrollArea,
+  Stack,
+  Text,
+  ThemeIcon,
+  Title,
+  Tooltip,
+} from '@mantine/core';
 import { useMediaQuery } from '@mantine/hooks';
-import { ArrowRight } from 'lucide-react';
-import { TIER_COLORS } from '../tiers';
+import { ArrowDown, ArrowUp, CopyX, CloudUpload, Undo2 } from 'lucide-react';
+import { TIER_COLORS, TIER_ORDER } from '../tiers';
 import { selectPendingMoves } from '../store/selectors';
-import { TIER_INK } from '../tierUtils';
+import { moveWithFeedback } from '../tierActions';
+import { TierChip } from './TierBits';
 
-function PendingChangesModal({ opened, moves, onClose }) {
+// YouTube Data API cost of pushing: a move is playlistItems.insert +
+// playlistItems.delete (50 each); removing a duplicate is one delete.
+const QUOTA = { move: 100, dedupe: 50 };
+const DAILY_QUOTA = 10000;
+
+const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
+const rank = (tier) => TIER_ORDER.indexOf(tier);
+
+function Stat({ icon: Icon, color, value, label }) {
+  return (
+    <Paper withBorder radius="md" px="sm" py={8} bg="var(--surface)" style={{ flex: 1, opacity: value ? 1 : 0.5 }}>
+      <Group gap={8} wrap="nowrap">
+        <ThemeIcon size={26} radius="xl" variant="light" color={color}>
+          <Icon size={14} />
+        </ThemeIcon>
+        <div>
+          <Text fz="lg" fw={800} lh={1}>
+            {value}
+          </Text>
+          <Text fz={11} c="dimmed" tt="uppercase" fw={600} lts={0.4}>
+            {label}
+          </Text>
+        </div>
+      </Group>
+    </Paper>
+  );
+}
+
+function ChangeRow({ move, onRevert }) {
+  const { video } = move;
+  const promoted = move.kind === 'move' && rank(move.to) < rank(move.from);
+  return (
+    <Group gap="sm" wrap="nowrap" px="sm" py={6} className="review-row">
+      <Image src={video.thumbnail || undefined} w={48} h={36} radius={4} fit="cover" alt="" />
+      <Box miw={0} flex={1}>
+        <Text fz="sm" fw={600} truncate="end" title={video.title}>
+          {video.title}
+        </Text>
+        <Text fz="xs" c="dimmed" truncate="end">
+          {video.channelTitle || ' '}
+        </Text>
+      </Box>
+      {move.kind === 'move' ? (
+        <Group gap={6} wrap="nowrap" flex="none">
+          <Text fz="xs" c="dimmed">
+            from
+          </Text>
+          <TierChip tier={move.from} size={20} />
+          <ThemeIcon size={20} radius="xl" variant="light" color={promoted ? 'teal' : 'orange'}>
+            {promoted ? <ArrowUp size={12} /> : <ArrowDown size={12} />}
+          </ThemeIcon>
+          <Tooltip label={`Put back in ${move.from}`} withArrow>
+            <ActionIcon variant="subtle" color="gray" onClick={onRevert} aria-label={`Put back in ${move.from}`}>
+              <Undo2 size={15} />
+            </ActionIcon>
+          </Tooltip>
+        </Group>
+      ) : (
+        <Group gap={6} wrap="nowrap" flex="none">
+          <Text fz="xs" c="dimmed">
+            kept in
+          </Text>
+          <TierChip tier={move.keptTier} size={20} />
+        </Group>
+      )}
+    </Group>
+  );
+}
+
+// One block per destination - the board's own tier row look (colour spine +
+// tier chip), so the review reads as "what your tier list will become".
+function Section({ tier, title, moves, onRevert }) {
+  return (
+    <Paper withBorder radius="md" style={{ overflow: 'hidden' }}>
+      <Group gap={0} wrap="nowrap" align="stretch">
+        <Box w={4} bg={tier ? TIER_COLORS[tier] : 'var(--border)'} style={{ flexShrink: 0 }} />
+        <Stack gap={0} flex={1} miw={0}>
+          <Group gap={8} px="sm" pt={8} pb={4}>
+            {title}
+            <Text fz="xs" c="dimmed">
+              {plural(moves.length, 'video')}
+            </Text>
+          </Group>
+          {moves.map((m) => (
+            <ChangeRow key={`${m.kind}-${m.video.videoId}-${m.tier ?? m.to}`} move={m} onRevert={() => onRevert(m)} />
+          ))}
+        </Stack>
+      </Group>
+    </Paper>
+  );
+}
+
+function ReviewChangesModal({ opened, onClose, moves, category, syncStatus, onPush, onDiscard }) {
+  const dispatch = useDispatch();
+  const syncing = syncStatus === 'syncing';
+  const moved = moves.filter((m) => m.kind === 'move');
+  const removed = moves.filter((m) => m.kind === 'dedupe');
+  const promoted = moved.filter((m) => rank(m.to) < rank(m.from)).length;
+  const quota = moves.reduce((sum, m) => sum + QUOTA[m.kind], 0);
+
+  useEffect(() => {
+    if (opened && moves.length === 0) onClose(); // everything reverted / pushed
+  }, [opened, moves.length, onClose]);
+
+  const revert = (m) => dispatch(moveWithFeedback([{ fromTier: m.to, toTier: m.from, videoId: m.video.videoId }]));
+
   return (
     <Modal
       opened={opened}
       onClose={onClose}
       centered
-      size="lg"
+      size={620}
+      radius="lg"
+      padding="lg"
+      overlayProps={{ backgroundOpacity: 0.5, blur: 3 }}
       title={
-        <Text fw={800} fz="lg">
-          {moves.length} change{moves.length === 1 ? '' : 's'} staged
-        </Text>
+        <Stack gap={2}>
+          <Text fz={11} fw={700} c="dimmed" tt="uppercase" lts={1}>
+            Review · {category}
+          </Text>
+          <Title order={3} fw={900}>
+            {plural(moves.length, 'change')} staged
+          </Title>
+        </Stack>
       }
-      scrollAreaComponent={ScrollArea.Autosize}
     >
-      <Text size="sm" c="dimmed" mb="sm">
-        Nothing has touched YouTube yet. Push to apply these, or discard to go back to what's on YouTube.
-      </Text>
-      <Stack gap={0}>
-        {moves.map((m) => (
-          <Group
-            key={`${m.kind}-${m.video.videoId}-${m.tier ?? m.to}`}
-            justify="space-between"
-            wrap="nowrap"
-            gap="md"
-            py={9}
-            style={{ borderBottom: '1px dashed var(--border-soft)' }}
-          >
-            <Text fz="sm" truncate="end" title={m.video.title}>
-              {m.video.title}
-            </Text>
-            <Group gap={6} wrap="nowrap" style={{ flexShrink: 0 }}>
-              <Badge radius="sm" color={TIER_COLORS[m.kind === 'dedupe' ? m.tier : m.from]} c={TIER_INK}>
-                {m.kind === 'dedupe' ? m.tier : m.from}
-              </Badge>
-              <ArrowRight size={13} color="var(--text-faint)" />
-              {m.kind === 'dedupe' ? (
-                <Text fz="xs" fw={600} c="red.5">
-                  removed (duplicate)
-                </Text>
-              ) : (
-                <Badge radius="sm" color={TIER_COLORS[m.to]} c={TIER_INK}>
-                  {m.to}
-                </Badge>
-              )}
-            </Group>
+      <Stack gap="md">
+        <Group gap="xs" wrap="nowrap">
+          <Stat icon={ArrowUp} color="teal" value={promoted} label="Moved up" />
+          <Stat icon={ArrowDown} color="orange" value={moved.length - promoted} label="Moved down" />
+          <Stat icon={CopyX} color="red" value={removed.length} label="Duplicates" />
+        </Group>
+
+        <ScrollArea.Autosize mah="min(52vh, 460px)" offsetScrollbars="present" type="auto">
+          <Stack gap="sm">
+            {TIER_ORDER.map((tier) => {
+              const into = moved.filter((m) => m.to === tier);
+              return into.length ? (
+                <Section
+                  key={tier}
+                  tier={tier}
+                  moves={into}
+                  onRevert={revert}
+                  title={
+                    <Group gap={6}>
+                      <Text fz="sm" fw={700}>
+                        Into
+                      </Text>
+                      <TierChip tier={tier} size={22} />
+                    </Group>
+                  }
+                />
+              ) : null;
+            })}
+            {removed.length > 0 && (
+              <Section
+                moves={removed}
+                title={
+                  <Text fz="sm" fw={700}>
+                    Removed - duplicate of a higher tier
+                  </Text>
+                }
+              />
+            )}
+          </Stack>
+        </ScrollArea.Autosize>
+
+        <Divider />
+        <Group justify="space-between" wrap="nowrap" gap="md">
+          <Text fz="xs" c="dimmed" flex={1} miw={0}>
+            Nothing is on YouTube yet. Pushing uses about {quota.toLocaleString()} of your{' '}
+            {DAILY_QUOTA.toLocaleString()} daily API units.
+          </Text>
+          <Group gap="xs" wrap="nowrap" flex="none">
+            <Button variant="subtle" color="red" onClick={onDiscard} disabled={syncing}>
+              Discard all
+            </Button>
+            <Button
+              leftSection={<CloudUpload size={16} />}
+              rightSection={<Kbd size="xs">⇧P</Kbd>}
+              onClick={onPush}
+              loading={syncing}
+            >
+              Push to YouTube
+            </Button>
           </Group>
-        ))}
+        </Group>
       </Stack>
     </Modal>
   );
@@ -71,6 +229,7 @@ export default function PendingChanges() {
   const syncStatus = useSelector((s) => s.tiers.syncStatus);
   const category = useSelector((s) => s.view.currentCategory);
   const [reviewOpen, setReviewOpen] = useState(false);
+  const closeReview = useCallback(() => setReviewOpen(false), []);
   const compact = useMediaQuery('(max-width: 62em)');
   const count = moves.length;
 
@@ -93,7 +252,15 @@ export default function PendingChanges() {
 
   return (
     <>
-      <PendingChangesModal opened={reviewOpen} moves={moves} onClose={() => setReviewOpen(false)} />
+      <ReviewChangesModal
+        opened={reviewOpen}
+        onClose={closeReview}
+        moves={moves}
+        category={category}
+        syncStatus={syncStatus}
+        onPush={() => syncChanges(category)}
+        onDiscard={discardChanges}
+      />
       {showBar && (
         <Paper
           withBorder

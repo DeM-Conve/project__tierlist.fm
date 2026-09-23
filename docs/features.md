@@ -57,6 +57,7 @@
 
 ## Sync to YouTube
 - A floating **staged-changes bar** (bottom-center, above the mini player) appears on every page of a board (tier list, tier page) whenever there are staged changes: "N changes staged · review" / "Discard" / "Push to YouTube ⇧P". Compact on phones. After a push it briefly reports "Synced to YouTube" / "Some changes failed" / "Sync failed".
+- **Review changes** (click "N changes staged · review"): the board's changes grouped by destination tier (tier-coloured edge + chip), each with its cover, channel, where it came from and an up/down arrow; totals for moved up / moved down / duplicates; a **Put back** button per change (restores its original tier, undoable); roughly how much of the daily YouTube API quota a push will use; and Discard all / Push to YouTube (`Shift+P`) right there. It closes itself once nothing is left.
 - Clicking "N changes staged" opens a popup (Mantine `Modal`) itemizing every staged change (video, from tier → to tier, or a duplicate removal - see below).
 - "Push to YouTube" calls the backend, which inserts each video into its new playlist before removing it from the old one (so a failed delete never loses a video). Partial failures are reported per item.
 - "Discard" reverts the board back to what's actually on YouTube.

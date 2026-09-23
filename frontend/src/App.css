@@ -412,3 +412,8 @@
   font-size: 12px;
 }
 
+
+/* Review-changes rows: hover highlight (a :hover pseudo-class - Mantine has
+   no prop for it). */
+.review-row { transition: background-color 120ms ease; }
+.review-row:hover { background: var(--surface-2); }

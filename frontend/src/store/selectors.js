@@ -54,7 +54,7 @@ export const selectPendingMoves = createSelector(
         if (originalTiers.length > 1) {
           const keepTier = TIER_ORDER.find((t) => originalTiers.includes(t));
           if (tier !== keepTier) {
-            moves.push({ kind: 'dedupe', video, tier });
+            moves.push({ kind: 'dedupe', video, tier, keptTier: keepTier });
           }
           continue;
         }
