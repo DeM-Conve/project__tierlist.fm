@@ -2,8 +2,12 @@ package fm.tierlist.settings;
 
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.AssertTrue;
+import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.Size;
 
+import java.util.Map;
 import java.util.Objects;
 
 // The API contract for GET/PUT /api/settings, grouped like the frontend's
@@ -21,7 +25,15 @@ public record SettingsDto(
     public record AppearanceDto(@NotNull Theme theme, @NotNull Accent accent, @NotNull TierPalette tierPalette) {
     }
 
-    public record NamingDto(@NotNull @NamingTemplate String template, @NamingTemplate String migratingFrom) {
+    // todoLinks: YouTube playlist id -> board (category) name.
+    public record NamingDto(
+        @NotNull @NamingTemplate String template,
+        @NamingTemplate String migratingFrom,
+        @NotNull @TodoKeyword String todoKeyword,
+        @NotNull @Size(max = 500) Map<
+            @Pattern(regexp = "^[A-Za-z0-9_-]{1,64}$") String,
+            @NotBlank @Size(max = NamingTemplate.MAX_LENGTH) String> todoLinks
+    ) {
 
         @AssertTrue(message = "migratingFrom must differ from template")
         boolean isMigratingFromDistinct() {
@@ -37,7 +49,7 @@ public record SettingsDto(
         Naming n = row.getNaming();
         return new SettingsDto(
             new AppearanceDto(a.theme(), a.accent(), a.tierPalette()),
-            new NamingDto(n.template(), n.migratingFrom()),
+            new NamingDto(n.template(), n.migratingFrom(), n.todoKeyword(), row.getTodoLinks()),
             new PrefsDto(row.getPrefs().duelStrategy())
         );
     }
@@ -47,7 +59,11 @@ public record SettingsDto(
     }
 
     public Naming toNaming() {
-        return new Naming(naming.template(), naming.migratingFrom());
+        return new Naming(naming.template(), naming.migratingFrom(), naming.todoKeyword());
+    }
+
+    public Map<String, String> toTodoLinks() {
+        return Map.copyOf(naming.todoLinks());
     }
 
     public Prefs toPrefs() {

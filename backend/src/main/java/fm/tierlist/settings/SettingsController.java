@@ -45,7 +45,7 @@ public class SettingsController {
     ) {
         WritePrecondition precondition = WritePrecondition.fromHeaders(ifMatch, ifNoneMatch);
         String userId = users.current(auth).getId();
-        return ok(settings.save(userId, precondition, dto.toAppearance(), dto.toNaming(), dto.toPrefs()));
+        return ok(settings.save(userId, precondition, dto.toAppearance(), dto.toNaming(), dto.toTodoLinks(), dto.toPrefs()));
     }
 
     private static ResponseEntity<SettingsDto> ok(UserSettings row) {

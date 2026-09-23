@@ -30,6 +30,9 @@ CREATE TABLE user_settings (
     -- while a rename job is unfinished (titles matching either stay visible).
     naming_template        VARCHAR(200)         NOT NULL,
     naming_migrating_from  VARCHAR(200),
+    -- The word that marks a playlist as a board's to-do list, wherever it
+    -- appears in the name ("[G] Rap TODO", "TODO - Rap"), any case.
+    naming_todo_keyword    VARCHAR(20)          NOT NULL,
     -- Settings -> Duels
     duel_strategy          duel_strategy_option NOT NULL,
     -- Optimistic lock, served as the ETag: a save based on a version the
@@ -46,7 +49,25 @@ CREATE TABLE user_settings (
         CHECK (naming_migrating_from IS NULL
                OR (naming_migrating_from LIKE '%{category}%' AND naming_migrating_from LIKE '%{tier}%')),
     CONSTRAINT naming_migrating_from_differs
-        CHECK (naming_migrating_from IS DISTINCT FROM naming_template)
+        CHECK (naming_migrating_from IS DISTINCT FROM naming_template),
+    -- Mirrors @TodoKeyword / todoLists.js validateTodoKeyword: words of
+    -- letters/digits, and never a tier code (that would read as a tier).
+    CONSTRAINT naming_todo_keyword_format
+        CHECK (naming_todo_keyword ~ '^[[:alnum:]]+( [[:alnum:]]+)*$'
+               AND upper(naming_todo_keyword) NOT IN ('T1', 'T2', 'T3', 'TE', 'TZ'))
+);
+
+-- Settings -> Playlist naming -> To-do lists: playlists the user explicitly
+-- assigned to a board as its to-do list (for names the keyword rule can't
+-- place on its own). One row per playlist; part of the settings row, so it
+-- shares its version/ETag and goes when the row does.
+CREATE TABLE todo_list_link (
+    user_id      TEXT         NOT NULL REFERENCES user_settings (user_id) ON DELETE CASCADE,
+    playlist_id  VARCHAR(64)  NOT NULL,
+    category     VARCHAR(200) NOT NULL,
+    PRIMARY KEY (user_id, playlist_id),
+    CONSTRAINT playlist_id_format CHECK (playlist_id ~ '^[A-Za-z0-9_-]{1,64}$'),
+    CONSTRAINT category_not_blank CHECK (btrim(category) <> '')
 );
 
 -- Inbox: liked videos the user marked "not a song", so they stop showing up
