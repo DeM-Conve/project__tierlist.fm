@@ -16,7 +16,7 @@ import {
   Tooltip,
   UnstyledButton,
 } from '@mantine/core';
-import { Home, Inbox, Keyboard, ListOrdered, LogOut, Search, Settings } from 'lucide-react';
+import { Home, Keyboard, ListOrdered, ListPlus, LogOut, Search, Settings } from 'lucide-react';
 import { TIER_ORDER, TODO_TIER } from '../tiers';
 
 // Each board shows its song total straight from the playlists' own item
@@ -31,7 +31,7 @@ export default function Sidebar({
   tierCategories,
   tierGroups,
   playlistCount,
-  inboxCount,
+  waitingCount,
   loading,
   onSelectSettings,
   onOpenShortcuts,
@@ -71,14 +71,22 @@ export default function Sidebar({
                 Jump to…
               </Text>
             </Group>
-            <Kbd size="xs">⌘K</Kbd>
+            <Group gap={4} wrap="nowrap">
+              <Kbd size="xs">o</Kbd>
+              <Kbd size="xs">⌘K</Kbd>
+            </Group>
           </Group>
         </UnstyledButton>
 
         <NavLink
           component={Link}
           to="/"
-          label="Home"
+          label={
+            <Group justify="space-between" wrap="nowrap">
+              Home
+              <Kbd size="xs" visibleFrom="md">g h</Kbd>
+            </Group>
+          }
           description={loading ? 'Loading your playlists…' : `Boards & ${playlistCount} playlists`}
           leftSection={<Home size={16} />}
           variant="light"
@@ -86,21 +94,25 @@ export default function Sidebar({
         />
         <NavLink
           component={Link}
-          to="/inbox"
-          label="Inbox"
-          description="Liked songs to rate"
-          leftSection={<Inbox size={16} />}
+          to="/add"
+          state={{ focusInput: true }}
+          label={
+            <Group justify="space-between" wrap="nowrap">
+              Add songs
+              <Kbd size="xs" visibleFrom="md">a</Kbd>
+            </Group>
+          }
+          description={waitingCount > 0 ? `${waitingCount} waiting for a tier` : 'Paste a link or search'}
+          leftSection={<ListPlus size={16} />}
           rightSection={
-            inboxCount == null ? (
-              <Skeleton h={16} w={22} radius="xl" />
-            ) : inboxCount > 0 ? (
-              <Badge size="sm" variant="filled" circle={inboxCount < 10}>
-                {inboxCount}
+            waitingCount > 0 ? (
+              <Badge size="sm" variant="filled" circle={waitingCount < 10}>
+                {waitingCount}
               </Badge>
             ) : null
           }
           variant="light"
-          active={location.pathname === '/inbox'}
+          active={location.pathname === '/add'}
           mb="xs"
         />
 
@@ -188,7 +200,7 @@ export default function Sidebar({
         </ScrollArea>
 
         <Group gap="xs" mt="md" wrap="nowrap">
-          <Tooltip label="Settings" withArrow>
+          <Tooltip label="Settings (g s)" withArrow>
             <ActionIcon variant="default" size="lg" onClick={onSelectSettings} aria-label="Settings">
               <Settings size={16} />
             </ActionIcon>

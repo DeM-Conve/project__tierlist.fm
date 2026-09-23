@@ -50,7 +50,7 @@ export function songLabel(video) {
 const fold = (text) => text.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase();
 
 // Who a video is by, normalised for matching ("KR$NA - Topic" and "Kr$na"
-// are the same artist) - the Inbox guesses a song's board from this.
+// are the same artist) - Add songs guesses a song's board from this.
 export function artistKey(video) {
   return fold(songLabel(video).artist).replace(/\s+/g, ' ').trim();
 }

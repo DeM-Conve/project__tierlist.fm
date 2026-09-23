@@ -20,3 +20,10 @@ export function videoIdFromText(text) {
   }
   return id && ID.test(id) ? id : null;
 }
+
+// Every distinct video id in a paste - one link, or several (one per line,
+// or separated by spaces/commas, as when copying from a chat).
+export function videoIdsFromText(text) {
+  const ids = (text || '').split(/[\s,]+/).map(videoIdFromText).filter(Boolean);
+  return [...new Set(ids)];
+}

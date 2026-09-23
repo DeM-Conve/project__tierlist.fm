@@ -137,7 +137,7 @@ const tiersSlice = createSlice({
         }
       });
     },
-    // A song filed from the Inbox is already on YouTube, so it joins the
+    // A song filed from Add songs is already on YouTube, so it joins the
     // loaded board's draft *and* its baseline - it's not a pending change.
     addSyncedVideo: (state, action) => {
       const { tier, video } = action.payload;

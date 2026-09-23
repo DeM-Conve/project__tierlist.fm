@@ -12,3 +12,9 @@ export const api = axios.create({
 });
 
 export { API_BASE };
+
+// The human-readable reason from a failed API call: the backend's
+// ProblemDetail `detail` (e.g. YouTube's quota is used up), else `fallback`.
+export function errorMessage(error, fallback) {
+  return error?.response?.data?.detail ?? fallback;
+}

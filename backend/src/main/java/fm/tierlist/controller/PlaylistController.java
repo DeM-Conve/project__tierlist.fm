@@ -16,23 +16,23 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.client.RestTemplate;
+import org.springframework.web.util.HtmlUtils;
+import org.springframework.web.util.UriComponentsBuilder;
 
 import java.net.URI;
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 @RestController
 public class PlaylistController {
 
     private static final String YOUTUBE_API_BASE = "https://www.googleapis.com/youtube/v3";
-    private static final int LIKES_PAGES = 6; // x50 = the 300 most recent likes (before keeping only music)
     private static final String MUSIC_CATEGORY = "10";
     private final RestTemplate restTemplate = new RestTemplate();
 
@@ -81,44 +81,38 @@ public class PlaylistController {
     }
 
     /**
-     * The account's most recent liked *songs* (YouTube's "LL" playlist, newest
-     * first, Music category only) - the Inbox's source. Capped at LIKES_PAGES pages so a long like history
-     * costs a few quota units, not hundreds. `addedAt` is when it was liked.
+     * Song search for "Add songs": YouTube videos in the Music category only,
+     * so a song name finds the song, not reaction clips. Quota: 100 units per
+     * call (the frontend caches each query and only searches on Enter).
      */
-    @GetMapping("/api/likes")
-    public List<Map<String, Object>> likes(@RegisteredOAuth2AuthorizedClient("google") OAuth2AuthorizedClient client) {
-        List<Map<String, Object>> items = new ArrayList<>();
-        String pageToken = null;
-        int pages = 0;
-        do {
-            String url = YOUTUBE_API_BASE + "/playlistItems?part=snippet,contentDetails&playlistId=LL&maxResults=50"
-                + (pageToken != null ? "&pageToken=" + pageToken : "");
-            Map<String, Object> body = callYoutubeApi(client, url);
-            List<Map<String, Object>> pageItems = (List<Map<String, Object>>) body.get("items");
-            if (pageItems != null) items.addAll(pageItems);
-            pageToken = (String) body.get("nextPageToken");
-        } while (pageToken != null && ++pages < LIKES_PAGES);
-        List<Map<String, Object>> videos = toVideos(items);
-        Set<String> music = musicVideoIds(client, videos.stream().map(v -> (String) v.get("videoId")).toList());
-        return videos.stream().filter(v -> music.contains(v.get("videoId"))).toList();
-    }
-
-    /**
-     * Which of these videos YouTube files under Music (videoCategoryId 10) -
-     * the Inbox is for songs, not every clip that got a like. Also what a
-     * YouTube Music like is. Quota: 1 unit per 50 ids.
-     */
-    private Set<String> musicVideoIds(OAuth2AuthorizedClient client, List<String> videoIds) {
-        Set<String> music = new HashSet<>();
-        for (int i = 0; i < videoIds.size(); i += 50) {
-            String ids = String.join(",", videoIds.subList(i, Math.min(i + 50, videoIds.size())));
-            Map<String, Object> body = callYoutubeApi(client, YOUTUBE_API_BASE + "/videos?part=snippet&maxResults=50&id=" + ids);
-            for (Map<String, Object> v : (List<Map<String, Object>>) body.getOrDefault("items", List.of())) {
-                Map<String, Object> snippet = (Map<String, Object>) v.get("snippet");
-                if (snippet != null && MUSIC_CATEGORY.equals(snippet.get("categoryId"))) music.add((String) v.get("id"));
-            }
+    @GetMapping("/api/search")
+    public List<Map<String, Object>> search(
+            @RequestParam String q,
+            @RegisteredOAuth2AuthorizedClient("google") OAuth2AuthorizedClient client
+    ) {
+        URI url = UriComponentsBuilder.fromHttpUrl(YOUTUBE_API_BASE + "/search")
+            .queryParam("part", "snippet")
+            .queryParam("type", "video")
+            .queryParam("videoCategoryId", MUSIC_CATEGORY)
+            .queryParam("maxResults", 10)
+            .queryParam("q", q)
+            .encode()
+            .build()
+            .toUri();
+        Map<String, Object> body = callYoutubeApi(client, url.toString());
+        List<Map<String, Object>> result = new ArrayList<>();
+        for (Map<String, Object> item : (List<Map<String, Object>>) body.getOrDefault("items", List.of())) {
+            Map<String, Object> id = (Map<String, Object>) item.get("id");
+            Map<String, Object> snippet = (Map<String, Object>) item.get("snippet");
+            if (id == null || snippet == null || id.get("videoId") == null) continue;
+            Map<String, Object> out = new LinkedHashMap<>();
+            out.put("videoId", id.get("videoId"));
+            out.put("title", HtmlUtils.htmlUnescape((String) snippet.get("title")));
+            out.put("channelTitle", snippet.get("channelTitle"));
+            out.put("thumbnail", extractThumbnail((Map<String, Object>) snippet.get("thumbnails")));
+            result.add(out);
         }
-        return music;
+        return result;
     }
 
     /** One video's details, for a pasted link. 404 if it doesn't exist / is private. Quota: 1 unit. */
@@ -185,7 +179,6 @@ public class PlaylistController {
         out.put("title", snippet.get("title"));
         out.put("channelTitle", snippet.get("videoOwnerChannelTitle"));
         out.put("thumbnail", extractThumbnail((Map<String, Object>) snippet.get("thumbnails")));
-        out.put("addedAt", snippet.get("publishedAt"));
         return out;
     }
 

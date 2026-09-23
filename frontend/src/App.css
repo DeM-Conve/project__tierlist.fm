@@ -72,14 +72,16 @@
 
 /* Hover/active feedback for the tier-list surfaces - Mantine has no
    :hover styling prop, so these interaction states stay as CSS. */
-.tier-label-btn, .more-tile, .row-open-btn, .rail-tier, .inbox-tier, .tier-chip-btn {
+.tier-label-btn, .more-tile, .row-open-btn, .rail-tier, .add-tier, .tier-chip-btn {
   transition: filter 0.12s ease, transform 0.12s ease, background 0.12s ease;
 }
-.tier-label-btn:hover, .rail-tier:hover, .inbox-tier:hover, .tier-chip-btn:hover { filter: brightness(1.12); }
-.inbox-tier:hover { transform: translateY(-3px); }
-.inbox-tier:active, .tier-chip-btn:active, .rail-tier:active { transform: scale(0.96); }
+.tier-label-btn:hover, .rail-tier:hover, .add-tier:hover, .tier-chip-btn:hover { filter: brightness(1.12); }
+.add-tier:hover { transform: translateY(-3px); }
+.add-tier:active, .tier-chip-btn:active, .rail-tier:active { transform: scale(0.96); }
 .more-tile:hover { filter: brightness(1.25); }
 .row-open-btn:hover { background: var(--surface-2); }
+/* Add songs search results: hover + the keyboard-highlighted row (Mantine has no hover/active-row prop). */
+.search-result:hover, .search-result[data-active] { background: var(--surface-2); }
 .track-row, .queue-row { transition: background 0.1s ease; }
 .track-row:hover, .queue-row:hover { background: var(--surface-2); }
 .board-card, .playlist-card { transition: border-color 0.15s ease, transform 0.15s ease; }
