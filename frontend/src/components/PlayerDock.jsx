@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { ActionIcon, Badge, Group, Slider, Stack, Text } from '@mantine/core';
+import { ActionIcon, Badge, Group, HoverCard, Slider, Stack, Text } from '@mantine/core';
 import {
   ChevronDown,
   ChevronUp,
@@ -10,6 +10,7 @@ import {
   Repeat1,
   RotateCcw,
   RotateCw,
+  Shuffle,
   SkipBack,
   SkipForward,
   Volume2,
@@ -35,6 +36,52 @@ import { isSequenceKey } from '../keyboard/sequence';
 // floating corner (both already "down", so j between them just swaps which
 // minimized view you're in) - it never wraps back up to expanded on its
 // own. k (up) always jumps straight back to expanded, from any state.
+
+const fmtTime = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
+
+// YouTube-style volume: the speaker icon mutes on click; hovering it pops
+// a vertical slider above it (the wheel over the icon nudges it too).
+function VolumeControl({ volume, muted, onToggleMute, onChange, size }) {
+  const off = muted || volume === 0;
+  return (
+    <HoverCard position="top" withArrow openDelay={60} closeDelay={220} shadow="md" radius="xl" zIndex={400}>
+      <HoverCard.Target>
+        <ActionIcon
+          variant="subtle"
+          color="gray"
+          radius="xl"
+          size={size}
+          onClick={onToggleMute}
+          onWheel={(e) => onChange(Math.min(100, Math.max(0, volume + (e.deltaY < 0 ? 5 : -5))))}
+          aria-label={off ? 'Unmute' : 'Mute'}
+          title="Mute (m)"
+        >
+          {off ? <VolumeX size={17} /> : <Volume2 size={17} />}
+        </ActionIcon>
+      </HoverCard.Target>
+      <HoverCard.Dropdown px={6} py={10}>
+        <Stack align="center" gap={8}>
+          <Text fz={11} fw={700} c="dimmed" w={24} ta="center">
+            {volume}
+          </Text>
+          <Slider
+            orientation="vertical"
+            h={110}
+            size="sm"
+            value={volume}
+            onChange={onChange}
+            min={0}
+            max={100}
+            step={1}
+            color="accent"
+            label={null}
+            aria-label="Volume"
+          />
+        </Stack>
+      </HoverCard.Dropdown>
+    </HoverCard>
+  );
+}
 
 const PLAYER_MODE_TRANSITIONS = {
   expanded: { down: 'mini', up: 'expanded' },
@@ -69,7 +116,10 @@ export default function PlayerDock({
   const cardRef = useRef(null);
   const playerRef = useRef(null);
   const [isPlaying, setIsPlaying] = useState(true);
-  const [progressPct, setProgressPct] = useState(0);
+  // Playback position, polled (see below); `scrub` holds the seek bar's
+  // value while it's being dragged so polling doesn't fight the thumb.
+  const [time, setTime] = useState({ cur: 0, dur: 0 });
+  const [scrub, setScrub] = useState(null);
   const [isMuted, setIsMuted] = useState(false);
   const [volume, setVolume] = useState(100);
   // Remembers the level to restore when unmuting via the button/shortcut,
@@ -108,13 +158,13 @@ export default function PlayerDock({
       if (!player?.getDuration) return;
       const duration = player.getDuration();
       if (!duration) return;
-      setProgressPct((player.getCurrentTime() / duration) * 100);
+      setTime({ cur: player.getCurrentTime(), dur: duration });
     }, 500);
     return () => clearInterval(id);
   }, []);
 
   useEffect(() => {
-    setProgressPct(0);
+    setTime({ cur: 0, dur: 0 });
   }, [video.videoId]);
 
   // Vim-style navigation for the dock, active globally (not just while
@@ -268,16 +318,6 @@ export default function PlayerDock({
     }
   }
 
-  function seek(e) {
-    const player = playerRef.current;
-    const duration = player?.getDuration?.();
-    if (!duration) return;
-    const rect = e.currentTarget.getBoundingClientRect();
-    const ratio = Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width));
-    player.seekTo(ratio * duration, true);
-    setProgressPct(ratio * 100);
-  }
-
   // The expanded view's ⟲ ⟳ buttons (and ←/→) scrub within the current
   // video - track skipping is h/l or the prev/next buttons.
   function seekBy(deltaSeconds) {
@@ -286,7 +326,7 @@ export default function PlayerDock({
     if (!duration) return;
     const next = Math.min(duration, Math.max(0, player.getCurrentTime() + deltaSeconds));
     player.seekTo(next, true);
-    setProgressPct((next / duration) * 100);
+    setTime({ cur: next, dur: duration });
   }
 
   function replayCurrent() {
@@ -301,7 +341,7 @@ export default function PlayerDock({
     const duration = player?.getDuration?.();
     if (!duration) return;
     player.seekTo((pct / 100) * duration, true);
-    setProgressPct(pct);
+    setTime({ cur: (pct / 100) * duration, dur: duration });
   }
 
   const iconSize = expanded ? 20 : 18;
@@ -327,45 +367,34 @@ export default function PlayerDock({
         tabIndex={-1}
         ref={cardRef}
         onClick={(e) => e.stopPropagation()}
+        // The bar carries a faint wash of the playing song's tier color -
+        // the tier list is the product, so the dock wears it too.
+        style={!expanded && currentTier ? { background: `color-mix(in srgb, ${TIER_COLORS[currentTier]} 7%, var(--surface))` } : undefined}
       >
-        {!expanded && (
-          <div className="player-dock-progress-track" onClick={seek}>
-            <div className="player-dock-progress" style={{ width: `${progressPct}%` }} />
-          </div>
+        {/* Floating/expanded only: the mini bar keeps these in its right
+            cluster instead. */}
+        {mode !== 'mini' && (
+          <Group className="player-dock-toolbar" gap={6} wrap="nowrap">
+            {expanded ? (
+              // Closing the expanded view minimizes it to the bottom bar
+              // instead of stopping playback - matches how YouTube Music's
+              // "✕" on the full player collapses to its mini bar rather than
+              // ending the song.
+              <ActionIcon variant="default" radius="xl" size={30} onClick={onMinimize} aria-label="Minimize" title="Minimize (Esc)">
+                <ChevronDown size={16} />
+              </ActionIcon>
+            ) : (
+              <>
+                <ActionIcon variant="default" radius="xl" size={26} onClick={onExpand} aria-label="Expand" title="Expand (k)">
+                  <ChevronUp size={16} />
+                </ActionIcon>
+                <ActionIcon variant="default" radius="xl" size={26} onClick={onStop} aria-label="Stop" title="Stop playback">
+                  <X size={16} />
+                </ActionIcon>
+              </>
+            )}
+          </Group>
         )}
-
-        <Group className="player-dock-toolbar" gap={6} wrap="nowrap">
-          <ActionIcon
-            variant={repeatMode !== 'off' ? 'filled' : 'default'}
-            color="accent"
-            radius="xl"
-            size={mode === 'mini' ? 26 : 30}
-            onClick={onCycleRepeat}
-            aria-label={`Repeat: ${repeatMode === 'one' ? 'this song' : repeatMode === 'all' ? 'the whole queue' : 'off'}`}
-            aria-pressed={repeatMode !== 'off'}
-            title={`Repeat: ${repeatMode === 'one' ? 'this song' : repeatMode === 'all' ? 'all' : 'off'}`}
-          >
-            {repeatOne ? <Repeat1 size={16} /> : <Repeat size={16} />}
-          </ActionIcon>
-          {expanded ? (
-            // Closing the expanded view minimizes it to the bottom bar
-            // instead of stopping playback - matches how YouTube Music's
-            // "✕" on the full player collapses to its mini bar rather than
-            // ending the song.
-            <ActionIcon variant="default" radius="xl" size={30} onClick={onMinimize} aria-label="Minimize" title="Minimize (Esc)">
-              <ChevronDown size={16} />
-            </ActionIcon>
-          ) : (
-            <>
-              <ActionIcon variant="default" radius="xl" size={26} onClick={onExpand} aria-label="Expand" title="Expand (k)">
-                <ChevronUp size={16} />
-              </ActionIcon>
-              <ActionIcon variant="default" radius="xl" size={26} onClick={onStop} aria-label="Stop" title="Stop playback">
-                <X size={16} />
-              </ActionIcon>
-            </>
-          )}
-        </Group>
 
         {/* Main column. `display: contents` in the mini/floating layouts, so
             it only groups children for the expanded grid - the player
@@ -410,7 +439,23 @@ export default function PlayerDock({
               </Group>
             </div>
 
-            <Group className="player-dock-controls" gap={expanded ? 6 : 2} wrap="nowrap">
+            <div className="player-dock-center">
+            <Group className="player-dock-controls" gap={expanded ? 6 : 4} wrap="nowrap">
+              {!expanded && (
+                <ActionIcon
+                  className="player-dock-extra"
+                  variant="subtle"
+                  color={isShuffling ? 'accent' : 'gray'}
+                  radius="xl"
+                  size={btnSize}
+                  onClick={onShuffleUpcoming}
+                  disabled={!queue?.upcoming?.length}
+                  aria-label="Shuffle up next"
+                  title="Shuffle up next"
+                >
+                  <Shuffle size={16} />
+                </ActionIcon>
+              )}
               <ActionIcon variant="subtle" color="gray" radius="xl" size={btnSize} onClick={onPrev} disabled={!hasPrev} aria-label="Previous" title="Previous (h)">
                 <SkipBack size={iconSize} fill="currentColor" />
               </ActionIcon>
@@ -438,7 +483,48 @@ export default function PlayerDock({
               <ActionIcon variant="subtle" color="gray" radius="xl" size={btnSize} onClick={onNext} disabled={!hasNext} aria-label="Next" title="Next (l)">
                 <SkipForward size={iconSize} fill="currentColor" />
               </ActionIcon>
+              <ActionIcon
+                className="player-dock-extra"
+                variant="subtle"
+                color={repeatMode !== 'off' ? 'accent' : 'gray'}
+                radius="xl"
+                size={btnSize}
+                onClick={onCycleRepeat}
+                aria-label={`Repeat: ${repeatMode === 'one' ? 'this song' : repeatMode === 'all' ? 'the whole queue' : 'off'}`}
+                aria-pressed={repeatMode !== 'off'}
+                title={`Repeat: ${repeatMode === 'one' ? 'this song' : repeatMode === 'all' ? 'all' : 'off'}`}
+              >
+                {repeatOne ? <Repeat1 size={16} /> : <Repeat size={16} />}
+              </ActionIcon>
             </Group>
+            {!expanded && (
+              <Group className="player-dock-seek" gap={8} wrap="nowrap">
+                <Text fz={11} c="dimmed" w={34} ta="right" style={{ fontVariantNumeric: 'tabular-nums' }}>
+                  {fmtTime(scrub != null ? (scrub / 100) * time.dur : time.cur)}
+                </Text>
+                <Slider
+                  flex={1}
+                  size={3}
+                  thumbSize={11}
+                  color="accent"
+                  label={null}
+                  min={0}
+                  max={100}
+                  step={0.1}
+                  value={scrub ?? (time.dur ? (time.cur / time.dur) * 100 : 0)}
+                  onChange={setScrub}
+                  onChangeEnd={(v) => {
+                    seekToPercent(v);
+                    setScrub(null);
+                  }}
+                  aria-label="Seek"
+                />
+                <Text fz={11} c="dimmed" w={34} style={{ fontVariantNumeric: 'tabular-nums' }}>
+                  {time.dur ? fmtTime(time.dur) : '-:--'}
+                </Text>
+              </Group>
+            )}
+            </div>
 
             <Group className="player-dock-secondary" gap={2} wrap="nowrap">
               {availableTiers.length > 0 && mode === 'mini' && (
@@ -458,23 +544,10 @@ export default function PlayerDock({
                   )}
                 </Group>
               )}
-              <ActionIcon variant="subtle" color="gray" radius="xl" size={30} onClick={toggleMute} aria-label={isMuted ? 'Unmute' : 'Mute'} title="Mute (m)">
-                {isMuted || volume === 0 ? <VolumeX size={17} /> : <Volume2 size={17} />}
-              </ActionIcon>
-              <Slider
-                value={volume}
-                onChange={handleVolumeChange}
-                min={0}
-                max={100}
-                step={5}
-                w={expanded ? 110 : 80}
-                size="xs"
-                color="accent"
-                label={null}
-                aria-label="Volume"
-              />
+              <VolumeControl volume={volume} muted={isMuted} onToggleMute={toggleMute} onChange={handleVolumeChange} size={30} />
               {!expanded && (
                 <ActionIcon
+                  className="player-dock-extra"
                   variant={floating ? 'light' : 'subtle'}
                   color={floating ? 'accent' : 'gray'}
                   radius="xl"
@@ -485,6 +558,16 @@ export default function PlayerDock({
                 >
                   <PictureInPicture2 size={17} />
                 </ActionIcon>
+              )}
+              {mode === 'mini' && (
+                <>
+                  <ActionIcon variant="subtle" color="gray" radius="xl" size={30} onClick={onExpand} aria-label="Expand" title="Expand (k)">
+                    <ChevronUp size={18} />
+                  </ActionIcon>
+                  <ActionIcon variant="subtle" color="gray" radius="xl" size={30} onClick={onStop} aria-label="Stop" title="Stop playback">
+                    <X size={17} />
+                  </ActionIcon>
+                </>
               )}
             </Group>
           </div>

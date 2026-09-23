@@ -172,7 +172,7 @@
   padding-left: 24px;
   border-left: 1px solid var(--border-soft);
 }
-.player-queue-head { padding-right: 84px; } /* room for the toolbar */
+.player-queue-head { padding-right: 44px; } /* room for the minimize button */
 .queue-row-remove { opacity: 0; transition: opacity 0.1s ease; }
 .queue-row:hover .queue-row-remove, .queue-row-remove:focus-visible { opacity: 1; }
 /* Queue cover doubles as the play button: its ▶ overlay shows on hover (a :hover state - Mantine has no prop for it). */
@@ -201,31 +201,35 @@
   max-width: none;
   max-height: none;
   overflow: visible;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 6px 12px;
+  padding: 8px 16px;
   border-width: 1px 0 0;
   border-radius: 0;
   box-shadow: 0 -8px 24px var(--shadow);
+  transition: background 0.4s ease;
 }
-.player-dock-progress-track {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 6px;
-  margin-top: -3px;
-  cursor: pointer;
+/* Three zones, Spotify/YouTube-Music style: song (art + title) | transport +
+   seek bar | rating + utilities. The body/main wrappers are `display:
+   contents` so the player subtree keeps its DOM position (no remount); the
+   right cluster spans a trailing 44px track so the side zones are equal and
+   the transport sits dead centre. (CSS Grid - no Mantine prop for this.) */
+.player-dock-mini:not(.player-dock-floating) .player-dock-card {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) auto minmax(0, 1fr) 44px;
+  align-items: center;
+  column-gap: 12px;
 }
-.player-dock-progress {
-  position: absolute;
-  top: 3px;
-  left: 0;
-  height: 2px;
-  background: var(--accent);
-  transition: width 0.2s linear;
-  pointer-events: none;
+.player-dock-mini .player-dock-secondary { grid-column: 4 / 6; justify-self: end; }
+.player-dock-center { display: flex; flex-direction: column; align-items: center; gap: 2px; min-width: 0; }
+.player-dock-mini .player-dock-seek { width: clamp(240px, 34vw, 560px); }
+/* Seek thumb only while the bar is hovered or dragged (a :hover state). */
+.player-dock-seek .mantine-Slider-thumb { opacity: 0; transition: opacity 0.12s ease; }
+.player-dock-seek:hover .mantine-Slider-thumb,
+.player-dock-seek .mantine-Slider-thumb:focus-visible { opacity: 1; }
+@media (max-width: 47.99em) {
+  .player-dock-mini:not(.player-dock-floating) .player-dock-card { grid-template-columns: 44px minmax(0, 1fr) auto auto; padding: 6px 10px; }
+  .player-dock-mini:not(.player-dock-floating) .player-dock-secondary { grid-column: auto; }
+  .player-dock-mini:not(.player-dock-floating) .player-dock-seek,
+  .player-dock-mini:not(.player-dock-floating) .player-dock-extra { display: none; }
 }
 
 .player-dock-toolbar {
@@ -236,8 +240,6 @@
   gap: 8px;
   z-index: 2;
 }
-.player-dock-mini .player-dock-toolbar { position: static; order: 3; }
-
 .player-dock-mini .focus-media {
   flex: 0 0 44px;
   width: 44px;
@@ -247,38 +249,23 @@
 .player-dock-mini .focus-embed { aspect-ratio: 1 / 1; border-radius: 4px; }
 
 .player-dock-body { min-width: 0; }
-/* Three regions (title | controls | mute) so the controls sit centered
-   in the bar's remaining width, the way YouTube Music's own bottom bar
-   does, instead of bunched right next to the thumbnail. */
-.player-dock-mini .player-dock-body {
-  display: grid;
-  grid-template-columns: 1fr auto auto;
-  align-items: center;
-  gap: 12px;
-  flex: 1;
-  min-width: 0;
-}
-.player-dock-mini .focus-info { grid-column: 1; min-width: 0; cursor: pointer; }
+.player-dock-mini .player-dock-body { display: contents; }
+.player-dock-mini .focus-info { min-width: 0; cursor: pointer; }
 .player-dock-mini .focus-info h2 {
-  font-size: 13px;
-  margin: 0;
+  font-size: 14px;
+  margin: 0 0 2px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 .player-dock-mini .focus-info .hint-text {
-  font-size: 11px;
+  font-size: 12px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.player-dock-controls {
-  grid-column: 2;
-  display: flex;
-  align-items: center;
-  gap: 2px;
-}
-.player-dock-secondary { grid-column: 3; display: flex; align-items: center; gap: 2px; }
+.player-dock-controls { display: flex; align-items: center; }
+.player-dock-secondary { display: flex; align-items: center; }
 
 /* Floating corner mode: an in-page floating box pinned to the bottom-right
    corner, the way YouTube Music's own in-app miniplayer works - a CSS-only
@@ -294,6 +281,7 @@
   z-index: 45;
 }
 .player-dock-floating .player-dock-card {
+  display: flex;
   flex-direction: column;
   align-items: stretch;
   padding: 0;
@@ -303,7 +291,6 @@
   overflow: hidden;
   box-shadow: 0 16px 40px var(--shadow);
 }
-.player-dock-floating .player-dock-progress-track { top: auto; bottom: 0; margin-top: 0; }
 .player-dock-floating .player-dock-toolbar {
   position: absolute;
   top: 8px;
@@ -316,7 +303,15 @@
   margin-bottom: 0;
 }
 .player-dock-floating .focus-embed { aspect-ratio: 16 / 9; border-radius: 0; }
-.player-dock-floating .player-dock-body { padding: 8px 10px; }
+.player-dock-floating .player-dock-body {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 4px;
+  padding: 8px 12px 10px;
+}
+.player-dock-floating .player-dock-seek { width: 100%; }
+.player-dock-floating .player-dock-secondary { justify-content: center; }
 
 .focus-media-slot { position: relative; }
 .focus-media {

@@ -58,6 +58,7 @@
 ## Tier Rail
 - A permanent strip of the board's tiers down the right edge of the tier list and tier pages (desktop), with live counts. **Global like the player:** while a song plays, the rail stays on Home, Settings and playlist pages too, showing the playing song's board so you can still rate it there (hidden only on the duel screen). One click does the most useful thing available: **re-rate the playing song** into that tier (when it's from this board; the playing song's art sits on its current tier, with `⇧1-5` hints) → otherwise **open that tier**. The header says which mode it's in ("Rate" / "Tiers").
 - Every rail tier is a drop target: drag any tile or row onto it to move it there.
+- Layout: the ranked tiers T1–TZ share the whole height of the rail; under a divider sit two equal slots for what isn't a tier - the board's **TODO** list (if it has one) and **Remove** (red outline like the player's Remove chip; shows how many are staged, and a `Del` hint while a song from this board plays). Both are drop targets; clicking Remove stages the playing song's removal.
 
 ## Tier page (full list for big tiers)
 - `/tier/<board>/t/<tier>`: a big tier header (Play / Shuffle this tier), tabs for every tier with counts (tabs are drop targets too), and the whole tier as a dense numbered list (rank, cover, title, channel).
