@@ -35,7 +35,7 @@ export default function SettingsView() {
 
   return (
     <Box component="section">
-      <Title order={1} fz={{ base: 30, sm: 40 }} fw={900} mb="lg">
+      <Title order={1} fz={{ base: 26, sm: 30 }} fw={900} mb="md">
         Settings
       </Title>
 
