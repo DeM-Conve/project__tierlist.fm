@@ -195,17 +195,22 @@ export function TierTile({
           draggable={false}
           style={{ pointerEvents: 'none', filter: isPendingRemoval ? 'grayscale(1)' : undefined }}
         />
+        {/* The scrim hugs the label: it starts a little above the first line
+            and darkens toward the edge, so a one-line name only shades the
+            bottom strip and a two-line one gets a taller fade - the art
+            above stays clean, even on white covers. */}
         <Box
           pos="absolute"
-          inset={0}
-          p={5}
+          left={0}
+          right={0}
+          bottom={0}
+          px={5}
+          pb={5}
+          pt={size >= 80 ? 16 : 12}
           style={{
-            borderRadius: 6,
+            borderRadius: '0 0 6px 6px',
             pointerEvents: 'none',
-            display: 'flex',
-            flexDirection: 'column',
-            justifyContent: 'flex-end',
-            background: 'linear-gradient(180deg, transparent 30%, var(--media-scrim) 62%, var(--media-control-bg))',
+            background: 'linear-gradient(180deg, transparent, var(--media-scrim) 40%, var(--media-control-bg))',
             textShadow: '0 1px 2px var(--media-control-shadow)',
           }}
         >
