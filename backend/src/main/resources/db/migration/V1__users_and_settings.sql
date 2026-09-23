@@ -18,7 +18,6 @@ CREATE TYPE theme_option         AS ENUM ('TOKYO', 'DRACULA', 'CHARCOAL', 'PAPER
 CREATE TYPE accent_option        AS ENUM ('BLUE', 'VIOLET', 'TEAL', 'GREEN', 'PINK', 'RED', 'ORANGE', 'AMBER');
 CREATE TYPE tier_palette_option  AS ENUM ('VIVID', 'CLASSIC', 'HEAT');
 CREATE TYPE duel_strategy_option AS ENUM ('TIER_AWARE_MERGE', 'MERGE_SORT', 'ELO');
-CREATE TYPE board_density_option AS ENUM ('ALL', 'COMPACT');
 
 -- One row per user: their app settings. No row = the account has never saved.
 CREATE TABLE user_settings (
@@ -33,8 +32,6 @@ CREATE TABLE user_settings (
     naming_migrating_from  VARCHAR(200),
     -- Settings -> Duels
     duel_strategy          duel_strategy_option NOT NULL,
-    -- Tier board layout: every song (rows wrap) or one line per tier
-    board_density          board_density_option NOT NULL,
     -- Optimistic lock, served as the ETag: a save based on a version the
     -- client never saw gets 412 instead of overwriting another device's change.
     version                BIGINT               NOT NULL DEFAULT 0,

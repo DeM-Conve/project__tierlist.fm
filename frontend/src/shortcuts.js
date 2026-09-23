@@ -16,7 +16,6 @@ export const SHORTCUTS = [
   { id: 'search', keys: ['/'], description: 'Search this tier board', category: 'Tier board' },
   { id: 'search-next', keys: ['n'], description: 'Jump to next match', category: 'Tier board' },
   { id: 'search-prev', keys: ['N'], description: 'Jump to previous match', category: 'Tier board' },
-  { id: 'hover-move', keys: ['hover', '1-5'], description: 'Move the hovered tile to that tier (1 = the top tier)', category: 'Tier board' },
   {
     id: 'search-play',
     keys: ['Enter'],
@@ -52,7 +51,7 @@ export const SHORTCUTS = [
   {
     id: 'player-seek-percent',
     keys: ['0-9'],
-    description: 'Jump to that 10% of the video (0 = start, 9 = 90%) - except while hovering a board tile, where 1-5 move it',
+    description: 'Jump to that 10% of the video (0 = start, 9 = 90%)',
     category: 'Player',
   },
   {

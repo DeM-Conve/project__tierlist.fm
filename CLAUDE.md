@@ -179,15 +179,9 @@ auto-grouped into a tier board per category.
   `moveVideoToTier`/`moveVideos` directly from a component. That's what gives every
   surface the same undo toast, the same Ctrl+Z step (`tiersSlice.undoStack`), and keeps
   the player's `focusedVideo.tier` in sync after a move.
-- **The tier list is the product's moat** (see `PRODUCT.md`): board pages render
-  inside `BoardShell` in `App.jsx` (Tier Rail + shared `PendingChanges` bar, which
-  also owns Shift+P). The Tier Rail (`TierRail.jsx`) is contextual, not permanent: it
-  slides in over the page only while dragging or while rows are selected (user's
-  call - it wasted width otherwise); it overlays rather than resizes, so nothing
-  shifts under a drag. The board layout is the `prefs.boardDensity` setting (`all`
-  default / `compact`, a Postgres enum like the other options). Hover + `1`-`5`
-  moves a board tile (capture-phase listener in `TierBoardView`, so it wins over the
-  player's digit seek while a tile is hovered).
+- **The tier list is the product's moat** (see `PRODUCT.md`): the Tier Rail
+  (`TierRail.jsx`) is always on board pages; board pages render inside `BoardShell`
+  in `App.jsx` (rail + shared `PendingChanges` bar, which also owns Shift+P).
 - **Duel ranking uses the Strategy pattern** (`frontend/src/duel/`): multiple
   interchangeable ranking algorithms (`tierAwareMerge` default, `mergeSort`, `elo`)
   behind a common interface, swappable at runtime from the duel screen or persisted as a

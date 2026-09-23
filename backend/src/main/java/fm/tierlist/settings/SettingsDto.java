@@ -29,7 +29,7 @@ public record SettingsDto(
         }
     }
 
-    public record PrefsDto(@NotNull DuelStrategy duelStrategy, @NotNull BoardDensity boardDensity) {
+    public record PrefsDto(@NotNull DuelStrategy duelStrategy) {
     }
 
     public static SettingsDto from(UserSettings row) {
@@ -38,7 +38,7 @@ public record SettingsDto(
         return new SettingsDto(
             new AppearanceDto(a.theme(), a.accent(), a.tierPalette()),
             new NamingDto(n.template(), n.migratingFrom()),
-            new PrefsDto(row.getPrefs().duelStrategy(), row.getPrefs().boardDensity())
+            new PrefsDto(row.getPrefs().duelStrategy())
         );
     }
 
@@ -51,6 +51,6 @@ public record SettingsDto(
     }
 
     public Prefs toPrefs() {
-        return new Prefs(prefs.duelStrategy(), prefs.boardDensity());
+        return new Prefs(prefs.duelStrategy());
     }
 }
