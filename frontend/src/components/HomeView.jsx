@@ -19,6 +19,7 @@ import {
 } from '@mantine/core';
 import { EyeOff, ListPlus, Plus, Search, Swords } from 'lucide-react';
 import CreateTierPlaylistsModal from './CreateTierPlaylistsModal';
+import PlaylistArt from './PlaylistArt';
 import { BOARD_TIERS, TIER_COLORS } from '../tiers';
 import { EqualizerMark, TierChip } from './TierBits';
 import { TIER_INK } from '../tierUtils';
@@ -47,16 +48,7 @@ function BoardCard({ category, tiers, onOpen, onDuel }) {
           {present.map((t) => (
             <Group key={t} gap={8} wrap="nowrap">
               <TierChip tier={t} size={22} />
-              <Image
-                src={tiers[t].thumbnail || undefined}
-                w={40}
-                h={22}
-                radius={3}
-                fit="cover"
-                bg="var(--surface-2)"
-                alt=""
-                style={{ flexShrink: 0 }}
-              />
+              <PlaylistArt playlist={tiers[t]} tier={t} w={40} h={22} radius={3} iconSize={13} style={{ flexShrink: 0 }} />
               <Box style={{ flex: 1 }} h={8} bg="var(--surface-2)" pos="relative">
                 <Box
                   h={8}
@@ -245,7 +237,7 @@ export default function HomeView({
                 style={{ cursor: 'pointer' }}
               >
                 <Card.Section pos="relative">
-                  <Image src={p.thumbnail || undefined} h={100} fit="cover" bg="var(--surface-2)" alt="" />
+                  <PlaylistArt playlist={p} tier={parsed?.tier} h={100} iconSize={34} />
                   {parsed && (
                     <Badge
                       pos="absolute"

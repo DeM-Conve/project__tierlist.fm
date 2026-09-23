@@ -65,3 +65,11 @@ export function videoMatches(video, query) {
   const haystack = fold([video.title, video.channelTitle, songLabel(video).artist].filter(Boolean).join(' '));
   return words.every((w) => haystack.includes(w));
 }
+
+// A playlist's cover, or null when it has none. YouTube never omits the
+// thumbnail - an empty playlist (or one whose first video is gone) gets its
+// grey "•••" placeholder `/img/no_thumbnail.jpg`, which we treat as no art.
+export function playlistThumbnail(playlist) {
+  const url = playlist?.thumbnail;
+  return url && !url.includes('/no_thumbnail') ? url : null;
+}

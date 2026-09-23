@@ -1,5 +1,6 @@
 import { ActionIcon, Anchor, Box, Button, Group, Image, Paper, Skeleton, Stack, Text, Title, UnstyledButton } from '@mantine/core';
 import { ArrowLeft, ArrowUpRight } from 'lucide-react';
+import PlaylistArt from './PlaylistArt';
 import { TierChip } from './TierBits';
 import { youtubeUrl } from '../tierUtils';
 
@@ -19,7 +20,7 @@ export default function ItemsView({ playlist, items, loading, onOpenBoard, onBac
 
       <Group justify="space-between" align="flex-end" wrap="wrap" gap="md" mb="lg">
         <Group gap="md" wrap="nowrap" style={{ minWidth: 0 }}>
-          <Image src={playlist?.thumbnail || undefined} w={120} h={68} radius={6} fit="cover" bg="var(--surface-2)" alt="" />
+          <PlaylistArt playlist={playlist} tier={parsed?.tier} w={120} h={68} radius={6} style={{ flexShrink: 0 }} />
           <Stack gap={4} style={{ minWidth: 0 }}>
             <Text fz={11} fw={800} tt="uppercase" c="accent" style={{ letterSpacing: 1.5 }}>
               Playlist
