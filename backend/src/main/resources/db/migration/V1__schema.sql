@@ -69,14 +69,3 @@ CREATE TABLE todo_list_link (
     CONSTRAINT playlist_id_format CHECK (playlist_id ~ '^[A-Za-z0-9_-]{1,64}$'),
     CONSTRAINT category_not_blank CHECK (btrim(category) <> '')
 );
-
--- Inbox: liked videos the user marked "not a song", so they stop showing up
--- among the likes waiting to be filed into a tier. Undo deletes the row.
-CREATE TABLE inbox_dismissal (
-    user_id       TEXT        NOT NULL REFERENCES app_user (id) ON DELETE CASCADE,
-    video_id      VARCHAR(11) NOT NULL,
-    dismissed_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
-    PRIMARY KEY (user_id, video_id),
-    -- YouTube video ids are exactly 11 URL-safe base64 characters.
-    CONSTRAINT video_id_format CHECK (video_id ~ '^[A-Za-z0-9_-]{11}$')
-);

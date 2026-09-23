@@ -88,9 +88,7 @@ auto-grouped into a tier board per category.
   template and to-do keyword (+ CHECK constraints) and a `version`), `todo_list_link`
   (playlist id -> board, part of the settings row: an `@ElementCollection` excluded
   from Hibernate's auto-versioning - it bumped the version on insert - so
-  `SettingsService` force-increments when links change), and `inbox_dismissal` (user +
-  video id: liked videos marked "Not a song" in the Inbox; package
-  `fm.tierlist.inbox`). Backend package
+  `SettingsService` force-increments when links change). Backend package
   `fm.tierlist.settings`, layered and SOLID:
   - enums `Theme`/`Accent`/`TierPalette`/`DuelStrategy`: constant name = Postgres
     enum label (Hibernate `@JdbcTypeCode(SqlTypes.NAMED_ENUM)` + `columnDefinition`
