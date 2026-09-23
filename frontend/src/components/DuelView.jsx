@@ -16,8 +16,9 @@ import {
 } from '@mantine/core';
 import { useMediaQuery } from '@mantine/hooks';
 import { Play, Square } from 'lucide-react';
-import { DEFAULT_DUEL_STRATEGY, DUEL_STRATEGIES, DUEL_STRATEGY_LABELS } from '../duel';
-import { SETTINGS, getSetting, setSetting } from '../settings';
+import { useDispatch, useSelector } from 'react-redux';
+import { DUEL_STRATEGIES, DUEL_STRATEGY_LABELS } from '../duel';
+import { setDuelStrategy } from '../store/prefsSlice';
 import { TIER_COLORS } from '../tiers';
 import { TIER_INK } from '../tierUtils';
 import EmbeddedPlayer from './EmbeddedPlayer';
@@ -78,9 +79,9 @@ function DuelCard({ video, tier, arrowKey, isPreviewing, onTogglePreview, onChoo
 }
 
 export default function DuelView({ videos, runs, tierSizes, onComplete, onCancel }) {
-  const [strategyKey, setStrategyKeyState] = useState(() =>
-    getSetting(SETTINGS.duelStrategy, DEFAULT_DUEL_STRATEGY)
-  );
+  const dispatch = useDispatch();
+  const defaultStrategy = useSelector((s) => s.prefs.duelStrategy);
+  const [strategyKey, setStrategyKeyState] = useState(defaultStrategy);
   const [currentPair, setCurrentPair] = useState(null);
   const [progress, setProgress] = useState({ completed: 0, total: 0 });
   const [spine, setSpine] = useState(null);
@@ -104,7 +105,7 @@ export default function DuelView({ videos, runs, tierSizes, onComplete, onCancel
   // and the in-session dropdown always agree on "what happens next time."
   function setStrategyKey(key) {
     setStrategyKeyState(key);
-    setSetting(SETTINGS.duelStrategy, key);
+    dispatch(setDuelStrategy(key));
   }
 
   function advance(strategy) {

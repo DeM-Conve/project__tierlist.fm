@@ -18,7 +18,7 @@ auto-grouped into a tier board per category.
     holds the `THEMES` (3 dark + 3 light chromes), `ACCENTS` (8 most popular, usable with any theme; most reuse Mantine's own default palettes),
     `TIER_PALETTES` (3), `MEDIA` (colors drawn over art/video) and `DEMO_ART`. The user
     picks theme/accent/tier palette in Settings -> Appearance (`appearanceSlice`,
-    persisted to localStorage). `buildAppearance()` turns the choice into CSS variables
+    persisted per account in Postgres - see the Database bullet). `buildAppearance()` turns the choice into CSS variables
     on `<html>` (`--bg`, `--surface*`, `--border*`, `--text*`, `--accent*`, `--shadow`,
     `--overlay`, `--tier-t1..tz`, `--tier-ink`, `--media-*`) plus the Mantine theme;
     `AppearanceRoot.jsx` wraps `MantineProvider` and re-applies both live.
@@ -73,6 +73,21 @@ auto-grouped into a tier board per category.
     loading indicator.
 - **Backend**: Spring Boot 3 (Java 21, Maven), in `backend/`. Session-based Google OAuth2
   login; talks to the YouTube Data API v3 directly (no separate token DB).
+- **Database**: **Postgres 17** (the `db` compose service, data in the `pgdata`
+  volume), accessed via **Spring Data JPA**, schema owned by **Flyway**
+  (`backend/src/main/resources/db/migration/V*__*.sql`; Hibernate is `ddl-auto:
+  validate` only). **Proper typed schemas, no JSON/`jsonb` blob columns** (the user's
+  explicit call) - a new setting is a new column in a new `V<n>__...sql` migration +
+  entity field + `SettingsDto` field, never an edit to an applied migration.
+  Tables: `app_user` (Google `sub` as id, recorded on every login by the success
+  handler in `SecurityConfig`) and `user_settings` (one row per user: theme, accent,
+  tier_palette, naming_template, naming_migrating_from, duel_strategy), served by
+  `GET/PUT /api/settings` (`user/SettingsController`). Frontend side:
+  `api/useSettingsSync.js` (called in `App()`) loads the row into the `appearance`/
+  `naming`/`prefs` slices via the `settingsLoaded` action, uploads this browser's
+  settings when the account has no row yet, and PUTs changes (debounced).
+  localStorage (`settings.js`) is only a boot cache so the theme applies before first
+  paint - the account's row wins.
 - **Deploy**: Docker Compose. `docker-compose.yml` (prod-style multi-stage builds) and
   `docker-compose.local.yml` (dev, volume-mounted). Rebuilding either container clears
   the backend's in-memory session, so you'll need to log in again after a redeploy.

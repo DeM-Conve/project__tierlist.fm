@@ -46,7 +46,7 @@ export default function AppearanceSettings() {
           Theme
         </Title>
         <Text c="dimmed" fz="sm" mb="md">
-          Backgrounds, surfaces and text - picking one also applies its signature accent. Changes apply instantly and are remembered on this browser.
+          Backgrounds, surfaces and text - picking one also applies its signature accent. Changes apply instantly and are saved to your account.
         </Text>
         <Radio.Group
           value={appearance.theme}

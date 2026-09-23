@@ -5,6 +5,7 @@ import tiersReducer from './tiersSlice';
 import focusReducer from './focusSlice';
 import appearanceReducer from './appearanceSlice';
 import namingReducer from './namingSlice';
+import prefsReducer from './prefsSlice';
 import { SETTINGS, setSetting } from '../settings';
 
 export const store = configureStore({
@@ -15,11 +16,13 @@ export const store = configureStore({
     focus: focusReducer,
     appearance: appearanceReducer,
     naming: namingReducer,
+    prefs: prefsReducer,
   },
 });
 
-// Persist user preferences held in Redux whenever they change.
-const PERSISTED = { appearance: SETTINGS.appearance, naming: SETTINGS.naming };
+// Cache user preferences held in Redux in localStorage whenever they change
+// (the account's copy in Postgres is synced by api/useSettingsSync.js).
+const PERSISTED = { appearance: SETTINGS.appearance, naming: SETTINGS.naming, prefs: SETTINGS.prefs };
 const last = {};
 Object.keys(PERSISTED).forEach((k) => (last[k] = store.getState()[k]));
 store.subscribe(() => {

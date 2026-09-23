@@ -1,11 +1,11 @@
-import { useState } from 'react';
+import { useDispatch, useSelector } from 'react-redux';
 import { Box, Group, Radio, Stack, Tabs, Text, Title } from '@mantine/core';
 import { ShortcutsList } from './ShortcutsModal';
 import AppearanceSettings from './AppearanceSettings';
 import PlaylistNamingSettings from './PlaylistNamingSettings';
 import { useSearchParams } from 'react-router-dom';
-import { DUEL_STRATEGIES, DUEL_STRATEGY_LABELS, DEFAULT_DUEL_STRATEGY } from '../duel';
-import { SETTINGS, getSetting, setSetting } from '../settings';
+import { DUEL_STRATEGIES, DUEL_STRATEGY_LABELS } from '../duel';
+import { setDuelStrategy } from '../store/prefsSlice';
 
 const CATEGORIES = [
   { key: 'appearance', label: 'Appearance' },
@@ -26,13 +26,11 @@ export default function SettingsView() {
   // ?tab=naming etc. deep-links to a tab (and the tab you're on stays in the URL).
   const [searchParams, setSearchParams] = useSearchParams();
   const tab = CATEGORIES.some((c) => c.key === searchParams.get('tab')) ? searchParams.get('tab') : 'appearance';
-  const [duelStrategy, setDuelStrategy] = useState(() =>
-    getSetting(SETTINGS.duelStrategy, DEFAULT_DUEL_STRATEGY)
-  );
+  const dispatch = useDispatch();
+  const duelStrategy = useSelector((s) => s.prefs.duelStrategy);
 
   function chooseStrategy(key) {
-    setDuelStrategy(key);
-    setSetting(SETTINGS.duelStrategy, key);
+    dispatch(setDuelStrategy(key));
   }
 
   return (

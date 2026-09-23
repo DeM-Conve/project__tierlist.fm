@@ -1,6 +1,7 @@
 import { createSlice } from '@reduxjs/toolkit';
 import { SETTINGS, getSetting } from '../settings';
 import { resolveAppearance } from '../themes';
+import { settingsLoaded } from './settingsActions';
 
 // The chosen theme / accent / tier palette (Settings -> Appearance). Client
 // state like everything else in store/; persisted to localStorage by the
@@ -19,6 +20,11 @@ const appearanceSlice = createSlice({
     setTierPalette: (state, action) => {
       state.tierPalette = action.payload;
     },
+  },
+  extraReducers: (builder) => {
+    builder.addCase(settingsLoaded, (state, action) =>
+      action.payload.appearance ? resolveAppearance(action.payload.appearance) : state
+    );
   },
 });
 

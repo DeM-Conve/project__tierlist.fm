@@ -105,9 +105,10 @@ Swappable at runtime via a dropdown on the duel screen (and persisted as a defau
 - **Elo** — rates videos via random pairwise duels using an Elo rating system; supports skip.
 
 ## Settings
-- **Appearance** tab (default): pick a **theme** (Tokyo Night, Dracula, Warm charcoal - dark; Paper, Sand, Solarized Light - light; picking one also applies its signature accent), an **accent** (Blue, Violet, Teal, Green, Pink, Red, Orange, Amber - works with any theme; Warm charcoal + Amber is the original look) and a **tier palette** (Vivid, TierMaker classic, Heat). Each option shows a live mini preview, changes apply instantly across the whole app (including the share image) and are remembered in this browser. All colors come from one file, `frontend/src/themes.js`.
+- **Appearance** tab (default): pick a **theme** (Tokyo Night, Dracula, Warm charcoal - dark; Paper, Sand, Solarized Light - light; picking one also applies its signature accent), an **accent** (Blue, Violet, Teal, Green, Pink, Red, Orange, Amber - works with any theme; Warm charcoal + Amber is the original look) and a **tier palette** (Vivid, TierMaker classic, Heat). Each option shows a live mini preview, changes apply instantly across the whole app (including the share image) and are saved to your account. All colors come from one file, `frontend/src/themes.js`.
 - Dedicated, persistent Settings page (GitHub-style layout: side nav + content), reachable via a gear icon in the sidebar or the `/settings` route.
-- Choose the default duel strategy from here; the choice is shared with the in-duel dropdown and persisted in `localStorage`.
+- Choose the default duel strategy from here; the choice is shared with the in-duel dropdown and saved to your account.
+- **Settings follow your Google account** (Postgres): theme, accent, tier palette, naming template (+ an unfinished migration) and duel strategy are saved per account and load on any browser you sign into. This browser keeps a cached copy so the right theme shows before the first paint; the account's copy wins once it loads. The first time an account signs in, the settings already on that browser are uploaded, so nothing is lost. A failed save shows a toast and retries on the next change.
 - "Keyboard shortcuts" tab: the full shortcut list (same source as the `?` modal).
 
 ## Routing

@@ -1,9 +1,14 @@
-// Small wrapper around localStorage for persisted, per-browser app
-// preferences (not synced anywhere, not sent to the backend).
+// Small wrapper around localStorage: the per-browser *cache* of the user's
+// settings, so the right theme etc. applies before the first paint. The
+// source of truth is the backend (Postgres, per Google account) - see
+// api/useSettingsSync.js, which overwrites these once the account's copy loads.
 const PREFIX = 'ytTierApp:';
 
 export const SETTINGS = {
+  // legacy: the duel strategy on its own (now inside `prefs`)
   duelStrategy: `${PREFIX}duelStrategy`,
+  // { duelStrategy } - see prefsSlice
+  prefs: `${PREFIX}prefs`,
   // { theme, accent, tierPalette } - see themes.js
   appearance: `${PREFIX}appearance`,
   // { template, migratingFrom } - see naming.js / namingSlice

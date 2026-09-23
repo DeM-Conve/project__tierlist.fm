@@ -89,3 +89,23 @@ export function useCreatePlaylistsMutation() {
     onSettled: () => queryClient.invalidateQueries({ queryKey: ['playlists'] }),
   });
 }
+
+// The account's saved settings (Postgres `user_settings` row): `{ theme,
+// accent, tierPalette, namingTemplate, namingMigratingFrom, duelStrategy }`,
+// or null if the account has never saved any (204). Loaded once per session;
+// useSettingsSync keeps it up to date from Redux.
+export function useSettingsQuery(enabled) {
+  return useQuery({
+    queryKey: ['settings'],
+    queryFn: async () => (await api.get('/api/settings')).data || null,
+    enabled,
+    staleTime: Infinity,
+    retry: 1,
+  });
+}
+
+export function useSaveSettingMutation() {
+  return useMutation({
+    mutationFn: async (settings) => (await api.put('/api/settings', settings)).data,
+  });
+}

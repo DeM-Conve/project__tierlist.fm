@@ -1,6 +1,7 @@
 import { createSlice } from '@reduxjs/toolkit';
 import { SETTINGS, getSetting } from '../settings';
 import { DEFAULT_TEMPLATE, normalizeTemplate, validateTemplate } from '../naming';
+import { settingsLoaded } from './settingsActions';
 
 // The playlist naming template (see naming.js). `migratingFrom` is set while
 // a rename job hasn't finished for every playlist: titles matching EITHER
@@ -9,15 +10,20 @@ import { DEFAULT_TEMPLATE, normalizeTemplate, validateTemplate } from '../naming
 // `needsDetection`: nobody has chosen a template yet on this browser, so the
 // first playlist load picks the preset that fits the user's existing names
 // (detectTemplate) instead of assuming everyone uses one convention.
-const saved = getSetting(SETTINGS.naming, null);
-const initialState =
-  saved && typeof saved.template === 'string' && validateTemplate(saved.template).length === 0
+function fromSaved(saved) {
+  return saved && typeof saved.template === 'string' && validateTemplate(saved.template).length === 0
     ? {
         template: normalizeTemplate(saved.template),
         migratingFrom: saved.migratingFrom ? normalizeTemplate(saved.migratingFrom) : null,
         needsDetection: !!saved.needsDetection,
       }
-    : { template: DEFAULT_TEMPLATE, migratingFrom: null, needsDetection: true };
+    : null;
+}
+const initialState = fromSaved(getSetting(SETTINGS.naming, null)) ?? {
+  template: DEFAULT_TEMPLATE,
+  migratingFrom: null,
+  needsDetection: true,
+};
 
 const namingSlice = createSlice({
   name: 'naming',
@@ -43,6 +49,13 @@ const namingSlice = createSlice({
     finishMigration: (state) => {
       state.migratingFrom = null;
     },
+  },
+  extraReducers: (builder) => {
+    // The account already has a template -> use it (no detection needed).
+    builder.addCase(settingsLoaded, (state, action) => {
+      const saved = fromSaved(action.payload.naming);
+      return saved ? { ...saved, needsDetection: false } : state;
+    });
   },
 });
 

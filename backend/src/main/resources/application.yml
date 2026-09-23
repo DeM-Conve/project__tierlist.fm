@@ -16,3 +16,12 @@ spring:
               - openid
               - profile
               - https://www.googleapis.com/auth/youtube.force-ssl
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/yt}
+    username: ${DB_USER:yt}
+    password: ${DB_PASSWORD:yt}
+  jpa:
+    open-in-view: false
+    hibernate:
+      # Flyway owns the schema (src/main/resources/db/migration); Hibernate only checks it.
+      ddl-auto: validate

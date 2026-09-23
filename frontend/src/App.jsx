@@ -38,6 +38,7 @@ import ShortcutsModal from './components/ShortcutsModal';
 import LoginView from './components/LoginView';
 import { setLoggedIn, setPlaylists } from './store/authSlice';
 import { detectedTemplate } from './store/namingSlice';
+import { useSettingsSync } from './api/useSettingsSync';
 import { detectTemplate } from './naming';
 import { setCurrentCategory, setQuery, setMobileSidebarOpen } from './store/viewSlice';
 import {
@@ -142,14 +143,18 @@ export default function App() {
     if (playlistsData) dispatch(setPlaylists(playlistsData));
   }, [playlistsData, dispatch]);
 
-  // First run on this browser: adopt the naming template that fits the
-  // user's existing playlists (no-op once a template has been chosen).
+  // Settings live in Postgres per account; localStorage is only a cache.
+  const { ready: settingsReady } = useSettingsSync(authData?.loggedIn === true);
+
+  // First run for this account: adopt the naming template that fits the
+  // user's existing playlists (no-op once a template has been chosen - wait
+  // for the account's saved settings, which may already have one).
   const needsTemplateDetection = useSelector((s) => s.naming.needsDetection);
   useEffect(() => {
-    if (playlistsData && needsTemplateDetection) {
+    if (playlistsData && settingsReady && needsTemplateDetection) {
       dispatch(detectedTemplate(detectTemplate(playlistsData.map((p) => p.title))));
     }
-  }, [playlistsData, needsTemplateDetection, dispatch]);
+  }, [playlistsData, settingsReady, needsTemplateDetection, dispatch]);
 
   function login() {
     window.location.href = `${API_BASE}/oauth2/authorization/google`;
