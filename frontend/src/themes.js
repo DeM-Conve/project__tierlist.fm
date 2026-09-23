@@ -25,13 +25,6 @@ export const THEMES = {
     border: '#2a2e38', borderSoft: '#20232b',
     text: '#eceef3', textDim: '#9ba1ad', textFaint: '#5f6573',
   },
-  midnight: {
-    label: 'Midnight',
-    scheme: 'dark',
-    bg: '#0a0f1e', surface: '#10172b', surface2: '#161f3a', surface3: '#1e2949',
-    border: '#253157', borderSoft: '#1a2443',
-    text: '#e8eefc', textDim: '#9aa8c7', textFaint: '#5c6a8a',
-  },
   oled: {
     label: 'Pure black',
     scheme: 'dark',
@@ -39,6 +32,7 @@ export const THEMES = {
     border: '#262626', borderSoft: '#181818',
     text: '#fafafa', textDim: '#a1a1a1', textFaint: '#5e5e5e',
   },
+  // The app's original look (pair with the Amber accent for the exact original).
   charcoal: {
     label: 'Warm charcoal',
     scheme: 'dark',
@@ -60,6 +54,15 @@ export const THEMES = {
     border: '#d9ccb6', borderSoft: '#e9dfce',
     text: '#241d14', textDim: '#6d6150', textFaint: '#a39580',
   },
+  // Ethan Schoonover's Solarized Light palette (base3/base2 backgrounds,
+  // base02/base01/base1 text).
+  solarized: {
+    label: 'Solarized Light',
+    scheme: 'light',
+    bg: '#fdf6e3', surface: '#fffbee', surface2: '#eee8d5', surface3: '#e4dcc3',
+    border: '#d6cdb2', borderSoft: '#e9e2cc',
+    text: '#073642', textDim: '#586e75', textFaint: '#93a1a1',
+  },
 };
 
 // 10-shade scales (0 = lightest). `onDark` / `onLight` = which shade is used
@@ -80,6 +83,12 @@ export const ACCENTS = {
     label: 'Cyan',
     scale: ['#e3fafc', '#c5f6fa', '#99e9f2', '#66d9e8', '#3bc9db', '#22b8cf', '#15aabf', '#1098ad', '#0c8599', '#0b7285'],
     onDark: 5, onLight: 8, textDark: 4, textLight: 8,
+  },
+  // The original accent (amber) - sits between T2 and T3, so it's opt-in.
+  amber: {
+    label: 'Amber',
+    scale: ['#fdf3e0', '#f7e6c2', '#f0d5a0', '#e9c37d', '#e2b15c', '#d6a24c', '#c48f3a', '#a97a2f', '#8a6326', '#6b4c1d'],
+    onDark: 5, onLight: 7, textDark: 5, textLight: 8,
   },
   mono: {
     label: 'Mono',
