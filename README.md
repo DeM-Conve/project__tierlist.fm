@@ -43,6 +43,12 @@ docker compose -f docker-compose.local.yml up
 
 This mounts your source code into containers running `mvn spring-boot:run` and `npm run dev` directly.
 
+Backend tests (unit + integration against a throwaway Postgres; needs Docker):
+
+```bash
+cd backend && mvn verify
+```
+
 ## 4. Run without Docker (alternative)
 
 Backend (needs a Postgres at `localhost:5432`, db/user/password `yt` by default -

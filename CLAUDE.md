@@ -76,18 +76,50 @@ auto-grouped into a tier board per category.
 - **Database**: **Postgres 17** (the `db` compose service, data in the `pgdata`
   volume), accessed via **Spring Data JPA**, schema owned by **Flyway**
   (`backend/src/main/resources/db/migration/V*__*.sql`; Hibernate is `ddl-auto:
-  validate` only). **Proper typed schemas, no JSON/`jsonb` blob columns** (the user's
-  explicit call) - a new setting is a new column in a new `V<n>__...sql` migration +
-  entity field + `SettingsDto` field, never an edit to an applied migration.
+  validate` only). **Proper typed schemas, no JSON/`jsonb` blob columns, and every
+  closed option set is a native Postgres `ENUM`, never a free VARCHAR** (the user's
+  explicit calls). **Not in production yet**: while that's true, change `V1` in place
+  and reset the dev volume (`docker compose down && docker volume rm
+  project__yt_pgdata`) instead of stacking migrations; once it ships, never edit an
+  applied migration.
   Tables: `app_user` (Google `sub` as id, recorded on every login by the success
-  handler in `SecurityConfig`) and `user_settings` (one row per user: theme, accent,
-  tier_palette, naming_template, naming_migrating_from, duel_strategy), served by
-  `GET/PUT /api/settings` (`user/SettingsController`). Frontend side:
-  `api/useSettingsSync.js` (called in `App()`) loads the row into the `appearance`/
-  `naming`/`prefs` slices via the `settingsLoaded` action, uploads this browser's
-  settings when the account has no row yet, and PUTs changes (debounced).
-  localStorage (`settings.js`) is only a boot cache so the theme applies before first
-  paint - the account's row wins.
+  handler in `SecurityConfig`) and `user_settings` (one row per user: `theme_option`,
+  `accent_option`, `tier_palette_option`, `duel_strategy_option` enums, the naming
+  template (+ CHECK constraints) and a `version`). Backend package
+  `fm.tierlist.settings`, layered and SOLID:
+  - enums `Theme`/`Accent`/`TierPalette`/`DuelStrategy`: constant name = Postgres
+    enum label (Hibernate `@JdbcTypeCode(SqlTypes.NAMED_ENUM)` + `columnDefinition`
+    naming the type so `validate` matches), `@JsonValue key()` = the frontend's id
+    (`tokyo`, `tierAwareMerge`) - the API speaks frontend keys, the DB its labels;
+  - `@Embeddable` records `Appearance`/`Naming`/`Prefs` (same grouping as the Redux
+    slices) inside the `UserSettings` entity; `SettingsDto` is the separate wire
+    contract with `from()`/`toX()` conversions (the DTO depends on the domain, never
+    the reverse);
+  - `@NamingTemplate` is a Bean Validation constraint mirroring `naming.js`
+    `validateTemplate` - keep the two grammars in step;
+  - `SettingsController` (thin, HTTP only) -> `SettingsService` (transactions, rules)
+    -> `UserSettingsRepository`;
+  - **conditional writes** (RFC 9110): the row's `@Version` is its `ETag`; a PUT must
+    send `If-Match: "<version>"` or `If-None-Match: *` (first save) - the sealed
+    `WritePrecondition` - else 428; stale -> 412 (`SettingsConflictException`, also
+    for lost `@Version`/insert races via `SettingsExceptionHandler`). Errors are
+    RFC 9457 ProblemDetail (`spring.mvc.problemdetails.enabled`).
+  Adding a setting: column (or enum type + column) in the migration, field in the
+  right embeddable + `SettingsDto`, one entry in the frontend's
+  `api/settingsMapping.js` `SCHEMA`. Adding an *option* (new theme etc.): enum label
+  in the migration, Java constant, and the frontend catalogue entry - the three
+  must match or the API rejects it (400).
+  Frontend side: `api/useSettingsSync.js` (called in `App()`) loads the row into the
+  `appearance`/`naming`/`prefs` slices via the `settingsLoaded` action, uploads this
+  browser's settings when the account has no row yet, PUTs changes (debounced, one
+  in flight) and on 412 refetches and `rebase()`s (three-way merge: this browser's
+  edits on top of the newer row). localStorage (`settings.js`) is only a boot cache
+  so the theme applies before first paint - the account's row wins.
+- **Backend tests**: `mvn verify` - unit tests (`*Test`, surefire) plus
+  Testcontainers integration tests (`*IT`, failsafe) against a real `postgres:17-alpine`
+  (needs Docker; `testcontainers.version` is pinned in `pom.xml` because Boot 3.3's
+  is too old for current Docker engines). New persistence/API behaviour gets an IT,
+  not a mock. The Docker image build skips tests.
 - **Deploy**: Docker Compose. `docker-compose.yml` (prod-style multi-stage builds) and
   `docker-compose.local.yml` (dev, volume-mounted). Rebuilding either container clears
   the backend's in-memory session, so you'll need to log in again after a redeploy.

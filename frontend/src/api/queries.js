@@ -90,22 +90,32 @@ export function useCreatePlaylistsMutation() {
   });
 }
 
-// The account's saved settings (Postgres `user_settings` row): `{ theme,
-// accent, tierPalette, namingTemplate, namingMigratingFrom, duelStrategy }`,
-// or null if the account has never saved any (204). Loaded once per session;
-// useSettingsSync keeps it up to date from Redux.
+// The account's saved settings (Postgres `user_settings` row) as
+// `{ settings, etag }`: settings is `{ appearance, naming, prefs }` (backend
+// SettingsDto) or null if the account has never saved (204); etag is the
+// row's version, which every save must quote back (see useSettingsSync).
 export function useSettingsQuery(enabled) {
   return useQuery({
     queryKey: ['settings'],
-    queryFn: async () => (await api.get('/api/settings')).data || null,
+    queryFn: async () => {
+      const res = await api.get('/api/settings');
+      return { settings: res.status === 204 ? null : res.data, etag: res.headers.etag ?? null };
+    },
     enabled,
     staleTime: Infinity,
     retry: 1,
   });
 }
 
-export function useSaveSettingMutation() {
+// Conditional save: `If-Match: <etag>` updates the version we last saw,
+// `If-None-Match: *` creates the account's first row. Fails with 412 when
+// someone else saved in between - the caller merges and retries.
+export function useSaveSettingsMutation() {
   return useMutation({
-    mutationFn: async (settings) => (await api.put('/api/settings', settings)).data,
+    mutationFn: async ({ settings, etag }) => {
+      const headers = etag ? { 'If-Match': etag } : { 'If-None-Match': '*' };
+      const res = await api.put('/api/settings', settings, { headers });
+      return { settings: res.data, etag: res.headers.etag ?? null };
+    },
   });
 }
