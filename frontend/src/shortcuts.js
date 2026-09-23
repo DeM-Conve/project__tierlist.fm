@@ -50,7 +50,7 @@ export const SHORTCUTS = [
     commandId: 'action-sync',
   },
 
-  { id: 'add-file', keys: ['1-5'], description: 'Put the song in T1…TZ of the shown board', category: 'Add songs' },
+  { id: 'add-file', keys: ['Shift', '1-5'], description: 'Put the song in T1…TZ of the shown board (plain digits still seek)', category: 'Add songs' },
   { id: 'add-later', keys: ['t'], description: 'Save it to the board’s TODO list for later', category: 'Add songs' },
   { id: 'add-listen', keys: ['Enter'], description: 'Listen (putting the playing song in a tier plays the next)', category: 'Add songs' },
   { id: 'add-skip', keys: ['s'], description: 'Skip to the next waiting song', category: 'Add songs' },

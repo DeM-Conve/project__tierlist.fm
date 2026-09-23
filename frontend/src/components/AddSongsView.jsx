@@ -129,7 +129,7 @@ function SongInput({ inputRef, onAddLinks }) {
 
 // "Add songs": bring a new song in (paste its link), then one
 // keypress puts it in a tier of the guessed board. Keys while the card is
-// up: 1-5 tier, t Later (the board's TODO list), s skip, x remove, Enter
+// up: Shift+1-5 tier, t Later (the board's TODO list), s skip, x remove, Enter
 // listen, b another board, u undo, / or a back to the input.
 export default function AddSongsView({ addSongs, actions, onAddLinks }) {
   const dispatch = useDispatch();
@@ -163,9 +163,11 @@ export default function AddSongsView({ addSongs, actions, onAddLinks }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [playingId]);
 
-  // Capture phase + stopImmediatePropagation: here 1-5 put a song in a tier
-  // instead of the player's seek-to-percent, and u / Ctrl+Z undo these adds
-  // instead of board edits. Not while the full-screen player covers the page.
+  // Shift+1-5 puts the song in a tier - the same key that rates the playing
+  // song everywhere else, so plain digits stay the player's seek-to-percent.
+  // Capture phase + stopImmediatePropagation so Shift+digit / u / Ctrl+Z act
+  // on this card, not on a board song that happens to be playing. Not while
+  // the full-screen player covers the page.
   useEffect(() => {
     function onKeyDown(e) {
       if (isSequenceKey(e)) return;
@@ -200,7 +202,8 @@ export default function AddSongsView({ addSongs, actions, onAddLinks }) {
         actions.listen(current);
       } else if (where || !guess) {
         return;
-      } else if (e.code.startsWith('Digit')) {
+      } else if (e.shiftKey && e.code.startsWith('Digit')) {
+        // e.code, not e.key: with Shift held e.key is "!", "@", ...
         const tier = TIER_ORDER[Number(e.code.slice(5)) - 1];
         if (!tier) return;
         claim();
@@ -231,7 +234,7 @@ export default function AddSongsView({ addSongs, actions, onAddLinks }) {
           Add a song
         </Title>
         <Text c="dimmed" fz="sm">
-          Paste its YouTube link, then press <Kbd size="xs">1</Kbd>–<Kbd size="xs">5</Kbd> to put it in a tier. <Kbd size="xs">Ctrl</Kbd> <Kbd size="xs">V</Kbd> with a link works on any page.
+          Paste its YouTube link, then press <Kbd size="xs">Shift</Kbd> + <Kbd size="xs">1</Kbd>–<Kbd size="xs">5</Kbd> to put it in a tier. <Kbd size="xs">Ctrl</Kbd> <Kbd size="xs">V</Kbd> with a link works on any page.
         </Text>
       </Stack>
 
@@ -323,7 +326,7 @@ export default function AddSongsView({ addSongs, actions, onAddLinks }) {
                       <TierTarget
                         key={tier}
                         tier={tier}
-                        hotkey={i + 1}
+                        hotkey={`⇧${i + 1}`}
                         disabled={!board[tier]}
                         onClick={() => actions.file(current, guess.category, tier)}
                       />
