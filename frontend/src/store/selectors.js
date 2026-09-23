@@ -1,6 +1,8 @@
 import { createSelector } from '@reduxjs/toolkit';
 import { BOARD_TIERS, REMOVED_TIER, TIER_ORDER, groupByTier } from '../tiers';
 import { parseTitle } from '../naming';
+import { boardsOf, resolveTodoLists } from '../todoLists';
+import { TODO_TIER } from '../tiers';
 
 const selectPlaylists = (state) => state.auth.playlists;
 const selectTierItems = (state) => state.tiers.tierItems;
@@ -14,11 +16,13 @@ const selectLoadedCategory = (state) => state.tiers.loadedCategory;
 
 const selectNamingTemplate = (state) => state.naming.template;
 const selectMigratingFrom = (state) => state.naming.migratingFrom;
+const selectTodoKeyword = (state) => state.naming.todoKeyword;
+const selectTodoLinks = (state) => state.naming.todoLinks;
 
 // The only playlists the app ever shows: those whose title follows the
 // naming template (anything else - e.g. a private playlist - stays hidden
 // everywhere). Each gets `.parsed` = { bracket, category, tier, template }.
-export const selectTierPlaylists = createSelector(
+const selectRankedPlaylists = createSelector(
   [selectPlaylists, selectNamingTemplate, selectMigratingFrom],
   (playlists, template, migratingFrom) => {
     if (!playlists) return null;
@@ -27,6 +31,33 @@ export const selectTierPlaylists = createSelector(
       const parsed = parseTitle(p.title, templates);
       return parsed ? [{ ...p, parsed }] : [];
     });
+  }
+);
+
+// Every to-do list candidate (keyword in the name, or linked by hand) and
+// where it landed - see todoLists.js. Settings -> To-do lists lists these.
+export const selectTodoRows = createSelector(
+  [selectPlaylists, selectRankedPlaylists, selectTodoKeyword, selectTodoLinks],
+  (playlists, ranked, keyword, links) => {
+    if (!playlists || !ranked) return [];
+    const rankedIds = new Set(ranked.map((p) => p.id));
+    return resolveTodoLists(
+      playlists.filter((p) => !rankedIds.has(p.id)),
+      { keyword, links, boards: boardsOf(ranked) }
+    );
+  }
+);
+
+// Ranked tier playlists plus each board's to-do list (parsed.tier = TODO,
+// parsed.via = 'link' | 'name'), so boards pick it up like any tier.
+export const selectTierPlaylists = createSelector(
+  [selectRankedPlaylists, selectTodoRows],
+  (ranked, todoRows) => {
+    if (!ranked) return null;
+    const todo = todoRows
+      .filter((r) => r.status === 'active')
+      .map((r) => ({ ...r.playlist, parsed: { bracket: null, category: r.category, tier: TODO_TIER, via: r.via } }));
+    return [...ranked, ...todo];
   }
 );
 

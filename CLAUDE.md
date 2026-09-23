@@ -85,7 +85,10 @@ auto-grouped into a tier board per category.
   Tables: `app_user` (Google `sub` as id, recorded on every login by the success
   handler in `SecurityConfig`) and `user_settings` (one row per user: `theme_option`,
   `accent_option`, `tier_palette_option`, `duel_strategy_option` enums, the naming
-  template (+ CHECK constraints) and a `version`), and `inbox_dismissal` (user +
+  template and to-do keyword (+ CHECK constraints) and a `version`), `todo_list_link`
+  (playlist id -> board, part of the settings row: an `@ElementCollection` excluded
+  from Hibernate's auto-versioning - it bumped the version on insert - so
+  `SettingsService` force-increments when links change), and `inbox_dismissal` (user +
   video id: liked videos marked "Not a song" in the Inbox; package
   `fm.tierlist.inbox`). Backend package
   `fm.tierlist.settings`, layered and SOLID:
@@ -189,6 +192,12 @@ auto-grouped into a tier board per category.
   between, `TIER_ORDER` for ranking only (duels, dedupe priority, "missing tiers",
   player Shift+digit rating). Triage (`focusSlice.isTriage`) auto-advances in
   `tierActions.moveWithFeedback` when the playing to-do song is rated.
+  To-do lists are **not** matched by the naming template: `src/todoLists.js`
+  finds them by keyword (whole word, anywhere, any case; `naming.todoKeyword`)
+  + the rest of the name = a board name (+ tag), or an explicit link
+  (`naming.todoLinks`, backend `todo_list_link` table). `selectTierPlaylists`
+  merges them in with `parsed.tier = 'TODO'`; `selectTodoRows` lists every
+  candidate for Settings. Keep `validateTodoKeyword` and `@TodoKeyword` in step.
 - **Duel ranking uses the Strategy pattern** (`frontend/src/duel/`): multiple
   interchangeable ranking algorithms (`tierAwareMerge` default, `mergeSort`, `elo`)
   behind a common interface, swappable at runtime from the duel screen or persisted as a
