@@ -22,16 +22,16 @@
 - (Replaced) the old "redirect to the first board on first login" - Home now leads with your boards, which is what that redirect existed for.
 - Open a playlist to see its videos as a numbered list (thumbnail, title, channel, opens on YouTube); a tier playlist shows its tier and an "Open the <board> tier list" button.
 
-## Inbox (adding new songs)
-- `/inbox`: songs you **liked on YouTube / YouTube Music** (the 300 most recent likes, keeping only videos YouTube files under Music - clips, shorts and talks stay out) that aren't on any board yet, one big card at a time - liking a song is the "add" step, filing it is one keypress. Sidebar "Inbox" link with a count badge, a card on Home, a command-palette entry.
-- The board is **guessed from the artist** (the board with the most songs by them; else the board the last song went to), shown with the reason; `b` or the picker changes it.
-- `1`-`5` (or click the big tier buttons) files the song straight into that tier on YouTube - no pending step, since it wasn't on a board. `t` saves it to the board's TODO list ("Later") when the board has one. `s` skips (to the back), `x` "Not a song" hides it for good (saved per account in Postgres), `u` / `Ctrl+Z` / the toast's Undo reverts the last one (deletes the added playlist item).
-- `Enter` / clicking the cover plays it in the mini player; filing the playing song plays the next one, and when a song ends by itself the card follows.
-- **Paste a YouTube link anywhere** (`Ctrl+V` outside a text box, or the paste box on the Inbox): watch / youtu.be / music / shorts links all work. A new song jumps to the front of the Inbox; one already on a board just says where it is.
-- Up next strip below the card (click to jump). Loading shows progress while every tier playlist is checked; empty state is "Inbox zero".
+## Add songs (bringing a new song in)
+- `/add` (sidebar "Add songs", `a` from anywhere, Home's "Add songs" button, command palette): **paste a YouTube / YouTube Music link** - or several at once (one per line / space-separated; watch, youtu.be, music, shorts links). Links only: there is no YouTube search, since a search costs 100 API quota units and a pasted link 1.
+- **`Ctrl+V` with a link on any page** (outside a text box) adds it and opens Add songs; anything that isn't a link says so.
+- Each added song becomes a card: cover (click / `Enter` to listen in the mini player), song + artist, the **board guessed from the artist** (from boards already loaded this session; else where the last one went; `b` / the picker changes it) and big tier buttons: `Shift+1`-`5` (same key as rating anywhere else; plain digits still seek) puts it straight into that tier on YouTube, `t` "Later" = the board's TODO list. `s` skips, `x` removes it from the waiting list, `/` or `a` back to the input. Putting the playing song in a tier plays the next waiting one.
+- A song it knows is already in a tier shows "Already in <board> · <tier>" with Open it / Dismiss; one that slips through is auto-deduped when its board is opened.
+- "Waiting" strip (click to jump) and an "Added this session" list with per-row Undo; `u` / `Ctrl+Z` / the toast's Undo takes the last one out of its playlist again.
+- Errors say what YouTube actually said (daily quota used up, login expired, video not found) instead of a generic failure.
 
 ## Sidebar
-- Brand, "Jump to… ⌘K" (command palette), Home, Inbox (with a count of liked songs waiting), and every board with its video total (from playlist item counts - no per-board fetch). Filter box, empty-state hint explaining the playlist naming convention.
+- Brand, "Jump to… ⌘K" (command palette), Home, Add songs (with a count of songs waiting for a tier), and every board with its video total (from playlist item counts - no per-board fetch). Filter box, empty-state hint explaining the playlist naming convention.
 - Footer: Settings, Keyboard shortcuts (`?`), Log out. On narrow screens the sidebar is a drawer opened from a burger button.
 
 ## Tier boards (the tier list)
@@ -135,7 +135,9 @@ Swappable at runtime via a dropdown on the duel screen (and persisted as a defau
 
 ## Keyboard shortcuts (full list)
 Source of truth is `frontend/src/shortcuts.js` (rendered by the `?` modal and Settings → Keyboard shortcuts) - keep this list in sync with it.
-- Global: `Ctrl/Cmd+K` command palette, `?` shortcut help, `Ctrl/Cmd+Z` undo last tier edit.
+- Global: `Ctrl/Cmd+K` command palette, `?` shortcut help, `Ctrl/Cmd+Z` undo last tier edit, `Ctrl+V` paste YouTube link(s) (outside a text box) to add them via Add songs.
+- Navigation (Vimium-style, anywhere outside a text box): `f` **link hints** - every visible clickable gets a letter label, type it to click/focus (`Backspace` edits, `Esc`/scroll/click cancels); `o` command palette; `a` Add songs; `g h` Home, `g s` Settings, `g u` up one level (tier page → board → Home), `g b` this board, `g p` playing song's board, `g t` its TODO list, `g d` duel; `[` / `]` previous/next board; `H` / `L` back/forward; `g g` / `G` top/bottom; `y y` copy the playing song's YouTube link. The key after a `g`/`y` prefix is never also taken by a page shortcut.
+- Add songs: `Shift+1`-`5` put in T1…TZ, `t` save to TODO, `Enter` listen, `s` skip, `x` remove, `b` pick board, `/` or `a` the input, `u` / `Ctrl+Z` undo.
 - Tier board: `/` search, `n` / `N` next/previous match, `Enter` play match (or step), `Esc` close search, `Shift+P` push to YouTube (any board page).
 - Tier page: `/` filter, `Esc` clear the filter.
 - Player: `h` / `l` prev/next track, `←`/`→` seek 10s (expanded), `Space` play/pause, `m` mute, `0`-`9` jump to that 10%, `j` minimize (expanded → mini → floating), `k` expand, `Esc` minimize from expanded, `Shift+1`-`9` rate the playing video (any mode, on its board), `Del` remove it from its playlist (staged until push).
