@@ -3,7 +3,7 @@ import { useSelector } from 'react-redux';
 import { Alert, Autocomplete, Button, Chip, Group, Modal, SegmentedControl, Stack, Text, TextInput } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 import { TIER_ORDER } from '../tiers';
-import { parseTitle, renderTitle } from '../naming';
+import { normalizeTemplate, parseTitle, renderTitle } from '../naming';
 import { selectTierGroups, selectTierPlaylists } from '../store/selectors';
 import { useCreatePlaylistsMutation } from '../api/queries';
 import { TierChip } from './TierBits';
@@ -32,7 +32,7 @@ export default function CreateTierPlaylistsModal({ opened, onClose, category: fi
   const [privacy, setPrivacy] = useState('private');
 
   const name = (fixedCategory ?? category).trim();
-  const usesBracket = template.includes('{bracket}');
+  const usesBracket = normalizeTemplate(template).includes('{tag}');
   const titles = tiers
     .filter((t) => !existingTiers.includes(t))
     .sort((a, b) => TIER_ORDER.indexOf(a) - TIER_ORDER.indexOf(b))
@@ -78,12 +78,12 @@ export default function CreateTierPlaylistsModal({ opened, onClose, category: fi
         )}
         {usesBracket && (
           <Autocomplete
-            label="Bracket"
-            description="Group tag in the name (optional)"
+            label="Tag"
+            description="The label your template puts in the name, e.g. G"
             data={brackets}
             value={bracket}
             onChange={setBracket}
-            error={name && unrecognised.length ? 'Your naming template needs a bracket here' : null}
+            error={name && unrecognised.length ? 'Your naming template needs a tag here' : null}
           />
         )}
         <div>

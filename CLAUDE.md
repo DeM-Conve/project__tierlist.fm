@@ -119,6 +119,9 @@ auto-grouped into a tier board per category.
   result or drag on every board/duel round-trip. Don't refetch tier-board data on mount
   without checking `loadedCategory` first.
 - **Playlist names follow the user's naming template (`src/naming.js`, `namingSlice`).**
+  The default is generic (`{category} {tier}`); the `[G]`/`[GA]`/`[GO]` tag prefix is the
+  user's personal convention, not something to assume for everyone - it's the optional
+  `{tag}` token, auto-detected on first run (`detectTemplate`).
   Never parse playlist titles with an ad-hoc regex - use `parseTitle`/`renderTitle`,
   and read playlists through `selectTierPlaylists` (template-matching only, each with
   `.parsed`), never `state.auth.playlists` directly in UI: non-matching playlists are

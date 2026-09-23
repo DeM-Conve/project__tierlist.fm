@@ -37,6 +37,8 @@ import SettingsView from './components/SettingsView';
 import ShortcutsModal from './components/ShortcutsModal';
 import LoginView from './components/LoginView';
 import { setLoggedIn, setPlaylists } from './store/authSlice';
+import { detectedTemplate } from './store/namingSlice';
+import { detectTemplate } from './naming';
 import { setCurrentCategory, setQuery, setMobileSidebarOpen } from './store/viewSlice';
 import {
   resetTierBoard,
@@ -139,6 +141,15 @@ export default function App() {
   useEffect(() => {
     if (playlistsData) dispatch(setPlaylists(playlistsData));
   }, [playlistsData, dispatch]);
+
+  // First run on this browser: adopt the naming template that fits the
+  // user's existing playlists (no-op once a template has been chosen).
+  const needsTemplateDetection = useSelector((s) => s.naming.needsDetection);
+  useEffect(() => {
+    if (playlistsData && needsTemplateDetection) {
+      dispatch(detectedTemplate(detectTemplate(playlistsData.map((p) => p.title))));
+    }
+  }, [playlistsData, needsTemplateDetection, dispatch]);
 
   function login() {
     window.location.href = `${API_BASE}/oauth2/authorization/google`;

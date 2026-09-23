@@ -19,8 +19,8 @@ import {
 } from '@mantine/core';
 import { modals } from '@mantine/modals';
 import { notifications } from '@mantine/notifications';
-import { AlertTriangle, ArrowRight, CheckCircle2, Play, RotateCcw } from 'lucide-react';
-import { TEMPLATE_PRESETS, TOKENS, parseTitle, renderTitle, validateTemplate } from '../naming';
+import { AlertTriangle, ArrowRight, CheckCircle2, Play, RotateCcw, Wand2 } from 'lucide-react';
+import { TEMPLATE_PRESET_GROUPS, TOKENS, detectTemplate, normalizeTemplate, parseTitle, renderTitle, validateTemplate } from '../naming';
 import { finishMigration, setTemplate, startMigration } from '../store/namingSlice';
 import { selectTierPlaylists } from '../store/selectors';
 import { useInvalidatePlaylists, useRenamePlaylistsMutation } from '../api/queries';
@@ -37,11 +37,13 @@ export default function PlaylistNamingSettings() {
   const activeTemplate = useSelector((s) => s.naming.template);
   const migratingFrom = useSelector((s) => s.naming.migratingFrom);
   const tierPlaylists = useSelector(selectTierPlaylists);
+  const allPlaylists = useSelector((s) => s.auth.playlists);
   const renameMutation = useRenamePlaylistsMutation();
   const invalidatePlaylists = useInvalidatePlaylists();
   const inputRef = useRef(null);
 
-  const [draft, setDraft] = useState(activeTemplate);
+  const [draft, setDraftRaw] = useState(activeTemplate);
+  const setDraft = (v) => setDraftRaw(normalizeTemplate(v));
   const [job, setJob] = useState(null); // { done, total, failed: [{from,to,error}] , running }
 
   const errors = validateTemplate(draft);
@@ -71,7 +73,7 @@ export default function PlaylistNamingSettings() {
         const back = parseTitle(r.to, [draft]);
         return !back || back.category !== r.parsed.category || back.tier !== r.parsed.tier;
       });
-  const dropsBracket = !draft.includes('{bracket}') && plan.some((r) => r.parsed.bracket);
+  const dropsBracket = !draft.includes('{tag}') && plan.some((r) => r.parsed.bracket);
   const quota = changes.length * QUOTA_PER_RENAME;
   const example = plan[0];
   const running = job?.running;
@@ -190,16 +192,29 @@ export default function PlaylistNamingSettings() {
             <Text fw={600} fz="sm">
               Template
             </Text>
+            <Group gap="xs">
+            <Tooltip label="Pick the preset that fits the names your playlists already have" withArrow>
+              <Button
+                size="xs"
+                variant="default"
+                leftSection={<Wand2 size={13} />}
+                onClick={() => allPlaylists && setDraft(detectTemplate(allPlaylists.map((p) => p.title)))}
+                disabled={!allPlaylists || !!migratingFrom || running}
+              >
+                Detect from my playlists
+              </Button>
+            </Tooltip>
             <Select
               size="xs"
               w={280}
               placeholder="Start from a preset…"
-              data={TEMPLATE_PRESETS}
+              data={TEMPLATE_PRESET_GROUPS}
               value={null}
               onChange={(v) => v && setDraft(v)}
               disabled={!!migratingFrom || running}
               comboboxProps={{ withinPortal: true }}
             />
+            </Group>
           </Group>
           <TextInput
             ref={inputRef}
@@ -246,7 +261,7 @@ export default function PlaylistNamingSettings() {
 
       {!errors.length && dropsBracket && (
         <Alert color="yellow" icon={<AlertTriangle size={18} />}>
-          This template has no <Code>{'{bracket}'}</Code>, so tags like [G] / [GA] are dropped from the names for good.
+          This template has no <Code>{'{tag}'}</Code>, so tags like [G] / [GA] are dropped from the names for good.
         </Alert>
       )}
       {unrecognised.length > 0 && (
@@ -261,7 +276,7 @@ export default function PlaylistNamingSettings() {
         <Alert color="red" icon={<AlertTriangle size={18} />} title="Two playlists would get the same name">
           <Text fz="sm">
             {collisions.slice(0, 3).join(', ')}
-            {collisions.length > 3 ? ` and ${collisions.length - 3} more` : ''} - add {'{bracket}'} or another token so
+            {collisions.length > 3 ? ` and ${collisions.length - 3} more` : ''} - add {'{tag}'} or other text so
             names stay unique.
           </Text>
         </Alert>
