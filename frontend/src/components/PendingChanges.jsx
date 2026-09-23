@@ -24,7 +24,7 @@ function ChangeRow({ move, first, onRevert }) {
           {song}
         </Text>
         <Text fz="xs" c="dimmed" truncate="end">
-          {move.kind === 'dedupe' ? `${artist} · duplicate` : artist}
+          {move.kind === 'dedupe' ? `${artist} · duplicate copy` : artist}
         </Text>
       </Box>
       {move.kind === 'move' ? (
@@ -34,28 +34,29 @@ function ChangeRow({ move, first, onRevert }) {
           <TierChip tier={move.to} size={20} />
         </Group>
       ) : (
-        // A deletion names the exact copy going away (outlined chip) and,
-        // for a duplicate, the tier that keeps the song (solid chip) - so
-        // it's obvious nothing is lost.
+        // A deletion reads as a sentence: "Remove from [TODO] · already in
+        // [T2]" for a duplicate (so it's obvious nothing is lost), "Remove
+        // from [T3]" for a plain removal.
         <Tooltip
           label={
             move.kind === 'dedupe'
-              ? `On YouTube this song is in both ${move.tier} and ${move.keptTier}. Pushing deletes the ${move.tier} copy; it stays in ${move.keptTier}.`
-              : `Pushing deletes this song from ${move.from}.`
+              ? `This song is in both ${move.tier} and ${move.keptTier} on YouTube. Pushing removes it from ${move.tier} only - it stays in ${move.keptTier}.`
+              : `Pushing removes this song from ${move.from}.`
           }
           withArrow
           multiline
           maw={260}
         >
           <Group gap={6} wrap="nowrap" flex="none">
-            <Badge size="sm" variant="light" color="red" leftSection={<Trash2 size={11} />}>
-              Delete
-            </Badge>
+            <Trash2 size={13} color="var(--mantine-color-red-filled)" />
+            <Text fz="xs" c="red" fw={600}>
+              Remove from
+            </Text>
             <TierChip tier={move.kind === 'dedupe' ? move.tier : move.from} size={20} active={false} />
             {move.kind === 'dedupe' && (
               <>
                 <Text fz="xs" c="dimmed" ml={4}>
-                  kept in
+                  · already in
                 </Text>
                 <TierChip tier={move.keptTier} size={20} />
               </>
