@@ -14,6 +14,10 @@
 - Playlists named `[G]/[GA]/[OG] <Category> T1/T2/T3/TE/TZ` are auto-grouped into a per-category tier board.
 - Sidebar lists every detected category as a "tier board," alongside a plain "Playlists" view and a filter box.
 - Each board renders as colored tier rows (T1 → TZ) filled with the real videos from each underlying playlist.
+- Each tier row shows its video count (or `matches/total` while searching) and its own per-tier shuffle-play button.
+- Every thumbnail has a hover "Open on YouTube" link (opens in a new tab without starting the in-app player).
+- Loading tiers show Mantine `Skeleton` placeholders; an empty tier shows a "Drop videos here" target.
+- Vim-style `/` search: `/` opens a find box (the `/` is part of the box's text - deleting it cancels), each tier filters down to its matches, `Enter`/`n` next match, `Shift+Enter`/`N` previous, `Enter` on a single match plays it, `Esc` closes. The active match is scrolled into view and highlighted.
 
 ## Drag-and-drop tier editing
 - Drag a video from one tier row to another, or reorder it within the same row.
@@ -25,6 +29,8 @@
 - Clicking "N pending" opens a popup itemizing every staged change (video, from tier → to tier, or a duplicate removal - see below).
 - "Push to YouTube" calls the backend, which inserts each video into its new playlist before removing it from the old one (so a failed delete never loses a video). Partial failures are reported per item.
 - "Discard" reverts the board back to what's actually on YouTube.
+- `Shift+P` pushes pending changes (only when there are any), same as the button / palette action.
+- Sync result feedback: "Synced", "Some failed", or "Sync failed" badge next to the controls.
 
 ## Duplicate cleanup
 - If the same video genuinely exists in two of a board's real tier playlists at once, the lower-tier copy is automatically staged as a pending removal (kept: the highest tier it's in; removed: every other copy) - no manual action needed to flag it.
@@ -41,6 +47,8 @@
 
 ## Shuffle play
 - A "🔀 Shuffle play" button on each tier board opens the focus modal on a random video from that board and auto-advances through a shuffled order (a "🔀 Shuffle" badge marks the session as shuffled). Uses the same auto-advance-on-end and prev/next controls as normal browsing.
+
+- Each tier row also has its own shuffle button that shuffles just that tier.
 
 ## Command palette
 - `Cmd/Ctrl+K` opens a fuzzy-searchable palette to jump straight to any tier board or playlist, or trigger contextual actions (start a duel, sync/discard pending changes) without leaving the keyboard.
@@ -65,6 +73,13 @@ Swappable at runtime via a dropdown on the duel screen (and persisted as a defau
 ## Routing
 - Real, refreshable URLs via the native History API: `/`, `/playlist/<id>`, `/tier/<category>`, `/tier/<category>/duel`, `/settings`.
 - Refreshing or using browser back/forward lands back on the exact board, playlist, or duel you were on.
+
+## Keyboard shortcuts (full list)
+Source of truth is `frontend/src/shortcuts.js` (also rendered by the `?` help modal) - keep this list in sync with it.
+- Global: `Ctrl/Cmd+K` command palette, `?` shortcut help.
+- Tier board: `/` search, `n` / `N` next/previous match, `Enter` play match (or step), `Esc` close search, `Shift+P` push to YouTube.
+- Player: `h` / `l` prev/next track, `←`/`→` seek 10s (expanded), `Space` play/pause, `m` mute, `0`-`9` jump to that 10% (works anywhere), `j` minimize (expanded → mini → floating), `k` expand, `Esc` minimize from expanded, `Shift+1`-`9` move the playing video to that tier.
+- Duel: `←` / `→` pick left/right, `Space` skip, `u` undo.
 
 ## Architecture
 - React (Vite) frontend + Spring Boot (Java 21, Maven) backend, fully separated.
