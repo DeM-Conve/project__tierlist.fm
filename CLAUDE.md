@@ -155,6 +155,14 @@ auto-grouped into a tier board per category.
   just theoretical: navigating to a different tier board replaces `tierItems`, so a
   selector chain rooted in it loses the still-playing video and the dock silently
   unmounts mid-navigation - the snapshot is what actually makes the dock global.
+- **The dock takes real layout space - never overlay it and offset things.** `Layout`
+  is a `100dvh` column: a body row (`Sidebar` | scrolling `<main>` canvas | `TierRail`)
+  above the mini dock, which sits in normal flow as the last row. Nothing is
+  `position: fixed` against the bottom, and nothing measures the dock's height (the old
+  `--player-dock-height` variable undercounted and cut the rail off). The canvas, not the
+  window, is the scroll container - use `useCanvas()` (`layout/canvas.js`) to measure or
+  scroll it. Overlays that must float above the dock (staged-changes bar, mobile drawer)
+  are `position: absolute` against the body row.
 - **Real Document Picture-in-Picture doesn't work for the YouTube iframe embed** -
   moving it into a separate top-level browsing context makes YouTube's embed treat it
   as an unauthorized origin and refuse to play ("owner has disabled embedding"),
