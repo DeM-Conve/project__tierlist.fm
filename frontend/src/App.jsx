@@ -54,6 +54,7 @@ import {
   selectTierGroups,
   selectTierCategories,
   selectPendingMoves,
+  selectPlayingVideoIdOnBoard,
   selectDuelPool,
   selectDuelRuns,
   selectDuelTierSizes,
@@ -488,6 +489,7 @@ function TierBoardPage() {
   const draggedVideoId = useSelector((s) => s.tiers.draggedVideoId);
   const syncStatus = useSelector((s) => s.tiers.syncStatus);
   const pendingMoves = useSelector(selectPendingMoves);
+  const playingVideoId = useSelector(selectPlayingVideoIdOnBoard);
 
   useEffect(() => {
     dispatch(setCurrentCategory(category));
@@ -555,6 +557,10 @@ function TierBoardPage() {
       onThumbDragStart={handleThumbDragStart}
       onThumbDragEnd={handleThumbDragEnd}
       onThumbClick={openFocus}
+      onMoveVideo={(fromTier, toTier, videoId, dropIndex) =>
+        dispatch(moveVideoToTierAction({ fromTier, toTier, videoId, dropIndex }))
+      }
+      playingVideoId={playingVideoId}
       pendingMoves={pendingMoves}
       syncStatus={syncStatus}
       onDiscard={discardChanges}

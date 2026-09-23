@@ -108,7 +108,9 @@ auto-grouped into a tier board per category.
   behind a common interface, swappable at runtime from the duel screen or persisted as a
   default from Settings.
 - Full feature list: `docs/features.md`. Keep it updated when you add a user-facing
-  feature.
+  feature. It doubles as the no-regression checklist (the user asked for this) -
+  before redesigning/rewriting any page, check every item listed for it (and the
+  "Keyboard shortcuts" section) still works afterwards, and update the entries.
 
 ## Pending work (frontend stack migration, in progress)
 

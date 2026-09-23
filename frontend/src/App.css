@@ -1,18 +1,18 @@
 /* Palette variables now live in index.css, alongside the Mantine theme
    built from the same values (src/mantineTheme.js). */
 
-/* Login landing entrance/float motion - Mantine has no keyframe animation
+/* Entrance/float motion (login landing, floating bars) - Mantine has no keyframe animation
    prop, so these two stay as CSS. */
-@keyframes landing-rise {
+@keyframes anim-rise {
   from { opacity: 0; transform: translateY(16px); }
   to { opacity: 1; transform: none; }
 }
-@keyframes landing-float {
+@keyframes anim-float {
   0%, 100% { translate: 0 0; }
   50% { translate: 0 -8px; }
 }
-.landing-rise { animation: landing-rise 0.7s cubic-bezier(0.2, 0.7, 0.2, 1) both; }
-.landing-float { animation: landing-float 5s ease-in-out infinite; }
+.anim-rise { animation: anim-rise 0.7s cubic-bezier(0.2, 0.7, 0.2, 1) both; }
+.anim-float { animation: anim-float 5s ease-in-out infinite; }
 
 /* App shell: fixed sidebar + scrolling canvas */
 .app-shell {
@@ -120,207 +120,25 @@
 .skeleton-card .card-body { display: flex; flex-direction: column; gap: 8px; }
 .skeleton-line { height: 12px; }
 
-/* Tier board detail */
-.tier-board {
-  margin-top: 8px;
-  border: 1px solid var(--border-soft);
-  border-radius: var(--radius);
-  overflow: hidden;
-}
-.tier-row {
-  display: flex;
-  border-bottom: 1px solid var(--border-soft);
-  transition: background 0.12s ease;
-}
-.tier-row:last-child { border-bottom: none; }
-.tier-row-dragover { background: rgba(214, 162, 76, 0.08); }
-.tier-label {
-  flex: 0 0 60px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 3px;
-  font-family: var(--font-display);
-  color: #1a1509;
-  font-weight: 900;
-  font-size: 15px;
-}
-.tier-count {
-  font-family: var(--font-body);
-  font-weight: 600;
-  font-size: 10px;
-  opacity: 0.7;
-}
-.tier-content {
-  flex: 1;
-  display: grid;
-  /* Each of the two explicit rows sizes to its own "auto" content, not a
-     fixed height - a 1-item tier only ever puts something in row 1, so
-     row 2 naturally collapses to 0 instead of reserving dead space for a
-     row that has nothing in it. Only a tier with enough items to actually
-     fill both rows grows to two rows tall. */
-  grid-template-rows: repeat(2, auto);
-  grid-auto-flow: column;
-  /* Without this, implicit "auto" column tracks split any leftover
-     container width evenly between themselves, spreading a handful of
-     140px-wide cards across the full row with huge gaps instead of
-     packing them tightly - max-content pins each column to its actual
-     card width so only `gap` separates them. */
-  grid-auto-columns: max-content;
-  gap: 8px;
-  padding: 10px;
-  overflow-x: auto;
-  background: var(--surface);
-  /* Matches one thumbnail row (140*9/16 image + title caption) so an
-     empty/no-matches row renders at that same height instead of
-     collapsing to nothing. */
-  min-height: 128px;
-  align-items: start;
-}
-/* While the "/" find bar is active, collapse back to a single row: matches
-   change on every keystroke, and a two-row column-flow grid would
-   redistribute which items land in which row/column as they do, which
-   reads far worse mid-search than just a single scrolling line whose
-   scroll position is the only thing that moves. */
-.tier-content-search {
-  grid-template-rows: none;
-  grid-auto-flow: row;
-  display: flex;
-  flex-wrap: nowrap;
-  min-height: 128px;
-  align-items: center;
-}
-.tier-thumb-wrap {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex: 0 0 auto;
-}
-.drop-indicator {
-  flex: 0 0 auto;
-  width: 3px;
-  align-self: stretch;
-  background: var(--accent);
-  border-radius: 2px;
-}
-/* The card's own look (border, background, radius) and its title text
-   (truncation) come from Mantine's Card/Text - these rules are only the
-   drag-and-drop-specific behavior Mantine has no concept of: fixed
-   thumbnail width, grab cursor, and the dim-while-dragging state. */
-.tier-thumb {
-  flex: 0 0 auto;
-  width: 140px;
-  cursor: grab;
-  transition: opacity 0.15s ease, transform 0.1s ease;
-}
-.tier-thumb:active { cursor: grabbing; }
-.tier-thumb-dragging { opacity: 0.35; }
-/* The "/" find bar's result highlighting - a tier's row filters down to
-   just its matches (not just dimmed) so a row of hundreds of videos doesn't
-   need horizontal scrolling to find a hit; the current match (n/N steps
-   through these) gets a stronger halo so it's easy to spot after
-   scrollIntoView. */
-.tier-thumb-search-match { outline: 2px solid var(--accent); outline-offset: -2px; }
-.tier-thumb-search-active {
-  outline: 2px solid var(--accent);
-  box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 35%, transparent);
-}
-.tier-thumb img {
-  width: 100%;
-  aspect-ratio: 16/9;
-  object-fit: cover;
-  display: block;
-  background: var(--surface-2);
-  pointer-events: none;
-}
-/* Positioning only - ActionIcon/Badge supply their own visual styling. */
-.tier-thumb-link {
-  position: absolute;
-  top: 6px;
-  right: 6px;
+/* Tier board lanes - layout/visuals are Mantine props; only what Mantine
+   has no prop for stays here: hover/focus-reveal of a tile's overlay
+   controls (a :hover/:focus-within pseudo-class) and the now-playing
+   equalizer keyframes. */
+.tile { transition: transform 0.12s ease, opacity 0.15s ease; }
+.tile:hover { transform: translateY(-2px); }
+.tile:active { cursor: grabbing; }
+.tile-overlay {
   opacity: 0;
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0.55), transparent 45%, rgba(0, 0, 0, 0.25));
   transition: opacity 0.15s ease;
 }
-.tier-thumb:hover .tier-thumb-link { opacity: 1; }
-.tier-thumb-duplicate-tag {
-  position: absolute;
-  bottom: 6px;
-  left: 6px;
+.tile:hover .tile-overlay,
+.tile:focus-within .tile-overlay { opacity: 1; }
+@keyframes eq-bounce {
+  0%, 100% { transform: scaleY(0.3); }
+  50% { transform: scaleY(1); }
 }
-.tier-thumb-skeleton {
-  flex: 0 0 auto;
-  width: 140px;
-  aspect-ratio: 16/9;
-}
-.tier-empty {
-  color: var(--text-faint);
-  font-size: 13px;
-  margin: 0;
-  padding: 0 8px;
-}
-
-/* Pending-moves popup, opened by clicking the "N pending" button */
-.pending-modal {
-  width: 100%;
-  max-width: 560px;
-  max-height: 70vh;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.5);
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-}
-.pending-panel-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 16px 18px;
-  border-bottom: 1px solid var(--border-soft);
-  flex-shrink: 0;
-}
-.pending-panel-header h2 { margin: 0; }
-.pending-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  overflow-y: auto;
-}
-.pending-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  padding: 9px 16px;
-  border-bottom: 1px dashed var(--border-soft);
-  font-size: 13.5px;
-}
-.pending-row:last-child { border-bottom: none; }
-.pending-title {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  color: var(--text);
-}
-.pending-tiers {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  flex-shrink: 0;
-}
-.tier-chip {
-  font-family: var(--font-display);
-  font-weight: 800;
-  font-size: 11px;
-  color: #1a1509;
-  padding: 2px 7px;
-  border-radius: 4px;
-}
-.pending-arrow { color: var(--text-faint); font-size: 12px; }
-.pending-remove-label { color: var(--danger); font-size: 12px; font-weight: 600; }
+.eq-bar { transform-origin: bottom; animation: eq-bounce 0.9s ease-in-out infinite; border-radius: 1px; }
 
 /* Duel view - everything (layout, card width, card media positioning, the
    VS badge, thumbnail, responsive width) is Mantine components/props or
@@ -364,23 +182,9 @@
     z-index: 35;
   }
   .canvas { padding: 72px 20px calc(32px + var(--player-dock-height)); }
-  .tier-thumb, .tier-thumb-skeleton { width: 112px; }
   .player-dock-expanded .player-dock-card { width: 94vw; }
   .focus-nav { display: none; }
   .player-dock-mini .focus-info .hint-text { display: none; }
-}
-
-/* Shared modal overlay (focus card + command palette) */
-.modal-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(8, 7, 6, 0.75);
-  backdrop-filter: blur(4px);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 50;
-  padding: 20px;
 }
 
 /* Player dock: expanded (full-screen, blocks the app underneath) vs mini

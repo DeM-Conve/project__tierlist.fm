@@ -94,7 +94,7 @@ function Thumb({ index, w = 72, lifted = false }) {
 
 function BoardMock() {
   return (
-    <Box pos="relative" className="landing-rise" style={{ animationDelay: '180ms' }}>
+    <Box pos="relative" className="anim-rise" style={{ animationDelay: '180ms' }}>
       <Paper
         withBorder
         radius="md"
@@ -166,7 +166,7 @@ function BoardMock() {
       </Paper>
 
       {/* A thumbnail mid-drag from T2 up into T1's drop slot. */}
-      <Box pos="absolute" top={72} right={34} className="landing-float" style={{ animationDelay: '0.6s' }}>
+      <Box pos="absolute" top={72} right={34} className="anim-float" style={{ animationDelay: '0.6s' }}>
         <Thumb index={3} w={84} lifted />
       </Box>
 
@@ -179,7 +179,7 @@ function BoardMock() {
         bottom={-80}
         left={-36}
         bg="var(--surface-2)"
-        className="landing-float"
+        className="anim-float"
         style={{ boxShadow: '0 24px 50px rgba(0, 0, 0, 0.6)' }}
       >
         <Text fz={10} fw={700} tt="uppercase" c="dimmed" mb={6} style={{ letterSpacing: 1 }}>
@@ -235,7 +235,7 @@ export default function LoginView({ onLogin }) {
 
       <Container size="lg" w="100%" style={{ flex: 1, display: 'flex', alignItems: 'center' }}>
         <SimpleGrid cols={{ base: 1, md: 2 }} spacing={72} py={48} w="100%" style={{ alignItems: 'center' }}>
-          <Stack gap="xl" className="landing-rise">
+          <Stack gap="xl" className="anim-rise">
             <Badge variant="light" size="lg" radius="sm" w="fit-content">
               Your own YouTube account
             </Badge>

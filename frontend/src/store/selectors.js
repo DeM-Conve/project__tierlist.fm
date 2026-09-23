@@ -125,3 +125,12 @@ export const selectFocusedAvailableTiers = createSelector(
       ? TIER_ORDER.filter((t) => tierGroups[focusedCategory]?.[t])
       : []
 );
+
+// The dock's current video, but only while this board is the one it was
+// opened from - lets the board mark the playing tile without the marker
+// leaking onto a different board that happens to share a video.
+export const selectPlayingVideoIdOnBoard = createSelector(
+  [selectFocusedVideo, selectFocusedCategory, selectCurrentCategory],
+  (focusedVideo, focusedCategory, currentCategory) =>
+    focusedVideo && focusedCategory === currentCategory ? focusedVideo.videoId : null
+);

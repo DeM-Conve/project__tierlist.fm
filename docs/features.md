@@ -13,20 +13,22 @@
 ## Tier boards
 - Playlists named `[G]/[GA]/[OG] <Category> T1/T2/T3/TE/TZ` are auto-grouped into a per-category tier board.
 - Sidebar lists every detected category as a "tier board," alongside a plain "Playlists" view and a filter box.
-- Each board renders as colored tier rows (T1 → TZ) filled with the real videos from each underlying playlist.
-- Each tier row shows its video count (or `matches/total` while searching) and its own per-tier shuffle-play button.
-- Every thumbnail has a hover "Open on YouTube" link (opens in a new tab without starting the in-app player).
-- Loading tiers show Mantine `Skeleton` placeholders; an empty tier shows a "Drop videos here" target.
-- Vim-style `/` search: `/` opens a find box (the `/` is part of the box's text - deleting it cancels), each tier filters down to its matches, `Enter`/`n` next match, `Shift+Enter`/`N` previous, `Enter` on a single match plays it, `Esc` closes. The active match is scrolled into view and highlighted.
+- Each board renders as colored tier lanes (T1 → TZ) filled with the real videos from each underlying playlist. Lanes are **one line** by default (horizontal scroll); a chevron on the right of each lane expands it to wrap and show every video, and collapses it back.
+- Header: board name, "N videos across M tiers", and a **tier distribution bar** (one colored segment per tier, sized by video count; hover for the count, click to scroll to that lane). Actions: Search (`/`), Start duel, Shuffle play.
+- Square album-art-style tiles with a 2-line title. Hover (or keyboard focus) reveals a play affordance, an "Open on YouTube" link (new tab, doesn't start the in-app player), and a `⋯` menu: **Move to** any other tier, **Move to top** of the current tier, Open on YouTube - a non-drag way to re-rank.
+- The video currently playing in the player dock is marked on the board (accent ring + animated "Playing" badge + highlighted title), only on the board it was opened from.
+- Each lane's colored rail shows the tier, its video count (or `matches/total` while searching), and a per-tier shuffle-play button.
+- Loading lanes show Mantine `Skeleton` placeholders; an empty lane shows a "Drop videos here" target.
+- Vim-style `/` search (also the header's Search button): `/` opens a find box floating at the top of the screen (the `/` is part of the box's text - deleting it cancels), each tier filters down to its matches, `Enter`/`n` next match, `Shift+Enter`/`N` previous, `Enter` on a single match plays it, `Esc` closes. The active match is scrolled into view and highlighted.
 
 ## Drag-and-drop tier editing
-- Drag a video from one tier row to another, or reorder it within the same row.
-- Drop position is cursor-aware (drops land where you release, not just appended to the end).
+- Drag a video from one tier lane to another, or reorder it within the same lane. The whole lane (rail included) is a drop target and tints in its tier color while hovered.
+- Drop position is cursor-aware (drops land where you release, shown by an accent insertion bar), in both one-line and expanded lanes.
 - Changes are staged locally first; nothing touches real YouTube data until you sync.
 
 ## Sync to YouTube
-- "N pending" / "Discard" / "Push to YouTube" controls appear only when there are real staged changes, grouped in their own pill in the board header, separate from general board utilities (Shuffle play, Start duel).
-- Clicking "N pending" opens a popup itemizing every staged change (video, from tier → to tier, or a duplicate removal - see below).
+- A floating **staged-changes bar** (bottom-center, above the mini player) appears only when there are real staged changes: "N changes staged" / "Discard" / "Push to YouTube ⇧P". Compact on phones.
+- Clicking "N changes staged" opens a popup (Mantine `Modal`) itemizing every staged change (video, from tier → to tier, or a duplicate removal - see below).
 - "Push to YouTube" calls the backend, which inserts each video into its new playlist before removing it from the old one (so a failed delete never loses a video). Partial failures are reported per item.
 - "Discard" reverts the board back to what's actually on YouTube.
 - `Shift+P` pushes pending changes (only when there are any), same as the button / palette action.
@@ -34,7 +36,7 @@
 
 ## Duplicate cleanup
 - If the same video genuinely exists in two of a board's real tier playlists at once, the lower-tier copy is automatically staged as a pending removal (kept: the highest tier it's in; removed: every other copy) - no manual action needed to flag it.
-- It shows up in the pending popup as `tier → removed (duplicate)`, and the thumbnail is tagged "Removing (duplicate)" until you sync.
+- It shows up in the pending popup as `tier → removed (duplicate)`, and the tile is greyed out and tagged "Duplicate" (tooltip: removed on sync) until you sync.
 - "Push to YouTube" actually deletes the redundant playlist entry (no bogus re-insert into the same playlist).
 
 ## Video focus modal

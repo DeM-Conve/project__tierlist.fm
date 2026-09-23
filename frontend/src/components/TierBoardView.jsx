@@ -1,23 +1,260 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ActionIcon, Badge, Button, Card, Group, Paper, Skeleton, Stack, Text, TextInput, Title, Tooltip } from '@mantine/core';
-import { ArrowUpRight, Shuffle } from 'lucide-react';
+import {
+  ActionIcon,
+  Badge,
+  Box,
+  Button,
+  Group,
+  Image,
+  Kbd,
+  Menu,
+  Modal,
+  Paper,
+  Progress,
+  ScrollArea,
+  Skeleton,
+  Stack,
+  Text,
+  TextInput,
+  Title,
+  Tooltip,
+} from '@mantine/core';
+import { useMediaQuery } from '@mantine/hooks';
+import {
+  ArrowRight,
+  ArrowUpRight,
+  ArrowUpToLine,
+  ChevronDown,
+  ChevronUp,
+  MoreHorizontal,
+  Play,
+  Search,
+  Shuffle,
+  Swords,
+  Trash2,
+} from 'lucide-react';
 import { TIER_COLORS, TIER_ORDER } from '../tiers';
 
-// Where among the existing thumbnails does clientX fall? Used so a drop
-// lands where the cursor actually is, not always appended at the end.
-function indexForClientX(container, clientX) {
-  const thumbs = Array.from(container.querySelectorAll('.tier-thumb'));
-  for (let i = 0; i < thumbs.length; i++) {
-    const rect = thumbs[i].getBoundingClientRect();
-    if (clientX < rect.left + rect.width / 2) return i;
+const TIER_INK = '#1a1509';
+
+// Which slot does the pointer fall in? Works for both a single-line lane
+// and an expanded (wrapped) one: the first tile whose row the pointer is
+// above, or whose row it's on and left of that tile's midpoint.
+function indexForPoint(container, clientX, clientY) {
+  if (!container) return 0;
+  const tiles = Array.from(container.querySelectorAll('[data-video-id]'));
+  for (let i = 0; i < tiles.length; i++) {
+    const r = tiles[i].getBoundingClientRect();
+    if (clientY < r.top) return i;
+    if (clientY <= r.bottom && clientX < r.left + r.width / 2) return i;
   }
-  return thumbs.length;
+  return tiles.length;
 }
 
-function TierRow({
+function DropIndicator({ size }) {
+  return <Box w={3} h={size} bg="accent" style={{ borderRadius: 2, flexShrink: 0 }} />;
+}
+
+function EqualizerMark() {
+  return (
+    <Group gap={2} align="flex-end" h={12} aria-label="Now playing">
+      {[0, 1, 2].map((i) => (
+        <Box key={i} w={3} h={12} bg={TIER_INK} className="eq-bar" style={{ animationDelay: `${i * 0.18}s` }} />
+      ))}
+    </Group>
+  );
+}
+
+function Tile({
+  video,
   tier,
+  size,
+  tiers,
+  isDragging,
+  isPlaying,
+  isPendingRemoval,
+  searchState,
+  onDragStart,
+  onDragEnd,
+  onPlay,
+  onMove,
+}) {
+  return (
+    <Box
+      className="tile"
+      data-video-id={video.videoId}
+      data-tier={tier}
+      w={size}
+      draggable
+      onDragStart={(e) => onDragStart(e, video, tier)}
+      onDragEnd={onDragEnd}
+      onClick={() => onPlay(tier, video.videoId)}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          onPlay(tier, video.videoId);
+        }
+      }}
+      role="button"
+      tabIndex={0}
+      title={video.title}
+      style={{
+        flexShrink: 0,
+        cursor: 'grab',
+        opacity: isDragging ? 0.35 : isPendingRemoval ? 0.55 : 1,
+      }}
+    >
+      <Box
+        pos="relative"
+        style={{
+          borderRadius: 6,
+          outline:
+            isPlaying || searchState ? '2px solid var(--accent)' : undefined,
+          outlineOffset: 2,
+          boxShadow:
+            searchState === 'active'
+              ? '0 0 0 6px color-mix(in srgb, var(--accent) 35%, transparent)'
+              : undefined,
+        }}
+      >
+        <Image
+          src={video.thumbnail || undefined}
+          alt={video.title}
+          w={size}
+          h={size}
+          radius={6}
+          fit="cover"
+          bg="var(--surface-2)"
+          draggable={false}
+          style={{
+            pointerEvents: 'none',
+            filter: isPendingRemoval ? 'grayscale(1)' : undefined,
+          }}
+        />
+
+        {isPlaying && (
+          <Badge
+            pos="absolute"
+            bottom={6}
+            left={6}
+            size="sm"
+            radius="sm"
+            variant="filled"
+            leftSection={<EqualizerMark />}
+            styles={{ label: { color: TIER_INK } }}
+          >
+            Playing
+          </Badge>
+        )}
+
+        {isPendingRemoval && (
+          <Tooltip label="Also in a higher tier - this copy is removed on sync (Removing: duplicate)" withArrow>
+            <Badge
+              pos="absolute"
+              bottom={6}
+              left={6}
+              size="xs"
+              radius="sm"
+              color="yellow"
+              leftSection={<Trash2 size={10} />}
+            >
+              Duplicate
+            </Badge>
+          </Tooltip>
+        )}
+
+        {/* Hover-only controls: play affordance, tier menu, YouTube link. */}
+        <Box className="tile-overlay" pos="absolute" inset={0} style={{ borderRadius: 6 }}>
+          <Group justify="space-between" p={5}>
+            <Menu position="bottom-start" withinPortal shadow="md" width={200}>
+              <Menu.Target>
+                <ActionIcon
+                  size="sm"
+                  variant="filled"
+                  color="dark.8"
+                  aria-label="Move to tier"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <MoreHorizontal size={14} />
+                </ActionIcon>
+              </Menu.Target>
+              <Menu.Dropdown onClick={(e) => e.stopPropagation()}>
+                <Menu.Label>Move to</Menu.Label>
+                {tiers
+                  .filter((t) => t !== tier)
+                  .map((t) => (
+                    <Menu.Item
+                      key={t}
+                      leftSection={<Box w={10} h={10} bg={TIER_COLORS[t]} style={{ borderRadius: 2 }} />}
+                      onClick={() => onMove(tier, t, video.videoId, null)}
+                    >
+                      {t}
+                    </Menu.Item>
+                  ))}
+                <Menu.Divider />
+                <Menu.Item
+                  leftSection={<ArrowUpToLine size={14} />}
+                  onClick={() => onMove(tier, tier, video.videoId, 0)}
+                >
+                  Move to top of {tier}
+                </Menu.Item>
+                <Menu.Item
+                  component="a"
+                  href={`https://www.youtube.com/watch?v=${video.videoId}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  leftSection={<ArrowUpRight size={14} />}
+                >
+                  Open on YouTube
+                </Menu.Item>
+              </Menu.Dropdown>
+            </Menu>
+            <ActionIcon
+              component="a"
+              href={`https://www.youtube.com/watch?v=${video.videoId}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              size="sm"
+              variant="filled"
+              color="dark.8"
+              title="Open on YouTube"
+              aria-label="Open on YouTube"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <ArrowUpRight size={14} />
+            </ActionIcon>
+          </Group>
+          <ActionIcon
+            pos="absolute"
+            top="50%"
+            left="50%"
+            size={38}
+            radius="xl"
+            variant="filled"
+            style={{ transform: 'translate(-50%, -50%)', pointerEvents: 'none' }}
+            aria-hidden
+            tabIndex={-1}
+          >
+            <Play size={16} fill={TIER_INK} color={TIER_INK} />
+          </ActionIcon>
+        </Box>
+      </Box>
+
+      <Text fz={11} lh={1.3} mt={6} lineClamp={2} c={isPlaying ? 'accent' : 'dark.1'} fw={isPlaying ? 600 : 400}>
+        {video.title}
+      </Text>
+    </Box>
+  );
+}
+
+function Lane({
+  tier,
+  tiers,
   items,
   loading,
+  size,
+  expanded,
+  onToggleExpanded,
   isDragOver,
   onDragOver,
   onDragLeave,
@@ -25,195 +262,308 @@ function TierRow({
   onThumbDragStart,
   onThumbDragEnd,
   onThumbClick,
+  onMove,
   draggedVideoId,
+  playingVideoId,
   pendingRemovalKeys,
   searchActive,
   matchedKeys,
   activeMatchKey,
   onShufflePlay,
 }) {
+  const contentRef = useRef(null);
   const [overIndex, setOverIndex] = useState(null);
-  // While a "/" search is active, a tier with hundreds of videos becomes
-  // unusable if matches just get dimmed in place - you'd still have to
-  // scroll through the whole row to find them. Filter down to only the
-  // matches instead; the active-match highlight still shows which one n/N
-  // is currently on.
+  // While a "/" search is active, filter each lane down to only its matches
+  // instead of dimming in place - a lane of hundreds would still need
+  // scrolling to find a hit otherwise.
   const visibleItems = searchActive
     ? items?.filter((v) => matchedKeys?.has(`${tier}:${v.videoId}`))
     : items;
+  const color = TIER_COLORS[tier];
 
-  function handleContentDragOver(e) {
+  function handleDragOver(e) {
     e.preventDefault();
     onDragOver(e);
-    setOverIndex(indexForClientX(e.currentTarget, e.clientX));
+    setOverIndex(indexForPoint(contentRef.current, e.clientX, e.clientY));
   }
 
-  function handleContentDragLeave(e) {
+  function handleDragLeave(e) {
+    // dragleave also fires moving between the lane's own children.
+    if (e.currentTarget.contains(e.relatedTarget)) return;
     onDragLeave(e);
     setOverIndex(null);
   }
 
-  function handleContentDrop(e) {
+  function handleDrop(e) {
     e.preventDefault();
-    const dropIndex = indexForClientX(e.currentTarget, e.clientX);
+    const dropIndex = indexForPoint(contentRef.current, e.clientX, e.clientY);
     setOverIndex(null);
     onDrop(e, dropIndex);
   }
 
+  const showIndicatorAt = (i) => isDragOver && overIndex === i;
+
+  const tiles = (
+    <Group
+      ref={contentRef}
+      gap={12}
+      wrap={expanded ? 'wrap' : 'nowrap'}
+      align="flex-start"
+      p={12}
+      mih={size + 48}
+    >
+      {loading &&
+        Array.from({ length: 6 }).map((_, i) => (
+          <Stack key={i} gap={6} style={{ flexShrink: 0 }}>
+            <Skeleton w={size} h={size} radius={6} />
+            <Skeleton w={size * 0.7} h={9} radius="sm" />
+          </Stack>
+        ))}
+      {!loading && visibleItems?.length === 0 && (
+        <Box
+          w={size}
+          h={size}
+          style={{
+            border: `1px dashed ${isDragOver ? 'var(--accent)' : 'var(--border)'}`,
+            borderRadius: 6,
+            display: 'grid',
+            placeItems: 'center',
+            flexShrink: 0,
+          }}
+        >
+          <Text fz={11} c="dimmed" ta="center" px={8}>
+            {searchActive ? 'No matches' : 'Drop videos here'}
+          </Text>
+        </Box>
+      )}
+      {!loading &&
+        visibleItems?.map((v, i) => {
+          const key = `${tier}:${v.videoId}`;
+          return (
+            <Group key={v.videoId} gap={12} wrap="nowrap" align="flex-start" style={{ flexShrink: 0 }}>
+              {showIndicatorAt(i) && <DropIndicator size={size} />}
+              <Tile
+                video={v}
+                tier={tier}
+                tiers={tiers}
+                size={size}
+                isDragging={draggedVideoId === v.videoId}
+                isPlaying={playingVideoId === v.videoId}
+                isPendingRemoval={pendingRemovalKeys.has(key)}
+                searchState={activeMatchKey === key ? 'active' : searchActive ? 'match' : null}
+                onDragStart={onThumbDragStart}
+                onDragEnd={onThumbDragEnd}
+                onPlay={onThumbClick}
+                onMove={onMove}
+              />
+            </Group>
+          );
+        })}
+      {!loading && visibleItems?.length > 0 && showIndicatorAt(visibleItems.length) && (
+        <DropIndicator size={size} />
+      )}
+    </Group>
+  );
+
   return (
-    <div className={`tier-row${isDragOver ? ' tier-row-dragover' : ''}`}>
-      <div className="tier-label" style={{ background: TIER_COLORS[tier] }}>
-        <span>{tier}</span>
+    <Paper
+      id={`lane-${tier}`}
+      radius="md"
+      withBorder
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+      style={{
+        overflow: 'hidden',
+        display: 'flex',
+        scrollMarginTop: 16,
+        borderColor: isDragOver ? color : undefined,
+        background: isDragOver
+          ? `linear-gradient(90deg, color-mix(in srgb, ${color} 14%, var(--surface)), var(--surface) 60%)`
+          : 'var(--surface)',
+        transition: 'border-color 120ms ease, background 120ms ease',
+      }}
+    >
+      <Stack
+        w={size < 110 ? 52 : 72}
+        gap={4}
+        align="center"
+        justify="center"
+        py="sm"
+        bg={color}
+        style={{ flexShrink: 0 }}
+      >
+        <Text ff="var(--font-display)" fw={900} fz={size < 110 ? 20 : 26} lh={1} c={TIER_INK}>
+          {tier}
+        </Text>
         {!loading && (
-          <span className="tier-count">
+          <Text fz={11} fw={700} c={TIER_INK} opacity={0.7}>
             {searchActive ? `${visibleItems?.length ?? 0}/${items?.length ?? 0}` : items?.length ?? 0}
-          </span>
+          </Text>
         )}
         {!loading && items?.length > 0 && (
-          <Tooltip label={`Shuffle play ${tier}`}>
+          <Tooltip label={`Shuffle play ${tier}`} withArrow position="right">
             <ActionIcon
-              variant="subtle"
-              color="dark"
+              variant="transparent"
               size="sm"
-              className="tier-shuffle-btn"
+              mt={2}
               onClick={() => onShufflePlay(tier)}
               aria-label={`Shuffle play ${tier}`}
+              style={{ color: TIER_INK }}
             >
-              <Shuffle size={14} />
+              <Shuffle size={15} />
             </ActionIcon>
           </Tooltip>
         )}
-      </div>
-      <div
-        className={`tier-content${searchActive ? ' tier-content-search' : ''}`}
-        onDragOver={handleContentDragOver}
-        onDragLeave={handleContentDragLeave}
-        onDrop={handleContentDrop}
-      >
-        {loading &&
-          Array.from({ length: 4 }).map((_, i) => (
-            <Skeleton key={i} className="tier-thumb-skeleton" radius="sm" />
-          ))}
-        {!loading && !searchActive && items?.length === 0 && (
-          <p className="tier-empty">Drop videos here</p>
+      </Stack>
+
+      <Box style={{ flex: 1, minWidth: 0 }}>
+        {expanded ? tiles : (
+          <ScrollArea type="hover" scrollbarSize={6} offsetScrollbars="x">
+            {tiles}
+          </ScrollArea>
         )}
-        {!loading && searchActive && visibleItems?.length === 0 && (
-          <p className="tier-empty">No matches in this tier</p>
-        )}
-        {!loading && visibleItems?.map((v, i) => {
-          const key = `${tier}:${v.videoId}`;
-          const isActiveMatch = activeMatchKey === key;
-          return (
-          <div key={v.videoId} className="tier-thumb-wrap">
-            {isDragOver && overIndex === i && <span className="drop-indicator" />}
-            <Card
-              className={`tier-thumb${draggedVideoId === v.videoId ? ' tier-thumb-dragging' : ''}${
-                searchActive ? ' tier-thumb-search-match' : ''
-              }${isActiveMatch ? ' tier-thumb-search-active' : ''}`}
-              data-video-id={v.videoId}
-              data-tier={tier}
-              padding={0}
-              radius="sm"
-              withBorder
-              draggable
-              onDragStart={(e) => onThumbDragStart(e, v, tier)}
-              onDragEnd={onThumbDragEnd}
-              onClick={() => onThumbClick(tier, v.videoId)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' || e.key === ' ') {
-                  e.preventDefault();
-                  onThumbClick(tier, v.videoId);
-                }
-              }}
-              role="button"
-              tabIndex={0}
-              title={v.title}
+      </Box>
+
+      {!loading && items?.length > 0 && (
+        <Box p={6} style={{ flexShrink: 0, borderLeft: '1px solid var(--border-soft)' }}>
+          <Tooltip label={expanded ? 'Collapse to one line' : 'Show all'} withArrow position="left">
+            <ActionIcon
+              variant="subtle"
+              color="dark.2"
+              onClick={onToggleExpanded}
+              aria-label={expanded ? `Collapse ${tier}` : `Expand ${tier}`}
             >
-              <Card.Section pos="relative">
-                <img src={v.thumbnail || ''} alt={v.title} draggable={false} />
-                {pendingRemovalKeys?.has(`${tier}:${v.videoId}`) && (
-                  <Badge
-                    color="yellow"
-                    size="xs"
-                    className="tier-thumb-duplicate-tag"
-                    title="Also in a higher tier's playlist - this copy will be removed on sync"
-                  >
-                    Removing (duplicate)
-                  </Badge>
-                )}
-                <ActionIcon
-                  component="a"
-                  href={`https://www.youtube.com/watch?v=${v.videoId}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  variant="filled"
-                  color="dark"
-                  size="sm"
-                  className="tier-thumb-link"
-                  title="Open on YouTube"
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <ArrowUpRight size={14} />
-                </ActionIcon>
-              </Card.Section>
-              <Text size="xs" c="dimmed" truncate="end" px={8} py={6} title={v.title}>
-                {v.title}
-              </Text>
-            </Card>
-          </div>
-          );
-        })}
-        {isDragOver && overIndex === visibleItems?.length && <span className="drop-indicator" />}
-      </div>
-    </div>
+              {expanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+            </ActionIcon>
+          </Tooltip>
+        </Box>
+      )}
+    </Paper>
   );
 }
 
-function PendingChangesModal({ moves, onClose }) {
+function PendingChangesModal({ opened, moves, onClose }) {
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="pending-modal" onClick={(e) => e.stopPropagation()}>
-        <div className="pending-panel-header">
-          <h2>
-            {moves.length} change{moves.length === 1 ? '' : 's'} staged
-          </h2>
-          <button className="modal-close" onClick={onClose} aria-label="Close">
-            ✕
-          </button>
-        </div>
+    <Modal
+      opened={opened}
+      onClose={onClose}
+      centered
+      size="lg"
+      title={
+        <Text fw={800} fz="lg">
+          {moves.length} change{moves.length === 1 ? '' : 's'} staged
+        </Text>
+      }
+      scrollAreaComponent={ScrollArea.Autosize}
+    >
+      <Stack gap={0}>
+        {moves.map((m) => (
+          <Group
+            key={`${m.kind}-${m.video.videoId}-${m.tier ?? m.to}`}
+            justify="space-between"
+            wrap="nowrap"
+            gap="md"
+            py={9}
+            style={{ borderBottom: '1px dashed var(--border-soft)' }}
+          >
+            <Text fz="sm" truncate="end" title={m.video.title}>
+              {m.video.title}
+            </Text>
+            <Group gap={6} wrap="nowrap" style={{ flexShrink: 0 }}>
+              <Badge radius="sm" color={TIER_COLORS[m.kind === 'dedupe' ? m.tier : m.from]} c={TIER_INK}>
+                {m.kind === 'dedupe' ? m.tier : m.from}
+              </Badge>
+              <ArrowRight size={13} color="var(--text-faint)" />
+              {m.kind === 'dedupe' ? (
+                <Text fz="xs" fw={600} c="red.5">
+                  removed (duplicate)
+                </Text>
+              ) : (
+                <Badge radius="sm" color={TIER_COLORS[m.to]} c={TIER_INK}>
+                  {m.to}
+                </Badge>
+              )}
+            </Group>
+          </Group>
+        ))}
+      </Stack>
+    </Modal>
+  );
+}
 
-        <ul className="pending-list">
-          {moves.map((m) => (
-            <li key={`${m.kind}-${m.video.videoId}-${m.tier ?? m.to}`} className="pending-row">
-              <span className="pending-title" title={m.video.title}>
-                {m.video.title}
-              </span>
-              <span className="pending-tiers">
-                {m.kind === 'dedupe' ? (
-                  <>
-                    <span className="tier-chip" style={{ background: TIER_COLORS[m.tier] }}>
-                      {m.tier}
-                    </span>
-                    <span className="pending-arrow">→</span>
-                    <span className="pending-remove-label">removed (duplicate)</span>
-                  </>
-                ) : (
-                  <>
-                    <span className="tier-chip" style={{ background: TIER_COLORS[m.from] }}>
-                      {m.from}
-                    </span>
-                    <span className="pending-arrow">→</span>
-                    <span className="tier-chip" style={{ background: TIER_COLORS[m.to] }}>
-                      {m.to}
-                    </span>
-                  </>
-                )}
-              </span>
-            </li>
-          ))}
-        </ul>
-      </div>
-    </div>
+// Floating "unsaved changes" bar - staged edits are the one thing on the
+// board that needs a decision, so they sit above everything (and above the
+// mini player) instead of competing with the header's buttons.
+function PendingBar({ count, syncStatus, compact, onReview, onDiscard, onSync }) {
+  return (
+    <Paper
+      withBorder
+      radius="md"
+      shadow="xl"
+      p={6}
+      pl="md"
+      className="anim-rise"
+      bg="var(--surface-2)"
+      style={{
+        position: 'fixed',
+        left: '50%',
+        bottom: 'calc(20px + var(--player-dock-height))',
+        translate: '-50% 0',
+        zIndex: 60,
+        maxWidth: 'calc(100vw - 32px)',
+      }}
+    >
+      <Group gap="sm" wrap="nowrap">
+        <Box w={8} h={8} bg="accent" style={{ borderRadius: '50%', flexShrink: 0 }} />
+        <Button variant="subtle" color="dark.0" px={6} onClick={onReview}>
+          {compact ? `${count} staged` : `${count} change${count === 1 ? '' : 's'} staged`}
+        </Button>
+        {syncStatus === 'done' && (
+          <Badge color="teal" variant="light">
+            Synced
+          </Badge>
+        )}
+        {(syncStatus === 'partial' || syncStatus === 'error') && (
+          <Badge color="red" variant="light">
+            {syncStatus === 'partial' ? 'Some failed' : 'Sync failed'}
+          </Badge>
+        )}
+        <Button variant="default" size={compact ? 'xs' : 'sm'} onClick={onDiscard} disabled={syncStatus === 'syncing'}>
+          Discard
+        </Button>
+        <Button
+          size={compact ? 'xs' : 'sm'}
+          onClick={onSync}
+          disabled={syncStatus === 'syncing'}
+          loading={syncStatus === 'syncing'}
+          rightSection={compact ? null : <Kbd size="xs">⇧P</Kbd>}
+        >
+          {compact ? 'Push' : 'Push to YouTube'}
+        </Button>
+      </Group>
+    </Paper>
+  );
+}
+
+function DistributionBar({ tiers, tierItems, total, onJump }) {
+  return (
+    <Progress.Root size={12} radius="sm" bg="var(--surface-2)">
+      {tiers.map((t) => {
+        const n = tierItems[t]?.length ?? 0;
+        if (!n) return null;
+        return (
+          <Tooltip key={t} label={`${t} · ${n} video${n === 1 ? '' : 's'}`} withArrow>
+            <Progress.Section
+              value={(n / total) * 100}
+              color={TIER_COLORS[t]}
+              onClick={() => onJump(t)}
+              style={{ cursor: 'pointer' }}
+            />
+          </Tooltip>
+        );
+      })}
+    </Progress.Root>
   );
 }
 
@@ -224,12 +574,14 @@ export default function TierBoardView({
   tierLoading,
   dragOverTier,
   draggedVideoId,
+  playingVideoId,
   onRowDragOver,
   onRowDragLeave,
   onRowDrop,
   onThumbDragStart,
   onThumbDragEnd,
   onThumbClick,
+  onMoveVideo,
   pendingMoves,
   syncStatus,
   onDiscard,
@@ -238,18 +590,39 @@ export default function TierBoardView({
   onShufflePlay,
 }) {
   const [showPending, setShowPending] = useState(false);
-  const hasVideos = Object.values(tierItems).some((arr) => arr?.length > 0);
-  const pendingRemovalKeys = new Set(
-    pendingMoves.filter((m) => m.kind === 'dedupe').map((m) => `${m.tier}:${m.video.videoId}`)
+  const [expandedTiers, setExpandedTiers] = useState(() => new Set());
+  const isNarrow = useMediaQuery('(max-width: 900px)');
+  const tileSize = isNarrow ? 96 : 120;
+
+  const tiers = TIER_ORDER.filter((t) => tierGroups[category]?.[t]);
+  const anyLoading = tiers.some((t) => tierLoading[t]);
+  const total = tiers.reduce((sum, t) => sum + (tierItems[t]?.length ?? 0), 0);
+  const hasVideos = total > 0;
+  const pendingRemovalKeys = useMemo(
+    () => new Set(pendingMoves.filter((m) => m.kind === 'dedupe').map((m) => `${m.tier}:${m.video.videoId}`)),
+    [pendingMoves]
   );
+
+  function toggleExpanded(tier) {
+    setExpandedTiers((prev) => {
+      const next = new Set(prev);
+      if (next.has(tier)) next.delete(tier);
+      else next.add(tier);
+      return next;
+    });
+  }
+
+  function jumpToTier(tier) {
+    document.getElementById(`lane-${tier}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
 
   // Vim-style "/" find: "/" opens it and is typed straight into the box as
   // the literal command-line prefix, the way vim's own "/" shows up in its
   // command line - deleting it (e.g. select-all + backspace) cancels the
   // search entirely rather than leaving a bare, unprefixed query active.
   // Enter (in the box) or n/N (once you've clicked away) step through
-  // matches, Escape closes it. Each tier row filters down to just its
-  // matches rather than merely highlighting them in place.
+  // matches, Escape closes it. Each lane filters down to just its matches
+  // rather than merely highlighting them in place.
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [matchIndex, setMatchIndex] = useState(0);
@@ -274,13 +647,28 @@ export default function TierBoardView({
     return searchableEntries.filter((e) => e.video.title.toLowerCase().includes(q));
   }, [searchableEntries, queryText]);
 
+  function openSearch() {
+    setSearchOpen(true);
+    setSearchQuery('/');
+    requestAnimationFrame(() => {
+      const el = searchInputRef.current;
+      el?.focus();
+      el?.setSelectionRange(el.value.length, el.value.length);
+    });
+  }
+
+  function closeSearch() {
+    setSearchOpen(false);
+    setSearchQuery('');
+    searchInputRef.current?.blur();
+  }
+
   function handleSearchChange(value) {
     if (!value.startsWith('/')) {
       // The leading "/" itself got deleted (e.g. select-all + backspace) -
       // same as vim, clearing the command line cancels the search outright
       // rather than leaving an unprefixed query active.
-      setSearchOpen(false);
-      setSearchQuery('');
+      closeSearch();
       return;
     }
     setSearchQuery(value);
@@ -308,13 +696,7 @@ export default function TierBoardView({
 
       if (e.key === '/' && !isTyping) {
         e.preventDefault();
-        setSearchOpen(true);
-        setSearchQuery('/');
-        requestAnimationFrame(() => {
-          const el = searchInputRef.current;
-          el?.focus();
-          el?.setSelectionRange(el.value.length, el.value.length);
-        });
+        openSearch();
         return;
       }
       // Shift+P pushes pending changes to YouTube - the same action the
@@ -333,9 +715,7 @@ export default function TierBoardView({
 
       if (e.key === 'Escape') {
         e.preventDefault();
-        setSearchOpen(false);
-        setSearchQuery('');
-        searchInputRef.current?.blur();
+        closeSearch();
         return;
       }
       if (e.key === 'Enter' && inSearchBox) {
@@ -347,9 +727,7 @@ export default function TierBoardView({
         if (matches.length === 1) {
           const only = matches[0];
           onThumbClick(only.tier, only.video.videoId);
-          setSearchOpen(false);
-          setSearchQuery('');
-          searchInputRef.current?.blur();
+          closeSearch();
           return;
         }
         setMatchIndex((i) => (e.shiftKey ? i - 1 + matches.length : i + 1) % matches.length);
@@ -369,103 +747,124 @@ export default function TierBoardView({
     () => new Set(matches.map((e) => `${e.tier}:${e.video.videoId}`)),
     [matches]
   );
-  const activeMatchKey =
-    matches.length > 0 ? `${matches[matchIndex % matches.length].tier}:${matches[matchIndex % matches.length].video.videoId}` : null;
+  const activeMatch = matches.length > 0 ? matches[matchIndex % matches.length] : null;
+  const activeMatchKey = activeMatch ? `${activeMatch.tier}:${activeMatch.video.videoId}` : null;
+  const searchActive = queryText.trim().length > 0;
 
   return (
-    <section>
-      <Group justify="space-between" align="flex-start" wrap="wrap" gap="lg" mb="sm">
-        <Stack gap={2}>
-          <Title order={1} fz={28} fw={800} lh={1.2}>
-            {category}
-          </Title>
-          <Text c="dimmed" size="sm">
-            Drag a video into another tier, then sync when you're ready.
-          </Text>
-        </Stack>
+    // Leaves room under the last lane for the floating staged-changes bar.
+    <Box component="section" pb={pendingMoves.length > 0 ? 72 : 0}>
+      {/* Header: same warm glow as the login page, stats + distribution. */}
+      <Box
+        mx={-16}
+        px={16}
+        pt="md"
+        pb="lg"
+        mb="md"
+        style={{
+          background:
+            'radial-gradient(560px 150px at 0% 0%, rgba(214, 162, 76, 0.12), transparent)',
+        }}
+      >
+        <Group justify="space-between" align="flex-end" wrap="wrap" gap="lg">
+          <Stack gap={6}>
+            <Text fz={11} fw={700} tt="uppercase" c="accent" style={{ letterSpacing: 1.5 }}>
+              Tier board
+            </Text>
+            <Title order={1} fz={{ base: 32, sm: 44 }} fw={900} lh={1} style={{ letterSpacing: '-0.02em' }}>
+              {category}
+            </Title>
+            <Text c="dimmed" fz="sm">
+              {anyLoading
+                ? 'Loading videos…'
+                : `${total} video${total === 1 ? '' : 's'} across ${tiers.length} tiers · drag, or use a tile's ⋯ menu, to re-rank`}
+            </Text>
+          </Stack>
 
-        <Group gap="md" wrap="wrap">
-          {pendingMoves.length > 0 && (
-            <Paper withBorder radius="sm" p={6}>
-              <Group gap="xs">
-                <Button variant="subtle" onClick={() => setShowPending(true)}>
-                  {pendingMoves.length} pending
-                </Button>
-                {syncStatus === 'done' && (
-                  <Badge color="teal" variant="light">
-                    Synced
-                  </Badge>
-                )}
-                {(syncStatus === 'partial' || syncStatus === 'error') && (
-                  <Badge color="red" variant="light">
-                    {syncStatus === 'partial' ? 'Some failed' : 'Sync failed'}
-                  </Badge>
-                )}
-                <Button variant="default" onClick={onDiscard} disabled={syncStatus === 'syncing'}>
-                  Discard
-                </Button>
-                <Button onClick={onSync} disabled={syncStatus === 'syncing'} loading={syncStatus === 'syncing'}>
-                  Push to YouTube
-                </Button>
-              </Group>
-            </Paper>
-          )}
-          <Group gap="xs">
+          <Group gap="xs" wrap="wrap">
             <Button
               variant="default"
-              leftSection={<Shuffle size={15} />}
-              onClick={() => onShufflePlay()}
+              leftSection={<Search size={15} />}
+              rightSection={<Kbd size="xs">/</Kbd>}
+              onClick={openSearch}
               disabled={!hasVideos}
             >
-              Shuffle play
+              Search
             </Button>
-            <Button variant="default" onClick={onStartDuel}>
+            <Button variant="default" leftSection={<Swords size={15} />} onClick={onStartDuel}>
               Start duel
+            </Button>
+            <Button leftSection={<Shuffle size={15} />} onClick={() => onShufflePlay()} disabled={!hasVideos}>
+              Shuffle play
             </Button>
           </Group>
         </Group>
-      </Group>
 
-      {showPending && (
-        <PendingChangesModal moves={pendingMoves} onClose={() => setShowPending(false)} />
-      )}
+        {hasVideos && (
+          <Box mt="lg">
+            <DistributionBar tiers={tiers} tierItems={tierItems} total={total} onJump={jumpToTier} />
+          </Box>
+        )}
+      </Box>
 
-      <div className="tier-board">
-        {TIER_ORDER.filter((t) => tierGroups[category]?.[t]).map((t) => (
-          <TierRow
+      <Stack gap={10}>
+        {tiers.map((t) => (
+          <Lane
             key={t}
             tier={t}
+            tiers={tiers}
             items={tierItems[t]}
             loading={tierLoading[t]}
+            size={tileSize}
+            expanded={expandedTiers.has(t)}
+            onToggleExpanded={() => toggleExpanded(t)}
             isDragOver={dragOverTier === t}
             draggedVideoId={draggedVideoId}
+            playingVideoId={playingVideoId}
             onDragOver={(e) => onRowDragOver(e, t)}
             onDragLeave={() => onRowDragLeave(t)}
             onDrop={(e, dropIndex) => onRowDrop(e, t, dropIndex)}
             onThumbDragStart={onThumbDragStart}
             onThumbDragEnd={onThumbDragEnd}
             onThumbClick={onThumbClick}
+            onMove={onMoveVideo}
             pendingRemovalKeys={pendingRemovalKeys}
-            searchActive={queryText.trim().length > 0}
+            searchActive={searchActive}
             matchedKeys={matchedKeys}
             activeMatchKey={activeMatchKey}
             onShufflePlay={onShufflePlay}
           />
         ))}
-      </div>
+      </Stack>
+
+      <PendingChangesModal opened={showPending} moves={pendingMoves} onClose={() => setShowPending(false)} />
+
+      {pendingMoves.length > 0 && (
+        <PendingBar
+          count={pendingMoves.length}
+          syncStatus={syncStatus}
+          compact={isNarrow}
+          onReview={() => setShowPending(true)}
+          onDiscard={onDiscard}
+          onSync={onSync}
+        />
+      )}
 
       {searchOpen && (
         <Paper
           withBorder
-          radius="sm"
-          shadow="md"
+          radius="md"
+          shadow="xl"
           p={6}
+          className="anim-rise"
+          bg="var(--surface-2)"
           style={{
             position: 'fixed',
-            left: 16,
-            bottom: 'calc(16px + var(--player-dock-height))',
+            top: 16,
+            left: '50%',
+            translate: '-50% 0',
             zIndex: 60,
-            width: 300,
+            width: 'min(420px, calc(100vw - 32px))',
           }}
         >
           <Group gap="xs" wrap="nowrap">
@@ -474,15 +873,22 @@ export default function TierBoardView({
               value={searchQuery}
               onChange={(e) => handleSearchChange(e.target.value)}
               placeholder="/search titles..."
-              size="xs"
-              style={{ flex: 1, fontFamily: 'monospace' }}
+              variant="unstyled"
+              leftSection={<Search size={15} />}
+              style={{ flex: 1 }}
+              styles={{ input: { fontFamily: 'monospace' } }}
             />
-            <Text size="xs" c="dimmed" style={{ whiteSpace: 'nowrap' }}>
+            <Badge variant="light" radius="sm">
               {matches.length > 0 ? `${(matchIndex % matches.length) + 1}/${matches.length}` : '0/0'}
-            </Text>
+            </Badge>
+            <Group gap={4} visibleFrom="sm">
+              <Kbd size="xs">n</Kbd>
+              <Kbd size="xs">N</Kbd>
+              <Kbd size="xs">Esc</Kbd>
+            </Group>
           </Group>
         </Paper>
       )}
-    </section>
+    </Box>
   );
 }
