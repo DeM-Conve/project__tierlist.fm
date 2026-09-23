@@ -103,6 +103,14 @@ auto-grouped into a tier board per category.
   returning from a duel) - removing that guard would silently discard an unsynced duel
   result or drag on every board/duel round-trip. Don't refetch tier-board data on mount
   without checking `loadedCategory` first.
+- **Every tier edit goes through `src/tierActions.jsx`** (`moveWithFeedback`,
+  `applyOrderWithFeedback`, `undoEdit`, `useTierDnd`) - never dispatch
+  `moveVideoToTier`/`moveVideos` directly from a component. That's what gives every
+  surface the same undo toast, the same Ctrl+Z step (`tiersSlice.undoStack`), and keeps
+  the player's `focusedVideo.tier` in sync after a move.
+- **The tier list is the product's moat** (see `PRODUCT.md`): the Tier Rail
+  (`TierRail.jsx`) is always on board pages; board pages render inside `BoardShell`
+  in `App.jsx` (rail + shared `PendingChanges` bar, which also owns Shift+P).
 - **Duel ranking uses the Strategy pattern** (`frontend/src/duel/`): multiple
   interchangeable ranking algorithms (`tierAwareMerge` default, `mergeSort`, `elo`)
   behind a common interface, swappable at runtime from the duel screen or persisted as a
@@ -151,10 +159,10 @@ The user asked for these on top of the Mantine/Redux migration above. Tracked he
   duel view to Mantine `Container`/`Group`/`Stack`/`Progress`/`Card`/`Card.Section`/
   `Badge`/`Text`/`Title` (only card-hover-lift and absolute-overlay positioning for
   the tier badge/preview button stayed as CSS - Mantine has no prop for either).
-  Still
-  hand-rolled CSS in `App.css`: the tier board's own grid/row layout (`.tier-row`,
-  `.tier-content`, drag-and-drop positioning), `PlayerDock`'s expanded/mini/floating
-  layouts, and the duel cards. Convert opportunistically whenever one of those is
+  The tier board, tier page, rail, home, sidebar, playlist page, quick sort and
+  share poster are all Mantine now (only hover states / keyframes stay as CSS).
+  Still hand-rolled CSS in `App.css`: `PlayerDock`'s expanded/mini/floating layouts
+  (plus its queue-column grid) and the duel card hover. Convert opportunistically whenever one of those is
   next touched, rather than in one big-bang rewrite - and when a hand-rolled class's
   last usage is removed, delete its now-dead CSS rule in the same pass (don't leave
   it orphaned "just in case").

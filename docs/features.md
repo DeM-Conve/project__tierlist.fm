@@ -6,33 +6,50 @@
 - Scopes: `openid`, `profile`, `https://www.googleapis.com/auth/youtube.force-ssl` (read + write access to playlists).
 - `/api/auth/status` reports login state without forcing an OAuth redirect on an unauthenticated request.
 
-## Playlists
-- Browse all of the logged-in account's YouTube playlists.
-- Open a playlist to see its videos (thumbnail, title, channel).
+## Home & playlists
+- `/` is **Home**: every board drawn as a mini tier list (tier chip + that tier playlist's cover + a bar sized by its video count), with Open / Quick sort / Duel on each card; a "Now playing" card (with a link back to rate it on its board) while the player is active; then every playlist as a card (tier badge + board name on tier playlists), filterable to "Not in a tier list".
+- Home's filter box and the sidebar filter share the same query.
+- (Replaced) the old "redirect to the first board on first login" - Home now leads with your boards, which is what that redirect existed for.
+- Open a playlist to see its videos as a numbered list (thumbnail, title, channel, opens on YouTube); a tier playlist shows its tier and an "Open the <board> tier list" button.
 
-## Tier boards
+## Sidebar
+- Brand, "Jump to… ⌘K" (command palette), Home, and every board with its video total and a mini tier-mix bar (from playlist item counts - no per-board fetch). Filter box, empty-state hint explaining the playlist naming convention.
+- Footer: Settings, Keyboard shortcuts (`?`), Log out. On narrow screens the sidebar is a drawer opened from a burger button.
+
+## Tier boards (the tier list)
 - Playlists named `[G]/[GA]/[OG] <Category> T1/T2/T3/TE/TZ` are auto-grouped into a per-category tier board.
-- Sidebar lists every detected category as a "tier board," alongside a plain "Playlists" view and a filter box.
-- Each board renders as colored tier lanes (T1 → TZ) filled with the real videos from each underlying playlist. Lanes are **one line** by default (horizontal scroll); a chevron on the right of each lane expands it to wrap and show every video, and collapses it back.
-- Header: board name, "N videos across M tiers", and a **tier distribution bar** (one colored segment per tier, sized by video count; hover for the count, click to scroll to that lane). Actions: Search (`/`), Start duel, Shuffle play.
-- Square album-art-style tiles with a 2-line title. Hover (or keyboard focus) reveals a play affordance, an "Open on YouTube" link (new tab, doesn't start the in-app player), and a `⋯` menu: **Move to** any other tier, **Move to top** of the current tier, Open on YouTube - a non-drag way to re-rank.
-- The video currently playing in the player dock is marked on the board (accent ring + animated "Playing" badge + highlighted title), only on the board it was opened from.
-- Each lane's colored rail shows the tier, its video count (or `matches/total` while searching), and a per-tier shuffle-play button.
-- Loading lanes show Mantine `Skeleton` placeholders; an empty lane shows a "Drop videos here" target.
-- Vim-style `/` search (also the header's Search button): `/` opens a find box floating at the top of the screen (the `/` is part of the box's text - deleting it cancels), each tier filters down to its matches, `Enter`/`n` next match, `Shift+Enter`/`N` previous, `Enter` on a single match plays it, `Esc` closes. The active match is scrolled into view and highlighted.
+- **Whole board on one screen**: one compact row per tier; each row shows as many square album-art tiles as fit on one line and folds the rest into a **"+N show all"** tile - so a tier of hundreds never pushes the rest of the board off screen.
+- Each row's colored label shows the tier, its count (or `matches/total` while searching), **Play from this tier** and **Shuffle this tier**; clicking the label, the "+N" tile, or the row's `›` opens that tier's full list.
+- Header: board name, "N videos · M tiers", a labelled **tier-mix bar** (segment per tier, hover for count, click to open that tier), and actions: Find (`/`), Share, Rank ▾ (Quick sort / Duel), Play (from the top tier) and Shuffle (whole board).
+- Tiles: click plays, drag moves, hover/focus reveals a play affordance and a `⋯` menu (**Move to** any tier, **Top / Bottom of** this tier, **Open on YouTube**). Full title on hover tooltip.
+- The playing video is marked (accent ring + animated equalizer) - only on the board it was opened from.
+- Loading rows show Mantine `Skeleton`s; empty rows show a drop target.
+- Vim-style `/` search (also the Find button): `/` opens a find box at the top of the screen (the `/` is part of the box's text - deleting it cancels), each row filters to its matches (and wraps to show all of them), `Enter`/`n` next match, `Shift+Enter`/`N` previous, `Enter` on a single match plays it, `Esc` closes. The active match is scrolled into view and highlighted.
+
+## Tier Rail
+- A permanent strip of the board's tiers down the right edge of the tier list and tier pages (desktop), with live counts. One click does the most useful thing available: **move the selected rows there** (when rows are selected) → otherwise **re-rate the playing song** into that tier (when it's from this board; the playing song's art sits on its current tier, with `⇧1-5` hints) → otherwise **open that tier**. The header says which mode it's in ("Move N to" / "Rate" / "Tiers").
+- Every rail tier is a drop target: drag any tile or row onto it to move it there.
+
+## Tier page (full list for big tiers)
+- `/tier/<board>/t/<tier>`: a big tier header (Play / Shuffle / Quick sort this tier), tabs for every tier with counts (tabs are drop targets too), and the whole tier as a dense numbered list (rank, cover, title, channel).
+- Every row has **one-click tier chips** (current tier filled) and a `⋯` menu (Top / Bottom / Open on YouTube). Click a row to play it.
+- **Multi-select**: checkboxes, Shift-click for a range, header checkbox for all shown, `Ctrl+A` for all shown, `Esc` to clear. A floating bulk bar moves the selection to any tier or to the top of this one; the Tier Rail does the same.
+- Filter box (`/` focuses it, `Esc` clears) filters by title or channel; drag rows to reorder (drop position maps back to the real position even while filtered).
+
+## Instant feedback & undo
+- Every tier edit - drag, menu, chip, bulk move, rail, player rating, quick sort, duel result - shows a toast (""Song" → T1", "Moved 5 videos → T2") with **Undo**, and `Ctrl/Cmd+Z` undoes the last edit anywhere (up to 50 steps; a bulk move or a whole duel result is one step). Undo history resets when the board is reloaded or discarded.
 
 ## Drag-and-drop tier editing
-- Drag a video from one tier lane to another, or reorder it within the same lane. The whole lane (rail included) is a drop target and tints in its tier color while hovered.
-- Drop position is cursor-aware (drops land where you release, shown by an accent insertion bar), in both one-line and expanded lanes.
+- Drag a video from one tier row to another, reorder within a row, drop onto the "+N" tile (appends), onto the Tier Rail, onto a tier tab, or reorder within a tier page's list. Rows tint in their tier color while hovered.
+- Drop position is cursor-aware (shown by an accent insertion bar).
 - Changes are staged locally first; nothing touches real YouTube data until you sync.
 
 ## Sync to YouTube
-- A floating **staged-changes bar** (bottom-center, above the mini player) appears only when there are real staged changes: "N changes staged" / "Discard" / "Push to YouTube ⇧P". Compact on phones.
+- A floating **staged-changes bar** (bottom-center, above the mini player) appears on every page of a board (tier list, tier page, quick sort) whenever there are staged changes: "N changes staged · review" / "Discard" / "Push to YouTube ⇧P". Compact on phones. After a push it briefly reports "Synced to YouTube" / "Some changes failed" / "Sync failed".
 - Clicking "N changes staged" opens a popup (Mantine `Modal`) itemizing every staged change (video, from tier → to tier, or a duplicate removal - see below).
 - "Push to YouTube" calls the backend, which inserts each video into its new playlist before removing it from the old one (so a failed delete never loses a video). Partial failures are reported per item.
 - "Discard" reverts the board back to what's actually on YouTube.
-- `Shift+P` pushes pending changes (only when there are any), same as the button / palette action.
-- Sync result feedback: "Synced", "Some failed", or "Sync failed" badge next to the controls.
+- `Shift+P` pushes pending changes (only when there are any) from any board page, same as the button / palette action.
 
 ## Duplicate cleanup
 - If the same video genuinely exists in two of a board's real tier playlists at once, the lower-tier copy is automatically staged as a pending removal (kept: the highest tier it's in; removed: every other copy) - no manual action needed to flag it.
@@ -41,26 +58,34 @@
 
 ## Video focus modal
 - Click any thumbnail to open a modal with a real, playable embedded YouTube player (via the official IFrame Player API — not a raw iframe), so playback failures (embedding disabled) are detected and shown with a clear fallback + "Open on YouTube" link.
-- Keyboard shortcuts: `Esc` close, `←`/`→` or `h`/`l` (vim-style) to move prev/next, `Shift+1`–`Shift+N` to reassign the current video's tier.
+- Keyboard shortcuts: `Esc` close, `←`/`→` or `h`/`l` (vim-style) to move prev/next, `Shift+1`–`Shift+N` to re-rate the current video (in every player mode - expanded, mini bar or floating - while you're on its board).
+- Expanded view: an **"Up next" queue** beside the video (click any entry to jump to it; shows position and a Shuffle badge), and a backdrop glow in the playing song's tier color.
+- Mini bar: tier chips for the playing song (click to re-rate), next to the volume controls.
 - Navigation walks the whole board in tier order — reaching the end of one tier's videos rolls straight into the next tier instead of stopping.
 - The browsing order is frozen the moment the modal opens, so reassigning a video's tier mid-browse never disturbs where "next" takes you.
 - When a video finishes playing, it automatically advances to the next one (same tier first, then the next tier).
-- Tier pills at the bottom show the current tier and let you reassign with a click as well as a shortcut.
+- "Rate" tier chips under the expanded video show the current tier and re-rate with a click as well as a shortcut.
 
 ## Shuffle play
-- A "🔀 Shuffle play" button on each tier board opens the focus modal on a random video from that board and auto-advances through a shuffled order (a "🔀 Shuffle" badge marks the session as shuffled). Uses the same auto-advance-on-end and prev/next controls as normal browsing.
-
-- Each tier row also has its own shuffle button that shuffles just that tier.
+- The board's Shuffle button opens the player on a random video from the board and auto-advances through a shuffled order (a "Shuffle" badge marks the session). Each tier row / tier page also shuffles just that tier. "Play" / "Play from T2" plays in tier order instead.
 
 ## Command palette
-- `Cmd/Ctrl+K` opens a fuzzy-searchable palette to jump straight to any tier board or playlist, or trigger contextual actions (start a duel, sync/discard pending changes) without leaving the keyboard.
+- `Cmd/Ctrl+K` opens a fuzzy-searchable palette to jump straight to any tier board, tier, or playlist, or trigger contextual actions (quick sort, start a duel, sync/discard pending changes) without leaving the keyboard.
+
+## Quick sort
+- `/tier/<board>/sort` (Rank ▾ → Quick sort, a board card, or a tier page): pick the whole board or one tier, shuffled or top-to-bottom, and start (`Enter`).
+- Each song plays in the normal player (minimized); big cover with a glow in its current tier's color, the title, its current tier, and one giant button per tier (`1`-`5`, current tier = "keep"). Rating files it and plays the next; `S` skips, `U` undoes. Progress ("12 of 40 sorted · 5 moved") and the next three songs are shown.
+- Follows the player: its own next/prev and auto-advance keep the session in step; if the player is stopped there's a "Resume" button. The end screen lists every change, with Undo / Sort more / Back to tier list. Changes are staged like any other edit.
+
+## Share as an image
+- Board → Share: a tier-list poster (board title, one row per tier with covers, "+N" overflow, small credit) with 10/20/40/80 covers per tier; **Download PNG** or **Copy image** to the clipboard.
 
 ## Duels (pairwise ranking)
-- "Start duel" on a tier board launches a side-by-side comparison flow: two videos at a time, pick the one that deserves the higher tier.
+- Rank ▾ → Duel on a tier board (or a Home card) launches a side-by-side comparison flow: two videos at a time, pick the one that deserves the higher tier.
 - Each duel card can toggle a live embedded player preview (only one plays at a time) so you can actually watch/listen before choosing, plus a tier badge showing the video's current tier.
 - Keyboard: `←` left wins, `→` right wins, `space` skip (strategy-dependent), `u` undo.
 - Progress bar + "X of Y duels · Z% settled" status.
-- Finishing a duel run re-applies the resulting order back onto the board's existing tier sizes (each tier keeps its current video count, just refilled from the new ranking).
+- Finishing a duel run re-applies the resulting order back onto the board's existing tier sizes (each tier keeps its current video count, just refilled from the new ranking) - as one undoable step.
 
 ### Duel strategies (Strategy pattern)
 Swappable at runtime via a dropdown on the duel screen (and persisted as a default via Settings):
@@ -71,16 +96,19 @@ Swappable at runtime via a dropdown on the duel screen (and persisted as a defau
 ## Settings
 - Dedicated, persistent Settings page (GitHub-style layout: side nav + content), reachable via a gear icon in the sidebar or the `/settings` route.
 - Choose the default duel strategy from here; the choice is shared with the in-duel dropdown and persisted in `localStorage`.
+- "Keyboard shortcuts" tab: the full shortcut list (same source as the `?` modal).
 
 ## Routing
-- Real, refreshable URLs via the native History API: `/`, `/playlist/<id>`, `/tier/<category>`, `/tier/<category>/duel`, `/settings`.
+- Real, refreshable URLs (React Router): `/`, `/playlist/<id>`, `/tier/<category>`, `/tier/<category>/t/<tier>`, `/tier/<category>/sort`, `/tier/<category>/duel`, `/settings`. Refreshing directly on any board URL loads it correctly (previously a refresh could leave a board blank until you navigated away and back).
 - Refreshing or using browser back/forward lands back on the exact board, playlist, or duel you were on.
 
 ## Keyboard shortcuts (full list)
-Source of truth is `frontend/src/shortcuts.js` (also rendered by the `?` help modal) - keep this list in sync with it.
-- Global: `Ctrl/Cmd+K` command palette, `?` shortcut help.
-- Tier board: `/` search, `n` / `N` next/previous match, `Enter` play match (or step), `Esc` close search, `Shift+P` push to YouTube.
-- Player: `h` / `l` prev/next track, `←`/`→` seek 10s (expanded), `Space` play/pause, `m` mute, `0`-`9` jump to that 10% (works anywhere), `j` minimize (expanded → mini → floating), `k` expand, `Esc` minimize from expanded, `Shift+1`-`9` move the playing video to that tier.
+Source of truth is `frontend/src/shortcuts.js` (rendered by the `?` modal and Settings → Keyboard shortcuts) - keep this list in sync with it.
+- Global: `Ctrl/Cmd+K` command palette, `?` shortcut help, `Ctrl/Cmd+Z` undo last tier edit.
+- Tier board: `/` search, `n` / `N` next/previous match, `Enter` play match (or step), `Esc` close search, `Shift+P` push to YouTube (any board page).
+- Tier page: `/` filter, `Ctrl/Cmd+A` select all shown, `Shift+Click` range select, `Esc` clear selection/filter.
+- Quick sort: `1`-`9` file into that tier, `S` skip, `U` undo, `Enter` start.
+- Player: `h` / `l` prev/next track, `←`/`→` seek 10s (expanded), `Space` play/pause, `m` mute, `0`-`9` jump to that 10% (anywhere except Quick sort), `j` minimize (expanded → mini → floating), `k` expand, `Esc` minimize from expanded, `Shift+1`-`9` rate the playing video (any mode, on its board).
 - Duel: `←` / `→` pick left/right, `Space` skip, `u` undo.
 
 ## Architecture
