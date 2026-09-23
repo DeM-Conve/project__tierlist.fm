@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useDispatch } from 'react-redux';
 import {
   ActionIcon,
@@ -24,20 +24,55 @@ import { TierMixBar, TierTile } from './TierBits';
 import { TIER_INK, indexForPointInFlow, videoMatches } from '../tierUtils';
 
 const GAP = 8;
+// A row's fixed vertical chrome around its tile lines: 2 x (4px box padding
+// + 4px inner padding) + the 1px top border.
+const ROW_CHROME = 4 * GAP / 2 + 1;
+
+// Tiles per line in a row whose tile area is `width` wide.
+// (width - 8): the inner row keeps 4px each side so focus/search rings aren't clipped.
+function tilesPerLine(width, size) {
+  return Math.max(1, Math.floor((width - 8 + GAP) / (size + GAP)));
+}
+
+// Splits `budget` tile lines between rows: every row gets one, then each
+// spare line goes to whichever row still hides the most songs - so a big
+// tier grows first and a tier that already fits never takes more space.
+function allocateLines(counts, perLine, budget) {
+  const lines = counts.map(() => 1);
+  let left = budget - counts.length;
+  while (left > 0) {
+    let best = -1;
+    let bestHidden = 0;
+    counts.forEach((c, i) => {
+      const hidden = c - lines[i] * perLine;
+      if (hidden > bestHidden) {
+        best = i;
+        bestHidden = hidden;
+      }
+    });
+    if (best < 0) break;
+    lines[best] += 1;
+    left -= 1;
+  }
+  return lines;
+}
 
 function DropIndicator({ size }) {
   return <Box w={3} h={size} bg="accent" style={{ borderRadius: 2, flexShrink: 0 }} />;
 }
 
-// One compact tier row. Shows as many tiles as fit on ONE line and folds the
-// rest into a "+N" tile that opens the tier on its own page - so the whole
-// board always fits on one screen, however big a tier gets.
+// One tier row. Shows `lines` lines of tiles (the board sizes that so every
+// row together fills the screen) and folds the rest into a "+N" tile that
+// opens the tier on its own page - so the whole board always fits on one
+// screen, however big a tier gets.
 function TierRow({
   tier,
   tiers,
   items,
   loading,
   size,
+  lines = 1,
+  onMeasure,
   searchActive,
   matchedKeys,
   activeMatchKey,
@@ -51,6 +86,9 @@ function TierRow({
 }) {
   const dnd = useTierDnd();
   const { ref: sizeRef, width } = useElementSize();
+  useEffect(() => {
+    if (width > 0) onMeasure?.(width);
+  }, [width, onMeasure]);
   const contentRef = useRef(null);
   const [overIndex, setOverIndex] = useState(null);
   const isOver = dnd.dragOverTier === tier;
@@ -60,8 +98,8 @@ function TierRow({
 
   const shown = searchActive ? items?.filter((v) => matchedKeys.has(`${tier}:${v.videoId}`)) : items;
   const total = shown?.length ?? 0;
-  // (width - 8): the inner row keeps 4px each side so focus/search rings aren't clipped.
-  const fit = Math.max(1, Math.floor((width - 8 + GAP) / (size + GAP)));
+  const perLine = tilesPerLine(width, size);
+  const fit = perLine * lines;
   // While searching, show every match (wrapping) so n/N can always reach it.
   const truncated = !searchActive && total > fit;
   const visible = truncated ? shown.slice(0, fit - 1) : shown || [];
@@ -156,9 +194,9 @@ function TierRow({
       </UnstyledButton>
 
       <Box ref={sizeRef} style={{ flex: 1, minWidth: 0 }} p={GAP - 4}>
-        <Group ref={contentRef} gap={GAP} wrap={searchActive ? 'wrap' : 'nowrap'} mih={size} p={4} style={{ overflow: 'hidden' }}>
+        <Group ref={contentRef} gap={GAP} wrap={searchActive || lines > 1 ? 'wrap' : 'nowrap'} mih={size} p={4} style={{ overflow: 'hidden' }}>
           {loading &&
-            Array.from({ length: Math.min(fit, 8) }).map((_, i) => <Skeleton key={i} w={size} h={size} radius={6} />)}
+            Array.from({ length: Math.min(perLine, 8) }).map((_, i) => <Skeleton key={i} w={size} h={size} radius={6} />)}
           {!loading && total === 0 && (
             <Box
               h={size}
@@ -285,6 +323,38 @@ export default function TierBoardView({
     [pendingMoves]
   );
 
+  // Fit the board to the screen: measure what's left of the viewport under
+  // the header (and above the mini player / footer), turn it into tile
+  // lines, and share them out between the rows (allocateLines). Only a
+  // board too big for even one line per tier scrolls.
+  const { ref: viewportRef, height: viewportHeight } = useElementSize();
+  const { ref: headerRef, height: headerHeight } = useElementSize();
+  const { ref: footerRef, height: footerHeight } = useElementSize();
+  const rowsRef = useRef(null);
+  const [rowsTop, setRowsTop] = useState(0);
+  const [rowWidth, setRowWidth] = useState(0);
+  useLayoutEffect(() => {
+    const el = rowsRef.current;
+    if (el) setRowsTop(el.getBoundingClientRect().top + window.scrollY);
+  }, [headerHeight, viewportHeight]);
+
+  const rowTiers = hasTodo ? [TODO_TIER, ...tiers] : tiers;
+  const perLine = tilesPerLine(rowWidth, tileSize);
+  const pendingPad = pendingMoves.length > 0 ? 80 : 0;
+  // 32 = the canvas's own bottom padding; the TODO row is a separate card
+  // (16px margin + its 2px of borders).
+  const available = viewportHeight - rowsTop - footerHeight - pendingPad - 32 - (hasTodo ? 18 : 0) - 1;
+  const lineBudget = Math.floor((available - rowTiers.length * (ROW_CHROME - GAP)) / (tileSize + GAP));
+  const rowLines = useMemo(() => {
+    const allocated = allocateLines(
+      rowTiers.map((t) => tierItems[t]?.length ?? 0),
+      perLine,
+      rowWidth > 0 && viewportHeight > 0 ? lineBudget : 0
+    );
+    return Object.fromEntries(rowTiers.map((t, i) => [t, allocated[i]]));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rowTiers.join(), tierItems, perLine, lineBudget, rowWidth, viewportHeight]);
+
   function move(fromTier, toTier, videoId, dropIndex) {
     dispatch(moveWithFeedback([{ fromTier, toTier, videoId, dropIndex }]));
   }
@@ -398,7 +468,15 @@ export default function TierBoardView({
   const searchActive = queryText.trim().length > 0;
 
   return (
-    <Box component="section" pb={pendingMoves.length > 0 ? 80 : 0}>
+    <Box component="section" pb={pendingPad}>
+      {/* Invisible, viewport-sized (minus the mini player) - measured so the
+          board knows how much height it can fill. */}
+      <Box
+        ref={viewportRef}
+        aria-hidden
+        style={{ position: 'fixed', top: 0, bottom: 'var(--player-dock-height)', width: 0, visibility: 'hidden', pointerEvents: 'none' }}
+      />
+      <Box ref={headerRef}>
       <Group justify="space-between" align="flex-end" wrap="wrap" gap="md" mb="md">
         <Stack gap={4}>
           <Text fz={11} fw={800} tt="uppercase" c="accent" style={{ letterSpacing: 1.5 }}>
@@ -456,6 +534,9 @@ export default function TierBoardView({
           <TierMixBar tiers={tiers} counts={counts} size={18} labels onSegmentClick={onOpenTier} />
         </Box>
       )}
+      </Box>
+
+      <Box ref={rowsRef}>
 
       {unknownTiers && (
         <Paper withBorder radius="md" style={{ overflow: 'hidden' }} bg="var(--surface)">
@@ -478,6 +559,8 @@ export default function TierBoardView({
             items={tierItems[TODO_TIER]}
             loading={tierLoading[TODO_TIER]}
             size={tileSize}
+            lines={rowLines[TODO_TIER]}
+            onMeasure={setRowWidth}
             searchActive={searchActive}
             matchedKeys={matchedKeys}
             activeMatchKey={activeMatchKey}
@@ -501,6 +584,8 @@ export default function TierBoardView({
             items={tierItems[t]}
             loading={tierLoading[t]}
             size={tileSize}
+            lines={rowLines[t]}
+            onMeasure={setRowWidth}
             searchActive={searchActive}
             matchedKeys={matchedKeys}
             activeMatchKey={activeMatchKey}
@@ -514,7 +599,10 @@ export default function TierBoardView({
           />
         ))}
       </Paper>
+      </Box>
 
+      {/* flow-root so the children's top margins count toward the measured height. */}
+      <Box ref={footerRef} style={{ display: 'flow-root' }}>
       {!anyLoading && tiers.length > 0 && (tiers.length < TIER_ORDER.length || !hasTodo) && (
         <Group justify="center" mt="sm" gap="xs">
           {tiers.length < TIER_ORDER.length && (
@@ -549,6 +637,7 @@ export default function TierBoardView({
           Drag tiles between tiers (or onto the rail) · click a tile to play · click a tier to see all of it · Ctrl+Z undoes
         </Text>
       )}
+      </Box>
 
       {searchOpen && (
         <Paper
