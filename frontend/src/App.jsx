@@ -82,7 +82,7 @@ import {
   selectFocusedVideoData,
   selectFocusedAvailableTiers,
 } from './store/selectors';
-import { api, API_BASE } from './api/client';
+import { api, API_BASE, errorMessage } from './api/client';
 import {
   useAuthStatusQuery,
   usePlaylistsQuery,
@@ -257,13 +257,18 @@ function Layout() {
     if (!ids.length) return false;
     Promise.allSettled(ids.map(fetchVideo)).then((results) => {
       const videos = results.filter((r) => r.status === 'fulfilled').map((r) => r.value);
-      const missing = results.length - videos.length;
+      const failed = results.filter((r) => r.status === 'rejected');
       if (videos.length) {
         dispatch(addVideos(videos));
         navigate('/add');
       }
-      if (missing) {
-        notifications.show({ color: 'red', message: `Couldn’t find ${missing === 1 ? 'that video' : `${missing} of those videos`} on YouTube` });
+      if (failed.length) {
+        const count = failed.length === 1 ? 'that song' : `${failed.length} of those songs`;
+        notifications.show({
+          color: 'red',
+          title: `Couldn’t add ${count}`,
+          message: errorMessage(failed[0].reason, 'The app couldn’t reach YouTube.'),
+        });
       }
     });
     return true;

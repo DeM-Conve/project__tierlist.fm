@@ -2,6 +2,7 @@ import { useDispatch, useSelector, useStore } from 'react-redux';
 import { Button, Group, Kbd, Text } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 import { useAddToPlaylistMutation, useRemovePlaylistItemMutation } from '../api/queries';
+import { errorMessage } from '../api/client';
 import { selectTierGroups } from '../store/selectors';
 import { recordAction, revertAction } from '../store/addSongsSlice';
 import { addSyncedVideo, removeSyncedVideo } from '../store/tiersSlice';
@@ -102,9 +103,9 @@ export function useAddSongsActions(addSongs) {
       return item;
     });
     pendingAdds.set(video.videoId, request);
-    request.catch(() => {
+    request.catch((error) => {
       dispatch(revertAction(entry));
-      toast(`Couldn't add "${song}" to ${category} · ${tier} - YouTube refused`, null, 'red');
+      toast(`Couldn't add "${song}" to ${category} · ${tier} - ${errorMessage(error, 'YouTube refused')}`, null, 'red');
     });
     toast(`"${song}" → ${category} · ${tier}`, () => undo(entry));
   }

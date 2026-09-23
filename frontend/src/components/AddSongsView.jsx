@@ -27,6 +27,7 @@ import { TIER_COLORS, TIER_ORDER, TODO_TIER } from '../tiers';
 import { selectPlayerCoversPage, selectTierCategories, selectTierGroups } from '../store/selectors';
 import { addVideos, chooseBoard, setCurrent } from '../store/addSongsSlice';
 import { useSongSearchQuery } from '../api/queries';
+import { errorMessage } from '../api/client';
 import { videoIdsFromText } from '../addSongs/youtubeLink';
 import { isSequenceKey } from '../keyboard/sequence';
 import { songLabel, TIER_INK, youtubeUrl } from '../tierUtils';
@@ -167,7 +168,7 @@ function SongInput({ inputRef, onAddLinks, placed, onPick }) {
           )}
           {search.isError && (
             <Text fz="sm" c="dimmed" p="sm">
-              Search didn’t work (YouTube may be out of search quota for today). Pasting a link still works.
+              Search didn’t work - {errorMessage(search.error, 'the app couldn’t reach YouTube.')} Pasting a link still works.
             </Text>
           )}
           {!search.isFetching && search.isSuccess && !results.length && (
