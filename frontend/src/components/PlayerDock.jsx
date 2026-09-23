@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { ActionIcon, Badge, Box, Button, Group, Image, ScrollArea, Slider, Stack, Text, UnstyledButton } from '@mantine/core';
+import { ActionIcon, Badge, Button, Group, Slider, Stack, Text } from '@mantine/core';
 import {
   ChevronDown,
   ChevronUp,
@@ -18,7 +18,8 @@ import {
   X,
 } from 'lucide-react';
 import { REMOVED_TIER, TIER_COLORS, TODO_TIER } from '../tiers';
-import { EqualizerMark, TierChip } from './TierBits';
+import { TierChip } from './TierBits';
+import QueuePanel from './QueuePanel';
 import EmbeddedPlayer from './EmbeddedPlayer';
 import { isSequenceKey } from '../keyboard/sequence';
 
@@ -35,10 +36,6 @@ import { isSequenceKey } from '../keyboard/sequence';
 // floating corner (both already "down", so j between them just swaps which
 // minimized view you're in) - it never wraps back up to expanded on its
 // own. k (up) always jumps straight back to expanded, from any state.
-// How many upcoming / already-played queue entries the expanded view
-// renders at once around the current song.
-const QUEUE_PREVIEW = 80;
-const QUEUE_HISTORY = 30;
 
 const PLAYER_MODE_TRANSITIONS = {
   expanded: { down: 'mini', up: 'expanded' },
@@ -62,16 +59,16 @@ export default function PlayerDock({
   onPrev,
   onNext,
   onChangeTier,
-  queue = [],
-  queueIndex = -1,
+  queue,
   onJump,
   onRemove,
+  onMoveInQueue,
+  onClearUpNext,
+  onShuffleUpcoming,
+  repeatMode = 'off',
+  onCycleRepeat,
 }) {
   const cardRef = useRef(null);
-  // Keeps the current song pinned near the top of the queue panel as the
-  // queue advances - played songs stay one scroll up, like YouTube Music.
-  const queueViewportRef = useRef(null);
-  const currentRowRef = useRef(null);
   const playerRef = useRef(null);
   const [isPlaying, setIsPlaying] = useState(true);
   const [progressPct, setProgressPct] = useState(0);
@@ -81,11 +78,9 @@ export default function PlayerDock({
   // the way a hardware volume knob would - dragging the slider itself to 0
   // is just another way of reaching muted, not a separate state.
   const lastVolumeRef = useRef(100);
-  // Like YouTube Music's repeat toggle, but just the one "repeat this song"
-  // state (not the off/repeat-all/repeat-one three-way cycle) - repeat-all
-  // would need to wrap the active sequence back to its own start, which is
-  // App.jsx's queue data, not something this component has.
-  const [repeatOne, setRepeatOne] = useState(false);
+  // Repeat lives in focusSlice (off -> all -> one, YouTube Music's cycle):
+  // repeat-all has to wrap the queue itself, which is App's state.
+  const repeatOne = repeatMode === 'one';
   const expanded = mode === 'expanded';
   // "Floating corner" mode: an in-page floating box pinned to the bottom-right
   // corner, the way YouTube Music's own in-app miniplayer works. This is
@@ -105,16 +100,6 @@ export default function PlayerDock({
   useEffect(() => {
     if (expanded) cardRef.current?.focus();
   }, [expanded]);
-
-  // Scroll the queue so the current song sits just below the top edge,
-  // with a sliver of the last played song showing above it.
-  useEffect(() => {
-    const viewport = queueViewportRef.current;
-    const row = currentRowRef.current;
-    if (!expanded || !viewport || !row) return;
-    const top = row.getBoundingClientRect().top - viewport.getBoundingClientRect().top + viewport.scrollTop;
-    viewport.scrollTo({ top: Math.max(0, top - 28), behavior: 'smooth' });
-  }, [expanded, queueIndex, queue.length]);
 
   // The mini bar is fixed to the bottom of the viewport, so anything else
   // fixed/scrollable at the page's own bottom (the sidebar's footer, the
@@ -343,13 +328,6 @@ export default function PlayerDock({
 
   const iconSize = expanded ? 20 : 18;
   const btnSize = expanded ? 38 : 30;
-  // One continuous list, YouTube-Music style: what's been played sits above
-  // the current song (dimmed), what's next below it.
-  const windowStart = Math.max(0, queueIndex - QUEUE_HISTORY);
-  const queueWindow = queue.slice(windowStart, queueIndex + 1 + QUEUE_PREVIEW);
-  const earlierCount = windowStart;
-  const moreCount = Math.max(0, queue.length - windowStart - queueWindow.length);
-  const nowTier = currentTier ?? queue[queueIndex]?.tier;
 
   return (
     <div
@@ -380,14 +358,14 @@ export default function PlayerDock({
 
         <Group className="player-dock-toolbar" gap={6} wrap="nowrap">
           <ActionIcon
-            variant={repeatOne ? 'filled' : 'default'}
+            variant={repeatMode !== 'off' ? 'filled' : 'default'}
             color="accent"
             radius="xl"
             size={mode === 'mini' ? 26 : 30}
-            onClick={() => setRepeatOne((r) => !r)}
-            aria-label={repeatOne ? 'Repeat this song: on' : 'Repeat this song: off'}
-            aria-pressed={repeatOne}
-            title={repeatOne ? 'Repeat: on' : 'Repeat: off'}
+            onClick={onCycleRepeat}
+            aria-label={`Repeat: ${repeatMode === 'one' ? 'this song' : repeatMode === 'all' ? 'the whole queue' : 'off'}`}
+            aria-pressed={repeatMode !== 'off'}
+            title={`Repeat: ${repeatMode === 'one' ? 'this song' : repeatMode === 'all' ? 'all' : 'off'}`}
           >
             {repeatOne ? <Repeat1 size={16} /> : <Repeat size={16} />}
           </ActionIcon>
@@ -421,7 +399,7 @@ export default function PlayerDock({
                 <EmbeddedPlayer
                   key={video.videoId}
                   videoId={video.videoId}
-                  onEnded={repeatOne ? replayCurrent : hasNext ? onNext : undefined}
+                  onEnded={repeatOne ? replayCurrent : hasNext || repeatMode === 'all' ? onNext : undefined}
                   onPlayerReady={(p) => {
                     playerRef.current = p;
                     // A new EmbeddedPlayer instance mounts per video (its own
@@ -588,109 +566,17 @@ export default function PlayerDock({
           )}
         </div>
 
-        {expanded && queue.length > 1 && (
+        {expanded && queue && (
           <aside className="player-queue">
-            <Group h={30} gap={8} wrap="nowrap" className="player-queue-head">
-              <Text fz={11} fw={800} tt="uppercase" c="dimmed" style={{ letterSpacing: 1 }}>
-                Queue
-              </Text>
-              <Text fz="xs" c="dimmed">
-                {queueIndex + 1} / {queue.length}
-              </Text>
-            </Group>
-
-            <ScrollArea
-              viewportRef={queueViewportRef}
-              mt={12}
-              style={{ flex: 1, minHeight: 0 }}
-              type="hover"
-              scrollbarSize={6}
-              offsetScrollbars
-            >
-              <Stack gap={2}>
-                {earlierCount > 0 && (
-                  <Text fz="xs" c="dimmed" ta="center" py={6}>
-                    {earlierCount} earlier
-                  </Text>
-                )}
-                {queueWindow.map((entry, i) => {
-                  const idx = windowStart + i;
-                  const isCurrent = idx === queueIndex;
-                  const played = idx < queueIndex;
-                  const tier = isCurrent ? nowTier : entry.tier;
-                  return (
-                    <Group
-                      key={entry.video.videoId}
-                      ref={isCurrent ? currentRowRef : undefined}
-                      className="queue-row"
-                      gap={4}
-                      wrap="nowrap"
-                      pr={4}
-                      bg={isCurrent ? 'color-mix(in srgb, var(--accent) 14%, transparent)' : undefined}
-                      opacity={played ? 0.55 : 1}
-                      aria-current={isCurrent ? 'true' : undefined}
-                      style={{ borderRadius: 8 }}
-                    >
-                      <UnstyledButton
-                        onClick={isCurrent ? undefined : () => onJump?.(idx)}
-                        px={6}
-                        py={6}
-                        style={{ flex: 1, minWidth: 0, cursor: isCurrent ? 'default' : undefined }}
-                      >
-                        <Group gap={10} wrap="nowrap">
-                          <Box w={22} style={{ flexShrink: 0, display: 'flex', justifyContent: 'flex-end' }}>
-                            {isCurrent ? (
-                              <EqualizerMark color="var(--accent)" height={11} />
-                            ) : (
-                              <Text fz={11} c="dimmed" style={{ fontVariantNumeric: 'tabular-nums' }}>
-                                {idx + 1}
-                              </Text>
-                            )}
-                          </Box>
-                          <Image src={entry.video.thumbnail} w={40} h={40} radius={6} fit="cover" alt="" />
-                          <Box style={{ flex: 1, minWidth: 0 }}>
-                            <Text fz="sm" fw={isCurrent ? 700 : 500} c={isCurrent ? 'accent' : undefined} truncate="end">
-                              {entry.video.title}
-                            </Text>
-                            <Text fz="xs" c="dimmed" truncate="end">
-                              {entry.video.channelTitle}
-                            </Text>
-                          </Box>
-                          {tier && <TierChip tier={tier} size={20} />}
-                        </Group>
-                      </UnstyledButton>
-                      {onRemove && !isCurrent ? (
-                        <ActionIcon
-                          className="queue-row-remove"
-                          variant="subtle"
-                          color="gray"
-                          radius="xl"
-                          size={26}
-                          onClick={() => onRemove(entry.video.videoId)}
-                          aria-label="Remove from queue"
-                          title="Remove from queue"
-                        >
-                          <X size={14} />
-                        </ActionIcon>
-                      ) : (
-                        <Box w={26} style={{ flexShrink: 0 }} />
-                      )}
-                    </Group>
-                  );
-                })}
-                {moreCount > 0 ? (
-                  <Text fz="xs" c="dimmed" ta="center" py={8}>
-                    + {moreCount} more
-                  </Text>
-                ) : (
-                  queueIndex === queue.length - 1 && (
-                    <Text fz="xs" c="dimmed" ta="center" py={8}>
-                      End of the queue
-                    </Text>
-                  )
-                )}
-              </Stack>
-            </ScrollArea>
+            <QueuePanel
+              queue={queue}
+              current={{ ...queue.current, tier: currentTier ?? queue.current.tier }}
+              onJump={onJump}
+              onRemove={onRemove}
+              onMove={onMoveInQueue}
+              onClearUpNext={onClearUpNext}
+              onShuffle={onShuffleUpcoming}
+            />
           </aside>
         )}
       </div>
