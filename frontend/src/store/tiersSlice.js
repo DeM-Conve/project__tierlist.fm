@@ -146,7 +146,7 @@ const tiersSlice = createSlice({
       pushUndo(state);
       applyMove(state, action.payload);
     },
-    // A batch (bulk "Move to", quick-sort rating, ...) is one undo step.
+    // A batch (bulk "Move to", a duel result, ...) is one undo step.
     moveVideos: (state, action) => {
       pushUndo(state);
       action.payload.moves.forEach((m) => applyMove(state, m));

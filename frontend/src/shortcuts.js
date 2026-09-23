@@ -51,7 +51,7 @@ export const SHORTCUTS = [
   {
     id: 'player-seek-percent',
     keys: ['0-9'],
-    description: 'Jump to that 10% of the video (0 = start, 9 = 90%) - works anywhere except Quick sort, where digits rate',
+    description: 'Jump to that 10% of the video (0 = start, 9 = 90%)',
     category: 'Player',
   },
   {
@@ -73,11 +73,6 @@ export const SHORTCUTS = [
     description: 'Rate the playing video into that tier (any player mode, on its own board)',
     category: 'Player',
   },
-
-  { id: 'sort-rate', keys: ['1-9'], description: 'File the song into that tier and play the next', category: 'Quick sort' },
-  { id: 'sort-skip', keys: ['S'], description: 'Skip (keep its tier)', category: 'Quick sort' },
-  { id: 'sort-undo', keys: ['U'], description: 'Undo the last rating', category: 'Quick sort' },
-  { id: 'sort-start', keys: ['Enter'], description: 'Start sorting (setup screen)', category: 'Quick sort' },
 
   { id: 'duel-left', keys: ['←'], description: 'Pick the left video', category: 'Duel' },
   { id: 'duel-right', keys: ['→'], description: 'Pick the right video', category: 'Duel' },

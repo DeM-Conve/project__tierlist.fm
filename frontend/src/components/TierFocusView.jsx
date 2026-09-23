@@ -19,7 +19,7 @@ import {
   Tooltip,
   UnstyledButton,
 } from '@mantine/core';
-import { ArrowLeft, ArrowUpToLine, ListOrdered, MoreHorizontal, Play, Search, Shuffle } from 'lucide-react';
+import { ArrowLeft, ArrowUpToLine, MoreHorizontal, Play, Search, Shuffle } from 'lucide-react';
 import { TIER_COLORS } from '../tiers';
 import { moveWithFeedback, useTierDnd } from '../tierActions';
 import { EqualizerMark, MoveMenu, TierChip } from './TierBits';
@@ -136,7 +136,6 @@ export default function TierFocusView({
   onPlay,
   onPlayFrom,
   onShuffle,
-  onQuickSort,
   onBack,
   onSwitchTier,
 }) {
@@ -253,9 +252,6 @@ export default function TierFocusView({
           </Stack>
         </Group>
         <Group gap="xs">
-          <Button variant="default" leftSection={<ListOrdered size={15} />} onClick={() => onQuickSort(tier)} disabled={!items.length}>
-            Quick sort {tier}
-          </Button>
           <Button variant="default" leftSection={<Shuffle size={15} />} onClick={() => onShuffle(tier)} disabled={!items.length}>
             Shuffle
           </Button>

@@ -10,7 +10,6 @@ import {
   useParams,
   useMatch,
   useOutletContext,
-  useSearchParams,
 } from 'react-router-dom';
 import { spotlight } from '@mantine/spotlight';
 import { ActionIcon, Affix, Box, Center, Loader } from '@mantine/core';
@@ -22,8 +21,6 @@ import { TIER_ORDER } from './tiers';
 import Sidebar from './components/Sidebar';
 import HomeView from './components/HomeView';
 import TierFocusView from './components/TierFocusView';
-import QuickSortView from './components/QuickSortView';
-import ShareTierListModal from './components/ShareTierListModal';
 import CreateTierPlaylistsModal from './components/CreateTierPlaylistsModal';
 import TierRail, { RAIL_WIDTH } from './components/TierRail';
 import PendingChanges from './components/PendingChanges';
@@ -181,7 +178,6 @@ export default function App() {
         <Route path="playlist/:id" element={<ItemsPage />} />
         <Route path="tier/:category" element={<TierBoardPage />} />
         <Route path="tier/:category/t/:tier" element={<TierFocusPage />} />
-        <Route path="tier/:category/sort" element={<QuickSortPage />} />
         <Route path="tier/:category/duel" element={<DuelPage />} />
         <Route path="settings" element={<SettingsPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
@@ -384,12 +380,6 @@ function Layout() {
       action: () => navigate('/'),
     });
     if (currentCategory) {
-      list.push({
-        id: 'action-quicksort',
-        section: 'Actions',
-        label: `Quick sort ${currentCategory}`,
-        action: () => navigate(`/tier/${encodeURIComponent(currentCategory)}/sort`),
-      });
       for (const t of TIER_ORDER.filter((x) => tierGroups[currentCategory]?.[x])) {
         list.push({
           id: `open-tier-${t}`,
@@ -499,7 +489,7 @@ function useCategoryParam() {
   return decodeURIComponent(rawCategory);
 }
 
-// Shared by every page of a board (tier list, tier focus, quick sort, duel):
+// Shared by every page of a board (tier list, tier focus, duel):
 // marks it as the current board, bounces unknown boards home, and loads
 // (or reuses - see loadedCategory) its tiers.
 function useBoardPage(category) {
@@ -575,7 +565,6 @@ function HomePage() {
       onQueryChange={(q) => dispatch(setQuery(q))}
       nowPlaying={playingVideo ? { video: playingVideo, category: focusedCategory } : null}
       onOpenBoard={(c) => navigate(`/tier/${encodeURIComponent(c)}`)}
-      onQuickSort={(c) => navigate(`/tier/${encodeURIComponent(c)}/sort`)}
       onDuel={(c) => navigate(`/tier/${encodeURIComponent(c)}/duel`)}
       onOpenPlaylist={(p) => navigate(`/playlist/${encodeURIComponent(p.id)}`)}
     />
@@ -620,8 +609,7 @@ function TierBoardPage() {
   const tierItems = useSelector((s) => s.tiers.tierItems);
   const pendingMoves = useSelector(selectPendingMoves);
   const playingVideoId = useSelector(selectPlayingVideoIdOnBoard);
-  const { tierGroups, tiers, tierLoading, isLoading } = useBoardPage(category);
-  const [shareOpen, setShareOpen] = useState(false);
+  const { tierGroups, tierLoading, isLoading } = useBoardPage(category);
   const [addingTiers, setAddingTiers] = useState(false);
   const base = `/tier/${encodeURIComponent(category)}`;
 
@@ -642,17 +630,8 @@ function TierBoardPage() {
         onPlayFrom={playFrom}
         onShufflePlay={startShufflePlay}
         onStartDuel={() => navigate(`${base}/duel`)}
-        onQuickSort={(t) => navigate(`${base}/sort${t ? `?tier=${t}` : ''}`)}
         onOpenTier={(t) => navigate(`${base}/t/${t}`)}
-        onShare={() => setShareOpen(true)}
         onAddMissingTiers={() => setAddingTiers(true)}
-      />
-      <ShareTierListModal
-        opened={shareOpen}
-        onClose={() => setShareOpen(false)}
-        category={category}
-        tiers={tiers}
-        tierItems={tierItems}
       />
     </BoardShell>
   );
@@ -701,35 +680,9 @@ function TierFocusPage() {
         onPlay={openFocus}
         onPlayFrom={playFrom}
         onShuffle={startShufflePlay}
-        onQuickSort={(t) => navigate(`${base}/sort?tier=${t}`)}
         onBack={() => navigate(base)}
         onSwitchTier={(t) => navigate(`${base}/t/${t}`, { replace: true })}
       />
-    </BoardShell>
-  );
-}
-
-function QuickSortPage() {
-  const category = useCategoryParam();
-  const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
-  const { tiers, isLoading } = useBoardPage(category);
-
-  return (
-    <BoardShell rail={false}>
-      {isLoading ? (
-        <Center py={120}>
-          <Loader size="sm" />
-        </Center>
-      ) : (
-        <QuickSortView
-          key={category}
-          category={category}
-          tiers={tiers}
-          initialScope={searchParams.get('tier')}
-          onBack={() => navigate(`/tier/${encodeURIComponent(category)}`)}
-        />
-      )}
     </BoardShell>
   );
 }

@@ -61,7 +61,7 @@ function PendingChangesModal({ opened, moves, onClose }) {
 }
 
 // Floating "unsaved changes" bar, shown on every page of a board (tier
-// list, tier focus, quick sort) - staged edits are the one thing that needs
+// list, tier focus, duel) - staged edits are the one thing that needs
 // a decision, so they sit above everything (and above the mini player)
 // instead of competing with page buttons. Also owns Shift+P, so the
 // shortcut works on every one of those pages, not just the tier list.

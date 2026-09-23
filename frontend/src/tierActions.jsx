@@ -11,7 +11,7 @@ import {
 import { setFocusedVideo } from './store/focusSlice';
 
 // Every tier edit in the app (drag, tile menu, row chips, bulk bar, Tier
-// Rail, player tier pills/Shift+digit, quick sort) goes through these
+// Rail, player tier pills/Shift+digit, duel) goes through these
 // thunks, so each one gets the same instant "Moved X -> T1 . Undo" feedback
 // and the same Ctrl+Z undo step, instead of each surface inventing its own.
 
@@ -40,13 +40,16 @@ function showToast(dispatch, message) {
     withCloseButton: false,
     message: (
       <Group justify="space-between" wrap="nowrap" gap="sm">
-        <Text size="sm" truncate="end">
+        {/* The title takes the leftover width and truncates; the shortcut
+            and Undo never shrink (they used to wrap / get clipped). */}
+        <Text size="sm" truncate="end" flex={1} miw={0}>
           {message}
         </Text>
-        <Group gap={6} wrap="nowrap">
-          <Kbd size="xs" visibleFrom="sm">
-            Ctrl Z
-          </Kbd>
+        <Group gap={4} wrap="nowrap" flex="none">
+          <Group gap={2} wrap="nowrap" visibleFrom="sm">
+            <Kbd size="xs">Ctrl</Kbd>
+            <Kbd size="xs">Z</Kbd>
+          </Group>
           <Button
             size="compact-sm"
             variant="subtle"

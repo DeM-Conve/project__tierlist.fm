@@ -230,8 +230,7 @@ The user asked for these on top of the Mantine/Redux migration above. Tracked he
   duel view to Mantine `Container`/`Group`/`Stack`/`Progress`/`Card`/`Card.Section`/
   `Badge`/`Text`/`Title` (only card-hover-lift and absolute-overlay positioning for
   the tier badge/preview button stayed as CSS - Mantine has no prop for either).
-  The tier board, tier page, rail, home, sidebar, playlist page, quick sort and
-  share poster are all Mantine now (only hover states / keyframes stay as CSS).
+  The tier board, tier page, rail, home, sidebar, playlist page and duel are all Mantine now (only hover states / keyframes stay as CSS).
   Still hand-rolled CSS in `App.css`: `PlayerDock`'s expanded/mini/floating layouts
   (plus its queue-column grid) and the duel card hover. Convert opportunistically whenever one of those is
   next touched, rather than in one big-bang rewrite - and when a hand-rolled class's
@@ -244,7 +243,7 @@ The user asked for these on top of the Mantine/Redux migration above. Tracked he
   preference.** If a mainstream library (high download count, actively maintained)
   solves the problem, use it rather than writing and debugging it ourselves: installing
   one is preferred over hand-rolling. Examples already in the codebase: `colord` for
-  color math (not hex arithmetic), `html-to-image` for PNG export, Mantine's
+  color math (not hex arithmetic), Mantine's
   `Radio.Card`/`ColorSwatch`/`Notifications`/`Spotlight`/`useElementSize`/`useHotkeys`
   instead of custom pickers, toasts, palettes or listeners, Mantine's
   `variantColorResolver`/`cssVariablesResolver` for theming. Only popular libraries -

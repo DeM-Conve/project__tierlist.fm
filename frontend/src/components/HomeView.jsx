@@ -16,7 +16,7 @@ import {
   Title,
   UnstyledButton,
 } from '@mantine/core';
-import { EyeOff, ListOrdered, Plus, Search, Swords } from 'lucide-react';
+import { EyeOff, Plus, Search, Swords } from 'lucide-react';
 import CreateTierPlaylistsModal from './CreateTierPlaylistsModal';
 import { TIER_COLORS, TIER_ORDER } from '../tiers';
 import { EqualizerMark, TierChip } from './TierBits';
@@ -25,7 +25,7 @@ import { TIER_INK } from '../tierUtils';
 // A board drawn as a tiny tier list: one line per tier, sized by how many
 // videos it holds - recognisably "a tier list" at a glance, built only from
 // the playlists' own metadata (no per-board fetch).
-function BoardCard({ category, tiers, onOpen, onQuickSort, onDuel }) {
+function BoardCard({ category, tiers, onOpen, onDuel }) {
   const present = TIER_ORDER.filter((t) => tiers[t]);
   const counts = Object.fromEntries(present.map((t) => [t, tiers[t].itemCount ?? 0]));
   const total = present.reduce((n, t) => n + counts[t], 0);
@@ -75,9 +75,6 @@ function BoardCard({ category, tiers, onOpen, onQuickSort, onDuel }) {
         <Button size="compact-sm" variant="light" onClick={onOpen}>
           Open
         </Button>
-        <Button size="compact-sm" variant="subtle" color="gray" leftSection={<ListOrdered size={13} />} onClick={onQuickSort}>
-          Quick sort
-        </Button>
         <Button size="compact-sm" variant="subtle" color="gray" leftSection={<Swords size={13} />} onClick={onDuel}>
           Duel
         </Button>
@@ -96,7 +93,6 @@ export default function HomeView({
   onQueryChange,
   nowPlaying,
   onOpenBoard,
-  onQuickSort,
   onDuel,
   onOpenPlaylist,
 }) {
@@ -199,7 +195,6 @@ export default function HomeView({
               category={c}
               tiers={tierGroups[c]}
               onOpen={() => onOpenBoard(c)}
-              onQuickSort={() => onQuickSort(c)}
               onDuel={() => onDuel(c)}
             />
           ))}

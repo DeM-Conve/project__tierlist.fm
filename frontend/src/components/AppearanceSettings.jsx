@@ -107,7 +107,7 @@ export default function AppearanceSettings() {
           Tier colors
         </Title>
         <Text c="dimmed" fz="sm" mb="md">
-          Used everywhere a tier appears - board rows, rail, chips, the player and the share image.
+          Used everywhere a tier appears - board rows, rail, chips and the player.
         </Text>
         <Radio.Group value={appearance.tierPalette} onChange={(v) => dispatch(setTierPalette(v))}>
           <SimpleGrid cols={{ base: 1, sm: 3 }} spacing="sm">

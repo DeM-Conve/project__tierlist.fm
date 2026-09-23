@@ -207,8 +207,7 @@ export default function PlayerDock({
         const digit = Number(e.code.slice('Digit'.length));
         const tier = availableTiers[digit - 1];
         if (tier) onChangeTier(tier);
-      } else if (!e.shiftKey && e.code.startsWith('Digit') && !document.querySelector('.quick-sort-view')) {
-        // (Quick sort owns plain 1-5 for rating, so seek-to-% steps aside there.)
+      } else if (!e.shiftKey && e.code.startsWith('Digit')) {
         // YouTube's own native "jump to N0% of the video" shortcut (0 = the
         // start, 9 = 90%) - reimplemented through the IFrame API instead of
         // relying on the embed's own listener, so it works globally (mini

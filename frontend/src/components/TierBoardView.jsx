@@ -7,7 +7,6 @@ import {
   Button,
   Group,
   Kbd,
-  Menu,
   Paper,
   Skeleton,
   Stack,
@@ -18,7 +17,7 @@ import {
   UnstyledButton,
 } from '@mantine/core';
 import { useElementSize, useMediaQuery } from '@mantine/hooks';
-import { ChevronDown, ChevronRight, Image as ImageIcon, ListOrdered, Play, Plus, Search, Shuffle, Swords } from 'lucide-react';
+import { ChevronRight, Play, Plus, Search, Shuffle, Swords } from 'lucide-react';
 import { TIER_COLORS, TIER_ORDER } from '../tiers';
 import { moveWithFeedback, useTierDnd } from '../tierActions';
 import { TierMixBar, TierTile } from './TierBits';
@@ -255,9 +254,7 @@ export default function TierBoardView({
   onPlayFrom,
   onShufflePlay,
   onStartDuel,
-  onQuickSort,
   onOpenTier,
-  onShare,
   onAddMissingTiers,
 }) {
   const dispatch = useDispatch();
@@ -417,26 +414,11 @@ export default function TierBoardView({
               Find
             </Button>
           </Tooltip>
-          <Button variant="default" leftSection={<ImageIcon size={15} />} onClick={onShare} disabled={!hasVideos}>
-            Share
-          </Button>
-          <Menu position="bottom-end" withinPortal shadow="md" width={260}>
-            <Menu.Target>
-              <Button variant="default" leftSection={<Swords size={15} />} rightSection={<ChevronDown size={14} />} disabled={!hasVideos}>
-                Rank
-              </Button>
-            </Menu.Target>
-            <Menu.Dropdown>
-              <Menu.Item leftSection={<ListOrdered size={15} />} onClick={() => onQuickSort()}>
-                <Text size="sm" fw={600}>Quick sort</Text>
-                <Text size="xs" c="dimmed">Listen and tap a tier for each song</Text>
-              </Menu.Item>
-              <Menu.Item leftSection={<Swords size={15} />} onClick={onStartDuel}>
-                <Text size="sm" fw={600}>Duel</Text>
-                <Text size="xs" c="dimmed">Pick the better of two until it's ranked</Text>
-              </Menu.Item>
-            </Menu.Dropdown>
-          </Menu>
+          <Tooltip label="Pick the better of two until it's ranked" withArrow>
+            <Button variant="default" leftSection={<Swords size={15} />} onClick={onStartDuel} disabled={!hasVideos}>
+              Duel
+            </Button>
+          </Tooltip>
           <Button.Group>
             <Button leftSection={<Play size={15} fill="currentColor" />} onClick={() => onPlayFrom(tiers[0])} disabled={!hasVideos}>
               Play
