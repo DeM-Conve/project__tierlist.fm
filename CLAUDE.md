@@ -15,7 +15,7 @@ auto-grouped into a tier board per category.
     Mantine's own components (`Tabs`, `Modal`, `Select`, etc.) for anything new/touched
     instead of hand-rolling equivalents.
   - **Every color is a variable, defined in exactly one place: `src/themes.js`.** It
-    holds the `THEMES` (3 dark + 3 light chromes), `ACCENTS` (5, usable with any theme),
+    holds the `THEMES` (3 dark + 3 light chromes), `ACCENTS` (12, usable with any theme; most reuse Mantine's own default palettes),
     `TIER_PALETTES` (3), `MEDIA` (colors drawn over art/video) and `DEMO_ART`. The user
     picks theme/accent/tier palette in Settings -> Appearance (`appearanceSlice`,
     persisted to localStorage). `buildAppearance()` turns the choice into CSS variables

@@ -1,4 +1,4 @@
-import { createTheme, defaultVariantColorsResolver, isLightColor } from '@mantine/core';
+import { DEFAULT_THEME, createTheme, defaultVariantColorsResolver, isLightColor } from '@mantine/core';
 import { colord, extend } from 'colord';
 import mixPlugin from 'colord/plugins/mix';
 
@@ -90,6 +90,22 @@ export const ACCENTS = {
     scale: ['#fdf3e0', '#f7e6c2', '#f0d5a0', '#e9c37d', '#e2b15c', '#d6a24c', '#c48f3a', '#a97a2f', '#8a6326', '#6b4c1d'],
     onDark: 5, onLight: 7, textDark: 5, textLight: 8,
   },
+  // Popular accents straight from Mantine's own tested default palettes
+  // (same shade conventions Mantine uses: filled 6 light / 8 dark).
+  ...Object.fromEntries(
+    [
+      ['blue', 'Blue'],
+      ['indigo', 'Indigo'],
+      ['teal', 'Teal'],
+      ['green', 'Green'],
+      ['pink', 'Pink'],
+      ['red', 'Red'],
+      ['orange', 'Orange'],
+    ].map(([key, label]) => [
+      key,
+      { label, scale: [...DEFAULT_THEME.colors[key]], onDark: 7, onLight: 6, textDark: 4, textLight: 7 },
+    ])
+  ),
   mono: {
     label: 'Mono',
     scale: ['#fafafa', '#f4f4f5', '#e4e4e7', '#d4d4d8', '#a1a1aa', '#71717a', '#52525b', '#3f3f46', '#27272a', '#18181b'],
