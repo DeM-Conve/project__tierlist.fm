@@ -69,8 +69,7 @@ import {
   playPrevInQueue,
   jumpInQueue,
   moveInQueue,
-  clearUpNext,
-  reorderContext,
+  reorderUpcoming,
   cycleRepeat,
 } from './store/focusSlice';
 import {
@@ -227,8 +226,7 @@ function Layout() {
   const focusSequence = useSelector(selectFocusSequence);
   const videoLookup = useSelector(selectVideoLookup);
   const queueHistory = useSelector((s) => s.focus.history);
-  const upNext = useSelector((s) => s.focus.upNext);
-  const queueContext = useSelector((s) => s.focus.context);
+  const queueUpcoming = useSelector((s) => s.focus.upcoming);
   const contextLabel = useSelector((s) => s.focus.contextLabel);
   const queueCurrent = useSelector((s) => s.focus.current);
   const repeatMode = useSelector((s) => s.focus.repeatMode);
@@ -614,7 +612,7 @@ function Layout() {
           currentTier={focusedVideo.tier}
           availableTiers={focusedAvailableTiers}
           hasPrev={queueHistory.length > 0}
-          hasNext={upNext.length + queueContext.length > 0}
+          hasNext={queueUpcoming.length > 0}
           repeatMode={repeatMode}
           onCycleRepeat={() => dispatch(cycleRepeat())}
           isShuffling={isShuffling}
@@ -626,18 +624,17 @@ function Layout() {
           onPrev={() => dispatch(playPrevInQueue())}
           onNext={() => dispatch(playNextInQueue())}
           onChangeTier={changeFocusedTier}
-          queue={{ history: queueHistory, current: queueCurrent, upNext, context: queueContext, contextLabel }}
+          queue={{ history: queueHistory, current: queueCurrent, upcoming: queueUpcoming, contextLabel }}
           onJump={(section, index) => dispatch(jumpInQueue({ section, index }))}
           onRemove={(key) => dispatch(removeFromQueue(key))}
           onMoveInQueue={(from, to) => dispatch(moveInQueue({ from, to }))}
-          onClearUpNext={() => dispatch(clearUpNext())}
           onShuffleUpcoming={() => {
-            const keys = queueContext.map((e) => e.key);
+            const keys = queueUpcoming.map((e) => e.key);
             for (let i = keys.length - 1; i > 0; i--) {
               const j = Math.floor(Math.random() * (i + 1));
               [keys[i], keys[j]] = [keys[j], keys[i]];
             }
-            dispatch(reorderContext(keys));
+            dispatch(reorderUpcoming(keys));
           }}
         />
       )}
