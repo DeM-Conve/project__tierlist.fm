@@ -2,11 +2,14 @@ import { useState } from 'react';
 import { Box, Group, Radio, Stack, Tabs, Text, Title } from '@mantine/core';
 import { ShortcutsList } from './ShortcutsModal';
 import AppearanceSettings from './AppearanceSettings';
+import PlaylistNamingSettings from './PlaylistNamingSettings';
+import { useSearchParams } from 'react-router-dom';
 import { DUEL_STRATEGIES, DUEL_STRATEGY_LABELS, DEFAULT_DUEL_STRATEGY } from '../duel';
 import { SETTINGS, getSetting, setSetting } from '../settings';
 
 const CATEGORIES = [
   { key: 'appearance', label: 'Appearance' },
+  { key: 'naming', label: 'Playlist naming' },
   { key: 'duels', label: 'Duels' },
   { key: 'keyboard', label: 'Keyboard shortcuts' },
 ];
@@ -20,6 +23,9 @@ const STRATEGY_DESCRIPTIONS = {
 };
 
 export default function SettingsView() {
+  // ?tab=naming etc. deep-links to a tab (and the tab you're on stays in the URL).
+  const [searchParams, setSearchParams] = useSearchParams();
+  const tab = CATEGORIES.some((c) => c.key === searchParams.get('tab')) ? searchParams.get('tab') : 'appearance';
   const [duelStrategy, setDuelStrategy] = useState(() =>
     getSetting(SETTINGS.duelStrategy, DEFAULT_DUEL_STRATEGY)
   );
@@ -35,7 +41,7 @@ export default function SettingsView() {
         Settings
       </Title>
 
-      <Tabs defaultValue="appearance" orientation="vertical">
+      <Tabs value={tab} onChange={(v) => v && setSearchParams({ tab: v }, { replace: true })} orientation="vertical">
         <Tabs.List>
           {CATEGORIES.map((c) => (
             <Tabs.Tab key={c.key} value={c.key}>
@@ -46,6 +52,10 @@ export default function SettingsView() {
 
         <Tabs.Panel value="appearance" pl="xl" maw={980}>
           <AppearanceSettings />
+        </Tabs.Panel>
+
+        <Tabs.Panel value="naming" pl="xl" maw={980}>
+          <PlaylistNamingSettings />
         </Tabs.Panel>
 
         <Tabs.Panel value="duels" pl="xl" maw={680}>

@@ -6,6 +6,8 @@ export const SETTINGS = {
   duelStrategy: `${PREFIX}duelStrategy`,
   // { theme, accent, tierPalette } - see themes.js
   appearance: `${PREFIX}appearance`,
+  // { template, migratingFrom } - see naming.js / namingSlice
+  naming: `${PREFIX}naming`,
 };
 
 export function getSetting(key, fallback) {

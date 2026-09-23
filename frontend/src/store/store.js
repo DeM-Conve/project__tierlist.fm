@@ -4,6 +4,7 @@ import viewReducer from './viewSlice';
 import tiersReducer from './tiersSlice';
 import focusReducer from './focusSlice';
 import appearanceReducer from './appearanceSlice';
+import namingReducer from './namingSlice';
 import { SETTINGS, setSetting } from '../settings';
 
 export const store = configureStore({
@@ -13,15 +14,20 @@ export const store = configureStore({
     tiers: tiersReducer,
     focus: focusReducer,
     appearance: appearanceReducer,
+    naming: namingReducer,
   },
 });
 
-// Persist the appearance choice whenever it changes.
-let lastAppearance = store.getState().appearance;
+// Persist user preferences held in Redux whenever they change.
+const PERSISTED = { appearance: SETTINGS.appearance, naming: SETTINGS.naming };
+const last = {};
+Object.keys(PERSISTED).forEach((k) => (last[k] = store.getState()[k]));
 store.subscribe(() => {
-  const next = store.getState().appearance;
-  if (next !== lastAppearance) {
-    lastAppearance = next;
-    setSetting(SETTINGS.appearance, next);
-  }
+  const state = store.getState();
+  Object.entries(PERSISTED).forEach(([k, key]) => {
+    if (state[k] !== last[k]) {
+      last[k] = state[k];
+      setSetting(key, state[k]);
+    }
+  });
 });

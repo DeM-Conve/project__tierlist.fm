@@ -1,5 +1,6 @@
 import { createSelector } from '@reduxjs/toolkit';
 import { TIER_ORDER, groupByTier } from '../tiers';
+import { parseTitle } from '../naming';
 
 const selectPlaylists = (state) => state.auth.playlists;
 const selectTierItems = (state) => state.tiers.tierItems;
@@ -10,8 +11,26 @@ const selectFocusQueue = (state) => state.focus.focusQueue;
 const selectFocusEntries = (state) => state.focus.focusEntries;
 const selectFocusedCategory = (state) => state.focus.focusedCategory;
 
-export const selectTierGroups = createSelector([selectPlaylists], (playlists) =>
-  playlists ? groupByTier(playlists) : {}
+const selectNamingTemplate = (state) => state.naming.template;
+const selectMigratingFrom = (state) => state.naming.migratingFrom;
+
+// The only playlists the app ever shows: those whose title follows the
+// naming template (anything else - e.g. a private playlist - stays hidden
+// everywhere). Each gets `.parsed` = { bracket, category, tier, template }.
+export const selectTierPlaylists = createSelector(
+  [selectPlaylists, selectNamingTemplate, selectMigratingFrom],
+  (playlists, template, migratingFrom) => {
+    if (!playlists) return null;
+    const templates = migratingFrom ? [template, migratingFrom] : [template];
+    return playlists.flatMap((p) => {
+      const parsed = parseTitle(p.title, templates);
+      return parsed ? [{ ...p, parsed }] : [];
+    });
+  }
+);
+
+export const selectTierGroups = createSelector([selectTierPlaylists], (tierPlaylists) =>
+  tierPlaylists ? groupByTier(tierPlaylists) : {}
 );
 
 export const selectTierCategories = createSelector([selectTierGroups], (groups) =>

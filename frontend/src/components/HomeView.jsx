@@ -8,7 +8,6 @@ import {
   Group,
   Image,
   Paper,
-  SegmentedControl,
   SimpleGrid,
   Skeleton,
   Stack,
@@ -17,8 +16,9 @@ import {
   Title,
   UnstyledButton,
 } from '@mantine/core';
-import { ListOrdered, Search, Swords } from 'lucide-react';
-import { TIER_COLORS, TIER_ORDER, parseTierTitle } from '../tiers';
+import { EyeOff, ListOrdered, Plus, Search, Swords } from 'lucide-react';
+import CreateTierPlaylistsModal from './CreateTierPlaylistsModal';
+import { TIER_COLORS, TIER_ORDER } from '../tiers';
 import { EqualizerMark, TierChip } from './TierBits';
 import { TIER_INK } from '../tierUtils';
 
@@ -88,6 +88,8 @@ function BoardCard({ category, tiers, onOpen, onQuickSort, onDuel }) {
 
 export default function HomeView({
   playlists,
+  hiddenCount,
+  onOpenNaming,
   tierGroups,
   tierCategories,
   query,
@@ -98,11 +100,11 @@ export default function HomeView({
   onDuel,
   onOpenPlaylist,
 }) {
-  const [playlistScope, setPlaylistScope] = useState('all');
+  const [creating, setCreating] = useState(false);
   const q = query.trim().toLowerCase();
   const boards = tierCategories.filter((c) => c.toLowerCase().includes(q));
-  const allPlaylists = (playlists || []).filter((p) => p.title.toLowerCase().includes(q));
-  const shownPlaylists = playlistScope === 'loose' ? allPlaylists.filter((p) => !parseTierTitle(p.title)) : allPlaylists;
+  // Only playlists that follow the naming template ever reach this view.
+  const shownPlaylists = (playlists || []).filter((p) => p.title.toLowerCase().includes(q));
 
   return (
     <Stack gap={36} component="section">
@@ -120,6 +122,10 @@ export default function HomeView({
               : `${tierCategories.length} boards built from ${playlists.length} playlists`}
           </Text>
         </Stack>
+        <Group gap="sm" wrap="wrap">
+        <Button leftSection={<Plus size={15} />} onClick={() => setCreating(true)} disabled={playlists === null}>
+          New tier list
+        </Button>
         <TextInput
           value={query}
           onChange={(e) => onQueryChange(e.target.value)}
@@ -128,7 +134,12 @@ export default function HomeView({
           rightSection={query ? <CloseButton size="sm" onClick={() => onQueryChange('')} aria-label="Clear" /> : null}
           w={300}
         />
+        </Group>
       </Group>
+
+      {creating && (
+        <CreateTierPlaylistsModal opened onClose={() => setCreating(false)} onCreated={onOpenBoard} />
+      )}
 
       {nowPlaying?.category && (
         <Paper withBorder radius="md" p="sm" bg="var(--surface-2)">
@@ -200,26 +211,28 @@ export default function HomeView({
           <Title order={2} fz={20}>
             Playlists
           </Title>
-          <SegmentedControl
-            size="xs"
-            value={playlistScope}
-            onChange={setPlaylistScope}
-            data={[
-              { value: 'all', label: 'All' },
-              { value: 'loose', label: 'Not in a tier list' },
-            ]}
-          />
+          {hiddenCount > 0 && (
+            <Button
+              variant="subtle"
+              color="gray"
+              size="compact-sm"
+              leftSection={<EyeOff size={13} />}
+              onClick={onOpenNaming}
+            >
+              {hiddenCount} playlist{hiddenCount === 1 ? '' : 's'} hidden - not named by your template
+            </Button>
+          )}
         </Group>
         {playlists !== null && shownPlaylists.length === 0 && (
           <Text c="dimmed" fz="sm">
-            {playlists.length === 0 ? 'No playlists found.' : q ? `No playlists match "${query}".` : 'Every playlist is part of a tier list.'}
+            {playlists.length === 0 ? 'No playlists follow your naming template yet.' : `No playlists match "${query}".`}
           </Text>
         )}
         <SimpleGrid cols={{ base: 2, sm: 3, lg: 4, xl: 6 }} spacing="sm">
           {playlists === null &&
             Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} h={150} radius="md" />)}
           {shownPlaylists.map((p) => {
-            const parsed = parseTierTitle(p.title);
+            const { parsed } = p;
             return (
               <Card
                 key={p.id}

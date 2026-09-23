@@ -118,6 +118,12 @@ auto-grouped into a tier board per category.
   returning from a duel) - removing that guard would silently discard an unsynced duel
   result or drag on every board/duel round-trip. Don't refetch tier-board data on mount
   without checking `loadedCategory` first.
+- **Playlist names follow the user's naming template (`src/naming.js`, `namingSlice`).**
+  Never parse playlist titles with an ad-hoc regex - use `parseTitle`/`renderTitle`,
+  and read playlists through `selectTierPlaylists` (template-matching only, each with
+  `.parsed`), never `state.auth.playlists` directly in UI: non-matching playlists are
+  deliberately invisible everywhere (privacy). Renames/creates go through
+  `/api/playlists/rename` / `/api/playlists/create` (per-item results).
 - **Every tier edit goes through `src/tierActions.jsx`** (`moveWithFeedback`,
   `applyOrderWithFeedback`, `undoEdit`, `useTierDnd`) - never dispatch
   `moveVideoToTier`/`moveVideos` directly from a component. That's what gives every

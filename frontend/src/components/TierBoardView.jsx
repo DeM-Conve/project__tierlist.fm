@@ -18,7 +18,7 @@ import {
   UnstyledButton,
 } from '@mantine/core';
 import { useElementSize, useMediaQuery } from '@mantine/hooks';
-import { ChevronDown, ChevronRight, Image as ImageIcon, ListOrdered, Play, Search, Shuffle, Swords } from 'lucide-react';
+import { ChevronDown, ChevronRight, Image as ImageIcon, ListOrdered, Play, Plus, Search, Shuffle, Swords } from 'lucide-react';
 import { TIER_COLORS, TIER_ORDER } from '../tiers';
 import { moveWithFeedback, useTierDnd } from '../tierActions';
 import { TierMixBar, TierTile } from './TierBits';
@@ -258,6 +258,7 @@ export default function TierBoardView({
   onQuickSort,
   onOpenTier,
   onShare,
+  onAddMissingTiers,
 }) {
   const dispatch = useDispatch();
   const isNarrow = useMediaQuery('(max-width: 62em)');
@@ -490,6 +491,14 @@ export default function TierBoardView({
           />
         ))}
       </Paper>
+
+      {!anyLoading && tiers.length > 0 && tiers.length < TIER_ORDER.length && (
+        <Group justify="center" mt="sm">
+          <Button variant="subtle" color="gray" size="compact-sm" leftSection={<Plus size={14} />} onClick={onAddMissingTiers}>
+            Add missing tiers ({TIER_ORDER.filter((t) => !tiers.includes(t)).join(', ')})
+          </Button>
+        </Group>
+      )}
 
       {!anyLoading && hasVideos && (
         <Text fz="xs" c="dimmed" mt="sm" ta="center">

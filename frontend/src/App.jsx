@@ -24,6 +24,7 @@ import HomeView from './components/HomeView';
 import TierFocusView from './components/TierFocusView';
 import QuickSortView from './components/QuickSortView';
 import ShareTierListModal from './components/ShareTierListModal';
+import CreateTierPlaylistsModal from './components/CreateTierPlaylistsModal';
 import TierRail, { RAIL_WIDTH } from './components/TierRail';
 import PendingChanges from './components/PendingChanges';
 import { applyOrderWithFeedback, moveWithFeedback, undoEdit } from './tierActions';
@@ -57,6 +58,7 @@ import {
 } from './store/focusSlice';
 import {
   selectTierGroups,
+  selectTierPlaylists,
   selectTierCategories,
   selectPendingMoves,
   selectPlayingVideoIdOnBoard,
@@ -184,7 +186,7 @@ function Layout() {
 
   const query = useSelector((s) => s.view.query);
   const mobileSidebarOpen = useSelector((s) => s.view.mobileSidebarOpen);
-  const playlists = useSelector((s) => s.auth.playlists);
+  const tierPlaylists = useSelector(selectTierPlaylists);
   const focusedVideo = useSelector((s) => s.focus.focusedVideo);
   const isShuffling = useSelector((s) => s.focus.isShuffling);
   const playerMode = useSelector((s) => s.focus.playerMode);
@@ -351,7 +353,7 @@ function Layout() {
         action: () => navigate(`/tier/${encodeURIComponent(category)}`),
       });
     }
-    for (const p of playlists || []) {
+    for (const p of tierPlaylists || []) {
       list.push({
         id: `playlist-${p.id}`,
         section: 'Playlists',
@@ -403,7 +405,7 @@ function Layout() {
     }
     return list;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tierCategories, playlists, currentCategory, pendingMoves, tierGroups]);
+  }, [tierCategories, tierPlaylists, currentCategory, pendingMoves, tierGroups]);
 
   return (
     <div className="app-shell">
@@ -423,8 +425,8 @@ function Layout() {
         onQueryChange={(q) => dispatch(setQuery(q))}
         tierCategories={tierCategories}
         tierGroups={tierGroups}
-        playlistCount={playlists?.length ?? 0}
-        loading={playlists === null}
+        playlistCount={tierPlaylists?.length ?? 0}
+        loading={tierPlaylists === null}
         onSelectSettings={() => navigate('/settings')}
         onOpenShortcuts={shortcutsHandlers.open}
         onLogout={logout}
@@ -533,7 +535,8 @@ function usePendingRemovalKeys() {
 function HomePage() {
   const dispatch = useDispatch();
   const navigate = useNavigate();
-  const playlists = useSelector((s) => s.auth.playlists);
+  const allPlaylists = useSelector((s) => s.auth.playlists);
+  const tierPlaylists = useSelector(selectTierPlaylists);
   const query = useSelector((s) => s.view.query);
   const tierGroups = useSelector(selectTierGroups);
   const tierCategories = useSelector(selectTierCategories);
@@ -547,7 +550,9 @@ function HomePage() {
 
   return (
     <HomeView
-      playlists={playlists}
+      playlists={tierPlaylists}
+      hiddenCount={allPlaylists && tierPlaylists ? allPlaylists.length - tierPlaylists.length : 0}
+      onOpenNaming={() => navigate('/settings?tab=naming')}
       tierGroups={tierGroups}
       tierCategories={tierCategories}
       query={query}
@@ -566,9 +571,15 @@ function ItemsPage() {
   const playlistId = decodeURIComponent(id);
   const dispatch = useDispatch();
   const navigate = useNavigate();
-  const playlists = useSelector((s) => s.auth.playlists);
-  const playlist = playlists?.find((p) => p.id === playlistId);
-  const { data: items, isLoading } = usePlaylistItemsQuery(playlistId);
+  // Only template-matching playlists are reachable - a hidden playlist's URL
+  // just goes home rather than exposing its contents.
+  const tierPlaylists = useSelector(selectTierPlaylists);
+  const playlist = tierPlaylists?.find((p) => p.id === playlistId);
+  const { data: items, isLoading } = usePlaylistItemsQuery(playlist ? playlistId : null);
+
+  useEffect(() => {
+    if (tierPlaylists && !playlist) navigate('/', { replace: true });
+  }, [tierPlaylists, playlist, navigate]);
 
   useEffect(() => {
     dispatch(setCurrentCategory(null));
@@ -595,10 +606,14 @@ function TierBoardPage() {
   const playingVideoId = useSelector(selectPlayingVideoIdOnBoard);
   const { tierGroups, tiers, tierLoading, isLoading } = useBoardPage(category);
   const [shareOpen, setShareOpen] = useState(false);
+  const [addingTiers, setAddingTiers] = useState(false);
   const base = `/tier/${encodeURIComponent(category)}`;
 
   return (
     <BoardShell>
+      {addingTiers && (
+        <CreateTierPlaylistsModal opened category={category} onClose={() => setAddingTiers(false)} />
+      )}
       <TierBoardView
         category={category}
         tierGroups={tierGroups}
@@ -614,6 +629,7 @@ function TierBoardPage() {
         onQuickSort={(t) => navigate(`${base}/sort${t ? `?tier=${t}` : ''}`)}
         onOpenTier={(t) => navigate(`${base}/t/${t}`)}
         onShare={() => setShareOpen(true)}
+        onAddMissingTiers={() => setAddingTiers(true)}
       />
       <ShareTierListModal
         opened={shareOpen}

@@ -6,8 +6,17 @@
 - Scopes: `openid`, `profile`, `https://www.googleapis.com/auth/youtube.force-ssl` (read + write access to playlists).
 - `/api/auth/status` reports login state without forcing an OAuth redirect on an unauthenticated request.
 
+## Playlist naming template (Settings -> Playlist naming)
+- Modelled on Immich's storage template + migration job. One template (default `[{bracket}] {category} {tier}`; tokens `{bracket}` optional, `{category}`, `{tier}` required) defines which playlists are tier playlists **and** how they're named.
+- **Privacy filter:** only playlists whose title matches the template appear anywhere in the app (Home, sidebar counts, command palette, playlist pages - a hidden playlist's URL redirects home). Home shows "N playlists hidden - not named by your template" (count only, no titles).
+- Editor: presets, click-to-insert tokens, validation (required tokens, no duplicates, unknown tokens), a live example and a full "current name -> new name" preview table of every tier playlist, estimated YouTube API quota (~51 units per rename, 10,000/day).
+- Safety checks block a run if two playlists would get the same name, or if a new name wouldn't read back as the same board/tier; warns when dropping `{bracket}` loses tags.
+- **Rename job** ("Save & rename N on YouTube", with a confirm): renames in batches of 10 with a progress bar and per-playlist errors. Only titles change - the backend re-sends each playlist's existing description/language. While any rename is unfinished, both old and new names are recognised (nothing disappears); a banner offers Retry or "Stop recognising old names".
+- "Save without renaming" switches the template only (with a warning about playlists that will stop matching).
+- New tier playlists are named by the template: Home -> **New tier list** (category, bracket, which tiers, Private/Unlisted/Public) and a board's **Add missing tiers**; both preview the exact names and refuse names the template wouldn't recognise.
+
 ## Home & playlists
-- `/` is **Home**: every board drawn as a mini tier list (tier chip + that tier playlist's cover + a bar sized by its video count), with Open / Quick sort / Duel on each card; a "Now playing" card (with a link back to rate it on its board) while the player is active; then every playlist as a card (tier badge + board name on tier playlists), filterable to "Not in a tier list".
+- `/` is **Home**: every board drawn as a mini tier list (tier chip + that tier playlist's cover + a bar sized by its video count), with Open / Quick sort / Duel on each card; a "Now playing" card (with a link back to rate it on its board) while the player is active; then every tier playlist as a card (tier badge + board name). Playlists not following the naming template are never listed.
 - Home's filter box and the sidebar filter share the same query.
 - (Replaced) the old "redirect to the first board on first login" - Home now leads with your boards, which is what that redirect existed for.
 - Open a playlist to see its videos as a numbered list (thumbnail, title, channel, opens on YouTube); a tier playlist shows its tier and an "Open the <board> tier list" button.

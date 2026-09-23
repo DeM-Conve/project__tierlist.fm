@@ -1,6 +1,7 @@
 import { useLayoutEffect, useMemo } from 'react';
 import { useSelector } from 'react-redux';
 import { MantineProvider } from '@mantine/core';
+import { ModalsProvider } from '@mantine/modals';
 import { applyCssVars, buildAppearance, cssVariablesResolver } from '../themes';
 
 // Rebuilds the CSS variables + Mantine theme whenever the Appearance
@@ -15,7 +16,7 @@ export default function AppearanceRoot({ children }) {
       forceColorScheme={built.scheme}
       cssVariablesResolver={cssVariablesResolver}
     >
-      {children}
+      <ModalsProvider>{children}</ModalsProvider>
     </MantineProvider>
   );
 }

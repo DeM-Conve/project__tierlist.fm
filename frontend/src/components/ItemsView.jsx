@@ -1,13 +1,12 @@
 import { ActionIcon, Anchor, Box, Button, Group, Image, Paper, Skeleton, Stack, Text, Title, UnstyledButton } from '@mantine/core';
 import { ArrowLeft, ArrowUpRight } from 'lucide-react';
-import { parseTierTitle } from '../tiers';
 import { TierChip } from './TierBits';
 import { youtubeUrl } from '../tierUtils';
 
 // A single YouTube playlist as a plain track list. If it's one of a tier
 // list's playlists, it says so and links straight to that board.
 export default function ItemsView({ playlist, items, loading, onOpenBoard, onBack }) {
-  const parsed = playlist ? parseTierTitle(playlist.title) : null;
+  const parsed = playlist?.parsed ?? null;
 
   return (
     <Box component="section">
