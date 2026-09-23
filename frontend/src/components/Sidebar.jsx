@@ -1,7 +1,6 @@
 import { Link, useLocation } from 'react-router-dom';
 import {
   ActionIcon,
-  Box,
   Button,
   CloseButton,
   Group,
@@ -18,9 +17,8 @@ import {
 } from '@mantine/core';
 import { Home, Keyboard, ListOrdered, LogOut, Search, Settings } from 'lucide-react';
 import { TIER_ORDER } from '../tiers';
-import { TierMixBar } from './TierBits';
 
-// Each board shows its tier mix straight from the playlists' own item
+// Each board shows its song total straight from the playlists' own item
 // counts - no per-board fetch needed just to draw the sidebar.
 function boardCounts(tiers) {
   return Object.fromEntries(TIER_ORDER.filter((t) => tiers[t]).map((t) => [t, tiers[t].itemCount ?? 0]));
@@ -137,11 +135,6 @@ export default function Sidebar({
                       </Text>
                     </Group>
                   }
-                  description={
-                    <Box mt={5}>
-                      <TierMixBar tiers={Object.keys(counts)} counts={counts} size={4} />
-                    </Box>
-                  }
                 />
               );
             })}
@@ -151,7 +144,6 @@ export default function Sidebar({
               Array.from({ length: 7 }).map((_, i) => (
                 <Stack key={i} gap={7} px={12} py={9}>
                   <Skeleton h={10} w={`${55 + ((i * 17) % 35)}%`} />
-                  <Skeleton h={4} />
                 </Stack>
               ))}
             {!loading && tierCategories.length === 0 && (

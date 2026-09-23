@@ -23,7 +23,7 @@
 - Open a playlist to see its videos as a numbered list (thumbnail, title, channel, opens on YouTube); a tier playlist shows its tier and an "Open the <board> tier list" button.
 
 ## Sidebar
-- Brand, "Jump to… ⌘K" (command palette), Home, and every board with its video total and a mini tier-mix bar (from playlist item counts - no per-board fetch). Filter box, empty-state hint explaining the playlist naming convention.
+- Brand, "Jump to… ⌘K" (command palette), Home, and every board with its video total (from playlist item counts - no per-board fetch). Filter box, empty-state hint explaining the playlist naming convention.
 - Footer: Settings, Keyboard shortcuts (`?`), Log out. On narrow screens the sidebar is a drawer opened from a burger button.
 
 ## Tier boards (the tier list)
