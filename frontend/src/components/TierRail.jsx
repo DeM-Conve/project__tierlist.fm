@@ -113,9 +113,15 @@ export default function TierRail({ category, activeTier }) {
             </Text>
           )}
           {isPlayingTier && playingVideo && (
-            // The playing song's art pinned to its tier's top-left corner,
-            // clear of the tier label and count.
-            <Box pos="absolute" left={-8} top={-8} style={{ borderRadius: 5, boxShadow: '0 4px 12px var(--shadow)' }}>
+            // The playing song's art on its tier's left edge, vertically
+            // centred - shifted mostly outside the slot so it never covers
+            // the tier label or count.
+            <Box
+              pos="absolute"
+              left={-16}
+              top="50%"
+              style={{ transform: 'translateY(-50%)', borderRadius: 5, boxShadow: '0 4px 12px var(--shadow)' }}
+            >
               <Image src={playingVideo.thumbnail} w={24} h={24} radius={5} fit="cover" alt="" />
               <Box pos="absolute" bottom={2} left={2} bg="accent" px={2} py={1} style={{ borderRadius: 2 }}>
                 <EqualizerMark height={6} />

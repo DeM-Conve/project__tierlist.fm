@@ -3,13 +3,17 @@ import { useSelector } from 'react-redux';
 import { MantineProvider } from '@mantine/core';
 import { ModalsProvider } from '@mantine/modals';
 import { applyCssVars, buildAppearance, cssVariablesResolver } from '../themes';
+import { applyFavicon } from './Favicon';
 
 // Rebuilds the CSS variables + Mantine theme whenever the Appearance
 // settings change, so switching theme/accent/tier colors is instant.
 export default function AppearanceRoot({ children }) {
   const appearance = useSelector((s) => s.appearance);
   const built = useMemo(() => buildAppearance(appearance), [appearance]);
-  useLayoutEffect(() => applyCssVars(built.cssVars), [built]);
+  useLayoutEffect(() => {
+    applyCssVars(built.cssVars);
+    applyFavicon(built.cssVars['--accent-fill'], built.cssVars['--accent-on']);
+  }, [built]);
   return (
     <MantineProvider
       theme={built.mantineTheme}
