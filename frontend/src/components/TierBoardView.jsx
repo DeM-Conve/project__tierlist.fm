@@ -132,7 +132,7 @@ function TierRow({
                 }}
                 aria-label={`Play from ${tier}`}
               >
-                <Play size={13} fill={TIER_INK} />
+                <Play size={13} fill="currentColor" />
               </ActionIcon>
             </Tooltip>
             <Tooltip label={`Shuffle ${tier}`} withArrow>
@@ -217,7 +217,7 @@ function TierRow({
                 justifyContent: 'center',
               }}
             >
-              <Text ff="var(--font-display)" fw={900} fz={size < 64 ? 15 : 19} lh={1} c={color}>
+              <Text ff="var(--font-display)" fw={900} fz={size < 64 ? 15 : 19} lh={1} c={`color-mix(in srgb, ${color} 60%, var(--text))`}>
                 +{hiddenCount}
               </Text>
               <Text fz={10} c="dimmed" mt={3}>
@@ -437,7 +437,7 @@ export default function TierBoardView({
               Play
             </Button>
             <Tooltip label="Shuffle the whole board" withArrow>
-              <Button px="sm" onClick={() => onShufflePlay()} disabled={!hasVideos} aria-label="Shuffle play" style={{ borderLeft: `1px solid ${TIER_INK}33` }}>
+              <Button px="sm" onClick={() => onShufflePlay()} disabled={!hasVideos} aria-label="Shuffle play" style={{ borderLeft: '1px solid color-mix(in srgb, var(--accent-on) 25%, transparent)' }}>
                 <Shuffle size={15} />
               </Button>
             </Tooltip>

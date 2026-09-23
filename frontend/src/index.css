@@ -21,7 +21,7 @@ body {
   background: var(--border);
   border-radius: 8px;
 }
-::-webkit-scrollbar-thumb:hover { background: #3a3f4a; }
+::-webkit-scrollbar-thumb:hover { background: var(--text-faint); }
 
 :focus-visible {
   outline: 2px solid var(--accent);
@@ -32,9 +32,10 @@ body {
   * { animation: none !important; transition: none !important; }
 }
 
-/* This app is always dark - single palette, no light/dark toggle. The same
-   hex values are also used to build the Mantine theme (src/mantineTheme.js),
-   so this is the one place the palette itself is defined. */
+/* Color tokens. The real values are set at runtime on <html> from
+   src/themes.js (Settings -> Appearance); these are only the fallback
+   (the default Graphite theme) for the instant before that runs.
+   Never hard-code a color in a component or App.css - use these. */
 :root {
   --bg: #0e0f12;
   --surface: #15171c;
@@ -46,11 +47,25 @@ body {
   --text-dim: #9ba1ad;
   --text-faint: #5f6573;
   --accent: #8b7cf6;
-  --accent-hover: #7a69ee;
-  --accent-text: #ffffff;
-  --success: #4caf6e;
-  --danger: #e8503a;
-  --radius: 4px;
+  --accent-fill: #7a69ee;
+  --accent-hover: #6856d9;
+  --accent-on: #ffffff;
+  --shadow: rgba(0, 0, 0, 0.55);
+  --overlay: rgba(0, 0, 0, 0.72);
+  --tier-t1: #ff5a5f;
+  --tier-t2: #ff9f43;
+  --tier-t3: #ffd43b;
+  --tier-te: #7bd88f;
+  --tier-tz: #4dabf7;
+  --tier-ink: #101114;
+  --media-bg: #000000;
+  --media-fg: #ffffff;
+  --media-scrim: rgba(0, 0, 0, 0.55);
+  --media-scrim-soft: rgba(0, 0, 0, 0.25);
+  --media-control-bg: rgba(0, 0, 0, 0.75);
+  --media-control-border: rgba(255, 255, 255, 0.3);
+  --media-control-shadow: rgba(0, 0, 0, 0.6);
+  --radius: 6px;
   --sidebar-w: 264px;
   /* Set at runtime by PlayerDock while the mini bar is showing (0px
      otherwise) - lets layout reserve exactly that much bottom space. */

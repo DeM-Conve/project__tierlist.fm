@@ -128,7 +128,7 @@ export default function TierRail({ activeTier, selection }) {
                     pos="absolute"
                     left={-6}
                     top="50%"
-                    style={{ transform: 'translateY(-50%)', borderRadius: 5, boxShadow: '0 4px 12px rgba(0,0,0,0.5)' }}
+                    style={{ transform: 'translateY(-50%)', borderRadius: 5, boxShadow: '0 4px 12px var(--shadow)' }}
                   >
                     <Image src={playingVideo.thumbnail} w={26} h={26} radius={5} fit="cover" alt="" />
                     <Box pos="absolute" bottom={2} left={2} bg="accent" px={2} py={1} style={{ borderRadius: 2 }}>

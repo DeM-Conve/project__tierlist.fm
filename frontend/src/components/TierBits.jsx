@@ -31,7 +31,7 @@ export function TierChip({ tier, size = 22, active = true, onClick, title, kbd }
         flexShrink: 0,
       }}
     >
-      <Text ff="var(--font-display)" fw={900} fz={size * 0.5} lh={1} c={active ? TIER_INK : TIER_COLORS[tier]}>
+      <Text ff="var(--font-display)" fw={900} fz={size * 0.5} lh={1} c={active ? TIER_INK : `color-mix(in srgb, ${TIER_COLORS[tier]} 60%, var(--text))`}>
         {tier}
       </Text>
       {kbd && (
@@ -250,7 +250,7 @@ export function TierTile({
               pointerEvents: 'none',
             }}
           >
-            <Play size={size > 60 ? 13 : 10} fill={TIER_INK} color={TIER_INK} />
+            <Play size={size > 60 ? 13 : 10} fill="currentColor" style={{ color: TIER_INK }} />
           </Box>
         </Box>
       </Box>

@@ -112,7 +112,7 @@ function TrackRow({
         tiers={tiers}
         onMove={onMove}
         target={
-          <ActionIcon variant="subtle" color="dark.2" aria-label="More" onClick={(e) => e.stopPropagation()}>
+          <ActionIcon variant="subtle" color="gray" aria-label="More" onClick={(e) => e.stopPropagation()}>
             <MoreHorizontal size={16} />
           </ActionIcon>
         }

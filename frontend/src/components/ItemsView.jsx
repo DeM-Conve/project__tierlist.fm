@@ -83,7 +83,7 @@ export default function ItemsView({ playlist, items, loading, onOpenBoard, onBac
                 {v.channelTitle || ' '}
               </Text>
             </Box>
-            <ActionIcon component="span" variant="subtle" color="dark.2" aria-hidden>
+            <ActionIcon component="span" variant="subtle" color="gray" aria-hidden>
               <ArrowUpRight size={15} />
             </ActionIcon>
           </Anchor>

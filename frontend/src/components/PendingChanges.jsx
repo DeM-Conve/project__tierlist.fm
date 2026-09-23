@@ -120,7 +120,7 @@ export default function PendingChanges() {
               style={{ borderRadius: '50%', flexShrink: 0 }}
             />
             {count > 0 ? (
-              <Button variant="subtle" color="dark.0" px={6} onClick={() => setReviewOpen(true)}>
+              <Button variant="subtle" color="gray" c="var(--text)" px={6} onClick={() => setReviewOpen(true)}>
                 {compact ? `${count} staged` : `${count} change${count === 1 ? '' : 's'} staged · review`}
               </Button>
             ) : (

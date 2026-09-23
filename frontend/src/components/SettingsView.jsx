@@ -1,10 +1,12 @@
 import { useState } from 'react';
 import { Box, Group, Radio, Stack, Tabs, Text, Title } from '@mantine/core';
 import { ShortcutsList } from './ShortcutsModal';
+import AppearanceSettings from './AppearanceSettings';
 import { DUEL_STRATEGIES, DUEL_STRATEGY_LABELS, DEFAULT_DUEL_STRATEGY } from '../duel';
 import { SETTINGS, getSetting, setSetting } from '../settings';
 
 const CATEGORIES = [
+  { key: 'appearance', label: 'Appearance' },
   { key: 'duels', label: 'Duels' },
   { key: 'keyboard', label: 'Keyboard shortcuts' },
 ];
@@ -33,7 +35,7 @@ export default function SettingsView() {
         Settings
       </Title>
 
-      <Tabs defaultValue="duels" orientation="vertical">
+      <Tabs defaultValue="appearance" orientation="vertical">
         <Tabs.List>
           {CATEGORIES.map((c) => (
             <Tabs.Tab key={c.key} value={c.key}>
@@ -41,6 +43,10 @@ export default function SettingsView() {
             </Tabs.Tab>
           ))}
         </Tabs.List>
+
+        <Tabs.Panel value="appearance" pl="xl" maw={980}>
+          <AppearanceSettings />
+        </Tabs.Panel>
 
         <Tabs.Panel value="duels" pl="xl" maw={680}>
           <div>

@@ -14,14 +14,26 @@ auto-grouped into a tier board per category.
     single full component library rather than utility CSS + headless primitives). Use
     Mantine's own components (`Tabs`, `Modal`, `Select`, etc.) for anything new/touched
     instead of hand-rolling equivalents.
-  - The app's palette is themed into Mantine via `src/mantineTheme.js` (`createTheme`,
-    `colors.dark` / `colors.accent` as 10-shade scales, `primaryColor: 'accent'`) so
-    every Mantine component inherits the graphite + violet look instead of Mantine's
-    defaults. `MantineProvider` is mounted once in `main.jsx` with
-    `forceColorScheme="dark"` (this app has no light mode).
-  - `src/index.css` still holds the same palette as plain CSS variables (`--bg`,
-    `--surface`, `--accent`, etc.) for the pre-Mantine hand-written `App.css`, which
-    most existing components still use directly. Don't add new hand-written CSS classes
+  - **Every color is a variable, defined in exactly one place: `src/themes.js`.** It
+    holds the `THEMES` (4 dark + 2 light chromes), `ACCENTS` (4, usable with any theme),
+    `TIER_PALETTES` (3), `MEDIA` (colors drawn over art/video) and `DEMO_ART`. The user
+    picks theme/accent/tier palette in Settings -> Appearance (`appearanceSlice`,
+    persisted to localStorage). `buildAppearance()` turns the choice into CSS variables
+    on `<html>` (`--bg`, `--surface*`, `--border*`, `--text*`, `--accent*`, `--shadow`,
+    `--overlay`, `--tier-t1..tz`, `--tier-ink`, `--media-*`) plus the Mantine theme;
+    `AppearanceRoot.jsx` wraps `MantineProvider` and re-applies both live.
+    `cssVariablesResolver` points Mantine's own color variables at ours and
+    `variantColorResolver` picks readable text on filled accent/tier colors - so there
+    is one set of color variables, and Mantine reads it.
+  - **Never hard-code a color** in a component or `App.css` - use `var(--token)`,
+    `TIER_COLORS` / `TIER_INK` (which are themselves `var(--tier-*)`), or Mantine color
+    props (`c="dimmed"`, `color="gray"` - never `dark.N`, which breaks light themes).
+    A genuinely new color means a new token in `themes.js` (+ its fallback in
+    `index.css :root`), not a literal. SVG icon props (`fill`/`color`) can't read CSS
+    variables - use `currentColor` and set `color` via `style`.
+  - `src/index.css :root` only holds *fallback* values for those tokens (the default
+    Graphite theme, for the instant before `themes.js` runs) plus font/radius tokens;
+    the pre-Mantine hand-written `App.css` reads the same variables. Don't add new hand-written CSS classes
     there for anything a Mantine component could do instead; convert an existing class
     to Mantine opportunistically when already touching that component, but there's no
     standing task to rewrite all of `App.css` at once.
@@ -67,10 +79,9 @@ auto-grouped into a tier board per category.
 
 ## Conventions / decisions worth knowing
 
-- **Palette: neutral graphite chrome + violet accent** (user's choice, replacing the
-  earlier warm charcoal + amber). The accent must stay outside the tiers' red -> blue
-  ramp (`TIER_COLORS` in `tiers.js`) so buttons never read as tiers - don't reintroduce
-  an orange/yellow/amber accent or tint the greys warm.
+- **Default look: Graphite theme + Violet accent + Vivid tiers**, user-switchable in
+  Settings -> Appearance (see the themes.js bullet above). Accents offered by default
+  stay outside the tiers' red -> blue ramp so buttons don't read as tiers.
 - **No MUI, no Tailwind, no shadcn/ui, no bare Radix.** All considered and explicitly
   rejected in favor of Mantine as a single, final UI library choice - see git history
   around the frontend stack migration for the reasoning behind each.
@@ -173,6 +184,16 @@ The user asked for these on top of the Mantine/Redux migration above. Tracked he
 
 ## Housekeeping
 
+- **Prefer popular, well-tested libraries over hand-written code - the user's standing
+  preference.** If a mainstream library (high download count, actively maintained)
+  solves the problem, use it rather than writing and debugging it ourselves: installing
+  one is preferred over hand-rolling. Examples already in the codebase: `colord` for
+  color math (not hex arithmetic), `html-to-image` for PNG export, Mantine's
+  `Radio.Card`/`ColorSwatch`/`Notifications`/`Spotlight`/`useElementSize`/`useHotkeys`
+  instead of custom pickers, toasts, palettes or listeners, Mantine's
+  `variantColorResolver`/`cssVariablesResolver` for theming. Only popular libraries -
+  no obscure or unmaintained packages. Extensible, quick-to-write code built on those
+  beats clever custom code.
 - **Library-first, every time, no exceptions.** Before writing a single line of
   hand-rolled CSS or plain-DOM/manual state code, check whether an already-installed
   library does the job: Mantine's own component props (`style`/`styles`, `gap`, `radius`,

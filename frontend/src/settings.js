@@ -4,6 +4,8 @@ const PREFIX = 'ytTierApp:';
 
 export const SETTINGS = {
   duelStrategy: `${PREFIX}duelStrategy`,
+  // { theme, accent, tierPalette } - see themes.js
+  appearance: `${PREFIX}appearance`,
 };
 
 export function getSetting(key, fallback) {

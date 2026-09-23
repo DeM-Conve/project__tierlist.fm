@@ -48,7 +48,7 @@ export default function Sidebar({
       <aside className={`sidebar${mobileOpen ? ' sidebar-open' : ''}`}>
         <Group gap={10} px={6} mb="md" wrap="nowrap">
           <ThemeIcon size={30} radius="sm" variant="filled">
-            <ListOrdered size={18} color="#fff" />
+            <ListOrdered size={18} />
           </ThemeIcon>
           <Text fw={800} fz={17}>
             Playlist Tiers

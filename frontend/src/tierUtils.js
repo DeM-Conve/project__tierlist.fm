@@ -1,5 +1,5 @@
 // Dark "ink" used for text/icons sitting on a tier's own color.
-export const TIER_INK = '#101114';
+export const TIER_INK = 'var(--tier-ink)';
 
 export function youtubeUrl(videoId) {
   return `https://www.youtube.com/watch?v=${videoId}`;

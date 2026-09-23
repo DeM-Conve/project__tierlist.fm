@@ -19,6 +19,7 @@ import { Play, Square } from 'lucide-react';
 import { DEFAULT_DUEL_STRATEGY, DUEL_STRATEGIES, DUEL_STRATEGY_LABELS } from '../duel';
 import { SETTINGS, getSetting, setSetting } from '../settings';
 import { TIER_COLORS } from '../tiers';
+import { TIER_INK } from '../tierUtils';
 import EmbeddedPlayer from './EmbeddedPlayer';
 
 function DuelCard({ video, tier, arrowKey, isPreviewing, onTogglePreview, onChoose, width }) {
@@ -31,7 +32,7 @@ function DuelCard({ video, tier, arrowKey, isPreviewing, onTogglePreview, onChoo
       onClick={onChoose}
       style={{ width }}
     >
-      <Card.Section style={{ position: 'relative', aspectRatio: '16/9', overflow: 'hidden', background: '#000' }}>
+      <Card.Section style={{ position: 'relative', aspectRatio: '16/9', overflow: 'hidden', background: 'var(--media-bg)' }}>
         {tier && (
           <Badge
             style={{
@@ -40,7 +41,7 @@ function DuelCard({ video, tier, arrowKey, isPreviewing, onTogglePreview, onChoo
               left: 8,
               zIndex: 2,
               background: TIER_COLORS[tier],
-              color: '#101114',
+              color: TIER_INK,
             }}
           >
             {tier}

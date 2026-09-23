@@ -75,10 +75,10 @@ function BoardCard({ category, tiers, onOpen, onQuickSort, onDuel }) {
         <Button size="compact-sm" variant="light" onClick={onOpen}>
           Open
         </Button>
-        <Button size="compact-sm" variant="subtle" color="dark.1" leftSection={<ListOrdered size={13} />} onClick={onQuickSort}>
+        <Button size="compact-sm" variant="subtle" color="gray" leftSection={<ListOrdered size={13} />} onClick={onQuickSort}>
           Quick sort
         </Button>
-        <Button size="compact-sm" variant="subtle" color="dark.1" leftSection={<Swords size={13} />} onClick={onDuel}>
+        <Button size="compact-sm" variant="subtle" color="gray" leftSection={<Swords size={13} />} onClick={onDuel}>
           Duel
         </Button>
       </Group>

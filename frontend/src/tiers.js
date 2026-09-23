@@ -1,13 +1,13 @@
 export const TIER_ORDER = ['T1', 'T2', 'T3', 'TE', 'TZ'];
 
-// Classic hot -> cold ramp, with even steps so neighbours are easy to tell
-// apart (the old TE/TZ were two muddy greens); the bottom tier reads "cold".
+// Tier colors are CSS variables so the Settings -> Appearance tier palette
+// applies everywhere at once; the actual hex values live in themes.js.
 export const TIER_COLORS = {
-  T1: '#ff5a5f',
-  T2: '#ff9f43',
-  T3: '#ffd43b',
-  TE: '#7bd88f',
-  TZ: '#4dabf7',
+  T1: 'var(--tier-t1)',
+  T2: 'var(--tier-t2)',
+  T3: 'var(--tier-t3)',
+  TE: 'var(--tier-te)',
+  TZ: 'var(--tier-tz)',
 };
 
 const TIER_SET = new Set(TIER_ORDER);
