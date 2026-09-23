@@ -14,7 +14,8 @@ import {
 import { spotlight } from '@mantine/spotlight';
 import { ActionIcon, Affix, Box, Center, Loader } from '@mantine/core';
 import { Menu as MenuIcon } from 'lucide-react';
-import { useDisclosure, useHotkeys } from '@mantine/hooks';
+import { useDisclosure, useHotkeys, useWindowEvent } from '@mantine/hooks';
+import { notifications } from '@mantine/notifications';
 import { useProgress } from '@bprogress/react';
 import './App.css';
 import { BOARD_TIERS, TODO_TIER } from './tiers';
@@ -30,6 +31,11 @@ import TierBoardView from './components/TierBoardView';
 import PlayerDock from './components/PlayerDock';
 import CommandPalette from './components/CommandPalette';
 import DuelView from './components/DuelView';
+import InboxView from './components/InboxView';
+import { useInbox } from './inbox/useInbox';
+import { useInboxActions } from './inbox/useInboxActions';
+import { videoIdFromText } from './inbox/youtubeLink';
+import { pasteVideo } from './store/inboxSlice';
 import SettingsView from './components/SettingsView';
 import ShortcutsModal from './components/ShortcutsModal';
 import LoginView from './components/LoginView';
@@ -80,6 +86,7 @@ import {
   useTierBoardQueries,
   useTierSyncMutation,
   useInvalidatePlaylistItems,
+  useFetchVideo,
 } from './api/queries';
 
 
@@ -179,6 +186,7 @@ export default function App() {
         <Route path="tier/:category" element={<TierBoardPage />} />
         <Route path="tier/:category/t/:tier" element={<TierFocusPage />} />
         <Route path="tier/:category/duel" element={<DuelPage />} />
+        <Route path="inbox" element={<InboxPage />} />
         <Route path="settings" element={<SettingsPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
@@ -218,14 +226,47 @@ function Layout() {
   const currentCategory = tierMatch ? decodeURIComponent(tierMatch.params.category) : null;
   const tierPageMatch = useMatch('/tier/:category/t/:tier');
   const duelMatch = useMatch('/tier/:category/duel');
+  const inboxMatch = useMatch('/inbox');
   const focusedCategory = useSelector((s) => s.focus.focusedCategory);
   // The Tier Rail is global like the player: on a board page it shows that
   // board; anywhere else it follows the playing song's board, so the song
   // can still be rated from Home / Settings / a playlist page. The duel
   // screen keeps the whole width to itself.
-  const railCategory = duelMatch
+  // The duel and the Inbox (which has its own tier targets) keep the whole
+  // width to themselves.
+  const railCategory = duelMatch || inboxMatch
     ? null
     : currentCategory ?? (focusedVideoData ? focusedCategory : null);
+
+  // The Inbox is computed up here: the sidebar badge, Home's card and
+  // paste-a-link-anywhere all need it, not just its page.
+  const inbox = useInbox();
+  const inboxActions = useInboxActions(inbox);
+  const fetchVideo = useFetchVideo();
+
+  // A pasted YouTube link (anywhere but a text box) goes to the Inbox, or,
+  // if it's already on a board, says where. Returns whether it was a link.
+  function handlePasteLink(text) {
+    const videoId = videoIdFromText(text);
+    if (!videoId) return false;
+    const where = inbox.placed.get(videoId)?.[0];
+    if (where) {
+      notifications.show({ message: `Already on ${where.category} · ${where.tier}` });
+      return true;
+    }
+    fetchVideo(videoId)
+      .then((video) => {
+        dispatch(pasteVideo(video));
+        navigate('/inbox');
+      })
+      .catch(() => notifications.show({ color: 'red', message: 'Couldn’t find that video on YouTube' }));
+    return true;
+  }
+  useWindowEvent('paste', (e) => {
+    const el = document.activeElement;
+    if (el?.tagName === 'INPUT' || el?.tagName === 'TEXTAREA' || el?.isContentEditable) return;
+    if (handlePasteLink(e.clipboardData?.getData('text'))) e.preventDefault();
+  });
 
   const tierSyncMutation = useTierSyncMutation();
   const invalidatePlaylistItems = useInvalidatePlaylistItems();
@@ -404,6 +445,12 @@ function Layout() {
       });
     }
     list.push({
+      id: 'action-inbox',
+      section: 'Actions',
+      label: 'Open Inbox (new liked songs)',
+      action: () => navigate('/inbox'),
+    });
+    list.push({
       id: 'action-playlists',
       section: 'Actions',
       label: 'Go to Home (boards & playlists)',
@@ -470,6 +517,7 @@ function Layout() {
         tierCategories={tierCategories}
         tierGroups={tierGroups}
         playlistCount={tierPlaylists?.length ?? 0}
+        inboxCount={inbox.loading ? null : inbox.list.length}
         loading={tierPlaylists === null}
         onSelectSettings={() => navigate('/settings')}
         onOpenShortcuts={shortcutsHandlers.open}
@@ -490,6 +538,9 @@ function Layout() {
             openFocus,
             startShufflePlay,
             playFrom,
+            inbox,
+            inboxActions,
+            handlePasteLink,
           }}
         />
         </Box>
@@ -589,6 +640,7 @@ function HomePage() {
   const tierCategories = useSelector(selectTierCategories);
   const focusedCategory = useSelector((s) => s.focus.focusedCategory);
   const playingVideo = useSelector(selectFocusedVideoData);
+  const { inbox } = useOutletContext();
 
   useEffect(() => {
     dispatch(setCurrentCategory(null));
@@ -597,6 +649,8 @@ function HomePage() {
 
   return (
     <HomeView
+      inbox={inbox.loading ? null : inbox.list}
+      onOpenInbox={() => navigate('/inbox')}
       playlists={tierPlaylists}
       hiddenCount={allPlaylists && tierPlaylists ? allPlaylists.length - tierPlaylists.length : 0}
       onOpenNaming={() => navigate('/settings?tab=naming')}
@@ -746,6 +800,18 @@ function DuelPage() {
       onCancel={() => navigate(`/tier/${encodeURIComponent(category)}`)}
     />
   );
+}
+
+function InboxPage() {
+  const dispatch = useDispatch();
+  const { inbox, inboxActions, handlePasteLink } = useOutletContext();
+
+  useEffect(() => {
+    dispatch(setCurrentCategory(null));
+    dispatch(setMobileSidebarOpen(false));
+  }, [dispatch]);
+
+  return <InboxView inbox={inbox} actions={inboxActions} onPasteLink={handlePasteLink} />;
 }
 
 function SettingsPage() {

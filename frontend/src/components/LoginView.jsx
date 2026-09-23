@@ -212,7 +212,7 @@ export default function LoginView({ onLogin }) {
           'var(--bg)',
       }}
     >
-      <Container size="lg" w="100%" py="lg">
+      <Container size="lg" w="100%" py="md">
         <Group gap={10}>
           <ThemeIcon size={30} radius="sm" variant="filled">
             <ListOrdered size={18} />
@@ -223,8 +223,11 @@ export default function LoginView({ onLogin }) {
         </Group>
       </Container>
 
+      {/* Everything below the logo shares one screen: hero + mock centered in
+          the free height, features in a single row along the bottom - so the
+          landing page never needs to scroll on a desktop-sized window. */}
       <Container size="lg" w="100%" style={{ flex: 1, display: 'flex', alignItems: 'center' }}>
-        <SimpleGrid cols={{ base: 1, md: 2 }} spacing={72} py={48} w="100%" style={{ alignItems: 'center' }}>
+        <SimpleGrid cols={{ base: 1, md: 2 }} spacing={72} py="md" w="100%" style={{ alignItems: 'center' }}>
           <Stack gap="xl" className="anim-rise">
             <Badge variant="light" size="lg" radius="sm" w="fit-content">
               Your own YouTube account
@@ -265,28 +268,31 @@ export default function LoginView({ onLogin }) {
               </Text>
             </Stack>
 
-            <Stack gap="md" mt="md" pt="xl" style={{ borderTop: '1px solid var(--border-soft)' }}>
-              {FEATURES.map(({ icon: Icon, title, body }) => (
-                <Group key={title} gap="md" wrap="nowrap" align="flex-start">
-                  <ThemeIcon variant="light" size={34} radius="sm">
-                    <Icon size={17} />
-                  </ThemeIcon>
-                  <div>
-                    <Text fw={600} fz="sm">
-                      {title}
-                    </Text>
-                    <Text fz="sm" c="dimmed">
-                      {body}
-                    </Text>
-                  </div>
-                </Group>
-              ))}
-            </Stack>
           </Stack>
 
           <Box visibleFrom="md" pb={80}>
             <BoardMock />
           </Box>
+        </SimpleGrid>
+      </Container>
+
+      <Container size="lg" w="100%" pb="xl">
+        <SimpleGrid cols={{ base: 1, sm: 3 }} spacing="xl" pt="lg" style={{ borderTop: '1px solid var(--border-soft)' }}>
+          {FEATURES.map(({ icon: Icon, title, body }) => (
+            <Group key={title} gap="md" wrap="nowrap" align="flex-start">
+              <ThemeIcon variant="light" size={34} radius="sm">
+                <Icon size={17} />
+              </ThemeIcon>
+              <div>
+                <Text fw={600} fz="sm">
+                  {title}
+                </Text>
+                <Text fz="sm" c="dimmed">
+                  {body}
+                </Text>
+              </div>
+            </Group>
+          ))}
         </SimpleGrid>
       </Container>
     </Box>

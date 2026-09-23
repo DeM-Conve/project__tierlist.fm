@@ -597,7 +597,9 @@ export default function PlayerDock({
                             {entry.video.channelTitle}
                           </Text>
                         </Box>
-                        <TierChip tier={isCurrent ? currentTier ?? entry.tier : entry.tier} size={20} />
+                        {(isCurrent ? currentTier ?? entry.tier : entry.tier) && (
+                          <TierChip tier={isCurrent ? currentTier ?? entry.tier : entry.tier} size={20} />
+                        )}
                       </Group>
                     </UnstyledButton>
                   );

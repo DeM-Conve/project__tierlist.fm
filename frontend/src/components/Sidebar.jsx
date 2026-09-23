@@ -16,7 +16,7 @@ import {
   Tooltip,
   UnstyledButton,
 } from '@mantine/core';
-import { Home, Keyboard, ListOrdered, LogOut, Search, Settings } from 'lucide-react';
+import { Home, Inbox, Keyboard, ListOrdered, LogOut, Search, Settings } from 'lucide-react';
 import { TIER_ORDER, TODO_TIER } from '../tiers';
 
 // Each board shows its song total straight from the playlists' own item
@@ -31,6 +31,7 @@ export default function Sidebar({
   tierCategories,
   tierGroups,
   playlistCount,
+  inboxCount,
   loading,
   onSelectSettings,
   onOpenShortcuts,
@@ -82,6 +83,24 @@ export default function Sidebar({
           leftSection={<Home size={16} />}
           variant="light"
           active={location.pathname === '/' || location.pathname.startsWith('/playlist/')}
+        />
+        <NavLink
+          component={Link}
+          to="/inbox"
+          label="Inbox"
+          description="Liked songs to rate"
+          leftSection={<Inbox size={16} />}
+          rightSection={
+            inboxCount == null ? (
+              <Skeleton h={16} w={22} radius="xl" />
+            ) : inboxCount > 0 ? (
+              <Badge size="sm" variant="filled" circle={inboxCount < 10}>
+                {inboxCount}
+              </Badge>
+            ) : null
+          }
+          variant="light"
+          active={location.pathname === '/inbox'}
           mb="xs"
         />
 

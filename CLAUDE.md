@@ -85,7 +85,9 @@ auto-grouped into a tier board per category.
   Tables: `app_user` (Google `sub` as id, recorded on every login by the success
   handler in `SecurityConfig`) and `user_settings` (one row per user: `theme_option`,
   `accent_option`, `tier_palette_option`, `duel_strategy_option` enums, the naming
-  template (+ CHECK constraints) and a `version`). Backend package
+  template (+ CHECK constraints) and a `version`), and `inbox_dismissal` (user +
+  video id: liked videos marked "Not a song" in the Inbox; package
+  `fm.tierlist.inbox`). Backend package
   `fm.tierlist.settings`, layered and SOLID:
   - enums `Theme`/`Accent`/`TierPalette`/`DuelStrategy`: constant name = Postgres
     enum label (Hibernate `@JdbcTypeCode(SqlTypes.NAMED_ENUM)` + `columnDefinition`

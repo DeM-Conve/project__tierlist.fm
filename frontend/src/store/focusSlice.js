@@ -41,13 +41,15 @@ const focusSlice = createSlice({
   },
   reducers: {
     openFocus: (state, action) => {
-      const { tier, videoId, queue, entries, category } = action.payload;
+      const { tier, videoId, queue, entries, category, mode } = action.payload;
       state.focusQueue = queue;
       state.focusEntries = entries;
       state.focusedCategory = category;
       state.isShuffling = false;
       state.isTriage = !!action.payload.triage;
-      state.playerMode = 'expanded';
+      // The Inbox passes 'mini' so its card stays in view while listening;
+      // everything else opens full-screen.
+      state.playerMode = mode ?? 'expanded';
       state.focusedVideo = { tier, videoId };
     },
     closeFocus: (state) => {

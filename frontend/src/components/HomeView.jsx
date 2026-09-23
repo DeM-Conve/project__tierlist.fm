@@ -1,12 +1,14 @@
 import { useState } from 'react';
 import {
   Badge,
+  Avatar,
   Box,
   Button,
   Card,
   CloseButton,
   Group,
   Image,
+  Kbd,
   Paper,
   SimpleGrid,
   Skeleton,
@@ -92,6 +94,8 @@ export default function HomeView({
   query,
   onQueryChange,
   nowPlaying,
+  inbox,
+  onOpenInbox,
   onOpenBoard,
   onDuel,
   onOpenPlaylist,
@@ -135,6 +139,31 @@ export default function HomeView({
 
       {creating && (
         <CreateTierPlaylistsModal opened onClose={() => setCreating(false)} onCreated={onOpenBoard} />
+      )}
+
+      {inbox?.length > 0 && (
+        <Paper withBorder radius="md" p="sm" bg="var(--surface-2)">
+          <Group justify="space-between" wrap="nowrap">
+            <Group gap="sm" wrap="nowrap" style={{ minWidth: 0 }}>
+              <Avatar.Group>
+                {inbox.slice(0, 3).map((v) => (
+                  <Avatar key={v.videoId} src={v.thumbnail} radius="sm" size={44} />
+                ))}
+              </Avatar.Group>
+              <Box style={{ minWidth: 0 }}>
+                <Text fz="xs" c="accent" fw={700} tt="uppercase">
+                  Inbox
+                </Text>
+                <Text fw={600} truncate="end">
+                  {inbox.length} liked {inbox.length === 1 ? 'song isn’t' : 'songs aren’t'} on a board yet
+                </Text>
+              </Box>
+            </Group>
+            <Button variant="light" onClick={onOpenInbox} rightSection={<Kbd size="xs">g i</Kbd>}>
+              Rate them
+            </Button>
+          </Group>
+        </Paper>
       )}
 
       {nowPlaying?.category && (

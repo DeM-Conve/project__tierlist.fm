@@ -36,6 +36,15 @@ export const SHORTCUTS = [
     commandId: 'action-sync',
   },
 
+  { id: 'inbox-file', keys: ['1-5'], description: 'File the song into T1…TZ of the shown board', category: 'Inbox' },
+  { id: 'inbox-later', keys: ['t'], description: 'Save it to the board’s TODO list for later', category: 'Inbox' },
+  { id: 'inbox-listen', keys: ['Enter'], description: 'Listen (filing the playing song plays the next)', category: 'Inbox' },
+  { id: 'inbox-skip', keys: ['s'], description: 'Skip (sends it to the back)', category: 'Inbox' },
+  { id: 'inbox-dismiss', keys: ['x'], description: 'Not a song - hide it for good', category: 'Inbox' },
+  { id: 'inbox-board', keys: ['b'], description: 'Pick a different board', category: 'Inbox' },
+  { id: 'inbox-undo', keys: ['u'], description: 'Undo the last Inbox action (Ctrl+Z works too)', category: 'Inbox' },
+  { id: 'inbox-paste', keys: ['Ctrl', 'V'], description: 'Paste a YouTube link anywhere to add that song', category: 'Global' },
+
   { id: 'player-prev', keys: ['h'], description: 'Previous track', category: 'Player' },
   { id: 'player-next', keys: ['l'], description: 'Next track', category: 'Player' },
   {

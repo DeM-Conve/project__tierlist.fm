@@ -22,8 +22,16 @@
 - (Replaced) the old "redirect to the first board on first login" - Home now leads with your boards, which is what that redirect existed for.
 - Open a playlist to see its videos as a numbered list (thumbnail, title, channel, opens on YouTube); a tier playlist shows its tier and an "Open the <board> tier list" button.
 
+## Inbox (adding new songs)
+- `/inbox`: songs you **liked on YouTube / YouTube Music** (the 200 most recent) that aren't on any board yet, one big card at a time - liking a song is the "add" step, filing it is one keypress. Sidebar "Inbox" link with a count badge, a card on Home, a command-palette entry.
+- The board is **guessed from the artist** (the board with the most songs by them; else the board the last song went to), shown with the reason; `b` or the picker changes it.
+- `1`-`5` (or click the big tier buttons) files the song straight into that tier on YouTube - no pending step, since it wasn't on a board. `t` saves it to the board's TODO list ("Later") when the board has one. `s` skips (to the back), `x` "Not a song" hides it for good (saved per account in Postgres), `u` / `Ctrl+Z` / the toast's Undo reverts the last one (deletes the added playlist item).
+- `Enter` / clicking the cover plays it in the mini player; filing the playing song plays the next one, and when a song ends by itself the card follows.
+- **Paste a YouTube link anywhere** (`Ctrl+V` outside a text box, or the paste box on the Inbox): watch / youtu.be / music / shorts links all work. A new song jumps to the front of the Inbox; one already on a board just says where it is.
+- Up next strip below the card (click to jump). Loading shows progress while every tier playlist is checked; empty state is "Inbox zero".
+
 ## Sidebar
-- Brand, "Jump to… ⌘K" (command palette), Home, and every board with its video total (from playlist item counts - no per-board fetch). Filter box, empty-state hint explaining the playlist naming convention.
+- Brand, "Jump to… ⌘K" (command palette), Home, Inbox (with a count of liked songs waiting), and every board with its video total (from playlist item counts - no per-board fetch). Filter box, empty-state hint explaining the playlist naming convention.
 - Footer: Settings, Keyboard shortcuts (`?`), Log out. On narrow screens the sidebar is a drawer opened from a burger button.
 
 ## Tier boards (the tier list)
