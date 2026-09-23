@@ -20,6 +20,10 @@ spring:
     url: ${DB_URL:jdbc:postgresql://localhost:5432/yt}
     username: ${DB_USER:yt}
     password: ${DB_PASSWORD:yt}
+  mvc:
+    # RFC 9457 application/problem+json bodies for every error (validation, 412, ...)
+    problemdetails:
+      enabled: true
   jpa:
     open-in-view: false
     hibernate:

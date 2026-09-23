@@ -1,4 +1,4 @@
-package fm.tierlist.user;
+package fm.tierlist.settings;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 
