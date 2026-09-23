@@ -1,5 +1,6 @@
 @import "@mantine/core/styles.css";
 @import "@mantine/spotlight/styles.css";
+@import "@mantine/notifications/styles.css";
 
 * { box-sizing: border-box; }
 
