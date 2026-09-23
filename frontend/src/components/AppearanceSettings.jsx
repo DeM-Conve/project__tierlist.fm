@@ -46,9 +46,16 @@ export default function AppearanceSettings() {
           Theme
         </Title>
         <Text c="dimmed" fz="sm" mb="md">
-          Backgrounds, surfaces and text. Changes apply instantly and are remembered on this browser.
+          Backgrounds, surfaces and text - picking one also applies its signature accent. Changes apply instantly and are remembered on this browser.
         </Text>
-        <Radio.Group value={appearance.theme} onChange={(v) => dispatch(setTheme(v))}>
+        <Radio.Group
+          value={appearance.theme}
+          onChange={(v) => {
+            dispatch(setTheme(v));
+            // Each theme comes with its signature accent; still changeable below.
+            if (THEMES[v].accent) dispatch(setAccent(THEMES[v].accent));
+          }}
+        >
           <SimpleGrid cols={{ base: 1, xs: 2, lg: 3 }} spacing="sm">
             {Object.entries(THEMES).map(([key, theme]) => (
               <Radio.Card key={key} value={key} radius="md" p="sm">

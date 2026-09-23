@@ -34,21 +34,21 @@ body {
 
 /* Color tokens. The real values are set at runtime on <html> from
    src/themes.js (Settings -> Appearance); these are only the fallback
-   (the default Graphite theme) for the instant before that runs.
+   (the default Tokyo Night theme) for the instant before that runs.
    Never hard-code a color in a component or App.css - use these. */
 :root {
-  --bg: #0e0f12;
-  --surface: #15171c;
-  --surface-2: #1c1f26;
-  --surface-3: #252932;
-  --border: #2a2e38;
-  --border-soft: #20232b;
-  --text: #eceef3;
-  --text-dim: #9ba1ad;
-  --text-faint: #5f6573;
-  --accent: #8b7cf6;
-  --accent-fill: #7a69ee;
-  --accent-hover: #6856d9;
+  --bg: #16161e;
+  --surface: #1a1b26;
+  --surface-2: #24283b;
+  --surface-3: #292e42;
+  --border: #3b4261;
+  --border-soft: #292e42;
+  --text: #c0caf5;
+  --text-dim: #a9b1d6;
+  --text-faint: #565f89;
+  --accent: #4dabf7;
+  --accent-fill: #1c7ed6;
+  --accent-hover: #1971c2;
   --accent-on: #ffffff;
   --shadow: rgba(0, 0, 0, 0.55);
   --overlay: rgba(0, 0, 0, 0.72);

@@ -15,7 +15,7 @@ auto-grouped into a tier board per category.
     Mantine's own components (`Tabs`, `Modal`, `Select`, etc.) for anything new/touched
     instead of hand-rolling equivalents.
   - **Every color is a variable, defined in exactly one place: `src/themes.js`.** It
-    holds the `THEMES` (3 dark + 3 light chromes), `ACCENTS` (12, usable with any theme; most reuse Mantine's own default palettes),
+    holds the `THEMES` (3 dark + 3 light chromes), `ACCENTS` (13, usable with any theme; most reuse Mantine's own default palettes),
     `TIER_PALETTES` (3), `MEDIA` (colors drawn over art/video) and `DEMO_ART`. The user
     picks theme/accent/tier palette in Settings -> Appearance (`appearanceSlice`,
     persisted to localStorage). `buildAppearance()` turns the choice into CSS variables
@@ -79,7 +79,7 @@ auto-grouped into a tier board per category.
 
 ## Conventions / decisions worth knowing
 
-- **Default look: Graphite theme + Violet accent + Vivid tiers**, user-switchable in
+- **Default look: Tokyo Night theme + Blue accent + Vivid tiers**, user-switchable in
   Settings -> Appearance (see the themes.js bullet above). Accents offered by default
   stay outside the tiers' red -> blue ramp so buttons don't read as tiers.
 - **No MUI, no Tailwind, no shadcn/ui, no bare Radix.** All considered and explicitly

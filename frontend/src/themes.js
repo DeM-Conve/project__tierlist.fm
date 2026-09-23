@@ -17,25 +17,33 @@ extend([mixPlugin]);
 // Nothing else in the app should hard-code a color - reference a variable
 // (or TIER_COLORS / TIER_INK, which are themselves variables).
 
+// Dark themes follow widely used editor/terminal palettes so each has a
+// clearly different character; `accent` = its signature accent, applied when
+// the theme is picked (the user can still change the accent after).
 export const THEMES = {
-  graphite: {
-    label: 'Graphite',
+  // Tokyo Night (enkia) - deep indigo night with a blue accent.
+  tokyo: {
+    label: 'Tokyo Night',
     scheme: 'dark',
-    bg: '#0e0f12', surface: '#15171c', surface2: '#1c1f26', surface3: '#252932',
-    border: '#2a2e38', borderSoft: '#20232b',
-    text: '#eceef3', textDim: '#9ba1ad', textFaint: '#5f6573',
+    accent: 'blue',
+    bg: '#16161e', surface: '#1a1b26', surface2: '#24283b', surface3: '#292e42',
+    border: '#3b4261', borderSoft: '#292e42',
+    text: '#c0caf5', textDim: '#a9b1d6', textFaint: '#565f89',
   },
-  oled: {
-    label: 'Pure black',
+  // Dracula (draculatheme.com) - purple-grey with its signature purple.
+  dracula: {
+    label: 'Dracula',
     scheme: 'dark',
-    bg: '#000000', surface: '#0a0a0a', surface2: '#141414', surface3: '#1e1e1e',
-    border: '#262626', borderSoft: '#181818',
-    text: '#fafafa', textDim: '#a1a1a1', textFaint: '#5e5e5e',
+    accent: 'dracula',
+    bg: '#21222c', surface: '#282a36', surface2: '#343746', surface3: '#44475a',
+    border: '#4d5066', borderSoft: '#383a4a',
+    text: '#f8f8f2', textDim: '#c3c6de', textFaint: '#6272a4',
   },
   // The app's original look (pair with the Amber accent for the exact original).
   charcoal: {
     label: 'Warm charcoal',
     scheme: 'dark',
+    accent: 'amber',
     bg: '#131110', surface: '#1c1915', surface2: '#241f1a', surface3: '#2c2620',
     border: '#332c23', borderSoft: '#2a251e',
     text: '#f3efe8', textDim: '#94897a', textFaint: '#5c5548',
@@ -69,6 +77,12 @@ export const THEMES = {
 // for filled buttons in a dark / light theme; `text*` = the shade used for
 // accent-colored text and focus rings (var(--accent)).
 export const ACCENTS = {
+  // Dracula's purple (#bd93f9) as a scale.
+  dracula: {
+    label: 'Dracula purple',
+    scale: ['#f6efff', '#ebdcff', '#dcc4fd', '#cdaefb', '#c39ffa', '#bd93f9', '#a77cf0', '#8e63dd', '#744cc0', '#5b3a9a'],
+    onDark: 5, onLight: 7, textDark: 5, textLight: 8,
+  },
   violet: {
     label: 'Violet',
     scale: ['#f1efff', '#e2ddff', '#c6bcff', '#a999fb', '#9585f8', '#8b7cf6', '#7a69ee', '#6856d9', '#5646b8', '#443893'],
@@ -152,7 +166,7 @@ export const DEMO_ART = [
   ['#2f3320', '#c9c25a'],
 ];
 
-export const DEFAULT_APPEARANCE = { theme: 'graphite', accent: 'violet', tierPalette: 'vivid' };
+export const DEFAULT_APPEARANCE = { theme: 'tokyo', accent: 'blue', tierPalette: 'vivid' };
 
 // Color math comes from libraries (colord's mix plugin, Mantine's
 // isLightColor) rather than hand-rolled hex arithmetic.
@@ -197,7 +211,7 @@ export function buildAppearance(choice) {
     '--accent': accentText,
     '--accent-fill': fill,
     '--accent-hover': a.scale[Math.min(9, (dark ? a.onDark : a.onLight) + 1)],
-    '--accent-on': isLightColor(fill, 0.55) ? '#111111' : '#ffffff',
+    '--accent-on': isLightColor(fill, 0.3) ? '#111111' : '#ffffff', // 0.3 = Mantine's own default threshold
     // Shadows/scrims are black in dark themes, a soft ink in light ones.
     '--shadow': dark ? 'rgba(0, 0, 0, 0.55)' : 'rgba(20, 24, 33, 0.16)',
     '--overlay': dark ? 'rgba(0, 0, 0, 0.72)' : 'rgba(20, 24, 33, 0.35)',
