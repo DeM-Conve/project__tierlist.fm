@@ -27,6 +27,8 @@ import { isSequenceKey } from '../keyboard/sequence';
 import { useCanvas } from '../layout/canvas';
 
 const GAP = 8;
+// Smallest tile the board shrinks to when fitting every row on screen.
+const MIN_TILE = 60;
 // A row's fixed vertical chrome around its tile lines: 2 x (4px box padding
 // + 4px inner padding) + the 1px top border.
 const ROW_CHROME = 4 * GAP / 2 + 1;
@@ -306,7 +308,7 @@ export default function TierBoardView({
 }) {
   const dispatch = useDispatch();
   const isNarrow = useMediaQuery('(max-width: 62em)');
-  const tileSize = isNarrow ? 64 : 88; // square; big enough to print the song name on
+  const baseTileSize = isNarrow ? 64 : 88; // square; big enough to print the song name on
 
   // `tiers` = the ranked rows; `boardTiers` adds the TODO list when the
   // board has one (it's a move target everywhere, but not ranked/counted).
@@ -345,11 +347,18 @@ export default function TierBoardView({
   // Staged removals aren't a row: they live on the rail's Remove slot and in
   // the staged-changes review (Put back).
   const rowTiers = [...tiers, ...(hasTodo ? [TODO_TIER] : [])];
-  const perLine = tilesPerLine(rowWidth, tileSize);
   const pendingPad = pendingMoves.length > 0 ? 80 : 0;
   // 32 = the canvas's own bottom padding; the TODO row is a separate card
   // (16px margin + its 2px of borders).
   const available = viewportHeight - rowsTop - footerHeight - pendingPad - 32 - (hasTodo ? 18 : 0) - 1;
+  // When even one line per row at the full tile size doesn't fit (a board
+  // with every tier + TODO on a short screen), shrink the tiles until it
+  // does - down to MIN_TILE, below which the song names stop being legible
+  // and the board scrolls instead.
+  const measured = rowWidth > 0 && viewportHeight > 0 && rowTiers.length > 0;
+  const fitSize = Math.floor((available - rowTiers.length * (ROW_CHROME - GAP)) / rowTiers.length - GAP);
+  const tileSize = measured ? Math.max(Math.min(baseTileSize, MIN_TILE), Math.min(baseTileSize, fitSize)) : baseTileSize;
+  const perLine = tilesPerLine(rowWidth, tileSize);
   const lineBudget = Math.floor((available - rowTiers.length * (ROW_CHROME - GAP)) / (tileSize + GAP));
   const rowLines = useMemo(() => {
     const allocated = allocateLines(
