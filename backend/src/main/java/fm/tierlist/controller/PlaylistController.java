@@ -16,12 +16,9 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.client.RestTemplate;
-import org.springframework.web.util.HtmlUtils;
-import org.springframework.web.util.UriComponentsBuilder;
 
 import java.net.URI;
 import java.util.ArrayList;
@@ -33,7 +30,6 @@ import java.util.Map;
 public class PlaylistController {
 
     private static final String YOUTUBE_API_BASE = "https://www.googleapis.com/youtube/v3";
-    private static final String MUSIC_CATEGORY = "10";
     private final RestTemplate restTemplate = new RestTemplate();
 
     @GetMapping("/api/auth/status")
@@ -78,41 +74,6 @@ public class PlaylistController {
         );
 
         return toVideos(allItems);
-    }
-
-    /**
-     * Song search for "Add songs": YouTube videos in the Music category only,
-     * so a song name finds the song, not reaction clips. Quota: 100 units per
-     * call (the frontend caches each query and only searches on Enter).
-     */
-    @GetMapping("/api/search")
-    public List<Map<String, Object>> search(
-            @RequestParam String q,
-            @RegisteredOAuth2AuthorizedClient("google") OAuth2AuthorizedClient client
-    ) {
-        URI url = UriComponentsBuilder.fromHttpUrl(YOUTUBE_API_BASE + "/search")
-            .queryParam("part", "snippet")
-            .queryParam("type", "video")
-            .queryParam("videoCategoryId", MUSIC_CATEGORY)
-            .queryParam("maxResults", 10)
-            .queryParam("q", q)
-            .encode()
-            .build()
-            .toUri();
-        Map<String, Object> body = callYoutubeApi(client, url.toString());
-        List<Map<String, Object>> result = new ArrayList<>();
-        for (Map<String, Object> item : (List<Map<String, Object>>) body.getOrDefault("items", List.of())) {
-            Map<String, Object> id = (Map<String, Object>) item.get("id");
-            Map<String, Object> snippet = (Map<String, Object>) item.get("snippet");
-            if (id == null || snippet == null || id.get("videoId") == null) continue;
-            Map<String, Object> out = new LinkedHashMap<>();
-            out.put("videoId", id.get("videoId"));
-            out.put("title", HtmlUtils.htmlUnescape((String) snippet.get("title")));
-            out.put("channelTitle", snippet.get("channelTitle"));
-            out.put("thumbnail", extractThumbnail((Map<String, Object>) snippet.get("thumbnails")));
-            result.add(out);
-        }
-        return result;
     }
 
     /** One video's details, for a pasted link. 404 if it doesn't exist / is private. Quota: 1 unit. */

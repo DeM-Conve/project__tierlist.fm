@@ -9,12 +9,9 @@ import {
   Group,
   Image,
   Kbd,
-  Loader,
   Paper,
-  Progress,
   ScrollArea,
   Select,
-  Skeleton,
   Stack,
   Text,
   TextInput,
@@ -22,13 +19,10 @@ import {
   Tooltip,
   UnstyledButton,
 } from '@mantine/core';
-import { ExternalLink, Link2, Play, Search, SkipForward, Trash2, Undo2 } from 'lucide-react';
+import { ExternalLink, Link2, Play, SkipForward, Trash2, Undo2 } from 'lucide-react';
 import { TIER_COLORS, TIER_ORDER, TODO_TIER } from '../tiers';
 import { selectPlayerCoversPage, selectTierCategories, selectTierGroups } from '../store/selectors';
-import { addVideos, chooseBoard, setCurrent } from '../store/addSongsSlice';
-import { useSongSearchQuery } from '../api/queries';
-import { errorMessage } from '../api/client';
-import { videoIdsFromText } from '../addSongs/youtubeLink';
+import { chooseBoard, setCurrent } from '../store/addSongsSlice';
 import { isSequenceKey } from '../keyboard/sequence';
 import { songLabel, TIER_INK, youtubeUrl } from '../tierUtils';
 import { EqualizerMark, TierChip } from './TierBits';
@@ -80,145 +74,60 @@ function TierTarget({ tier, hotkey, disabled, onClick }) {
   );
 }
 
-// The one input: a pasted link (or several) adds those songs; anything else
-// is a song search on Enter (Music results only, cached per query). Arrow
-// keys pick a result, Enter adds it.
-function SongInput({ inputRef, onAddLinks, placed, onPick }) {
+// The one input: paste a YouTube / YouTube Music link (or several) and
+// those songs are added. Links only - a YouTube search costs 100 quota units,
+// a pasted link 1.
+function SongInput({ inputRef, onAddLinks }) {
   const [text, setText] = useState('');
-  const [submitted, setSubmitted] = useState('');
-  const [highlight, setHighlight] = useState(0);
-  const search = useSongSearchQuery(submitted);
-  const results = submitted ? search.data ?? [] : [];
-  const looksLikeLink = videoIdsFromText(text).length > 0;
+  const [error, setError] = useState(null);
 
-  function reset() {
-    setText('');
-    setSubmitted('');
-    setHighlight(0);
-  }
-  function pick(video) {
-    onPick(video);
-    reset();
-    inputRef.current?.blur();
-  }
-
-  function onKeyDown(e) {
-    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
-      if (!results.length) return;
-      e.preventDefault();
-      setHighlight((h) => (h + (e.key === 'ArrowDown' ? 1 : -1) + results.length) % results.length);
-    } else if (e.key === 'Enter') {
-      e.preventDefault();
-      if (looksLikeLink) {
-        if (onAddLinks(text)) {
-          reset();
-          inputRef.current?.blur();
-        }
-      } else if (results.length && submitted === text.trim()) {
-        pick(results[highlight]);
-      } else if (text.trim()) {
-        setSubmitted(text.trim());
-        setHighlight(0);
-      }
-    } else if (e.key === 'Escape') {
-      e.preventDefault();
-      if (text) reset();
-      else inputRef.current?.blur();
+  function submit(value) {
+    if (!value.trim()) return false;
+    if (!onAddLinks(value)) {
+      setError('That isn’t a YouTube link - copy the address of the song’s page and paste it here.');
+      return false;
     }
+    setText('');
+    setError(null);
+    inputRef.current?.blur();
+    return true;
   }
 
   return (
-    <Stack gap="xs">
-      <TextInput
-        ref={inputRef}
-        size="lg"
-        radius="md"
-        value={text}
-        onChange={(e) => setText(e.currentTarget.value)}
-        onPaste={(e) => {
-          const pasted = e.clipboardData.getData('text');
-          if (videoIdsFromText(pasted).length && onAddLinks(pasted)) {
-            e.preventDefault();
-            reset();
-            inputRef.current?.blur();
-          }
-        }}
-        onKeyDown={onKeyDown}
-        placeholder="Paste a YouTube link, or type a song and press Enter"
-        leftSection={looksLikeLink ? <Link2 size={18} /> : <Search size={18} />}
-        rightSection={search.isFetching ? <Loader size="xs" /> : <Kbd size="xs">Enter</Kbd>}
-        rightSectionWidth={64}
-        aria-label="Paste a YouTube link or search for a song"
-      />
-
-      {submitted && (
-        <Paper withBorder radius="md" p={4}>
-          {search.isFetching && (
-            <Stack gap={4} p={4}>
-              {Array.from({ length: 4 }).map((_, i) => (
-                <Group key={i} gap="sm" wrap="nowrap">
-                  <Skeleton w={64} h={36} radius="sm" />
-                  <Stack gap={6} style={{ flex: 1 }}>
-                    <Skeleton h={10} w="50%" />
-                    <Skeleton h={8} w="30%" />
-                  </Stack>
-                </Group>
-              ))}
-            </Stack>
-          )}
-          {search.isError && (
-            <Text fz="sm" c="dimmed" p="sm">
-              Search didn’t work - {errorMessage(search.error, 'the app couldn’t reach YouTube.')} Pasting a link still works.
-            </Text>
-          )}
-          {!search.isFetching && search.isSuccess && !results.length && (
-            <Text fz="sm" c="dimmed" p="sm">
-              No songs found for “{submitted}”.
-            </Text>
-          )}
-          {!search.isFetching &&
-            results.map((video, i) => {
-              const label = songLabel(video);
-              const where = placed.get(video.videoId)?.[0];
-              return (
-                <UnstyledButton
-                  key={video.videoId}
-                  onClick={() => pick(video)}
-                  onMouseEnter={() => setHighlight(i)}
-                  className="search-result"
-                  data-active={i === highlight || undefined}
-                  p={6}
-                  w="100%"
-                  style={{ borderRadius: 8 }}
-                >
-                  <Group gap="sm" wrap="nowrap">
-                    <Thumb video={video} w={64} />
-                    <Stack gap={0} style={{ flex: 1, minWidth: 0 }}>
-                      <Text fz="sm" fw={600} truncate="end" title={video.title}>
-                        {label.song}
-                      </Text>
-                      <Text fz="xs" c="dimmed" truncate="end">
-                        {label.artist}
-                      </Text>
-                    </Stack>
-                    {where ? (
-                      <Badge variant="light" color="gray">
-                        In {where.category} · {where.tier}
-                      </Badge>
-                    ) : (
-                      i === highlight && <Kbd size="xs">Enter</Kbd>
-                    )}
-                  </Group>
-                </UnstyledButton>
-              );
-            })}
-        </Paper>
-      )}
-    </Stack>
+    <TextInput
+      ref={inputRef}
+      size="lg"
+      radius="md"
+      value={text}
+      onChange={(e) => {
+        setText(e.currentTarget.value);
+        setError(null);
+      }}
+      onPaste={(e) => {
+        if (submit(e.clipboardData.getData('text'))) e.preventDefault();
+      }}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          submit(text);
+        } else if (e.key === 'Escape') {
+          e.preventDefault();
+          setText('');
+          setError(null);
+          inputRef.current?.blur();
+        }
+      }}
+      placeholder="Paste a YouTube or YouTube Music link"
+      leftSection={<Link2 size={18} />}
+      rightSection={<Kbd size="xs">Ctrl V</Kbd>}
+      rightSectionWidth={72}
+      error={error}
+      aria-label="Paste a YouTube link"
+    />
   );
 }
 
-// "Add songs": bring a new song in (paste its link, or search), then one
+// "Add songs": bring a new song in (paste its link), then one
 // keypress puts it in a tier of the guessed board. Keys while the card is
 // up: 1-5 tier, t Later (the board's TODO list), s skip, x remove, Enter
 // listen, b another board, u undo, / or a back to the input.
@@ -233,7 +142,7 @@ export default function AddSongsView({ addSongs, actions, onAddLinks }) {
   const inputRef = useRef(null);
   const boardRef = useRef(null);
 
-  const { current, list, loading, progress, placed } = addSongs;
+  const { current, list, placed } = addSongs;
   const guess = addSongs.guessBoard(current);
   const board = guess ? tierGroups[guess.category] ?? {} : {};
   const hasTodo = !!board[TODO_TIER];
@@ -322,30 +231,13 @@ export default function AddSongsView({ addSongs, actions, onAddLinks }) {
           Add a song
         </Title>
         <Text c="dimmed" fz="sm">
-          Paste its YouTube link or search for it, then press <Kbd size="xs">1</Kbd>–<Kbd size="xs">5</Kbd> to put it in a
-          tier. <Kbd size="xs">Ctrl</Kbd> <Kbd size="xs">V</Kbd> with a link works on any page.
+          Paste its YouTube link, then press <Kbd size="xs">1</Kbd>–<Kbd size="xs">5</Kbd> to put it in a tier. <Kbd size="xs">Ctrl</Kbd> <Kbd size="xs">V</Kbd> with a link works on any page.
         </Text>
       </Stack>
 
-      <SongInput
-        inputRef={inputRef}
-        onAddLinks={onAddLinks}
-        placed={placed}
-        onPick={(video) => dispatch(addVideos([video]))}
-      />
+      <SongInput inputRef={inputRef} onAddLinks={onAddLinks} />
 
-      {loading && current && (
-        <Paper withBorder radius="lg" p="lg">
-          <Stack gap="xs">
-            <Text fz="sm" c="dimmed">
-              Checking your {progress.total} tier playlists for where this fits… {progress.loaded}/{progress.total}
-            </Text>
-            <Progress value={progress.total ? (progress.loaded / progress.total) * 100 : 0} animated />
-          </Stack>
-        </Paper>
-      )}
-
-      {!loading && current && (
+      {current && (
         <Paper withBorder radius="lg" p={{ base: 'md', sm: 'xl' }} bg="var(--surface)">
           <Flex gap="xl" direction={{ base: 'column', sm: 'row' }}>
             <UnstyledButton

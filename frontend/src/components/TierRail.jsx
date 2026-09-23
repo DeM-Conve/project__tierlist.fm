@@ -8,10 +8,12 @@ import { moveWithFeedback, useTierDnd } from '../tierActions';
 import { EqualizerMark } from './TierBits';
 import { TIER_INK } from '../tierUtils';
 
-export const RAIL_WIDTH = 84;
+const RAIL_WIDTH = 84;
 
 // The Tier Rail: a board's tiers as a permanent strip down the right edge -
-// the "tier list is always in reach" surface. Global like the player: Layout
+// the "tier list is always in reach" surface. It's the last column of the
+// Layout's body row, so it always ends exactly where the player dock begins.
+// Global like the player: Layout
 // passes the board being viewed, or off board pages the playing song's board.
 // One click on a tier does the most useful thing available:
 //   1. a song from this board is playing -> re-rate the playing song
@@ -59,14 +61,11 @@ export default function TierRail({ category, activeTier }) {
   return (
     <Box
       visibleFrom="md"
-      pos="fixed"
-      top={0}
-      right={0}
       w={RAIL_WIDTH}
       p={8}
       bg="var(--surface)"
       style={{
-        bottom: 'var(--player-dock-height)',
+        flexShrink: 0,
         borderLeft: '1px solid var(--border-soft)',
         zIndex: 20,
         display: 'flex',

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { ActionIcon, Badge, Button, Group, Slider, Stack, Text } from '@mantine/core';
+import { ActionIcon, Badge, Group, Slider, Stack, Text } from '@mantine/core';
 import {
   ChevronDown,
   ChevronUp,
@@ -12,13 +12,12 @@ import {
   RotateCw,
   SkipBack,
   SkipForward,
-  Trash2,
   Volume2,
   VolumeX,
   X,
 } from 'lucide-react';
 import { REMOVED_TIER, TIER_COLORS, TODO_TIER } from '../tiers';
-import { TierChip } from './TierBits';
+import { RemoveChip, TierChip } from './TierBits';
 import QueuePanel from './QueuePanel';
 import EmbeddedPlayer from './EmbeddedPlayer';
 import { isSequenceKey } from '../keyboard/sequence';
@@ -101,32 +100,6 @@ export default function PlayerDock({
     if (expanded) cardRef.current?.focus();
   }, [expanded]);
 
-  // The mini bar is fixed to the bottom of the viewport, so anything else
-  // fixed/scrollable at the page's own bottom (the sidebar's footer, the
-  // last row of a tier board, ...) would otherwise render underneath it.
-  // Expose its real, measured height as a CSS variable so the rest of the
-  // layout can reserve exactly that much space - only while it's actually
-  // showing as a bar, and never a guessed/hardcoded pixel value.
-  useEffect(() => {
-    const root = document.documentElement;
-    // Floating mode is a small corner box, not a full-width bar - it
-    // shouldn't reserve any bottom padding on the rest of the layout.
-    if (expanded || floating) {
-      root.style.setProperty('--player-dock-height', '0px');
-      return;
-    }
-    const el = cardRef.current;
-    if (!el) return;
-    const observer = new ResizeObserver(([entry]) => {
-      root.style.setProperty('--player-dock-height', `${entry.contentRect.height}px`);
-    });
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, [expanded, floating]);
-
-  useEffect(() => {
-    return () => document.documentElement.style.setProperty('--player-dock-height', '0px');
-  }, []);
 
   // The IFrame API doesn't push time-update events, so the mini bar's
   // progress line has to be polled from the player instead.
@@ -206,6 +179,11 @@ export default function PlayerDock({
         // above for onDuelScreen already keeps this from firing there.
         e.preventDefault();
         togglePlay();
+      } else if (e.key === 'Delete' && availableTiers.length > 0) {
+        // Same as the Remove chip: stage the playing song's removal from its
+        // playlist (only while its board is loaded, like Shift+digit).
+        e.preventDefault();
+        if (currentTier !== REMOVED_TIER) onChangeTier(REMOVED_TIER);
       } else if (e.key === 'm') {
         e.preventDefault();
         toggleMute();
@@ -243,6 +221,7 @@ export default function PlayerDock({
     hasPrev,
     hasNext,
     availableTiers,
+    currentTier,
     onChangeTier,
     // togglePlay/toggleMute close over isPlaying/isMuted state directly
     // (rather than reading it fresh off the player), so this effect must
@@ -476,16 +455,7 @@ export default function PlayerDock({
                     />
                   ))}
                   {currentTier !== REMOVED_TIER && (
-                    <ActionIcon
-                      variant="subtle"
-                      color="red"
-                      size={24}
-                      onClick={() => onChangeTier(REMOVED_TIER)}
-                      aria-label="Remove from playlist"
-                      title="Remove from its playlist (on push)"
-                    >
-                      <Trash2 size={14} />
-                    </ActionIcon>
+                    <RemoveChip size={24} onClick={() => onChangeTier(REMOVED_TIER)} title="Remove from its playlist (Del)" />
                   )}
                 </Group>
               )}
@@ -545,22 +515,19 @@ export default function PlayerDock({
                   ))}
                   {/* Staged like any move: nothing is deleted until you push,
                       and the review's "Put back" (or Ctrl+Z) undoes it. */}
-                  <Button
-                    variant="subtle"
-                    color="red"
-                    size="compact-sm"
-                    ml="xs"
-                    leftSection={<Trash2 size={14} />}
+                  <RemoveChip
+                    size={34}
+                    label={currentTier === REMOVED_TIER ? 'Removed on push' : 'Remove'}
+                    kbd={currentTier === REMOVED_TIER ? undefined : 'Del'}
                     onClick={() => onChangeTier(REMOVED_TIER)}
                     disabled={currentTier === REMOVED_TIER}
-                  >
-                    {currentTier === REMOVED_TIER ? 'Removed on push' : 'Remove from playlist'}
-                  </Button>
+                    title="Remove from its playlist - staged, deleted on push (Del)"
+                  />
                 </Group>
               )}
               <Text fz={11} c="dimmed" opacity={0.75}>
                 esc/j minimize · ← → seek 10s · h l navigate · space play/pause · m mute · 0-9 seek %
-                {availableTiers.length > 0 && ` · shift+1-${availableTiers.length} set tier`}
+                {availableTiers.length > 0 && ` · shift+1-${availableTiers.length} set tier · del remove`}
               </Text>
             </Stack>
           )}

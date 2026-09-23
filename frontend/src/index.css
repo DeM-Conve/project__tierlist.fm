@@ -68,9 +68,6 @@ body {
   --media-control-shadow: rgba(0, 0, 0, 0.6);
   --radius: 6px;
   --sidebar-w: 264px;
-  /* Set at runtime by PlayerDock while the mini bar is showing (0px
-     otherwise) - lets layout reserve exactly that much bottom space. */
-  --player-dock-height: 0px;
 
   --font-display: 'Archivo', -apple-system, sans-serif;
   --font-body: 'Inter', -apple-system, sans-serif;

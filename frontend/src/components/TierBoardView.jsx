@@ -24,6 +24,7 @@ import { selectPlayerCoversPage } from '../store/selectors';
 import { TierMixBar, TierTile } from './TierBits';
 import { TIER_INK, indexForPointInFlow, videoMatches } from '../tierUtils';
 import { isSequenceKey } from '../keyboard/sequence';
+import { useCanvas } from '../layout/canvas';
 
 const GAP = 8;
 // A row's fixed vertical chrome around its tile lines: 2 x (4px box padding
@@ -329,7 +330,7 @@ export default function TierBoardView({
   // the header (and above the mini player / footer), turn it into tile
   // lines, and share them out between the rows (allocateLines). Only a
   // board too big for even one line per tier scrolls.
-  const { ref: viewportRef, height: viewportHeight } = useElementSize();
+  const { ref: canvasRef, height: viewportHeight } = useCanvas();
   const { ref: headerRef, height: headerHeight } = useElementSize();
   const { ref: footerRef, height: footerHeight } = useElementSize();
   const rowsRef = useRef(null);
@@ -337,7 +338,8 @@ export default function TierBoardView({
   const [rowWidth, setRowWidth] = useState(0);
   useLayoutEffect(() => {
     const el = rowsRef.current;
-    if (el) setRowsTop(el.getBoundingClientRect().top + window.scrollY);
+    const canvas = canvasRef.current;
+    if (el && canvas) setRowsTop(el.getBoundingClientRect().top - canvas.getBoundingClientRect().top + canvas.scrollTop);
   }, [headerHeight, viewportHeight]);
 
   // Staged removals aren't a row: they live on the rail's Remove slot and in
@@ -483,13 +485,6 @@ export default function TierBoardView({
 
   return (
     <Box component="section" pb={pendingPad}>
-      {/* Invisible, viewport-sized (minus the mini player) - measured so the
-          board knows how much height it can fill. */}
-      <Box
-        ref={viewportRef}
-        aria-hidden
-        style={{ position: 'fixed', top: 0, bottom: 'var(--player-dock-height)', width: 0, visibility: 'hidden', pointerEvents: 'none' }}
-      />
       <Box ref={headerRef}>
       <Group justify="space-between" align="flex-end" wrap="wrap" gap="md" mb="md">
         <Stack gap={4}>

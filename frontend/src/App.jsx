@@ -12,9 +12,9 @@ import {
   useOutletContext,
 } from 'react-router-dom';
 import { spotlight } from '@mantine/spotlight';
-import { ActionIcon, Affix, Box, Center, Loader } from '@mantine/core';
+import { ActionIcon, Affix, Box, Center, Flex, Loader } from '@mantine/core';
 import { Menu as MenuIcon } from 'lucide-react';
-import { useDisclosure, useHotkeys, useWindowEvent } from '@mantine/hooks';
+import { useDisclosure, useElementSize, useHotkeys, useMergedRef, useWindowEvent } from '@mantine/hooks';
 import { notifications } from '@mantine/notifications';
 import { useProgress } from '@bprogress/react';
 import './App.css';
@@ -24,7 +24,8 @@ import HomeView from './components/HomeView';
 import TierFocusView from './components/TierFocusView';
 import CreateTierPlaylistsModal from './components/CreateTierPlaylistsModal';
 import TodoListModal from './components/TodoListModal';
-import TierRail, { RAIL_WIDTH } from './components/TierRail';
+import TierRail from './components/TierRail';
+import { CanvasContext } from './layout/canvas';
 import PendingChanges from './components/PendingChanges';
 import { applyOrderWithFeedback, moveWithFeedback, undoEdit } from './tierActions';
 import ItemsView from './components/ItemsView';
@@ -251,10 +252,8 @@ function Layout() {
     : currentCategory ?? (focusedVideoData ? focusedCategory : null);
 
   // Add songs lives up here: the sidebar count and paste-a-link-anywhere
-  // need it, not just its page. Where songs already are is only fetched once
-  // the page is open or something was picked (one request per playlist).
-  const waitingCount = useSelector((s) => s.addSongs.queue.length - s.addSongs.hidden.length);
-  const addSongs = useAddSongs(!!addMatch || waitingCount > 0);
+  // need it, not just its page.
+  const addSongs = useAddSongs();
   const addSongsActions = useAddSongsActions(addSongs);
   const fetchVideo = useFetchVideo();
 
@@ -292,8 +291,13 @@ function Layout() {
 
   const [shortcutsOpened, shortcutsHandlers] = useDisclosure(false);
   const hintsRef = useRef(null);
+  const canvasEl = useRef(null);
+  const { ref: canvasSizeRef, height: canvasHeight } = useElementSize();
+  const canvasRef = useMergedRef(canvasEl, canvasSizeRef);
+  const canvas = useMemo(() => ({ ref: canvasEl, height: canvasHeight }), [canvasHeight]);
   useVimKeys({
     hintsRef,
+    canvasRef: canvasEl,
     categories: tierCategories,
     currentCategory,
     playingCategory: focusedVideoData ? focusedCategory : null,
@@ -539,7 +543,16 @@ function Layout() {
   }, [tierCategories, tierPlaylists, currentCategory, pendingMoves, tierGroups, focusSequence]);
 
   return (
-    <div className="app-shell">
+    // The shell is a fixed-height column: the body row (sidebar | canvas |
+    // rail) above the player dock's own row. The mini dock takes real space
+    // there, so nothing is fixed over the page or has to measure the dock -
+    // everything simply ends where the dock begins. (Expanded and floating
+    // dock modes are position: fixed overlays, so they leave the flow and
+    // the body row gets the full height back.) Plain Flex rather than
+    // Mantine AppShell: AppShell fixes its footer at a static height and
+    // collapses it with a transform, which would re-anchor the dock's own
+    // fixed expanded/floating modes to the footer box.
+    <Flex direction="column" h="100dvh">
       <Affix position={{ top: 14, left: 14 }} hiddenFrom="md" zIndex={30}>
         <ActionIcon
           size="lg"
@@ -551,40 +564,48 @@ function Layout() {
         </ActionIcon>
       </Affix>
 
-      <Sidebar
-        query={query}
-        onQueryChange={(q) => dispatch(setQuery(q))}
-        tierCategories={tierCategories}
-        tierGroups={tierGroups}
-        playlistCount={tierPlaylists?.length ?? 0}
-        waitingCount={addSongs.list.length}
-        loading={tierPlaylists === null}
-        onSelectSettings={() => navigate('/settings')}
-        onOpenShortcuts={shortcutsHandlers.open}
-        onLogout={logout}
-        onOpenPalette={() => spotlight.open()}
-        mobileOpen={mobileSidebarOpen}
-        onCloseMobile={() => dispatch(setMobileSidebarOpen(false))}
-      />
-
-      <main className="canvas">
-        {railCategory && <TierRail category={railCategory} activeTier={tierPageMatch?.params.tier} />}
-        <Box pr={railCategory ? { base: 0, md: RAIL_WIDTH - 16 } : 0}>
-        <Outlet
-          context={{
-            syncChanges,
-            discardChanges,
-            moveVideoToTier,
-            openFocus,
-            startShufflePlay,
-            playFrom,
-            addSongs,
-            addSongsActions,
-            handleAddLinks,
-          }}
+      {/* pos="relative": the mobile sidebar drawer and the staged-changes
+          bar are positioned against this row, i.e. above the dock. */}
+      <Flex pos="relative" flex={1} mih={0}>
+        <Sidebar
+          query={query}
+          onQueryChange={(q) => dispatch(setQuery(q))}
+          tierCategories={tierCategories}
+          tierGroups={tierGroups}
+          playlistCount={tierPlaylists?.length ?? 0}
+          waitingCount={addSongs.list.length}
+          loading={tierPlaylists === null}
+          onSelectSettings={() => navigate('/settings')}
+          onOpenShortcuts={shortcutsHandlers.open}
+          onLogout={logout}
+          onOpenPalette={() => spotlight.open()}
+          mobileOpen={mobileSidebarOpen}
+          onCloseMobile={() => dispatch(setMobileSidebarOpen(false))}
         />
+
+        {/* The canvas is the page's scroll container (see layout/canvas.js). */}
+        <Box component="main" ref={canvasRef} flex={1} miw={0} style={{ overflowY: 'auto' }}>
+          <Box pt={{ base: 72, md: 14 }} px={{ base: 20, md: 40 }} pb={32}>
+            <CanvasContext.Provider value={canvas}>
+              <Outlet
+                context={{
+                  syncChanges,
+                  discardChanges,
+                  moveVideoToTier,
+                  openFocus,
+                  startShufflePlay,
+                  playFrom,
+                  addSongs,
+                  addSongsActions,
+                  handleAddLinks,
+                }}
+              />
+            </CanvasContext.Provider>
+          </Box>
         </Box>
-      </main>
+
+        {railCategory && <TierRail category={railCategory} activeTier={tierPageMatch?.params.tier} />}
+      </Flex>
 
       {focusedVideoData && (
         <PlayerDock
@@ -624,7 +645,7 @@ function Layout() {
       <CommandPalette items={commandItems} />
       <LinkHints ref={hintsRef} />
       <ShortcutsModal opened={shortcutsOpened} onClose={shortcutsHandlers.close} />
-    </div>
+    </Flex>
   );
 }
 

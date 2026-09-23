@@ -60,6 +60,54 @@ export function TierChip({ tier, size = 22, active = true, onClick, title, kbd }
   );
 }
 
+// The "remove from playlist" twin of TierChip: same shape and size, so it
+// sits in a row of tier chips as one more choice - outlined in red, with a
+// trash icon and (optionally) its key hint.
+export function RemoveChip({ size = 22, onClick, disabled, title = 'Remove from playlist (on push)', kbd, label }) {
+  const red = 'var(--mantine-color-red-text)';
+  return (
+    <Tooltip label={title} withArrow openDelay={300}>
+      <UnstyledButton
+        onClick={(e) => {
+          e.stopPropagation();
+          onClick();
+        }}
+        disabled={disabled}
+        aria-label={title}
+        className="tier-chip-btn"
+        style={{ opacity: disabled ? 0.45 : 1, cursor: disabled ? 'default' : 'pointer' }}
+      >
+        <Box
+          h={size}
+          miw={size}
+          px={label || kbd ? 8 : 4}
+          style={{
+            borderRadius: 4,
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 6,
+            border: `1px solid color-mix(in srgb, ${red} 55%, transparent)`,
+            color: red,
+          }}
+        >
+          <Trash2 size={size * 0.45} />
+          {label && (
+            <Text fw={800} fz={size * 0.4} lh={1} c={red}>
+              {label}
+            </Text>
+          )}
+          {kbd && (
+            <Text fz={size * 0.34} fw={700} c="dimmed" opacity={0.8} lh={1}>
+              {kbd}
+            </Text>
+          )}
+        </Box>
+      </UnstyledButton>
+    </Tooltip>
+  );
+}
+
 // Proportional stacked bar of a board's tier sizes. `counts` = { T1: n, ... }.
 export function TierMixBar({ tiers, counts, size = 8, onSegmentClick, labels = false }) {
   const total = tiers.reduce((sum, t) => sum + (counts[t] || 0), 0);

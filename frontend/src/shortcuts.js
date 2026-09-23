@@ -95,6 +95,12 @@ export const SHORTCUTS = [
     description: 'Rate the playing video into that tier (any player mode, on its own board)',
     category: 'Player',
   },
+  {
+    id: 'player-remove',
+    keys: ['Del'],
+    description: 'Remove the playing video from its playlist (staged until you push; on its own board)',
+    category: 'Player',
+  },
 
   { id: 'duel-left', keys: ['←'], description: 'Pick the left video', category: 'Duel' },
   { id: 'duel-right', keys: ['→'], description: 'Pick the right video', category: 'Duel' },
