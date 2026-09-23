@@ -1,29 +1,18 @@
 /* Palette variables now live in index.css, alongside the Mantine theme
    built from the same values (src/mantineTheme.js). */
 
-.login-screen {
-  min-height: 100vh;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+/* Login landing entrance/float motion - Mantine has no keyframe animation
+   prop, so these two stay as CSS. */
+@keyframes landing-rise {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: none; }
 }
-#login-view {
-  max-width: 440px;
-  padding: 0 20px;
+@keyframes landing-float {
+  0%, 100% { translate: 0 0; }
+  50% { translate: 0 -8px; }
 }
-.login-headline {
-  font-family: var(--font-display);
-  font-size: 34px;
-  font-weight: 900;
-  margin: 0 0 12px;
-  letter-spacing: -0.5px;
-}
-#login-view p {
-  color: var(--text-dim);
-  margin-bottom: 24px;
-  font-size: 15px;
-  line-height: 1.5;
-}
+.landing-rise { animation: landing-rise 0.7s cubic-bezier(0.2, 0.7, 0.2, 1) both; }
+.landing-float { animation: landing-float 5s ease-in-out infinite; }
 
 /* App shell: fixed sidebar + scrolling canvas */
 .app-shell {

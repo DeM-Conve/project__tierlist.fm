@@ -12,7 +12,7 @@ import {
   useOutletContext,
 } from 'react-router-dom';
 import { spotlight } from '@mantine/spotlight';
-import { Button } from '@mantine/core';
+import { Center, Loader } from '@mantine/core';
 import { useDisclosure, useHotkeys } from '@mantine/hooks';
 import { useProgress } from '@bprogress/react';
 import './App.css';
@@ -26,6 +26,7 @@ import CommandPalette from './components/CommandPalette';
 import DuelView from './components/DuelView';
 import SettingsView from './components/SettingsView';
 import ShortcutsModal from './components/ShortcutsModal';
+import LoginView from './components/LoginView';
 import { setLoggedIn, setPlaylists } from './store/authSlice';
 import { setCurrentCategory, setQuery, setMobileSidebarOpen } from './store/viewSlice';
 import {
@@ -139,21 +140,15 @@ export default function App() {
 
   if (loggedIn === false) {
     return (
-      <main className="login-screen">
-        <section id="login-view">
-          <h2 className="login-headline">Your playlists, ranked.</h2>
-          <p>Sign in to load your playlists and start sorting them into tiers.</p>
-          <Button onClick={login}>Continue with Google</Button>
-        </section>
-      </main>
+      <LoginView onLogin={login} />
     );
   }
 
   if (loggedIn === null) {
     return (
-      <main className="login-screen">
-        <p className="hint-text">Loading...</p>
-      </main>
+      <Center mih="100vh">
+        <Loader size="sm" />
+      </Center>
     );
   }
 

@@ -2,6 +2,7 @@
 
 ## Auth & data access
 - Google login via Spring Security OAuth2 (session-based, no separate token storage).
+- Signed-out landing page (`LoginView`): hero + "Continue with Google", feature summary, and an illustrative tier-board/duel mock (desktop only).
 - Scopes: `openid`, `profile`, `https://www.googleapis.com/auth/youtube.force-ssl` (read + write access to playlists).
 - `/api/auth/status` reports login state without forcing an OAuth redirect on an unauthenticated request.
 
