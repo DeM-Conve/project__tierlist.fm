@@ -23,7 +23,7 @@
 - Open a playlist to see its videos as a numbered list (thumbnail, title, channel, opens on YouTube); a tier playlist shows its tier and an "Open the <board> tier list" button.
 
 ## Inbox (adding new songs)
-- `/inbox`: songs you **liked on YouTube / YouTube Music** (the 200 most recent) that aren't on any board yet, one big card at a time - liking a song is the "add" step, filing it is one keypress. Sidebar "Inbox" link with a count badge, a card on Home, a command-palette entry.
+- `/inbox`: songs you **liked on YouTube / YouTube Music** (the 300 most recent likes, keeping only videos YouTube files under Music - clips, shorts and talks stay out) that aren't on any board yet, one big card at a time - liking a song is the "add" step, filing it is one keypress. Sidebar "Inbox" link with a count badge, a card on Home, a command-palette entry.
 - The board is **guessed from the artist** (the board with the most songs by them; else the board the last song went to), shown with the reason; `b` or the picker changes it.
 - `1`-`5` (or click the big tier buttons) files the song straight into that tier on YouTube - no pending step, since it wasn't on a board. `t` saves it to the board's TODO list ("Later") when the board has one. `s` skips (to the back), `x` "Not a song" hides it for good (saved per account in Postgres), `u` / `Ctrl+Z` / the toast's Undo reverts the last one (deletes the added playlist item).
 - `Enter` / clicking the cover plays it in the mini player; filing the playing song plays the next one, and when a song ends by itself the card follows.

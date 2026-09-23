@@ -179,15 +179,15 @@ export default function InboxView({ inbox, actions, onPasteLink }) {
           </Title>
           <Text c="dimmed" fz="sm">
             {loading
-              ? 'Looking for new likes…'
+              ? 'Looking for songs you liked…'
               : list.length
-                ? `${list.length} liked ${list.length === 1 ? 'song isn’t' : 'songs aren’t'} on a board yet`
-                : 'Everything you liked is on a board'}
+                ? `${list.length} ${list.length === 1 ? 'song' : 'songs'} you liked on YouTube, not in a tier yet`
+                : 'Every song you liked is in a tier'}
           </Text>
         </Stack>
         <TextInput
-          w={320}
-          placeholder="Paste a YouTube link…"
+          w={360}
+          placeholder="Add a song: paste its YouTube link"
           leftSection={<Link2 size={15} />}
           rightSection={<Kbd size="xs">Ctrl V</Kbd>}
           rightSectionWidth={64}
@@ -261,7 +261,7 @@ export default function InboxView({ inbox, actions, onPasteLink }) {
             <Stack gap="md" style={{ flex: 1, minWidth: 0 }}>
               <Stack gap={4}>
                 <Text fz="xs" c="dimmed">
-                  {current.addedAt ? `Liked ${ago(current.addedAt)}` : 'Pasted link'}
+                  {current.addedAt ? `You liked this on YouTube ${ago(current.addedAt)}` : 'Added from a pasted link'}
                 </Text>
                 <Title order={2} fz={{ base: 24, sm: 30 }} lh={1.15} lineClamp={2} title={current.title}>
                   {label.song}
