@@ -201,14 +201,13 @@
   max-width: none;
   max-height: none;
   overflow: visible;
-  padding: 8px 16px;
+  padding: 6px 12px;
   border-width: 1px 0 0;
   border-radius: 0;
   box-shadow: 0 -8px 24px var(--shadow);
   transition: background 0.4s ease;
 }
-/* Three zones, Spotify/YouTube-Music style: song (art + title) | transport +
-   seek bar | rating + utilities. The body/main wrappers are `display:
+/* Three zones, Spotify/YouTube-Music style: song (art + title) | transport | rating + utilities. The body/main wrappers are `display:
    contents` so the player subtree keeps its DOM position (no remount); the
    right cluster spans a trailing 44px track so the side zones are equal and
    the transport sits dead centre. (CSS Grid - no Mantine prop for this.) */
@@ -220,15 +219,30 @@
 }
 .player-dock-mini .player-dock-secondary { grid-column: 4 / 6; justify-self: end; }
 .player-dock-center { display: flex; flex-direction: column; align-items: center; gap: 2px; min-width: 0; }
-.player-dock-mini .player-dock-seek { width: clamp(240px, 34vw, 560px); }
-/* Seek thumb only while the bar is hovered or dragged (a :hover state). */
-.player-dock-seek .mantine-Slider-thumb { opacity: 0; transition: opacity 0.12s ease; }
-.player-dock-seek:hover .mantine-Slider-thumb,
-.player-dock-seek .mantine-Slider-thumb:focus-visible { opacity: 1; }
+.player-dock-progress-track {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 10px;
+  margin-top: -5px;
+  cursor: pointer;
+  z-index: 1;
+}
+.player-dock-progress {
+  position: absolute;
+  top: 4px;
+  left: 0;
+  height: 2px;
+  background: var(--accent);
+  transition: width 0.2s linear, height 0.12s ease, top 0.12s ease;
+  pointer-events: none;
+}
+/* The line thickens under the pointer so it's an easy seek target (a :hover state). */
+.player-dock-progress-track:hover .player-dock-progress { top: 3px; height: 4px; }
 @media (max-width: 47.99em) {
   .player-dock-mini:not(.player-dock-floating) .player-dock-card { grid-template-columns: 44px minmax(0, 1fr) auto auto; padding: 6px 10px; }
   .player-dock-mini:not(.player-dock-floating) .player-dock-secondary { grid-column: auto; }
-  .player-dock-mini:not(.player-dock-floating) .player-dock-seek,
   .player-dock-mini:not(.player-dock-floating) .player-dock-extra { display: none; }
 }
 
@@ -310,7 +324,8 @@
   gap: 4px;
   padding: 8px 12px 10px;
 }
-.player-dock-floating .player-dock-seek { width: 100%; }
+.player-dock-floating .player-dock-progress-track { top: auto; bottom: 0; margin-top: 0; }
+.player-dock-floating .player-dock-progress { top: auto; bottom: 0; }
 .player-dock-floating .player-dock-secondary { justify-content: center; }
 
 .focus-media-slot { position: relative; }

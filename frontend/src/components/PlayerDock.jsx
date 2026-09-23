@@ -37,8 +37,6 @@ import { isSequenceKey } from '../keyboard/sequence';
 // minimized view you're in) - it never wraps back up to expanded on its
 // own. k (up) always jumps straight back to expanded, from any state.
 
-const fmtTime = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
-
 // YouTube-style volume: the speaker icon mutes on click; hovering it pops
 // a vertical slider above it (the wheel over the icon nudges it too).
 function VolumeControl({ volume, muted, onToggleMute, onChange, size }) {
@@ -116,10 +114,8 @@ export default function PlayerDock({
   const cardRef = useRef(null);
   const playerRef = useRef(null);
   const [isPlaying, setIsPlaying] = useState(true);
-  // Playback position, polled (see below); `scrub` holds the seek bar's
-  // value while it's being dragged so polling doesn't fight the thumb.
+  // Playback position, polled (see below) for the edge progress line.
   const [time, setTime] = useState({ cur: 0, dur: 0 });
-  const [scrub, setScrub] = useState(null);
   const [isMuted, setIsMuted] = useState(false);
   const [volume, setVolume] = useState(100);
   // Remembers the level to restore when unmuting via the button/shortcut,
@@ -318,6 +314,12 @@ export default function PlayerDock({
     }
   }
 
+  // Click anywhere on the edge progress line to jump there.
+  function seek(e) {
+    const rect = e.currentTarget.getBoundingClientRect();
+    seekToPercent(Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width)) * 100);
+  }
+
   // The expanded view's ⟲ ⟳ buttons (and ←/→) scrub within the current
   // video - track skipping is h/l or the prev/next buttons.
   function seekBy(deltaSeconds) {
@@ -371,6 +373,12 @@ export default function PlayerDock({
         // the tier list is the product, so the dock wears it too.
         style={!expanded && currentTier ? { background: `color-mix(in srgb, ${TIER_COLORS[currentTier]} 7%, var(--surface))` } : undefined}
       >
+        {!expanded && (
+          <div className="player-dock-progress-track" onClick={seek}>
+            <div className="player-dock-progress" style={{ width: `${time.dur ? (time.cur / time.dur) * 100 : 0}%` }} />
+          </div>
+        )}
+
         {/* Floating/expanded only: the mini bar keeps these in its right
             cluster instead. */}
         {mode !== 'mini' && (
@@ -497,33 +505,6 @@ export default function PlayerDock({
                 {repeatOne ? <Repeat1 size={16} /> : <Repeat size={16} />}
               </ActionIcon>
             </Group>
-            {!expanded && (
-              <Group className="player-dock-seek" gap={8} wrap="nowrap">
-                <Text fz={11} c="dimmed" w={34} ta="right" style={{ fontVariantNumeric: 'tabular-nums' }}>
-                  {fmtTime(scrub != null ? (scrub / 100) * time.dur : time.cur)}
-                </Text>
-                <Slider
-                  flex={1}
-                  size={3}
-                  thumbSize={11}
-                  color="accent"
-                  label={null}
-                  min={0}
-                  max={100}
-                  step={0.1}
-                  value={scrub ?? (time.dur ? (time.cur / time.dur) * 100 : 0)}
-                  onChange={setScrub}
-                  onChangeEnd={(v) => {
-                    seekToPercent(v);
-                    setScrub(null);
-                  }}
-                  aria-label="Seek"
-                />
-                <Text fz={11} c="dimmed" w={34} style={{ fontVariantNumeric: 'tabular-nums' }}>
-                  {time.dur ? fmtTime(time.dur) : '-:--'}
-                </Text>
-              </Group>
-            )}
             </div>
 
             <Group className="player-dock-secondary" gap={2} wrap="nowrap">
