@@ -652,11 +652,6 @@ export default function TierBoardView({
         </Group>
       )}
 
-      {!anyLoading && hasVideos && (
-        <Text fz="xs" c="dimmed" mt="sm" ta="center">
-          Drag tiles between tiers (or onto the rail) · click a tile to play · click a tier to see all of it · Ctrl+Z undoes
-        </Text>
-      )}
       </Box>
 
       {searchOpen && (

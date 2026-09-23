@@ -199,7 +199,7 @@ export default function Sidebar({
           </Stack>
         </ScrollArea>
 
-        <Group gap="xs" mt="md" wrap="nowrap">
+        <Group gap="xs" pt="sm" mt={4} wrap="nowrap" style={{ borderTop: '1px solid var(--border-soft)' }}>
           <Tooltip label="Settings (g s)" withArrow>
             <ActionIcon variant="default" size="lg" onClick={onSelectSettings} aria-label="Settings">
               <Settings size={16} />

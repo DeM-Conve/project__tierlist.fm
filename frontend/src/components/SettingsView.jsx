@@ -40,7 +40,8 @@ export default function SettingsView() {
       </Title>
 
       <Tabs value={tab} onChange={(v) => v && setSearchParams({ tab: v }, { replace: true })} orientation="vertical">
-        <Tabs.List>
+        {/* Only as tall as its tabs (not the open section), and it stays put while a long section scrolls. */}
+        <Tabs.List style={{ alignSelf: 'flex-start', position: 'sticky', top: 16 }}>
           {CATEGORIES.map((c) => (
             <Tabs.Tab key={c.key} value={c.key}>
               {c.label}

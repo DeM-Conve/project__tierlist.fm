@@ -198,7 +198,8 @@
   padding: 6px 12px;
   border-width: 1px 0 0;
   border-radius: 0;
-  box-shadow: 0 -8px 24px var(--shadow);
+  /* In flow (not overlaying the page), so the top border is the only
+     separation it needs - a shadow smudged the sidebar/rail bottoms. */
   transition: background 0.4s ease;
 }
 /* Three zones, Spotify/YouTube-Music style: song (art + title) | transport | rating + utilities. The body/main wrappers are `display:
