@@ -26,6 +26,16 @@ export function keywordWords(text) {
   return text.replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
 }
 
+// The title with its keyword (plus any symbols hugging it) re-written as
+// `styled` - how the user typed it: ("Rap [todo]", "TODO", "**TODO**") ->
+// "Rap **TODO**". Unchanged if the keyword isn't in it as a whole word.
+export function restyleKeyword(title, words, styled) {
+  if (!words || !styled) return title;
+  const core = words.split(' ').join('[^\\p{L}\\p{N}]+');
+  const re = new RegExp(`(?<![\\p{L}\\p{N}])[^\\p{L}\\p{N}\\s]*${core}[^\\p{L}\\p{N}\\s]*(?![\\p{L}\\p{N}])`, 'iu');
+  return title.replace(re, () => styled);
+}
+
 // Mirrors the backend's @TodoKeyword - keep the two in step.
 export function validateTodoKeyword(keyword) {
   const errors = [];
