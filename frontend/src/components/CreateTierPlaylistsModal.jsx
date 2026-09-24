@@ -55,7 +55,7 @@ export default function CreateTierPlaylistsModal({ opened, onClose, category: fi
   ];
   const unrecognised = titles.filter((t) =>
     t.tier === TODO_TIER
-      ? boardFromName(t.title, todoKeyword, boards) !== name
+      ? boardFromName(t.title, todoKeyword, boards, [template]) !== name
       : parseTitle(t.title, [template])?.tier !== t.tier
   );
   const canCreate = name && titles.length > 0 && !exists && unrecognised.length === 0 && !createMutation.isPending;

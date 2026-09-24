@@ -1,3 +1,4 @@
+import { renderTitle } from './naming';
 import { TIER_ORDER } from './tiers';
 
 // Which playlists are a board's to-do list (Settings -> Playlist naming ->
@@ -9,8 +10,10 @@ import { TIER_ORDER } from './tiers';
 //      anywhere, any case. That's what makes it a to-do list at all.
 //   2. which board it belongs to:
 //        a. an explicit link (playlist id -> board) the user set, else
-//        b. the rest of the title, once the keyword is taken out, is exactly a
-//           board's name - optionally with that board's tag ("[G] Rap").
+//        b. the title is the naming template with the keyword in the {tier}
+//           slot ("[Tierlist.fm] Rap TODO") - how the rename job names them -
+//           or the rest of the title, once the keyword is taken out, is
+//           exactly a board's name - optionally with its tag ("[G] Rap").
 //      Punctuation, brackets, "_" and case don't matter ("Jazz Cozy" =
 //      "Jazz_Cozy"). Anything else stays unplaced until it's linked by hand.
 //
@@ -24,16 +27,6 @@ export const TODO_KEYWORD_MAX = 20;
 // ("(**TODO**)" -> "TODO"). Matching ignores symbols anyway (normalizeName).
 export function keywordWords(text) {
   return text.replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
-}
-
-// The title with its keyword (plus any symbols hugging it) re-written as
-// `styled` - how the user typed it: ("Rap [todo]", "TODO", "**TODO**") ->
-// "Rap **TODO**". Unchanged if the keyword isn't in it as a whole word.
-export function restyleKeyword(title, words, styled) {
-  if (!words || !styled) return title;
-  const core = words.split(' ').join('[^\\p{L}\\p{N}]+');
-  const re = new RegExp(`(?<![\\p{L}\\p{N}])[^\\p{L}\\p{N}\\s]*${core}[^\\p{L}\\p{N}\\s]*(?![\\p{L}\\p{N}])`, 'iu');
-  return title.replace(re, () => styled);
 }
 
 // Mirrors the backend's @TodoKeyword - keep the two in step.
@@ -68,11 +61,23 @@ function withoutKeyword(title, keyword) {
   return ` ${normalizeName(title)} `.replace(` ${normalizeName(keyword)} `, ' ').trim().replace(/\s+/g, ' ');
 }
 
+// A board's to-do list named by the template: the keyword fills {tier}, the
+// board's (first) tag fills {tag}.
+export function todoTitle(template, { category, tags }, keyword) {
+  return renderTitle(template, { bracket: tags[0] ?? null, category, tier: keyword });
+}
+
 // boards: [{ category, tags: string[] }] -> the board this title names, or
-// null (no board, or two boards fit equally).
-export function boardFromName(title, keyword, boards) {
+// null (no board, or two boards fit equally). `templates`: the naming
+// template(s) in use (see todoTitle).
+export function boardFromName(title, keyword, boards, templates = []) {
   const rest = withoutKeyword(title, keyword);
+  const whole = normalizeName(title);
   const hits = boards.filter(({ category, tags }) => {
+    const byTemplate = templates.some((tpl) =>
+      [null, ...tags].some((tag) => normalizeName(renderTitle(tpl, { bracket: tag, category, tier: keyword })) === whole)
+    );
+    if (byTemplate) return true;
     const name = normalizeName(category);
     if (rest === name) return true;
     return tags.some((tag) => {
@@ -98,7 +103,7 @@ export function boardsOf(rankedPlaylists) {
 // -> one row per candidate (has the keyword, or is linked):
 //    { playlist, category, via: 'link' | 'name' | null,
 //      status: 'active' | 'duplicate' | 'unplaced' | 'missingBoard' }
-export function resolveTodoLists(playlists, { keyword, links, boards }) {
+export function resolveTodoLists(playlists, { keyword, links, boards, templates }) {
   const known = new Set(boards.map((b) => b.category));
   const rows = [];
   for (const playlist of playlists) {
@@ -106,7 +111,7 @@ export function resolveTodoLists(playlists, { keyword, links, boards }) {
     if (linked) {
       rows.push({ playlist, category: linked, via: 'link', status: known.has(linked) ? 'active' : 'missingBoard' });
     } else if (hasTodoKeyword(playlist.title, keyword)) {
-      const category = boardFromName(playlist.title, keyword, boards);
+      const category = boardFromName(playlist.title, keyword, boards, templates);
       rows.push({ playlist, category, via: category ? 'name' : null, status: category ? 'active' : 'unplaced' });
     }
   }

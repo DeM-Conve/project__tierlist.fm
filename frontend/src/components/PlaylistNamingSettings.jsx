@@ -23,6 +23,7 @@ import { AlertTriangle, ArrowRight, CheckCircle2, Play, RotateCcw, Wand2 } from 
 import { TEMPLATE_PRESET_GROUPS, TOKENS, detectTemplate, normalizeTemplate, parseTitle, renderTitle, validateTemplate } from '../naming';
 import { finishMigration, setTemplate, startMigration } from '../store/namingSlice';
 import { selectTierPlaylists } from '../store/selectors';
+import { boardFromName, boardsOf, todoTitle } from '../todoLists';
 import { useInvalidatePlaylists, useRenamePlaylistsMutation } from '../api/queries';
 import { TODO_TIER } from '../tiers';
 import TodoListSettings from './TodoListSettings';
@@ -51,17 +52,23 @@ export default function PlaylistNamingSettings() {
   const errors = validateTemplate(draft);
   const dirty = draft !== activeTemplate;
 
+  const todoKeyword = useSelector((s) => s.naming.todoKeyword);
+  const boards = useMemo(() => boardsOf((tierPlaylists || []).filter((p) => p.parsed.tier !== TODO_TIER)), [tierPlaylists]);
+
   const plan = useMemo(
     () =>
-      // To-do lists keep whatever name they have (they're found by keyword,
-      // not by this template - see TodoListSettings).
-      (tierPlaylists || []).filter((p) => p.parsed.tier !== TODO_TIER).map((p) => ({
-        id: p.id,
-        from: p.title,
-        to: errors.length ? p.title : renderTitle(draft, p.parsed),
-        parsed: p.parsed,
-      })),
-    [tierPlaylists, draft, errors.length]
+      // To-do lists follow the template too, with the keyword in {tier}'s
+      // place and the board's tag in {tag}'s ("[G] Rap TODO").
+      (tierPlaylists || []).map((p) => {
+        const board = p.parsed.tier === TODO_TIER && boards.find((b) => b.category === p.parsed.category);
+        const to = errors.length
+          ? p.title
+          : board
+          ? todoTitle(draft, board, todoKeyword)
+          : renderTitle(draft, p.parsed);
+        return { id: p.id, from: p.title, to, parsed: p.parsed };
+      }),
+    [tierPlaylists, boards, draft, todoKeyword, errors.length]
   );
   const changes = plan.filter((r) => r.from !== r.to);
   const collisions = useMemo(() => {
@@ -74,6 +81,7 @@ export default function PlaylistNamingSettings() {
   const unrecognised = errors.length
     ? []
     : plan.filter((r) => {
+        if (r.parsed.tier === TODO_TIER) return boardFromName(r.to, todoKeyword, boards, [draft]) !== r.parsed.category;
         const back = parseTitle(r.to, [draft]);
         return !back || back.category !== r.parsed.category || back.tier !== r.parsed.tier;
       });

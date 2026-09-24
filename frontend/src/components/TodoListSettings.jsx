@@ -1,13 +1,10 @@
 import { useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { Badge, Button, Code, Divider, Group, Paper, ScrollArea, Select, Stack, Table, Text, TextInput, Title } from '@mantine/core';
-import { modals } from '@mantine/modals';
-import { notifications } from '@mantine/notifications';
-import { ArrowRight, ListTodo, Play } from 'lucide-react';
-import { useInvalidatePlaylists, useRenamePlaylistsMutation } from '../api/queries';
+import { Badge, Code, Divider, Group, Paper, ScrollArea, Select, Stack, Table, Text, TextInput, Title } from '@mantine/core';
+import { ListTodo } from 'lucide-react';
 import { linkTodoList, setTodoKeyword } from '../store/namingSlice';
 import { selectTierCategories, selectTodoRows } from '../store/selectors';
-import { keywordWords, restyleKeyword, validateTodoKeyword } from '../todoLists';
+import { keywordWords, validateTodoKeyword } from '../todoLists';
 
 const AUTO = '__auto';
 
@@ -35,48 +32,6 @@ export default function TodoListSettings() {
   const words = keywordWords(draft);
   const errors = validateTodoKeyword(words);
 
-  const renameMutation = useRenamePlaylistsMutation();
-  const invalidatePlaylists = useInvalidatePlaylists();
-
-  // Keyword typed with a style ("**TODO**"): offer to write it into the
-  // to-do lists' names on YouTube, so they read the way it was typed.
-  const styled = errors.length ? '' : draft.trim();
-  const renames = rows
-    .map((r) => ({ id: r.playlist.id, from: r.playlist.title, to: restyleKeyword(r.playlist.title, words, styled) }))
-    .filter((r) => r.to !== r.from);
-  const renameTo = new Map(renames.map((r) => [r.id, r.to]));
-
-  async function runRenames() {
-    try {
-      const res = await renameMutation.mutateAsync(renames.map((r) => ({ id: r.id, title: r.to })));
-      const failed = res.results.filter((r) => !r.success);
-      if (failed.length) notifications.show({ color: 'red', message: `${failed.length} rename(s) failed: ${failed[0].error}` });
-      else notifications.show({ message: `Renamed ${renames.length} to-do list${renames.length === 1 ? '' : 's'} on YouTube` });
-    } catch (e) {
-      notifications.show({ color: 'red', message: `Rename failed: ${e.message}` });
-    }
-    await invalidatePlaylists();
-  }
-
-  function confirmRenames() {
-    modals.openConfirmModal({
-      title: <Text fw={800}>Rename {renames.length} to-do list{renames.length === 1 ? '' : 's'} on YouTube?</Text>,
-      children: (
-        <Stack gap={6}>
-          {renames.map((r) => (
-            <Group key={r.id} gap={8} wrap="nowrap" ff="monospace" fz="sm">
-              <Text inherit c="dimmed">{r.from}</Text>
-              <ArrowRight size={14} />
-              <Text inherit fw={600}>{r.to}</Text>
-            </Group>
-          ))}
-        </Stack>
-      ),
-      labels: { confirm: 'Rename', cancel: 'Cancel' },
-      onConfirm: runRenames,
-    });
-  }
-
   function changeKeyword(value) {
     setDraft(value);
     const next = keywordWords(value);
@@ -96,9 +51,9 @@ export default function TodoListSettings() {
         A playlist is a board&apos;s to-do list (songs waiting for a tier) when its name contains the keyword as a
         whole word - anywhere, in any case. The rest of the name must be the board&apos;s name, optionally with its
         tag: with <Code>{keyword}</Code>, <Code>[G] Rap {keyword}</Code>, <Code>{keyword} - Rap</Code> and{' '}
-        <Code>rap {keyword.toLowerCase()}</Code> are all Rap&apos;s. For any other name, pick the board below. To-do lists
-        aren&apos;t renamed by the template - type the keyword the way you want it written (e.g.{' '}
-        <Code>**TODO**</Code>) and use &quot;Rename on YouTube&quot; below.
+        <Code>rap {keyword.toLowerCase()}</Code> are all Rap&apos;s. For any other name, pick the board below. The naming
+        template&apos;s rename job renames to-do lists too, with the keyword in the tier&apos;s place (e.g.{' '}
+        <Code>[G] Rap {keyword}</Code>).
       </Text>
       <TextInput
         label="Keyword"
@@ -107,7 +62,7 @@ export default function TodoListSettings() {
         error={errors[0]}
         description={
           !errors.length && words !== draft
-            ? `Matching on "${words}" - symbols around it are ignored when matching; rename below to write it as "${draft.trim()}"`
+            ? `Matching on "${words}" - symbols around it are ignored, so names like "[G] Rap ${draft.trim()}" still count`
             : 'Symbols in names are ignored: TODO also matches "(**TODO**)" or "[TODO]"'
         }
         inputWrapperOrder={['label', 'input', 'description', 'error']}
@@ -138,15 +93,7 @@ export default function TodoListSettings() {
                   const linked = links[r.playlist.id];
                   return (
                     <Table.Tr key={r.playlist.id}>
-                      <Table.Td ff="monospace">
-                        {r.playlist.title}
-                        {renameTo.has(r.playlist.id) && (
-                          <Group gap={6} wrap="nowrap" c="accent" fz="xs">
-                            <ArrowRight size={12} />
-                            {renameTo.get(r.playlist.id)}
-                          </Group>
-                        )}
-                      </Table.Td>
+                      <Table.Td ff="monospace">{r.playlist.title}</Table.Td>
                       <Table.Td>
                         <Select
                           size="xs"
@@ -175,11 +122,6 @@ export default function TodoListSettings() {
               </Table.Tbody>
             </Table>
           </ScrollArea.Autosize>
-        )}
-        {renames.length > 0 && (
-          <Button mt="md" leftSection={<Play size={15} />} loading={renameMutation.isPending} onClick={confirmRenames}>
-            Rename {renames.length} on YouTube
-          </Button>
         )}
       </Paper>
     </Stack>

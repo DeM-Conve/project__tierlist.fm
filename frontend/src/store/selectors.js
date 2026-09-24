@@ -35,13 +35,13 @@ const selectRankedPlaylists = createSelector(
 // Every to-do list candidate (keyword in the name, or linked by hand) and
 // where it landed - see todoLists.js. Settings -> To-do lists lists these.
 export const selectTodoRows = createSelector(
-  [selectPlaylists, selectRankedPlaylists, selectTodoKeyword, selectTodoLinks],
-  (playlists, ranked, keyword, links) => {
+  [selectPlaylists, selectRankedPlaylists, selectTodoKeyword, selectTodoLinks, selectNamingTemplate, selectMigratingFrom],
+  (playlists, ranked, keyword, links, template, migratingFrom) => {
     if (!playlists || !ranked) return [];
     const rankedIds = new Set(ranked.map((p) => p.id));
     return resolveTodoLists(
       playlists.filter((p) => !rankedIds.has(p.id)),
-      { keyword, links, boards: boardsOf(ranked) }
+      { keyword, links, boards: boardsOf(ranked), templates: migratingFrom ? [template, migratingFrom] : [template] }
     );
   }
 );
