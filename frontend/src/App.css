@@ -369,3 +369,59 @@
   color: var(--text-faint);
   font-size: 12px;
 }
+
+/* Board name on a tier board (BoardNameEditor): renamed in place like an
+   Office document name. CSS because no Mantine prop covers these: the box
+   sizes itself to the text (a hidden span and the input share one grid
+   cell), and the outline is revealed by :hover / :focus. The negative
+   margin keeps the text aligned with the label above when the outline is
+   invisible. */
+.board-name {
+  display: inline-grid;
+  max-width: 100%;
+  letter-spacing: -0.02em;
+}
+.board-name > span,
+.board-name .board-name-field .board-name-input {
+  grid-area: 1 / 1;
+  font: inherit;
+  letter-spacing: inherit;
+  padding: 2px 8px;
+  margin-left: -9px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+}
+.board-name > span {
+  visibility: hidden;
+  white-space: pre;
+  overflow: hidden;
+}
+.board-name .board-name-field {
+  grid-area: 1 / 1;
+  display: grid;
+  min-width: 0;
+}
+.board-name .board-name-field .board-name-input {
+  width: 100%;
+  min-width: 2ch;
+  height: auto;
+  min-height: 0;
+  color: inherit;
+  background: transparent;
+  cursor: text;
+  text-overflow: ellipsis;
+  transition: border-color 150ms ease, background-color 150ms ease, box-shadow 150ms ease;
+}
+.board-name .board-name-field .board-name-input:hover {
+  border-color: var(--border);
+}
+.board-name .board-name-field .board-name-input:focus {
+  border-color: var(--accent);
+  background: var(--surface);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent);
+  text-overflow: clip;
+}
+.board-name .board-name-field .board-name-input:disabled {
+  opacity: 0.6;
+  cursor: progress;
+}

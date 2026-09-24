@@ -76,6 +76,19 @@ export function useRenamePlaylistsMutation() {
   });
 }
 
+// Writes renamed titles straight into the cached playlist list and returns
+// the new list - so a renamed board regroups at once (YouTube's list can lag
+// a few seconds behind an update). [{ id, title }] -> playlists.
+export function useApplyPlaylistTitles() {
+  const queryClient = useQueryClient();
+  return (renames) => {
+    const titleOf = new Map(renames.map((r) => [r.id, r.title]));
+    return queryClient.setQueryData(['playlists'], (old) =>
+      old?.map((p) => (titleOf.has(p.id) ? { ...p, title: titleOf.get(p.id) } : p))
+    );
+  };
+}
+
 export function useInvalidatePlaylists() {
   const queryClient = useQueryClient();
   return () => queryClient.invalidateQueries({ queryKey: ['playlists'] });

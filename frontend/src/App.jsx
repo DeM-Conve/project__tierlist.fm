@@ -841,6 +841,7 @@ function TierBoardPage() {
         onAddMissingTiers={(tiers) =>
           tiers.length === 1 && tiers[0] === TODO_TIER ? setAddingTodo(true) : setAddingTiers(tiers)
         }
+        onRenameBoard={(name) => navigate(`/tier/${encodeURIComponent(name)}`, { replace: true })}
       />
     </BoardShell>
   );

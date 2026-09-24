@@ -12,7 +12,6 @@ import {
   Stack,
   Text,
   TextInput,
-  Title,
   Tooltip,
   UnstyledButton,
 } from '@mantine/core';
@@ -22,6 +21,7 @@ import { BOARD_TIERS, TIER_COLORS, TIER_ORDER, TODO_TIER } from '../tiers';
 import { moveWithFeedback, useTierDnd } from '../tierActions';
 import { selectPlayerCoversPage } from '../store/selectors';
 import { TierMixBar, TierTile } from './TierBits';
+import BoardNameEditor from './BoardNameEditor';
 import { TIER_INK, indexForPointInFlow, videoMatches } from '../tierUtils';
 import { isSequenceKey } from '../keyboard/sequence';
 import { useCanvas } from '../layout/canvas';
@@ -336,6 +336,7 @@ export default function TierBoardView({
   onStartDuel,
   onOpenTier,
   onAddMissingTiers,
+  onRenameBoard,
 }) {
   const dispatch = useDispatch();
   const isNarrow = useMediaQuery('(max-width: 62em)');
@@ -531,9 +532,7 @@ export default function TierBoardView({
           <Text fz={11} fw={800} tt="uppercase" c="accent" style={{ letterSpacing: 1.5 }}>
             Tier list
           </Text>
-          <Title order={1} fz={{ base: 30, sm: 40 }} fw={900} lh={1} style={{ letterSpacing: '-0.02em' }}>
-            {category}
-          </Title>
+          <BoardNameEditor key={category} category={category} onRenamed={onRenameBoard} />
           <Text c="dimmed" fz="sm">
             {anyLoading
               ? 'Loading videos…'
