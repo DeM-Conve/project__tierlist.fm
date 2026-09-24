@@ -150,7 +150,13 @@ export default function TierFocusView({
 
   const q = filter.trim();
   const visible = useMemo(() => items.filter((v) => videoMatches(v, q)), [items, q]);
-  const rankOf = useMemo(() => new Map(items.map((v, i) => [v.videoId, i + 1])), [items]);
+  // A video's first position - a playlist can hold the same video twice,
+  // and a plain Map would keep the last copy's number for both.
+  const rankOf = useMemo(() => {
+    const ranks = new Map();
+    items.forEach((v, i) => ranks.has(v.videoId) || ranks.set(v.videoId, i + 1));
+    return ranks;
+  }, [items]);
 
   function move(fromTier, toTier, videoId, dropIndex) {
     dispatch(moveWithFeedback([{ fromTier, toTier, videoId, dropIndex }]));
@@ -302,11 +308,11 @@ export default function TierFocusView({
           )}
           {!loading &&
             visible.map((v, i) => (
-              <Box key={v.videoId}>
+              <Box key={`${v.videoId}:${i}`}>
                 {dnd.dragOverTier === `list:${tier}` && overIndex === i && <Box h={2} bg="accent" mx="sm" style={{ borderRadius: 1 }} />}
                 <TrackRow
                   video={v}
-                  rank={rankOf.get(v.videoId)}
+                  rank={q ? rankOf.get(v.videoId) : i + 1}
                   tier={tier}
                   tiers={tiers}
                   isPlaying={playingVideoId === v.videoId}
