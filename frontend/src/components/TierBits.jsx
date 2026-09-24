@@ -1,9 +1,10 @@
+import { Fragment } from 'react';
 import { ActionIcon, Box, Group, Image, Menu, Progress, Text, Tooltip, UnstyledButton } from '@mantine/core';
-import { ArrowDownToLine, ArrowUpRight, ArrowUpToLine, ListEnd, ListStart, MoreHorizontal, Play, Trash2 } from 'lucide-react';
+import { MoreHorizontal, Play, Trash2 } from 'lucide-react';
 import { useDispatch } from 'react-redux';
-import { queueSong } from '../queueActions';
-import { REMOVED_TIER, TIER_COLORS } from '../tiers';
-import { TIER_INK, songLabel, youtubeUrl } from '../tierUtils';
+import { TIER_COLORS } from '../tiers';
+import { TIER_INK, songLabel } from '../tierUtils';
+import { songMenuGroups, useSongContextMenu } from '../songMenu';
 
 export function EqualizerMark({ color = TIER_INK, height = 12 }) {
   return (
@@ -138,76 +139,38 @@ export function TierMixBar({ tiers, counts, size = 8, onSegmentClick, labels = f
   );
 }
 
-// "Move to" menu shared by board tiles and list rows. For a song in the
-// Remove bin, "Move to" is how it's put back.
+// "..." button menu.
 export function MoveMenu({ video, tier, tiers, onMove, target }) {
   const dispatch = useDispatch();
-  const inBin = tier === REMOVED_TIER;
+  const groups = songMenuGroups({ video, tier, tiers, onMove, dispatch });
   return (
     <Menu position="bottom-end" withinPortal shadow="md" width={210}>
       <Menu.Target>{target}</Menu.Target>
       <Menu.Dropdown onClick={(e) => e.stopPropagation()}>
-        {!inBin && (
-          <>
-            <Menu.Item leftSection={<ListStart size={14} />} onClick={() => dispatch(queueSong(tier, video, 'next'))}>
-              Play next
-            </Menu.Item>
-            <Menu.Item leftSection={<ListEnd size={14} />} onClick={() => dispatch(queueSong(tier, video, 'end'))}>
-              Add to queue
-            </Menu.Item>
-            <Menu.Divider />
-          </>
-        )}
-        <Menu.Label>Move to</Menu.Label>
-        {tiers
-          .filter((t) => t !== tier)
-          .map((t) => (
-            <Menu.Item
-              key={t}
-              leftSection={<Box w={10} h={10} bg={TIER_COLORS[t]} style={{ borderRadius: 2 }} />}
-              onClick={() => onMove(tier, t, video.videoId, null)}
-            >
-              {t}
-            </Menu.Item>
-          ))}
-        {!inBin && (
-          <>
-            <Menu.Divider />
-            <Menu.Item leftSection={<ArrowUpToLine size={14} />} onClick={() => onMove(tier, tier, video.videoId, 0)}>
-              Top of {tier}
-            </Menu.Item>
-            <Menu.Item
-              leftSection={<ArrowDownToLine size={14} />}
-              onClick={() => onMove(tier, tier, video.videoId, Number.MAX_SAFE_INTEGER)}
-            >
-              Bottom of {tier}
-            </Menu.Item>
-            <Menu.Item
-              color="red"
-              leftSection={<Trash2 size={14} />}
-              onClick={() => onMove(tier, REMOVED_TIER, video.videoId, null)}
-            >
-              Remove from playlist
-            </Menu.Item>
-          </>
-        )}
-        <Menu.Divider />
-        <Menu.Item
-          component="a"
-          href={youtubeUrl(video.videoId)}
-          target="_blank"
-          rel="noopener noreferrer"
-          leftSection={<ArrowUpRight size={14} />}
-        >
-          Open on YouTube
-        </Menu.Item>
+        {groups.map((g, i) => (
+          <Fragment key={g.key}>
+            {i > 0 && <Menu.Divider />}
+            {g.label && <Menu.Label>{g.label}</Menu.Label>}
+            {g.items.map((item) =>
+              item.href ? (
+                <Menu.Item key={item.key} component="a" href={item.href} target="_blank" rel="noopener noreferrer" leftSection={item.icon}>
+                  {item.title}
+                </Menu.Item>
+              ) : (
+                <Menu.Item key={item.key} color={item.color} leftSection={item.icon} onClick={item.onClick}>
+                  {item.title}
+                </Menu.Item>
+              )
+            )}
+          </Fragment>
+        ))}
       </Menu.Dropdown>
     </Menu>
   );
 }
 
 // Square album-art tile used on the tier list. Click plays, drag moves,
-// hover reveals the "..." move menu. The song name (+ artist, when there's
+// right-click or the hover "..." opens the song menu. The song name (+ artist, when there's
 // room) is always printed over the bottom of the art, so an album cover
 // shared by many songs is still tellable apart without hovering.
 export function TierTile({
@@ -226,6 +189,7 @@ export function TierTile({
 }) {
   const ring = isPlaying || searchState;
   const { song, artist } = songLabel(video);
+  const openSongMenu = useSongContextMenu();
   return (
     <Tooltip label={video.title} openDelay={450} withArrow multiline maw={260}>
       <Box
@@ -239,6 +203,7 @@ export function TierTile({
         onDragStart={(e) => onDragStart(e, video, tier)}
         onDragEnd={onDragEnd}
         onClick={() => onPlay(tier, video.videoId)}
+        onContextMenu={openSongMenu(video, tier, tiers, onMove)}
         onKeyDown={(e) => {
           if (e.key === 'Enter' || e.key === ' ') {
             e.preventDefault();

@@ -65,6 +65,12 @@ auto-grouped into a tier board per category.
     `RAIL_X` sides). Sidebar, canvas and rail pass these to Mantine `p*` props;
     layout maths reads them via `spacingPx()`. Don't hand-pick a padding number
     for a shell column - change the token.
+  - **Right-click menus are `mantine-contextmenu`** (`ContextMenuProvider` in
+    `AppearanceRoot`, `useContextMenu()`), chosen over react-contexify / Radix
+    because it's built on Mantine and follows the theme. The song menu's items
+    are defined once as data in `src/songMenu.jsx` (`songMenuGroups`) and drawn
+    by both the `...` button (`MoveMenu`, Mantine `Menu`) and right-click
+    (`useSongContextMenu`) - add a song action there, never in one of them.
   - `lucide-react` is available for icons - prefer it over new unicode/emoji glyphs
     where a component is otherwise being touched.
   - **Mantine's `Skeleton`** for loading placeholders (tier board thumbnails, playlist

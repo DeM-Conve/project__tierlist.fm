@@ -22,6 +22,7 @@ import { TIER_COLORS, TODO_TIER } from '../tiers';
 import { moveWithFeedback, useTierDnd } from '../tierActions';
 import { selectPendingMoves, selectPlayerCoversPage } from '../store/selectors';
 import { EqualizerMark, MoveMenu, TierChip } from './TierBits';
+import { useSongContextMenu } from '../songMenu';
 import { TIER_INK, indexForPointInList, songLabel, videoMatches } from '../tierUtils';
 
 const NO_ITEMS = [];
@@ -40,11 +41,13 @@ function TrackRow({
   onDragEnd,
 }) {
   const { song, artist } = songLabel(video);
+  const openSongMenu = useSongContextMenu();
   return (
     <Box
       data-video-id={video.videoId}
       data-tier={tier}
       className="track-row"
+      onContextMenu={openSongMenu(video, tier, tiers, onMove)}
       draggable
       onDragStart={(e) => onDragStart(e, video, tier)}
       onDragEnd={onDragEnd}

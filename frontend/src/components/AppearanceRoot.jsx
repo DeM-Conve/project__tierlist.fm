@@ -2,6 +2,7 @@ import { useLayoutEffect, useMemo } from 'react';
 import { useSelector } from 'react-redux';
 import { MantineProvider } from '@mantine/core';
 import { ModalsProvider } from '@mantine/modals';
+import { ContextMenuProvider } from 'mantine-contextmenu';
 import { applyCssVars, buildAppearance, cssVariablesResolver } from '../themes';
 import { applyFavicon } from './Favicon';
 
@@ -20,7 +21,10 @@ export default function AppearanceRoot({ children }) {
       forceColorScheme={built.scheme}
       cssVariablesResolver={cssVariablesResolver}
     >
-      <ModalsProvider>{children}</ModalsProvider>
+      {/* Right-click menus (mantine-contextmenu), e.g. on songs. */}
+      <ContextMenuProvider shadow="md" borderRadius="md" submenuDelay={120}>
+        <ModalsProvider>{children}</ModalsProvider>
+      </ContextMenuProvider>
     </MantineProvider>
   );
 }
