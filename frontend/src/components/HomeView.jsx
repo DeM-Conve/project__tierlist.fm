@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import {
+  Alert,
   Badge,
   Box,
   Button,
@@ -17,7 +18,7 @@ import {
   Title,
   UnstyledButton,
 } from '@mantine/core';
-import { EyeOff, ListPlus, Plus, Search, Swords } from 'lucide-react';
+import { CircleAlert, EyeOff, ListPlus, Plus, Search, Swords } from 'lucide-react';
 import CreateTierPlaylistsModal from './CreateTierPlaylistsModal';
 import PlaylistArt from './PlaylistArt';
 import { BOARD_TIERS, TIER_COLORS } from '../tiers';
@@ -78,6 +79,10 @@ function BoardCard({ category, tiers, onOpen, onDuel }) {
 
 export default function HomeView({
   playlists,
+  loadError,
+  retrying,
+  onRetry,
+  onRelogin,
   hiddenCount,
   onOpenNaming,
   tierGroups,
@@ -107,7 +112,9 @@ export default function HomeView({
             Your tier lists
           </Title>
           <Text c="dimmed" fz="sm">
-            {playlists === null
+            {loadError
+              ? 'Couldn’t load your playlists'
+              : playlists === null
               ? 'Loading your playlists…'
               : `${tierCategories.length} boards built from ${playlists.length} playlists`}
           </Text>
@@ -162,7 +169,22 @@ export default function HomeView({
       )}
 
       <div>
-        {playlists === null && (
+        {loadError && (
+          <Alert variant="light" color="red" radius="md" icon={<CircleAlert size={18} />} title="Couldn’t load your playlists">
+            <Stack gap="sm" align="flex-start">
+              <Text fz="sm">{loadError}</Text>
+              <Group gap="sm">
+                <Button size="compact-sm" onClick={onRelogin}>
+                  Log in again
+                </Button>
+                <Button size="compact-sm" variant="default" loading={retrying} onClick={onRetry}>
+                  Retry
+                </Button>
+              </Group>
+            </Stack>
+          </Alert>
+        )}
+        {!loadError && playlists === null && (
           <SimpleGrid cols={{ base: 1, sm: 2, xl: 3 }} spacing="md">
             {Array.from({ length: 6 }).map((_, i) => (
               <Skeleton key={i} h={200} radius="md" />

@@ -723,6 +723,8 @@ function HomePage() {
   const tierCategories = useSelector(selectTierCategories);
   const focusedCategory = useSelector((s) => s.focus.focusedCategory);
   const playingVideo = useSelector(selectFocusedVideoData);
+  // Same cached query App() runs - read here only for its error.
+  const { error: playlistsError, refetch: retryPlaylists, isFetching: retryingPlaylists } = usePlaylistsQuery(true);
 
   useEffect(() => {
     dispatch(setCurrentCategory(null));
@@ -733,6 +735,14 @@ function HomePage() {
     <HomeView
       onAddSongs={() => navigate('/add', { state: { focusInput: true } })}
       playlists={tierPlaylists}
+      loadError={
+        playlistsError && tierPlaylists === null
+          ? errorMessage(playlistsError, 'The app couldn’t load your playlists from YouTube.')
+          : null
+      }
+      retrying={retryingPlaylists}
+      onRetry={() => retryPlaylists()}
+      onRelogin={() => (window.location.href = `${API_BASE}/oauth2/authorization/google`)}
       hiddenCount={allPlaylists && tierPlaylists ? allPlaylists.length - tierPlaylists.length : 0}
       onOpenNaming={() => navigate('/settings?tab=naming')}
       tierGroups={tierGroups}
