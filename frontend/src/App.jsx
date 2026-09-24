@@ -593,8 +593,11 @@ function Layout() {
           onCloseMobile={() => dispatch(setMobileSidebarOpen(false))}
         />
 
-        {/* The canvas is the page's scroll container (see layout/canvas.js). */}
-        <Box component="main" ref={canvasRef} flex={1} miw={0} style={{ overflowY: 'auto' }}>
+        {/* The canvas is the page's scroll container (see layout/canvas.js).
+            scrollbarGutter: the scrollbar's space is always reserved, so the
+            board (which sizes itself to the canvas) can't flicker between
+            "fits -> no scrollbar -> wider -> overflows -> scrollbar". */}
+        <Box component="main" ref={canvasRef} flex={1} miw={0} style={{ overflowY: 'auto', scrollbarGutter: 'stable' }}>
           <Box pt={CANVAS_TOP} px={CANVAS_X} pb={SHELL_Y}>
             <CanvasContext.Provider value={canvas}>
               <Outlet
