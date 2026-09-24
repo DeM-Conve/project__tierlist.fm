@@ -17,7 +17,7 @@ import {
   UnstyledButton,
 } from '@mantine/core';
 import { useElementSize, useMediaQuery } from '@mantine/hooks';
-import { ChevronRight, ListTodo, Play, Plus, Search, Shuffle, Swords } from 'lucide-react';
+import { ChevronDown, ChevronUp, ListTodo, Play, Plus, Search, Shuffle, Swords } from 'lucide-react';
 import { BOARD_TIERS, TIER_COLORS, TIER_ORDER, TODO_TIER } from '../tiers';
 import { moveWithFeedback, useTierDnd } from '../tierActions';
 import { selectPlayerCoversPage } from '../store/selectors';
@@ -68,9 +68,10 @@ function DropIndicator({ size }) {
 }
 
 // One tier row. Shows `lines` lines of tiles (the board sizes that so every
-// row together fills the screen) and folds the rest into a "+N" tile that
-// opens the tier on its own page - so the whole board always fits on one
-// screen, however big a tier gets.
+// row together fills the screen) and folds the rest into a "+N" tile - so
+// the whole board fits on one screen, however big a tier gets. The chevron
+// column on the right expands the row in place to every song (and folds it
+// back); "+N" and the tier label open the tier's list page.
 function TierRow({
   tier,
   tiers,
@@ -97,6 +98,7 @@ function TierRow({
   }, [width, onMeasure]);
   const contentRef = useRef(null);
   const [overIndex, setOverIndex] = useState(null);
+  const [expanded, setExpanded] = useState(false);
   const isOver = dnd.dragOverTier === tier;
   const color = TIER_COLORS[tier];
   const isTodo = tier === TODO_TIER;
@@ -107,7 +109,8 @@ function TierRow({
   const perLine = tilesPerLine(width, size);
   const fit = perLine * lines;
   // While searching, show every match (wrapping) so n/N can always reach it.
-  const truncated = !searchActive && total > fit;
+  const overflows = !searchActive && total > fit;
+  const truncated = overflows && !expanded;
   const visible = truncated ? shown.slice(0, fit - 1) : shown || [];
   const hiddenCount = total - visible.length;
 
@@ -200,7 +203,7 @@ function TierRow({
       </UnstyledButton>
 
       <Box ref={sizeRef} style={{ flex: 1, minWidth: 0 }} p={GAP - 4}>
-        <Group ref={contentRef} gap={GAP} wrap={searchActive || lines > 1 ? 'wrap' : 'nowrap'} mih={size} p={4} style={{ overflow: 'hidden' }}>
+        <Group ref={contentRef} gap={GAP} wrap={searchActive || expanded || lines > 1 ? 'wrap' : 'nowrap'} mih={size} p={4} style={{ overflow: 'hidden' }}>
           {loading &&
             Array.from({ length: Math.min(perLine, 8) }).map((_, i) => <Skeleton key={i} w={size} h={size} radius={6} />)}
           {!loading && total === 0 && (
@@ -277,15 +280,42 @@ function TierRow({
         </Group>
       </Box>
 
-      <Tooltip label={`Open ${tier} (${items?.length ?? 0})`} withArrow position="left">
+      {/* Right column: the row's expand / collapse toggle - the same spot in
+          every row; the icon sits level with the first line of tiles and
+          stays pinned while scrolling a long, expanded tier. */}
+      <Tooltip
+        label={!overflows ? `All ${total} shown` : expanded ? `Show less of ${tier}` : `Expand ${tier} - show all ${total} here`}
+        withArrow
+        position="left"
+      >
         <UnstyledButton
-          onClick={() => onOpenTier(tier)}
+          onClick={() => setExpanded((e) => !e)}
+          disabled={!overflows}
           px={6}
-          aria-label={`Open ${tier}`}
+          aria-label={expanded ? `Show less of ${tier}` : `Expand ${tier}`}
+          aria-expanded={overflows ? expanded : undefined}
           className="row-open-btn"
-          style={{ display: 'grid', placeItems: 'center', borderLeft: '1px solid var(--border-soft)', flexShrink: 0 }}
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'flex-start',
+            borderLeft: '1px solid var(--border-soft)',
+            flexShrink: 0,
+            cursor: overflows ? 'pointer' : 'default',
+            background: overflows && expanded ? `color-mix(in srgb, ${color} 10%, var(--surface))` : undefined,
+          }}
         >
-          <ChevronRight size={16} color="var(--text-dim)" />
+          <Box
+            h={size}
+            mt={GAP}
+            style={{ position: 'sticky', top: 0, display: 'grid', placeItems: 'center', opacity: overflows ? 1 : 0.3 }}
+          >
+            {expanded && overflows ? (
+              <ChevronUp size={16} color={`color-mix(in srgb, ${color} 60%, var(--text))`} />
+            ) : (
+              <ChevronDown size={16} color="var(--text-dim)" />
+            )}
+          </Box>
         </UnstyledButton>
       </Tooltip>
     </Box>
@@ -558,7 +588,7 @@ export default function TierBoardView({
       <Box ref={rowsRef}>
 
       {unknownTiers && (
-        <Paper withBorder radius="md" style={{ overflow: 'hidden' }} bg="var(--surface)">
+        <Paper withBorder radius="md" style={{ overflow: 'clip' }} bg="var(--surface)">
           {Array.from({ length: 5 }).map((_, i) => (
             <Group key={i} gap={GAP} p={GAP} wrap="nowrap" style={{ borderTop: i ? '1px solid var(--border-soft)' : undefined }}>
               <Skeleton w={60} h={tileSize} radius={6} style={{ flexShrink: 0 }} />
@@ -570,10 +600,10 @@ export default function TierBoardView({
         </Paper>
       )}
 
-      <Paper withBorder radius="md" style={{ overflow: 'hidden', borderTop: 'none', display: unknownTiers ? 'none' : undefined }} bg="var(--surface)">
+      <Paper withBorder radius="md" style={{ overflow: 'clip', borderTop: 'none', display: unknownTiers ? 'none' : undefined }} bg="var(--surface)">
         {tiers.map((t) => (
           <TierRow
-            key={t}
+            key={`${category}:${t}`}
             tier={t}
             tiers={boardTiers}
             items={tierItems[t]}
@@ -597,8 +627,9 @@ export default function TierBoardView({
       {/* The TODO list sits under the ranked tiers: songs waiting to be
           rated, not a tier above T1. */}
       {hasTodo && !unknownTiers && (
-        <Paper withBorder radius="md" mt="md" style={{ overflow: 'hidden', borderTop: 'none' }} bg="var(--surface)">
+        <Paper withBorder radius="md" mt="md" style={{ overflow: 'clip', borderTop: 'none' }} bg="var(--surface)">
           <TierRow
+            key={`${category}:${TODO_TIER}`}
             tier={TODO_TIER}
             tiers={boardTiers}
             items={tierItems[TODO_TIER]}
