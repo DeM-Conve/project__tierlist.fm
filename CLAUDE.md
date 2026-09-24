@@ -287,6 +287,11 @@ The user asked for these on top of the Mantine/Redux migration above. Tracked he
   when you do, so it's clear it wasn't just the lazy default. The user has said this
   multiple times; reaching for `className`+`App.css` first, or "as well as" a library
   prop instead of "instead of" it, is the specific mistake to stop making.
+- **Branches (public OSS repo, see `CONTRIBUTING.md`)**: day-to-day work is
+  committed on `dev` (as before); `main` is the stable default branch and only
+  moves on a release (merge `dev` -> `main`, tag `vX.Y.Z`). Never commit
+  straight to `main`. Topic branches are `feat/*`/`fix/*`/`docs/*`/`chore/*`
+  off `dev`, deleted once merged.
 - Commit incrementally as you go (the user asked for this explicitly, more than once).
 - **Never add a `Co-Authored-By: Claude` (or any Claude/Anthropic attribution) line to
   commit messages or PR descriptions.** The user had these stripped from all existing

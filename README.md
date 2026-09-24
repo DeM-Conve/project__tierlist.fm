@@ -87,3 +87,10 @@ endpoints).
 - While the OAuth consent screen is in "Testing" mode, only accounts added as test users can log in.
 - If your browser blocks the Google consent screen with a generic "Something went wrong" error, try an incognito window — an ad blocker/privacy extension is usually the cause.
 - Backend session is in-memory (lost on restart) — fine for local personal use.
+
+## Contributing
+
+`main` is the stable, released branch; work happens on `dev`, and pull requests
+target `dev`. See [CONTRIBUTING.md](CONTRIBUTING.md) for the branch model,
+commit style and release steps. Licensed under the [Business Source License 1.1](LICENSE)
+(free for personal self-hosting).
