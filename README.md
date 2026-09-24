@@ -90,7 +90,7 @@ endpoints).
 
 ## Contributing
 
-`main` is the stable, released branch; work happens on `dev`, and pull requests
-target `dev`. See [CONTRIBUTING.md](CONTRIBUTING.md) for the branch model,
+Trunk-based: `main` is the only long-lived branch, pull requests target `main`
+from short-lived `feat/*`/`fix/*` branches, and releases are `vX.Y.Z` tags. See [CONTRIBUTING.md](CONTRIBUTING.md) for the branch model,
 commit style and release steps. Licensed under the [Business Source License 1.1](LICENSE)
 (free for personal self-hosting).
