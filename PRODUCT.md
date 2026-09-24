@@ -69,7 +69,7 @@ are the source of truth.
 
 ## Brand Commitments
 
-- **Name: Tierlist.fm** (chosen 2026-09-24; the repo stays `project__yt`). Use it
+- **Name: Tierlist.fm** (chosen 2026-09-24). Use it
   everywhere the product names itself - tab title, sidebar and login logo.
   No fixed logo/voice yet.
 

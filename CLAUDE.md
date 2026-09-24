@@ -1,4 +1,4 @@
-# project__yt - Tierlist.fm
+# Tierlist.fm
 
 A personal tool to log into your own YouTube account, browse playlists, and manage a
 custom tier-list system. Playlists named `[G]/[GA]/[OG] <Category> T1/T2/T3/TE/TZ` are
@@ -85,7 +85,7 @@ auto-grouped into a tier board per category.
   closed option set is a native Postgres `ENUM`, never a free VARCHAR** (the user's
   explicit calls). **Not in production yet**: while that's true, change `V1` in place
   and reset the dev volume (`docker compose down && docker volume rm
-  project__yt_pgdata`) instead of stacking migrations; once it ships, never edit an
+  tierlistfm_pgdata`) instead of stacking migrations; once it ships, never edit an
   applied migration.
   Tables: `app_user` (Google `sub` as id, recorded on every login by the success
   handler in `SecurityConfig`) and `user_settings` (one row per user: `theme_option`,

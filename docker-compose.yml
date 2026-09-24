@@ -1,3 +1,6 @@
+# Fixed project name, so containers/volumes are "tierlistfm-*" whatever the folder is called.
+name: tierlistfm
+
 services:
   # Per-user app state (settings). Data lives in the pgdata volume, so it
   # survives rebuilds; schema is created by the backend's Flyway migrations.
