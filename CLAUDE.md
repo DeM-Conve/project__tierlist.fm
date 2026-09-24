@@ -140,6 +140,16 @@ auto-grouped into a tier board per category.
 - **No MUI, no Tailwind, no shadcn/ui, no bare Radix.** All considered and explicitly
   rejected in favor of Mantine as a single, final UI library choice - see git history
   around the frontend stack migration for the reasoning behind each.
+- **A failed load must say why, never skeleton forever.** YouTube API errors
+  come back as ProblemDetail from `YoutubeErrorHandler` with a plain-language
+  `detail` (quota -> 429, login expired -> 401, missing YouTube scope
+  `insufficientPermissions` -> 403 "log in again and tick the YouTube
+  permission", else 502); `errorMessage()` in `api/client.js` reads it. Home
+  shows a playlists-load failure as an error card with Log in again / Retry
+  (`HomeView` `loadError`). A new page that loads data needs the same.
+- **Ranks are positions.** A playlist can hold the same video twice, so a
+  row's number is its index (`i + 1`), and list keys include the index -
+  never a `videoId -> rank` map, which gave both copies the last one's number.
 - **Duplicate videos are auto-resolved, not flagged for the user to decide.** If the same
   video exists in two of a board's real tier playlists, the highest-tier copy is kept and
   every other copy is automatically staged as a pending removal (shows in the "N pending"
@@ -203,9 +213,14 @@ auto-grouped into a tier board per category.
   between, `TIER_ORDER` for ranking only (duels, dedupe priority, "missing tiers",
   player Shift+digit rating). Triage (`focusSlice.isTriage`) auto-advances in
   `tierActions.moveWithFeedback` when the playing to-do song is rated.
-  To-do lists are **not** matched by the naming template: `src/todoLists.js`
-  finds them by keyword (whole word, anywhere, any case; `naming.todoKeyword`)
-  + the rest of the name = a board name (+ tag), or an explicit link
+  To-do lists **follow the naming template** with the keyword in `{tier}`'s
+  place (`[Tierlist.fm] Rap TODO`; `todoTitle()`), and the template's rename
+  job renames them too - the user's call: TODO *is* a tier type, just
+  unranked. The keyword is plain letters/digits (`TODO`), not a styled
+  `**TODO**`. `src/todoLists.js` finds them by: an explicit link, else the
+  template shape (`boardFromName(..., templates)`), else keyword (whole word,
+  anywhere, any case; `naming.todoKeyword`) + the rest of the name = a board
+  name (+ tag) - so pre-template names keep working. Explicit links are
   (`naming.todoLinks`, backend `todo_list_link` table). `selectTierPlaylists`
   merges them in with `parsed.tier = 'TODO'`; `selectTodoRows` lists every
   candidate for Settings. Keep `validateTodoKeyword` and `@TodoKeyword` in step.
@@ -287,11 +302,43 @@ The user asked for these on top of the Mantine/Redux migration above. Tracked he
   when you do, so it's clear it wasn't just the lazy default. The user has said this
   multiple times; reaching for `className`+`App.css` first, or "as well as" a library
   prop instead of "instead of" it, is the specific mistake to stop making.
-- **Branches: trunk-based (public OSS repo, see `CONTRIBUTING.md`)**. `main`
-  is the only long-lived branch (`dev` was retired 2026-09-24). Small, safe
-  commits go straight to `main`; anything bigger goes on a short-lived
-  `feat/*`/`fix/*`/`docs/*`/`chore/*` branch off `main`, merged back and
-  deleted. Releases are `vX.Y.Z` tags on `main` - no release branches.
+- **The repo is public open source** at
+  `https://github.com/DeM-Conve/project__tierlist.fm` (the user's explicit
+  call: "use proper git strategy from now on for oss repo"). The product is
+  **Tierlist.fm** everywhere - `project__yt` was a temporary name and is gone
+  from the code (only the local folder is still called that); the Compose
+  project is pinned to `name: tierlistfm` (containers `tierlistfm-*`, volume
+  `tierlistfm_pgdata`). Never commit secrets - `.env` is gitignored, only
+  `.env.example` (placeholders) is tracked.
+- **Git strategy: trunk-based, every change through a PR** (see
+  `CONTRIBUTING.md`). `main` is the only long-lived branch and the GitHub
+  default (`dev` was retired 2026-09-24). For every piece of work: branch off
+  `main` as `feat/*`, `fix/*`, `docs/*`, `chore/*` or `refactor/*`, commit
+  there (Conventional Commits), push, open a PR into `main` with `gh pr
+  create` (the template in `.github/` fills the body), then `gh pr merge
+  --squash --delete-branch` - the PR title becomes the commit on `main`, so
+  make it a Conventional Commit. Don't commit straight to `main`. The GitHub
+  repo allows squash merges only, auto-deletes merged branches, and a ruleset
+  ("Protect main") blocks force-pushes and deleting `main`. Releases are
+  annotated `vX.Y.Z` tags on `main` + `gh release create --generate-notes`
+  (SemVer; not tagged yet - ask before cutting the first). Delete local
+  topic branches once merged. `gh` lives at `~/.local/bin/gh` (not on the
+  default PATH).
+- **License: Business Source License 1.1** (`LICENSE`). Licensor DeM-Conve,
+  work "Tierlist.fm", Additional Use Grant = free self-hosting for personal,
+  non-commercial use (no hosted/managed/paid service, no selling), Change
+  Date 2033-01-01, Change License MIT. BSL caps it at 4 years per released
+  version, so each version really turns MIT 4 years after release. Don't
+  touch the license terms without the user asking; third-party deps are
+  MIT/Apache, so adding one with a copyleft or non-commercial license needs
+  a check first.
+- **`README.md` is the product pitch** (hero screenshot, why, features,
+  how it works, self-host steps) for people landing on the public repo.
+  Screenshots live in `docs/screenshots/` (`landing.png` is the signed-out
+  page, capturable headless: `google-chrome --headless=new --window-size=1600,1000
+  --virtual-time-budget=6000 --screenshot=... http://localhost/`); signed-in
+  screens need the user's own login, so ask them for those. Keep README's
+  feature list in step with `docs/features.md` when a headline feature lands.
 - Commit incrementally as you go (the user asked for this explicitly, more than once).
 - **Never add a `Co-Authored-By: Claude` (or any Claude/Anthropic attribution) line to
   commit messages or PR descriptions.** The user had these stripped from all existing
