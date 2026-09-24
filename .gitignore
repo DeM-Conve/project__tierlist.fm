@@ -3,3 +3,10 @@ dist/
 target/
 .env
 *.log
+
+# Local editor / agent config - machine-specific, may hold personal paths
+.cursor/
+.claude/
+.impeccable/
+.vscode/
+.idea/

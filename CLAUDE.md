@@ -315,15 +315,31 @@ The user asked for these on top of the Mantine/Redux migration above. Tracked he
   default (`dev` was retired 2026-09-24). For every piece of work: branch off
   `main` as `feat/*`, `fix/*`, `docs/*`, `chore/*` or `refactor/*`, commit
   there (Conventional Commits), push, open a PR into `main` with `gh pr
-  create` (the template in `.github/` fills the body), then `gh pr merge
-  --squash --delete-branch` - the PR title becomes the commit on `main`, so
-  make it a Conventional Commit. Don't commit straight to `main`. The GitHub
-  repo allows squash merges only, auto-deletes merged branches, and a ruleset
-  ("Protect main") blocks force-pushes and deleting `main`. Releases are
+  create` (the template in `.github/` fills the body), then **merge it
+  locally, never with GitHub's merge button**: squash the branch to one
+  commit (`git reset --soft main && git commit`, message = the PR title, a
+  Conventional Commit), `git push --force-with-lease` the branch, then
+  fast-forward `main` to it (`git switch main && git merge --ff-only <branch>
+  && git push`) - GitHub sees the PR's head land on `main` and marks it
+  merged. Then `git push origin --delete <branch>` and delete it locally.
+  Why: the merge button authors the commit with the GitHub *profile* name
+  (the user's real name) and "GitHub" as committer; the user wants only
+  `DeM-Conve` in history (a squash-merge leaked it once and history had to
+  be rewritten on 2026-09-24).
+  Don't commit straight to `main`. The GitHub
+  repo auto-deletes merged branches, and a ruleset ("Protect main") blocks
+  force-pushes and deleting `main`. Releases are
   annotated `vX.Y.Z` tags on `main` + `gh release create --generate-notes`
   (SemVer; not tagged yet - ask before cutting the first). Delete local
   topic branches once merged. `gh` lives at `~/.local/bin/gh` (not on the
   default PATH).
+- **Nothing personal in the public repo** (the user's explicit call). No real
+  name, work email/employer, home-directory paths or personal playlists in
+  code, docs, screenshots, commit messages or authorship - only the
+  `DeM-Conve` identity and its noreply email. The Java package is
+  `fm.tierlist` (renamed through all history on 2026-09-24).
+  Machine-local config (`.cursor/`, `.claude/`, `.impeccable/`, `.vscode/`)
+  is gitignored - never commit it. Before pushing, scan the diff for these.
 - **License: Business Source License 1.1** (`LICENSE`). Licensor DeM-Conve,
   work "Tierlist.fm", Additional Use Grant = free self-hosting for personal,
   non-commercial use (no hosted/managed/paid service, no selling), Change
