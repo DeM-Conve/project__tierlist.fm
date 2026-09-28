@@ -1,4 +1,5 @@
 import { Fragment } from 'react';
+import { useTierName } from '../tierLabels';
 import { ActionIcon, Box, Group, Image, Menu, Progress, Text, Tooltip, UnstyledButton } from '@mantine/core';
 import { MoreHorizontal, Play, Trash2 } from 'lucide-react';
 import { useDispatch } from 'react-redux';
@@ -16,8 +17,11 @@ export function EqualizerMark({ color = TIER_INK, height = 12 }) {
   );
 }
 
-// Small solid tier square ("T2") - the app's one visual token for a tier.
-export function TierChip({ tier, size = 22, active = true, onClick, title, kbd }) {
+// Small solid tier square ("A") - the app's one visual token for a tier.
+// Shows the user's name for the tier; `label` overrides it ("" = a plain swatch).
+export function TierChip({ tier, size = 22, active = true, onClick, title, kbd, label }) {
+  const tierNameOf = useTierName();
+  const text = label ?? tierNameOf(tier);
   const content = (
     <Box
       h={size}
@@ -35,7 +39,7 @@ export function TierChip({ tier, size = 22, active = true, onClick, title, kbd }
       }}
     >
       <Text ff="var(--font-display)" fw={900} fz={size * 0.5} lh={1} c={active ? TIER_INK : `color-mix(in srgb, ${TIER_COLORS[tier]} 60%, var(--text))`}>
-        {tier}
+        {text}
       </Text>
       {kbd && (
         <Text fz={size * 0.38} fw={700} c={active ? TIER_INK : 'dimmed'} opacity={0.7} lh={1}>
@@ -52,7 +56,7 @@ export function TierChip({ tier, size = 22, active = true, onClick, title, kbd }
           e.stopPropagation();
           onClick();
         }}
-        aria-label={title ?? `Move to ${tier}`}
+        aria-label={title ?? `Move to ${text}`}
         className="tier-chip-btn"
       >
         {content}
@@ -109,8 +113,9 @@ export function RemoveChip({ size = 22, onClick, disabled, title = 'Remove from 
   );
 }
 
-// Proportional stacked bar of a board's tier sizes. `counts` = { T1: n, ... }.
+// Proportional stacked bar of a board's tier sizes. `counts` = { S: n, ... }.
 export function TierMixBar({ tiers, counts, size = 8, onSegmentClick, labels = false }) {
+  const tierName = useTierName();
   const total = tiers.reduce((sum, t) => sum + (counts[t] || 0), 0);
   if (!total) return <Progress.Root size={size} radius="sm" bg="var(--surface-2)" />;
   return (
@@ -119,7 +124,7 @@ export function TierMixBar({ tiers, counts, size = 8, onSegmentClick, labels = f
         const n = counts[t] || 0;
         if (!n) return null;
         return (
-          <Tooltip key={t} label={`${t} · ${n} video${n === 1 ? '' : 's'}`} withArrow>
+          <Tooltip key={t} label={`${tierName(t)} · ${n} video${n === 1 ? '' : 's'}`} withArrow>
             <Progress.Section
               value={(n / total) * 100}
               color={TIER_COLORS[t]}
@@ -128,7 +133,7 @@ export function TierMixBar({ tiers, counts, size = 8, onSegmentClick, labels = f
             >
               {labels && (n / total > 0.06) && (
                 <Progress.Label c={TIER_INK} fz={11} fw={800}>
-                  {t} {n}
+                  {tierName(t)} {n}
                 </Progress.Label>
               )}
             </Progress.Section>

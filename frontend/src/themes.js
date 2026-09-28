@@ -9,10 +9,10 @@ extend([mixPlugin]);
 // A look is three independent choices, all picked in Settings -> Appearance:
 //   THEMES        - the chrome (backgrounds, surfaces, borders, text), dark or light
 //   ACCENTS       - buttons / active states / rings (works with any theme)
-//   TIER_PALETTES - the T1..TZ colors (+ a neutral TODO)
+//   TIER_PALETTES - the S..D colors (+ a neutral TODO)
 //
 // buildAppearance() turns a choice into (a) CSS variables set on <html>
-// (--bg, --surface, --accent, --tier-t1, ...) that every component and
+// (--bg, --surface, --accent, --tier-s, ...) that every component and
 // App.css read, and (b) the Mantine theme, so Mantine components match.
 // Nothing else in the app should hard-code a color - reference a variable
 // (or TIER_COLORS / TIER_INK, which are themselves variables).
@@ -106,15 +106,15 @@ export const ACCENTS = {
 export const TIER_PALETTES = {
   vivid: {
     label: 'Vivid',
-    colors: { T1: '#ff5a5f', T2: '#ff9f43', T3: '#ffd43b', TE: '#7bd88f', TZ: '#4dabf7', TODO: '#c3c8d2' },
+    colors: { S: '#ff5a5f', A: '#ff9f43', B: '#ffd43b', C: '#7bd88f', D: '#4dabf7', TODO: '#c3c8d2' },
   },
   classic: {
     label: 'TierMaker classic',
-    colors: { T1: '#ff7f7f', T2: '#ffbf7f', T3: '#ffdf7f', TE: '#bfff7f', TZ: '#7fdfff', TODO: '#d4d4d4' },
+    colors: { S: '#ff7f7f', A: '#ffbf7f', B: '#ffdf7f', C: '#bfff7f', D: '#7fdfff', TODO: '#d4d4d4' },
   },
   heat: {
     label: 'Heat',
-    colors: { T1: '#e8503a', T2: '#e8823a', T3: '#e8b93a', TE: '#b9c93a', TZ: '#4caf6e', TODO: '#c8c2b8' },
+    colors: { S: '#e8503a', A: '#e8823a', B: '#e8b93a', C: '#b9c93a', D: '#4caf6e', TODO: '#c8c2b8' },
   },
 };
 
@@ -191,11 +191,11 @@ export function buildAppearance(choice) {
     // Shadows/scrims are black in dark themes, a soft ink in light ones.
     '--shadow': dark ? 'rgba(0, 0, 0, 0.55)' : 'rgba(20, 24, 33, 0.16)',
     '--overlay': dark ? 'rgba(0, 0, 0, 0.72)' : 'rgba(20, 24, 33, 0.35)',
-    '--tier-t1': tiers.T1,
-    '--tier-t2': tiers.T2,
-    '--tier-t3': tiers.T3,
-    '--tier-te': tiers.TE,
-    '--tier-tz': tiers.TZ,
+    '--tier-s': tiers.S,
+    '--tier-a': tiers.A,
+    '--tier-b': tiers.B,
+    '--tier-c': tiers.C,
+    '--tier-d': tiers.D,
     '--tier-todo': tiers.TODO, // neutral: not rated yet
     // Text/icons drawn on top of a tier color - every palette is bright.
     '--tier-ink': '#101114',

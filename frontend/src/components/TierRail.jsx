@@ -1,4 +1,5 @@
 import { useDispatch, useSelector } from 'react-redux';
+import { tierName } from '../tierLabels';
 import { useNavigate } from 'react-router-dom';
 import { Box, Divider, Image, Stack, Text, Tooltip, UnstyledButton } from '@mantine/core';
 import { Trash2 } from 'lucide-react';
@@ -47,15 +48,15 @@ export default function TierRail({ category, activeTier }) {
 
   function actionFor(tier) {
     if (playingHere && playingVideo) {
-      if (playingHere.tier === tier) return { label: `"${playingVideo.title}" is in ${tier}`, run: null };
+      if (playingHere.tier === tier) return { label: `"${playingVideo.title}" is in ${tierName(tier)}`, run: null };
       return {
-        label: `Rate "${playingVideo.title}" → ${tier}`,
+        label: `Rate "${playingVideo.title}" → ${tierName(tier)}`,
         run: () =>
           dispatch(moveWithFeedback([{ fromTier: playingHere.tier, toTier: tier, videoId: playingHere.videoId }])),
       };
     }
     return {
-      label: `Open ${tier}`,
+      label: `Open ${tierName(tier)}`,
       run: () => navigate(`/tier/${encodeURIComponent(category)}/t/${tier}`),
     };
   }
@@ -102,7 +103,7 @@ export default function TierRail({ category, activeTier }) {
           }}
         >
           <Text ff="var(--font-display)" fw={900} fz={isTodo ? 13 : 20} lh={1} c={TIER_INK}>
-            {tier}
+            {tierName(tier)}
           </Text>
           <Text fz={11} fw={700} c={TIER_INK} opacity={0.7} lh={1}>
             {count}
@@ -154,7 +155,7 @@ export default function TierRail({ category, activeTier }) {
       </Text>
 
       {/* Layout: the ranked tiers share all the height there is (flex: 1,
-          no cap - a capped rail left dead space under TZ); below a divider,
+          no cap - a capped rail left dead space under D); below a divider,
           the two slots that aren't tiers - TODO and Remove - get one equal,
           fixed size, big enough to be easy drop targets. */}
       <Stack gap={6} style={{ flex: 1, minHeight: 0 }}>

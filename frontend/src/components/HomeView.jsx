@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
+import { useHotkeys } from 'react-hotkeys-hook';
 import {
   Alert,
   Badge,
@@ -21,7 +22,11 @@ import {
 import { CircleAlert, EyeOff, ListPlus, Plus, Search, Swords } from 'lucide-react';
 import CreateTierPlaylistsModal from './CreateTierPlaylistsModal';
 import PlaylistArt from './PlaylistArt';
-import { BOARD_TIERS, TIER_COLORS } from '../tiers';
+import { BOARD_TIERS, TIER_COLORS, TIER_ORDER } from '../tiers';
+import { exampleTitle } from '../naming';
+import { useSelector } from 'react-redux';
+import { selectNaming } from '../store/selectors';
+import { useTierName } from '../tierLabels';
 import { EqualizerMark, TierChip } from './TierBits';
 import { TIER_INK } from '../tierUtils';
 
@@ -35,7 +40,17 @@ function BoardCard({ category, tiers, onOpen, onDuel }) {
   const max = Math.max(1, ...present.map((t) => counts[t]));
 
   return (
-    <Paper withBorder radius="md" p="md" bg="var(--surface)" className="board-card">
+    // Fills its grid cell (h 100%) as a column, so Open/Duel (mt auto) sit
+    // on the same line in every card of a row, TODO row or not.
+    <Paper
+      withBorder
+      radius="md"
+      p="md"
+      bg="var(--surface)"
+      className="board-card"
+      h="100%"
+      style={{ display: 'flex', flexDirection: 'column' }}
+    >
       <UnstyledButton onClick={onOpen} w="100%" aria-label={`Open ${category}`}>
         <Group justify="space-between" mb="sm" wrap="nowrap">
           <Text ff="var(--font-display)" fw={900} fz={20} truncate="end">
@@ -65,7 +80,7 @@ function BoardCard({ category, tiers, onOpen, onDuel }) {
           ))}
         </Stack>
       </UnstyledButton>
-      <Group gap={6} mt="md">
+      <Group gap={6} mt="auto" pt="md">
         <Button size="compact-sm" variant="light" onClick={onOpen}>
           Open
         </Button>
@@ -95,6 +110,12 @@ export default function HomeView({
   onDuel,
   onOpenPlaylist,
 }) {
+  const naming = useSelector(selectNaming);
+  const tierName = useTierName();
+  // Vim-style "/": jump to the filter box (react-hotkeys-hook ignores it
+  // while typing in another field); Escape in the box hands focus back.
+  const filterRef = useRef(null);
+  useHotkeys('slash', () => filterRef.current?.focus(), { preventDefault: true });
   const [creating, setCreating] = useState(false);
   const q = query.trim().toLowerCase();
   const boards = tierCategories.filter((c) => c.toLowerCase().includes(q));
@@ -127,11 +148,13 @@ export default function HomeView({
           New tier list
         </Button>
         <TextInput
+          ref={filterRef}
           value={query}
           onChange={(e) => onQueryChange(e.target.value)}
+          onKeyDown={(e) => e.key === 'Escape' && e.currentTarget.blur()}
           placeholder="Filter boards & playlists…"
           leftSection={<Search size={15} />}
-          rightSection={query ? <CloseButton size="sm" onClick={() => onQueryChange('')} aria-label="Clear" /> : null}
+          rightSection={query ? <CloseButton size="sm" onClick={() => onQueryChange('')} aria-label="Clear" /> : <Kbd size="xs">/</Kbd>}
           w={300}
         />
         </Group>
@@ -197,8 +220,10 @@ export default function HomeView({
               No tier lists yet
             </Title>
             <Text c="dimmed" fz="sm" maw={520} mx="auto">
-              Name YouTube playlists like <b>[G] Rap T1</b>, <b>[G] Rap T2</b> … <b>T3</b>, <b>TE</b>, <b>TZ</b> and each
-              category turns into a tier list here automatically.
+              Name YouTube playlists like <b>{exampleTitle(naming, 'Rap', TIER_ORDER[0])}</b>,{' '}
+              <b>{exampleTitle(naming, 'Rap', TIER_ORDER[1])}</b> …{' '}
+              <b>{exampleTitle(naming, 'Rap', TIER_ORDER[TIER_ORDER.length - 1])}</b> (your naming, Settings → Playlist
+              naming) and each category turns into a tier list here automatically.
             </Text>
           </Paper>
         )}
@@ -269,7 +294,7 @@ export default function HomeView({
                       color={TIER_COLORS[parsed.tier]}
                       c={TIER_INK}
                     >
-                      {parsed.tier}
+                      {tierName(parsed.tier)}
                     </Badge>
                   )}
                 </Card.Section>

@@ -31,8 +31,8 @@ function estimateComparisons(runs) {
  * DuelStrategy contract: constructor(runs), nextPair(), reportResult(winnerId),
  * isDone(), getSpine(), getProgress(), supportsSkip.
  *
- * Takes your *existing* tier groupings as already-correct runs (T1's videos
- * are assumed better than T2's, and so on) and only asks duels to resolve
+ * Takes your *existing* tier groupings as already-correct runs (S's videos
+ * are assumed better than A's, and so on) and only asks duels to resolve
  * order *between* runs during merging - never within one. That trust is
  * exactly what cuts the duel count from a full from-scratch sort's
  * ~n*log2(n) down to ~n*log2(k), where k is the number of tiers (typically

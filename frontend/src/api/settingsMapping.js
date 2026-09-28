@@ -1,15 +1,14 @@
-import { normalizeTemplate } from '../naming';
-
 // The settings the account stores (backend SettingsDto), grouped exactly like
 // the Redux slices that own them. One schema drives mapping, comparison and
 // merging, so a new setting is one entry here (+ its column/enum backend-side).
 const SCHEMA = {
   appearance: ['theme', 'accent', 'tierPalette'],
-  naming: ['template', 'migratingFrom', 'todoKeyword', 'todoLinks'],
+  naming: ['template', 'tierLabels', 'tierDisplayNames', 'migratingFrom', 'migratingFromTierLabels', 'todoLinks'],
   prefs: ['duelStrategy'],
 };
 
-// Fields are primitives except todoLinks ({ playlistId: category }), so
+// Fields are primitives except tierLabels / tierDisplayNames ({ slot: name }) and todoLinks
+// ({ playlistId: category }), so
 // compare by value: a copy that came back from the server is still "same".
 function sameValue(a, b) {
   if (a === b) return true;
@@ -24,13 +23,9 @@ function mapFields(fn) {
   );
 }
 
-// Redux state -> the API body. Templates go up in canonical form (the backend
-// only knows {tag}, not its old alias {bracket}).
+// Redux state -> the API body.
 export function toServer(state) {
-  const settings = mapFields((group, field) => state[group][field] ?? null);
-  settings.naming.template = normalizeTemplate(settings.naming.template);
-  if (settings.naming.migratingFrom) settings.naming.migratingFrom = normalizeTemplate(settings.naming.migratingFrom);
-  return settings;
+  return mapFields((group, field) => state[group][field] ?? null);
 }
 
 export function sameSettings(a, b) {

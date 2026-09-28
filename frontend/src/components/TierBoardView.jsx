@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { tierName } from '../tierLabels';
 import { useDispatch, useSelector } from 'react-redux';
 import {
   ActionIcon,
@@ -102,7 +103,7 @@ function TierRow({
   const isOver = dnd.dragOverTier === tier;
   const color = TIER_COLORS[tier];
   const isTodo = tier === TODO_TIER;
-  const playLabel = isTodo ? 'Triage: play and rate one by one' : `Play ${tier}`;
+  const playLabel = isTodo ? 'Triage: play and rate one by one' : `Play ${tierName(tier)}`;
 
   const shown = searchActive ? items?.filter((v) => matchedKeys.has(`${tier}:${v.videoId}`)) : items;
   const total = shown?.length ?? 0;
@@ -146,7 +147,7 @@ function TierRow({
         onClick={() => onOpenTier(tier)}
         w={size < 64 ? 54 : 68}
         bg={color}
-        aria-label={`Open ${tier}`}
+        aria-label={`Open ${tierName(tier)}`}
         className="tier-label-btn"
         style={{
           flexShrink: 0,
@@ -159,7 +160,7 @@ function TierRow({
         }}
       >
         <Text ff="var(--font-display)" fw={900} fz={(size < 64 ? 18 : 22) * (isTodo ? 0.7 : 1)} lh={1} c={TIER_INK}>
-          {tier}
+          {tierName(tier)}
         </Text>
         {!loading && (
           <Text fz={11} fw={700} c={TIER_INK} opacity={0.7} lh={1.2}>
@@ -183,7 +184,7 @@ function TierRow({
                 <Play size={13} fill="currentColor" />
               </ActionIcon>
             </Tooltip>
-            <Tooltip label={`Shuffle ${tier}`} withArrow>
+            <Tooltip label={`Shuffle ${tierName(tier)}`} withArrow>
               <ActionIcon
                 component="span"
                 variant="transparent"
@@ -193,7 +194,7 @@ function TierRow({
                   e.stopPropagation();
                   onShuffle(tier);
                 }}
-                aria-label={`Shuffle ${tier}`}
+                aria-label={`Shuffle ${tierName(tier)}`}
               >
                 <Shuffle size={13} />
               </ActionIcon>
@@ -256,7 +257,7 @@ function TierRow({
               w={size}
               h={size}
               onClick={() => onOpenTier(tier)}
-              aria-label={`Show all ${items.length} in ${tier}`}
+              aria-label={`Show all ${items.length} in ${tierName(tier)}`}
               className="more-tile"
               style={{
                 flexShrink: 0,
@@ -284,7 +285,7 @@ function TierRow({
           every row; the icon sits level with the first line of tiles and
           stays pinned while scrolling a long, expanded tier. */}
       <Tooltip
-        label={!overflows ? `All ${total} shown` : expanded ? `Show less of ${tier}` : `Expand ${tier} - show all ${total} here`}
+        label={!overflows ? `All ${total} shown` : expanded ? `Show less of ${tierName(tier)}` : `Expand ${tierName(tier)} - show all ${total} here`}
         withArrow
         position="left"
       >
@@ -292,7 +293,7 @@ function TierRow({
           onClick={() => setExpanded((e) => !e)}
           disabled={!overflows}
           px={6}
-          aria-label={expanded ? `Show less of ${tier}` : `Expand ${tier}`}
+          aria-label={expanded ? `Show less of ${tierName(tier)}` : `Expand ${tierName(tier)}`}
           aria-expanded={overflows ? expanded : undefined}
           className="row-open-btn"
           style={{
@@ -528,7 +529,7 @@ export default function TierBoardView({
     <Box component="section" pb={pendingPad}>
       <Box ref={headerRef}>
       <Group justify="space-between" align="flex-end" wrap="wrap" gap="md" mb="md">
-        <Stack gap={4}>
+        <Stack gap={4} align="flex-start">
           <Text fz={11} fw={800} tt="uppercase" c="accent" style={{ letterSpacing: 1.5 }}>
             Tier list
           </Text>
@@ -624,7 +625,7 @@ export default function TierBoardView({
         ))}
       </Paper>
       {/* The TODO list sits under the ranked tiers: songs waiting to be
-          rated, not a tier above T1. */}
+          rated, not a tier above S. */}
       {hasTodo && !unknownTiers && (
         <Paper withBorder radius="md" mt="md" style={{ overflow: 'clip', borderTop: 'none' }} bg="var(--surface)">
           <TierRow

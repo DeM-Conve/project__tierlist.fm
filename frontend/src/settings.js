@@ -11,7 +11,7 @@ export const SETTINGS = {
   prefs: `${PREFIX}prefs`,
   // { theme, accent, tierPalette } - see themes.js
   appearance: `${PREFIX}appearance`,
-  // { template, migratingFrom, todoKeyword, todoLinks } - see naming.js / namingSlice
+  // { template, tierLabels, migratingFrom, migratingFromTierLabels, todoLinks } - see naming.js / namingSlice
   naming: `${PREFIX}naming`,
 };
 

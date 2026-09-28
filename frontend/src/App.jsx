@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { tierName } from './tierLabels';
 import { useDispatch, useSelector } from 'react-redux';
 import { useQueryClient } from '@tanstack/react-query';
 import {
@@ -29,7 +30,6 @@ import { CANVAS_TOP, CANVAS_X, SHELL_Y } from './layout/spacing';
 import { CanvasContext } from './layout/canvas';
 import PendingChanges from './components/PendingChanges';
 import { applyOrderWithFeedback, moveWithFeedback, undoEdit } from './tierActions';
-import ItemsView from './components/ItemsView';
 import TierBoardView from './components/TierBoardView';
 import PlayerDock from './components/PlayerDock';
 import CommandPalette from './components/CommandPalette';
@@ -45,10 +45,10 @@ import SettingsView from './components/SettingsView';
 import ShortcutsModal from './components/ShortcutsModal';
 import LoginView from './components/LoginView';
 import { setLoggedIn, setPlaylists } from './store/authSlice';
-import { detectedTemplate } from './store/namingSlice';
+import { detectedNaming } from './store/namingSlice';
 import { useSettingsSync } from './api/useSettingsSync';
-import { detectTemplate } from './naming';
-import { setCurrentCategory, setQuery, setMobileSidebarOpen } from './store/viewSlice';
+import { detectNaming } from './naming';
+import { setCurrentCategory, setHomeQuery, setSidebarQuery, setMobileSidebarOpen } from './store/viewSlice';
 import {
   resetTierBoard,
   setLoadedCategory,
@@ -86,12 +86,12 @@ import {
   selectVideoLookup,
   selectFocusedVideoData,
   selectFocusedAvailableTiers,
+  selectNaming,
 } from './store/selectors';
 import { api, API_BASE, errorMessage } from './api/client';
 import {
   useAuthStatusQuery,
   usePlaylistsQuery,
-  usePlaylistItemsQuery,
   useTierBoardQueries,
   useTierSyncMutation,
   useInvalidatePlaylistItems,
@@ -159,15 +159,16 @@ export default function App() {
   // Settings live in Postgres per account; localStorage is only a cache.
   const { ready: settingsReady } = useSettingsSync(authData?.loggedIn === true);
 
-  // First run for this account: adopt the naming template that fits the
-  // user's existing playlists (no-op once a template has been chosen - wait
-  // for the account's saved settings, which may already have one).
-  const needsTemplateDetection = useSelector((s) => s.naming.needsDetection);
+  // First run for this account: adopt the naming (template + tier names)
+  // that fits the user's existing playlists (no-op once one has been chosen -
+  // wait for the account's saved settings, which may already have one).
+  const needsNamingDetection = useSelector((s) => s.naming.needsDetection);
+  const currentNaming = useSelector(selectNaming);
   useEffect(() => {
-    if (playlistsData && settingsReady && needsTemplateDetection) {
-      dispatch(detectedTemplate(detectTemplate(playlistsData.map((p) => p.title))));
+    if (playlistsData && settingsReady && needsNamingDetection) {
+      dispatch(detectedNaming(detectNaming(playlistsData.map((p) => p.title), currentNaming)));
     }
-  }, [playlistsData, settingsReady, needsTemplateDetection, dispatch]);
+  }, [playlistsData, settingsReady, needsNamingDetection, currentNaming, dispatch]);
 
   function login() {
     window.location.href = `${API_BASE}/oauth2/authorization/google`;
@@ -191,7 +192,7 @@ export default function App() {
     <Routes>
       <Route path="/" element={<Layout />}>
         <Route index element={<HomePage />} />
-        <Route path="playlist/:id" element={<ItemsPage />} />
+        <Route path="playlist/:id" element={<PlaylistRedirect />} />
         <Route path="tier/:category" element={<TierBoardPage />} />
         <Route path="tier/:category/t/:tier" element={<TierFocusPage />} />
         <Route path="tier/:category/duel" element={<DuelPage />} />
@@ -213,7 +214,7 @@ function Layout() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
-  const query = useSelector((s) => s.view.query);
+  const query = useSelector((s) => s.view.sidebarQuery);
   const mobileSidebarOpen = useSelector((s) => s.view.mobileSidebarOpen);
   const tierPlaylists = useSelector(selectTierPlaylists);
   const focusedVideo = useSelector((s) => s.focus.focusedVideo);
@@ -360,7 +361,7 @@ function Layout() {
   }
 
   // A tier's own Play button plays just that tier, like playing one
-  // playlist ("Playing from Rap · T2"); with no tier (the board header's
+  // playlist ("Playing from Rap · A"); with no tier (the board header's
   // Play) it plays the whole board in tier order. Playing the TODO list is
   // always a triage session.
   function playFrom(tier) {
@@ -374,7 +375,7 @@ function Layout() {
         queue: pool.map((e) => e.video.videoId),
         entries: focusSequence,
         category: currentCategory,
-        label: tier ? `${currentCategory} · ${tier}` : currentCategory,
+        label: tier ? `${currentCategory} · ${tierName(tier)}` : currentCategory,
       })
     );
   }
@@ -435,7 +436,7 @@ function Layout() {
         videoId: first.video.videoId,
         entries: focusSequence,
         category: currentCategory,
-        label: `${currentCategory}${tier ? ` · ${tier}` : ''} · shuffle`,
+        label: `${currentCategory}${tier ? ` · ${tierName(tier)}` : ''} · shuffle`,
       })
     );
   }
@@ -473,7 +474,7 @@ function Layout() {
         id: `playlist-${p.id}`,
         section: 'Playlists',
         label: `Open ${p.title}`,
-        action: () => navigate(`/playlist/${encodeURIComponent(p.id)}`),
+        action: () => navigate(tierPagePath(p.parsed)),
       });
     }
     list.push({
@@ -489,7 +490,7 @@ function Layout() {
       { id: 'page-add', label: 'Add songs (liked songs to rate)', to: '/add', keywords: ['inbox', 'likes', 'liked', 'new songs', 'paste link'] },
       { id: 'page-settings', label: 'Settings', to: '/settings', keywords: ['settings', 'preferences', 'options', 'config'] },
       { id: 'page-settings-appearance', label: 'Settings → Appearance', to: '/settings?tab=appearance', keywords: ['settings', 'theme', 'dark mode', 'light mode', 'accent', 'color', 'tier colors', 'palette'] },
-      { id: 'page-settings-naming', label: 'Settings → Playlist naming & to-do lists', to: '/settings?tab=naming', keywords: ['settings', 'template', 'rename', 'naming', 'todo', 'to-do', 'keyword', 'tag'] },
+      { id: 'page-settings-naming', label: 'Settings → Playlist naming', to: '/settings?tab=naming', keywords: ['settings', 'template', 'rename', 'naming', 'todo', 'to-do', 'keyword', 'tag'] },
       { id: 'page-settings-duels', label: 'Settings → Duels', to: '/settings?tab=duels', keywords: ['settings', 'duel', 'strategy', 'elo', 'merge sort', 'ranking'] },
       { id: 'page-settings-keyboard', label: 'Settings → Keyboard shortcuts', to: '/settings?tab=keyboard', keywords: ['settings', 'keys', 'hotkeys', 'shortcuts'] },
     ];
@@ -523,7 +524,7 @@ function Layout() {
         list.push({
           id: `open-tier-${t}`,
           section: 'Tiers',
-          label: `Open ${t} of ${currentCategory}`,
+          label: `Open ${tierName(t)} of ${currentCategory}`,
           action: () => navigate(`/tier/${encodeURIComponent(currentCategory)}/t/${t}`),
         });
       }
@@ -579,7 +580,7 @@ function Layout() {
       <Flex pos="relative" flex={1} mih={0}>
         <Sidebar
           query={query}
-          onQueryChange={(q) => dispatch(setQuery(q))}
+          onQueryChange={(q) => dispatch(setSidebarQuery(q))}
           tierCategories={tierCategories}
           tierGroups={tierGroups}
           playlistCount={tierPlaylists?.length ?? 0}
@@ -721,7 +722,7 @@ function HomePage() {
   const navigate = useNavigate();
   const allPlaylists = useSelector((s) => s.auth.playlists);
   const tierPlaylists = useSelector(selectTierPlaylists);
-  const query = useSelector((s) => s.view.query);
+  const query = useSelector((s) => s.view.homeQuery);
   const tierGroups = useSelector(selectTierGroups);
   const tierCategories = useSelector(selectTierCategories);
   const focusedCategory = useSelector((s) => s.focus.focusedCategory);
@@ -751,44 +752,27 @@ function HomePage() {
       tierGroups={tierGroups}
       tierCategories={tierCategories}
       query={query}
-      onQueryChange={(q) => dispatch(setQuery(q))}
+      onQueryChange={(q) => dispatch(setHomeQuery(q))}
       nowPlaying={playingVideo ? { video: playingVideo, category: focusedCategory } : null}
       onOpenBoard={(c) => navigate(`/tier/${encodeURIComponent(c)}`)}
       onDuel={(c) => navigate(`/tier/${encodeURIComponent(c)}/duel`)}
-      onOpenPlaylist={(p) => navigate(`/playlist/${encodeURIComponent(p.id)}`)}
+      onOpenPlaylist={(p) => navigate(tierPagePath(p.parsed))}
     />
   );
 }
 
-function ItemsPage() {
+// A tier playlist's page is its tier page (same list, player, tier chips,
+// drag-to-reorder) - there's no separate playlist view. Old /playlist/<id>
+// links land there; a hidden (non-matching) playlist's URL just goes home
+// rather than exposing its contents.
+const tierPagePath = ({ category, tier }) => `/tier/${encodeURIComponent(category)}/t/${tier}`;
+
+function PlaylistRedirect() {
   const { id } = useParams();
-  const playlistId = decodeURIComponent(id);
-  const dispatch = useDispatch();
-  const navigate = useNavigate();
-  // Only template-matching playlists are reachable - a hidden playlist's URL
-  // just goes home rather than exposing its contents.
   const tierPlaylists = useSelector(selectTierPlaylists);
-  const playlist = tierPlaylists?.find((p) => p.id === playlistId);
-  const { data: items, isLoading } = usePlaylistItemsQuery(playlist ? playlistId : null);
-
-  useEffect(() => {
-    if (tierPlaylists && !playlist) navigate('/', { replace: true });
-  }, [tierPlaylists, playlist, navigate]);
-
-  useEffect(() => {
-    dispatch(setCurrentCategory(null));
-    dispatch(setMobileSidebarOpen(false));
-  }, [dispatch]);
-
-  return (
-    <ItemsView
-      playlist={playlist}
-      items={items ?? null}
-      loading={isLoading}
-      onOpenBoard={(c) => navigate(`/tier/${encodeURIComponent(c)}`)}
-      onBack={() => navigate('/')}
-    />
-  );
+  if (!tierPlaylists) return null;
+  const playlist = tierPlaylists.find((p) => p.id === decodeURIComponent(id));
+  return <Navigate to={playlist ? tierPagePath(playlist.parsed) : '/'} replace />;
 }
 
 function TierBoardPage() {

@@ -1,8 +1,9 @@
 # Tierlist.fm
 
 A personal tool to log into your own YouTube account, browse playlists, and manage a
-custom tier-list system. Playlists named `[G]/[GA]/[OG] <Category> T1/T2/T3/TE/TZ` are
-auto-grouped into a tier board per category.
+custom tier-list system. Playlists whose names follow the user's naming template
+(`{category} {tier}` by default, e.g. `Rap S`) are auto-grouped into a tier board per
+category.
 
 ## Stack
 
@@ -20,7 +21,7 @@ auto-grouped into a tier board per category.
     picks theme/accent/tier palette in Settings -> Appearance (`appearanceSlice`,
     persisted per account in Postgres - see the Database bullet). `buildAppearance()` turns the choice into CSS variables
     on `<html>` (`--bg`, `--surface*`, `--border*`, `--text*`, `--accent*`, `--shadow`,
-    `--overlay`, `--tier-t1..tz`, `--tier-ink`, `--media-*`) plus the Mantine theme;
+    `--overlay`, `--tier-s..d` + `--tier-todo`, `--tier-ink`, `--media-*`) plus the Mantine theme;
     `AppearanceRoot.jsx` wraps `MantineProvider` and re-applies both live.
     `cssVariablesResolver` points Mantine's own color variables at ours and
     `variantColorResolver` picks readable text on filled accent/tier colors - so there
@@ -48,7 +49,7 @@ auto-grouped into a tier board per category.
     etc.) are memoized selectors in `store/selectors.js`, not component-level `useMemo`.
   - **TanStack Query** (`@tanstack/react-query`) is the primary data-fetching layer for
     *server* state - all API reads/writes go through hooks in `frontend/src/api/queries.js`
-    (`usePlaylistsQuery`, `usePlaylistItemsQuery`, `useTierBoardQueries`,
+    (`usePlaylistsQuery`, `useTierBoardQueries`,
     `useTierSyncMutation`, ...), never a raw `fetch`/`axios` call inline in a component.
     **axios** (`frontend/src/api/client.js`'s `api` instance) is the HTTP transport
     underneath it, not a separate calling convention - nothing outside `src/api/` should
@@ -96,7 +97,10 @@ auto-grouped into a tier board per category.
   Tables: `app_user` (Google `sub` as id, recorded on every login by the success
   handler in `SecurityConfig`) and `user_settings` (one row per user: `theme_option`,
   `accent_option`, `tier_palette_option`, `duel_strategy_option` enums, the naming
-  template and to-do keyword (+ CHECK constraints) and a `version`), `todo_list_link`
+  template and the six tier names `naming_tier_s..d/todo` - plus the same seven
+  nullable `naming_migrating_from*` columns for an unfinished rename, all or none -
+  (+ CHECK constraints via the `tier_label_valid` / `tier_labels_distinct` SQL
+  functions) and a `version`), `todo_list_link`
   (playlist id -> board, part of the settings row: an `@ElementCollection` excluded
   from Hibernate's auto-versioning - it bumped the version on insert - so
   `SettingsService` force-increments when links change). Backend package
@@ -197,10 +201,26 @@ auto-grouped into a tier board per category.
   returning from a duel) - removing that guard would silently discard an unsynced duel
   result or drag on every board/duel round-trip. Don't refetch tier-board data on mount
   without checking `loadedCategory` first.
-- **Playlist names follow the user's naming template (`src/naming.js`, `namingSlice`).**
-  The default is generic (`{category} {tier}`); the `[G]`/`[GA]`/`[GO]` tag prefix is the
-  user's personal convention, not something to assume for everyone - it's the optional
-  `{tag}` token, auto-detected on first run (`detectTemplate`).
+- **Playlist names follow the user's naming (`src/naming.js`, `namingSlice`) = template
+  + tier names.** The product knows exactly two tokens, `{category}` and `{tier}`; any
+  other `{word}` in the template is a token *of the user's own*, named by them (e.g. `{my_label}` for
+  `[Chill] Rap S`) - free text read from each title into `parsed.fields` and written back
+  unchanged, with no meaning to the app. Never build a user's personal convention into
+  the product (no built-in or detected token names, no `[G]` examples; `detectNaming` only tries the presets + the user's own current template) - the user's explicit call.
+  **Tier ids are `S A B C D` + `TODO`** (`tiers.js`), fixed internal slots that colors
+  (`--tier-s..d`), the rail, duels and shortcuts key on. What each is *called* is the
+  user's choice: `naming.tierLabels` = the name in playlist names (default `S A B C D` /
+  `TODO`; e.g. `T1..TZ` / `(**TODO**)`, matched exactly), `naming.tierDisplayNames` =
+  optional "shown as" per tier (null = the name; backend `naming_tier_*_shown`), used
+  **everywhere on screen**: render a
+  tier's name with `useTierName()` / `tierName()` (`src/tierLabels.js`) or `TierChip`,
+  never the raw id. Never hard-code a tier name like `T1`. No legacy/back-compat
+  labels (the user's call): no saved tier names -> defaults + first-run detection
+  (`detectNaming`, which tries the typed-in names and the `TIER_LABEL_PRESETS`).
+  **Settings -> Playlist naming never renames anything** (the user's call): it only
+  decides which playlists are tier playlists (a live "Matching playlists" preview +
+  Save). `migratingFrom*` (a previous naming still recognised) stays in the state /
+  schema but nothing in that page sets it any more.
   Never parse playlist titles with an ad-hoc regex - use `parseTitle`/`renderTitle`,
   and read playlists through `selectTierPlaylists` (template-matching only, each with
   `.parsed`), never `state.auth.playlists` directly in UI: non-matching playlists are
@@ -219,17 +239,20 @@ auto-grouped into a tier board per category.
   between, `TIER_ORDER` for ranking only (duels, dedupe priority, "missing tiers",
   player Shift+digit rating). Triage (`focusSlice.isTriage`) auto-advances in
   `tierActions.moveWithFeedback` when the playing to-do song is rated.
-  To-do lists **follow the naming template** with the keyword in `{tier}`'s
-  place (`[Tierlist.fm] Rap TODO`; `todoTitle()`), and the template's rename
-  job renames them too - the user's call: TODO *is* a tier type, just
-  unranked. The keyword is plain letters/digits (`TODO`), not a styled
-  `**TODO**`. `src/todoLists.js` finds them by: an explicit link, else the
-  template shape (`boardFromName(..., templates)`), else keyword (whole word,
-  anywhere, any case; `naming.todoKeyword`) + the rest of the name = a board
-  name (+ tag) - so pre-template names keep working. Explicit links are
-  (`naming.todoLinks`, backend `todo_list_link` table). `selectTierPlaylists`
-  merges them in with `parsed.tier = 'TODO'`; `selectTodoRows` lists every
-  candidate for Settings. Keep `validateTodoKeyword` and `@TodoKeyword` in step.
+  To-do lists **follow the naming** with the to-do tier's name
+  (`tierLabels.TODO`, kept exactly as typed, symbols and all - e.g.
+  `(**TODO**)`) in `{tier}`'s place (`todoTitle()`), and the rename job renames
+  them too - the user's call: TODO *is* a tier type, just unranked.
+  They're matched **literally, like any tier** (the user's call): `parseTitle`
+  matches all six names in `{tier}`'s slot, so a to-do list is the template
+  with the exact to-do name there - no keyword/fuzzy matching, symbols count.
+  `src/todoLists.js` `resolveTodoLists`: an explicit link, else that literal
+  name. Explicit links are `naming.todoLinks` (backend `todo_list_link`
+  table). `selectTierPlaylists` merges them in with `parsed.tier = 'TODO'`;
+  `selectTodoRows` lists every
+  candidate (the board's "Add a to-do list" modal uses it; Settings has no to-do
+  section - the user removed it). Keep `validateTemplate`/`@NamingTemplate` and
+  `validateTierLabels`/`@TierLabel` + `TierLabelsDto.isDistinct` in step.
 - **Duel ranking uses the Strategy pattern** (`frontend/src/duel/`): multiple
   interchangeable ranking algorithms (`tierAwareMerge` default, `mergeSort`, `elo`)
   behind a common interface, swappable at runtime from the duel screen or persisted as a
@@ -244,15 +267,16 @@ auto-grouped into a tier board per category.
 The user asked for these on top of the Mantine/Redux migration above. Tracked here
 (no task-tracking tool is available in this environment) - update as items land:
 
-- [x] **React Router** - done. Real `Routes`/`Route`s (`/`, `/playlist/:id`,
+- [x] **React Router** - done. Real `Routes`/`Route`s (`/`, `/playlist/:id` - now only a redirect to
+  that playlist's tier page `/tier/:category/t/:tier`, there's no separate playlist view -
   `/tier/:category`, `/tier/:category/duel`, `/settings`) replace the hand-rolled
   History-API routing. Also fixed a latent bug found while doing this: navigation
   used to unconditionally close the player dock, defeating the "plays in the
   background" point of the mini bar - navigation no longer touches it at all.
 - [x] **TanStack Query + axios** - done. `frontend/src/api/` (`client.js`'s axios
   instance, `queries.js`'s hooks) is now the only place API calls happen; no
-  component does a raw `fetch`. `itemsSlice` was removed entirely (ItemsPage reads
-  straight from `usePlaylistItemsQuery`); `tiersSlice.loadedCategory` mediates
+  component does a raw `fetch`. `itemsSlice` was removed entirely (and the old playlist
+  page with it - a playlist opens its tier page); `tiersSlice.loadedCategory` mediates
   between TanStack Query's cache (pristine server data) and the local editable draft
   (drags, duel results) - see `useLoadTierBoard` in `App.jsx`. Don't refetch
   tier-board data on mount without checking `loadedCategory` first, and don't

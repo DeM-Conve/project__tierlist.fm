@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { tierName } from '../tierLabels';
 import { useDispatch, useSelector } from 'react-redux';
 import { useOutletContext } from 'react-router-dom';
 import { ActionIcon, Badge, Box, Button, Group, Image, Kbd, Modal, Paper, ScrollArea, Stack, Text, Tooltip } from '@mantine/core';
@@ -35,13 +36,13 @@ function ChangeRow({ move, first, onRevert }) {
         </Group>
       ) : (
         // A deletion reads as a sentence: "Remove from [TODO] · already in
-        // [T2]" for a duplicate (so it's obvious nothing is lost), "Remove
-        // from [T3]" for a plain removal.
+        // [A]" for a duplicate (so it's obvious nothing is lost), "Remove
+        // from [B]" for a plain removal.
         <Tooltip
           label={
             move.kind === 'dedupe'
-              ? `This song is in both ${move.tier} and ${move.keptTier} on YouTube. Pushing removes it from ${move.tier} only - it stays in ${move.keptTier}.`
-              : `Pushing removes this song from ${move.from}.`
+              ? `This song is in both ${tierName(move.tier)} and ${tierName(move.keptTier)} on YouTube. Pushing removes it from ${tierName(move.tier)} only - it stays in ${tierName(move.keptTier)}.`
+              : `Pushing removes this song from ${tierName(move.from)}.`
           }
           withArrow
           multiline
@@ -66,8 +67,8 @@ function ChangeRow({ move, first, onRevert }) {
       )}
       <Box w={28} flex="none">
         {move.kind !== 'dedupe' && (
-          <Tooltip label={`Put back in ${move.from}`} withArrow>
-            <ActionIcon variant="subtle" color="gray" onClick={onRevert} aria-label={`Put back in ${move.from}`}>
+          <Tooltip label={`Put back in ${tierName(move.from)}`} withArrow>
+            <ActionIcon variant="subtle" color="gray" onClick={onRevert} aria-label={`Put back in ${tierName(move.from)}`}>
               <Undo2 size={15} />
             </ActionIcon>
           </Tooltip>

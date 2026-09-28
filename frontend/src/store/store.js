@@ -8,6 +8,7 @@ import namingReducer from './namingSlice';
 import prefsReducer from './prefsSlice';
 import addSongsReducer from './addSongsSlice';
 import { SETTINGS, setSetting } from '../settings';
+import { syncTierLabels } from '../tierLabels';
 
 export const store = configureStore({
   reducer: {
@@ -27,8 +28,10 @@ export const store = configureStore({
 const PERSISTED = { appearance: SETTINGS.appearance, naming: SETTINGS.naming, prefs: SETTINGS.prefs };
 const last = {};
 Object.keys(PERSISTED).forEach((k) => (last[k] = store.getState()[k]));
+syncTierLabels(store.getState().naming);
 store.subscribe(() => {
   const state = store.getState();
+  syncTierLabels(state.naming);
   Object.entries(PERSISTED).forEach(([k, key]) => {
     if (state[k] !== last[k]) {
       last[k] = state[k];

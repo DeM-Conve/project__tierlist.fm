@@ -75,7 +75,7 @@ const focusSlice = createSlice({
     history: [],
     current: null,
     upcoming: [],
-    // What was started ("Rap", "Rap · T2 · shuffle", "Rap · TODO", ...),
+    // What was started ("Rap", "Rap · A · shuffle", "Rap · TODO", ...),
     // shown as "Playing from" in the queue panel.
     contextLabel: null,
     // The tier-board category playback was started from. Tier reassignment

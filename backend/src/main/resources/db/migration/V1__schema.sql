@@ -19,6 +19,20 @@ CREATE TYPE accent_option        AS ENUM ('BLUE', 'VIOLET', 'TEAL', 'GREEN', 'PI
 CREATE TYPE tier_palette_option  AS ENUM ('VIVID', 'CLASSIC', 'HEAT');
 CREATE TYPE duel_strategy_option AS ENUM ('TIER_AWARE_MERGE', 'MERGE_SORT', 'ELO');
 
+-- A tier's name as the user wrote it ("S", "T1", "(**TODO**)"). Mirrors
+-- @TierLabel / naming.js validateTierLabels: no surrounding spaces, a
+-- letter/digit, no template braces (length is the column's).
+CREATE FUNCTION tier_label_valid(label TEXT) RETURNS BOOLEAN
+    LANGUAGE sql IMMUTABLE STRICT
+    RETURN label = btrim(label) AND label ~ '[[:alnum:]]' AND label !~ '[{}]';
+
+-- True when no two names are the same, case and symbols aside ("TODO" and
+-- "(**todo**)" count as one) - they'd be indistinguishable in a playlist name.
+CREATE FUNCTION tier_labels_distinct(VARIADIC labels TEXT[]) RETURNS BOOLEAN
+    LANGUAGE sql IMMUTABLE STRICT
+    RETURN (SELECT count(DISTINCT btrim(regexp_replace(lower(l), '[^[:alnum:]]+', ' ', 'g'))) = count(*)
+            FROM unnest(labels) AS l);
+
 -- One row per user: their app settings. No row = the account has never saved.
 CREATE TABLE user_settings (
     user_id                TEXT                 PRIMARY KEY REFERENCES app_user (id) ON DELETE CASCADE,
@@ -26,13 +40,33 @@ CREATE TABLE user_settings (
     theme                  theme_option         NOT NULL,
     accent                 accent_option        NOT NULL,
     tier_palette           tier_palette_option  NOT NULL,
-    -- Settings -> Playlist naming. migrating_from is the previous template
-    -- while a rename job is unfinished (titles matching either stay visible).
+    -- Settings -> Playlist naming: the template, and what each tier is called
+    -- (the five ranked tiers best first, then the to-do list - whose name is
+    -- also what marks a playlist as a board's to-do list, wherever it appears).
     naming_template        VARCHAR(200)         NOT NULL,
-    naming_migrating_from  VARCHAR(200),
-    -- The word that marks a playlist as a board's to-do list, wherever it
-    -- appears in the name ("[G] Rap TODO", "TODO - Rap"), any case.
-    naming_todo_keyword    VARCHAR(20)          NOT NULL,
+    naming_tier_s          VARCHAR(20)          NOT NULL,
+    naming_tier_a          VARCHAR(20)          NOT NULL,
+    naming_tier_b          VARCHAR(20)          NOT NULL,
+    naming_tier_c          VARCHAR(20)          NOT NULL,
+    naming_tier_d          VARCHAR(20)          NOT NULL,
+    naming_tier_todo       VARCHAR(20)          NOT NULL,
+    -- What the app shows for each tier ("TODO" for "(**TODO**)"); NULL = the
+    -- name above. Never matched, so they may repeat.
+    naming_tier_s_shown    VARCHAR(20),
+    naming_tier_a_shown    VARCHAR(20),
+    naming_tier_b_shown    VARCHAR(20),
+    naming_tier_c_shown    VARCHAR(20),
+    naming_tier_d_shown    VARCHAR(20),
+    naming_tier_todo_shown VARCHAR(20),
+    -- The previous naming while a rename job is unfinished (titles matching
+    -- either stay visible): all of it, or none.
+    naming_migrating_from           VARCHAR(200),
+    naming_migrating_from_tier_s    VARCHAR(20),
+    naming_migrating_from_tier_a    VARCHAR(20),
+    naming_migrating_from_tier_b    VARCHAR(20),
+    naming_migrating_from_tier_c    VARCHAR(20),
+    naming_migrating_from_tier_d    VARCHAR(20),
+    naming_migrating_from_tier_todo VARCHAR(20),
     -- Settings -> Duels
     duel_strategy          duel_strategy_option NOT NULL,
     -- Optimistic lock, served as the ETag: a save based on a version the
@@ -48,13 +82,28 @@ CREATE TABLE user_settings (
     CONSTRAINT naming_migrating_from_has_tokens
         CHECK (naming_migrating_from IS NULL
                OR (naming_migrating_from LIKE '%{category}%' AND naming_migrating_from LIKE '%{tier}%')),
-    CONSTRAINT naming_migrating_from_differs
-        CHECK (naming_migrating_from IS DISTINCT FROM naming_template),
-    -- Mirrors @TodoKeyword / todoLists.js validateTodoKeyword: words of
-    -- letters/digits, and never a tier code (that would read as a tier).
-    CONSTRAINT naming_todo_keyword_format
-        CHECK (naming_todo_keyword ~ '^[[:alnum:]]+( [[:alnum:]]+)*$'
-               AND upper(naming_todo_keyword) NOT IN ('T1', 'T2', 'T3', 'TE', 'TZ'))
+    CONSTRAINT naming_tier_labels_valid
+        CHECK (tier_label_valid(naming_tier_s) AND tier_label_valid(naming_tier_a) AND tier_label_valid(naming_tier_b)
+               AND tier_label_valid(naming_tier_c) AND tier_label_valid(naming_tier_d) AND tier_label_valid(naming_tier_todo)),
+    -- tier_label_valid is STRICT: a NULL (not set) passes.
+    CONSTRAINT naming_tier_shown_valid
+        CHECK (tier_label_valid(naming_tier_s_shown) AND tier_label_valid(naming_tier_a_shown)
+               AND tier_label_valid(naming_tier_b_shown) AND tier_label_valid(naming_tier_c_shown)
+               AND tier_label_valid(naming_tier_d_shown) AND tier_label_valid(naming_tier_todo_shown)),
+    CONSTRAINT naming_tier_labels_distinct
+        CHECK (tier_labels_distinct(naming_tier_s, naming_tier_a, naming_tier_b, naming_tier_c, naming_tier_d, naming_tier_todo)),
+    CONSTRAINT naming_migration_complete
+        CHECK (num_nulls(naming_migrating_from, naming_migrating_from_tier_s, naming_migrating_from_tier_a,
+                         naming_migrating_from_tier_b, naming_migrating_from_tier_c, naming_migrating_from_tier_d,
+                         naming_migrating_from_tier_todo) IN (0, 7)),
+    CONSTRAINT naming_migrating_from_tier_labels_valid
+        CHECK (naming_migrating_from IS NULL
+               OR (tier_label_valid(naming_migrating_from_tier_s) AND tier_label_valid(naming_migrating_from_tier_a)
+                   AND tier_label_valid(naming_migrating_from_tier_b) AND tier_label_valid(naming_migrating_from_tier_c)
+                   AND tier_label_valid(naming_migrating_from_tier_d) AND tier_label_valid(naming_migrating_from_tier_todo)
+                   AND tier_labels_distinct(naming_migrating_from_tier_s, naming_migrating_from_tier_a,
+                                            naming_migrating_from_tier_b, naming_migrating_from_tier_c,
+                                            naming_migrating_from_tier_d, naming_migrating_from_tier_todo)))
 );
 
 -- Settings -> Playlist naming -> To-do lists: playlists the user explicitly

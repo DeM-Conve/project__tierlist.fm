@@ -1,4 +1,5 @@
 import { useDispatch, useSelector } from 'react-redux';
+import { tierName } from '../tierLabels';
 import { Badge, Box, CheckIcon, ColorSwatch, Group, Radio, SimpleGrid, Stack, Text, Title } from '@mantine/core';
 import { ACCENTS, THEMES, TIER_PALETTES } from '../themes';
 import { TIER_ORDER } from '../tiers';
@@ -118,7 +119,7 @@ export default function AppearanceSettings() {
                   {TIER_ORDER.map((t) => (
                     <Box key={t} h={24} bg={p.colors[t]} style={{ flex: 1, borderRadius: 4, display: 'grid', placeItems: 'center' }}>
                       <Text ff="var(--font-display)" fw={900} fz={11} c="var(--tier-ink)">
-                        {t}
+                        {tierName(t)}
                       </Text>
                     </Box>
                   ))}

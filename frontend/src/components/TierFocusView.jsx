@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { tierName } from '../tierLabels';
 import { useDispatch, useSelector } from 'react-redux';
 import {
   ActionIcon,
@@ -212,12 +213,12 @@ export default function TierFocusView({
         <Group gap="md" wrap="nowrap">
           <Box w={72} h={72} bg={color} style={{ borderRadius: 12, display: 'grid', placeItems: 'center', flexShrink: 0 }}>
             <Text ff="var(--font-display)" fw={900} fz={isTodo ? 20 : 30} c={TIER_INK}>
-              {tier}
+              {tierName(tier)}
             </Text>
           </Box>
           <Stack gap={2}>
             <Title order={1} fz={{ base: 26, sm: 34 }} fw={900} lh={1.05}>
-              {tier} <Text span inherit c="dimmed" fw={700}>in {category}</Text>
+              {tierName(tier)} <Text span inherit c="dimmed" fw={700}>in {category}</Text>
             </Title>
             <Text c="dimmed" fz="sm">
               {loading
@@ -236,7 +237,7 @@ export default function TierFocusView({
             disabled={!items.length}
             title={isTodo ? 'Play each song and give it a tier - rating one moves on to the next' : undefined}
           >
-            {isTodo ? 'Triage' : `Play ${tier}`}
+            {isTodo ? 'Triage' : `Play ${tierName(tier)}`}
           </Button>
         </Group>
       </Group>
@@ -253,7 +254,7 @@ export default function TierFocusView({
               onDrop={(e) => dnd.onDrop(e, t)}
               style={dnd.dragOverTier === `tab:${t}` ? { background: `color-mix(in srgb, ${TIER_COLORS[t]} 25%, transparent)` } : undefined}
             >
-              {t} <Text span c="dimmed" fz="xs">{counts(t)}</Text>
+              {tierName(t)} <Text span c="dimmed" fz="xs">{counts(t)}</Text>
             </Tabs.Tab>
           ))}
           {/* The filter shares the tab row (right end) instead of its own row. */}
@@ -267,7 +268,7 @@ export default function TierFocusView({
           ref={filterRef}
           value={filter}
           onChange={(e) => setFilter(e.target.value)}
-          placeholder={`Filter ${tier}…`}
+          placeholder={`Filter ${tierName(tier)}…`}
           leftSection={<Search size={14} />}
           rightSection={filter ? <CloseButton size="sm" onClick={() => setFilter('')} aria-label="Clear filter" /> : <Kbd size="xs">/</Kbd>}
           size="xs"
@@ -306,7 +307,7 @@ export default function TierFocusView({
             ))}
           {!loading && visible.length === 0 && (
             <Text ta="center" c="dimmed" fz="sm" py="xl">
-              {q ? `Nothing in ${tier} matches "${filter}".` : `${tier} is empty - drag videos onto ${tier} in the rail, or use a row's tier chips on another tier.`}
+              {q ? `Nothing in ${tierName(tier)} matches "${filter}".` : `${tierName(tier)} is empty - drag videos onto ${tierName(tier)} in the rail, or use a row's tier chips on another tier.`}
             </Text>
           )}
           {!loading &&

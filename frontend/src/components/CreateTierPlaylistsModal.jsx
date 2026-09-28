@@ -3,9 +3,9 @@ import { useSelector } from 'react-redux';
 import { Alert, Autocomplete, Button, Chip, Group, Modal, SegmentedControl, Stack, Text, TextInput } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 import { BOARD_TIERS, TODO_TIER } from '../tiers';
-import { boardFromName, boardsOf } from '../todoLists';
-import { normalizeTemplate, parseTitle, renderTitle } from '../naming';
-import { selectTierGroups, selectTierPlaylists } from '../store/selectors';
+import { customTokens, parseTitle, renderTitle } from '../naming';
+import { selectNaming, selectTierGroups, selectTierPlaylists } from '../store/selectors';
+import { useTierName } from '../tierLabels';
 import { useCreatePlaylistsMutation } from '../api/queries';
 import { TierChip } from './TierBits';
 
@@ -14,50 +14,53 @@ import { TierChip } from './TierBits';
 //   - from a board: just its missing tiers, or its TODO list (category
 //     fixed; `initialTiers` = what to preselect)
 export default function CreateTierPlaylistsModal({ opened, onClose, category: fixedCategory, initialTiers, onCreated }) {
-  const template = useSelector((s) => s.naming.template);
-  const todoKeyword = useSelector((s) => s.naming.todoKeyword);
+  const naming = useSelector(selectNaming);
+  const tierName = useTierName();
   const tierGroups = useSelector(selectTierGroups);
   const tierPlaylists = useSelector(selectTierPlaylists);
   const createMutation = useCreatePlaylistsMutation();
 
   const existingTiers = fixedCategory ? Object.keys(tierGroups[fixedCategory] || {}) : [];
-  const brackets = useMemo(
-    () => [...new Set((tierPlaylists || []).map((p) => p.parsed.bracket).filter(Boolean))],
-    [tierPlaylists]
+  // The user's own tokens (whatever they named them): one input each, suggesting the values
+  // their playlists already use; a board's missing tiers reuse the board's.
+  const tokens = useMemo(() => customTokens(naming.template), [naming.template]);
+  const known = useMemo(
+    () =>
+      Object.fromEntries(
+        tokens.map((t) => [t, [...new Set((tierPlaylists || []).map((p) => p.parsed.fields?.[t]).filter(Boolean))]])
+      ),
+    [tierPlaylists, tokens]
   );
-  const boardBracket = fixedCategory
-    ? Object.values(tierGroups[fixedCategory] || {})[0]?.parsed?.bracket ?? ''
-    : '';
+  const boardFields = fixedCategory
+    ? Object.values(tierGroups[fixedCategory] || {}).find((p) => p.parsed.tier !== TODO_TIER)?.parsed?.fields ?? {}
+    : {};
 
   const [category, setCategory] = useState('');
-  const [bracket, setBracket] = useState(boardBracket || brackets[0] || '');
+  const [fieldValues, setFieldValues] = useState(() =>
+    Object.fromEntries(tokens.map((t) => [t, boardFields[t] ?? known[t]?.[0] ?? '']))
+  );
+  const fields = Object.fromEntries(tokens.map((t) => [t, (fieldValues[t] ?? '').trim() || undefined]));
   const [tiers, setTiers] = useState(() =>
     (initialTiers ?? BOARD_TIERS).filter((t) => !existingTiers.includes(t))
   );
   const [privacy, setPrivacy] = useState('private');
 
   const name = (fixedCategory ?? category).trim();
-  const usesBracket = normalizeTemplate(template).includes('{tag}');
   const titles = tiers
     .filter((t) => !existingTiers.includes(t))
     .sort((a, b) => BOARD_TIERS.indexOf(a) - BOARD_TIERS.indexOf(b))
     .map((tier) => ({
       tier,
-      // A to-do list is the template with the keyword in the tier's place.
-      title: renderTitle(template, { bracket: bracket.trim() || null, category: name, tier: tier === TODO_TIER ? todoKeyword : tier }),
+      // A to-do list is the template with the to-do name in the tier's place.
+      title: renderTitle(naming, { fields, category: name, tier }),
     }));
   const exists = !fixedCategory && name && tierGroups[name];
   // Safety net: every name we create must be recognised by the template
-  // again, or the new playlist would be invisible in the app.
-  const boards = [
-    ...boardsOf((tierPlaylists || []).filter((p) => p.parsed.tier !== TODO_TIER && p.parsed.category !== name)),
-    { category: name, tags: bracket.trim() ? [bracket.trim()] : [] },
-  ];
-  const unrecognised = titles.filter((t) =>
-    t.tier === TODO_TIER
-      ? boardFromName(t.title, todoKeyword, boards, [template]) !== name
-      : parseTitle(t.title, [template])?.tier !== t.tier
-  );
+  // again (same board and tier), or the new playlist would be invisible.
+  const unrecognised = titles.filter((t) => {
+    const back = parseTitle(t.title, [naming]);
+    return back?.tier !== t.tier || back.category !== name;
+  });
   const canCreate = name && titles.length > 0 && !exists && unrecognised.length === 0 && !createMutation.isPending;
 
   async function create() {
@@ -93,16 +96,17 @@ export default function CreateTierPlaylistsModal({ opened, onClose, category: fi
             data-autofocus
           />
         )}
-        {usesBracket && (
+        {tokens.map((t) => (
           <Autocomplete
-            label="Tag"
-            description="The label your template puts in the name, e.g. G"
-            data={brackets}
-            value={bracket}
-            onChange={setBracket}
-            error={name && unrecognised.length ? 'Your naming template needs a tag here' : null}
+            key={t}
+            label={`{${t}}`}
+            description="Your own token from the naming template"
+            data={known[t]}
+            value={fieldValues[t] ?? ''}
+            onChange={(v) => setFieldValues((f) => ({ ...f, [t]: v }))}
+            error={name && unrecognised.length && !fields[t] ? 'Your naming template needs a value here' : null}
           />
-        )}
+        ))}
         <div>
           <Text fz="sm" fw={500} mb={6}>
             Tiers to create
@@ -111,7 +115,7 @@ export default function CreateTierPlaylistsModal({ opened, onClose, category: fi
             <Group gap={6}>
               {BOARD_TIERS.map((t) => (
                 <Chip key={t} value={t} disabled={existingTiers.includes(t)} size="sm">
-                  {t}
+                  {tierName(t)}
                   {existingTiers.includes(t) ? ' (exists)' : ''}
                 </Chip>
               ))}

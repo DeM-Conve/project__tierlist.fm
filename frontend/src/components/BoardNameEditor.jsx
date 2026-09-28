@@ -1,14 +1,15 @@
 import { useRef, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { Alert, Code, Stack, Table, Text, TextInput, Title, Tooltip } from '@mantine/core';
+import { useElementSize } from '@mantine/hooks';
 import { modals } from '@mantine/modals';
 import { notifications } from '@mantine/notifications';
 import { ArrowRight, Info } from 'lucide-react';
 import { TierChip } from './TierBits';
-import { parseTitle, renderTitle } from '../naming';
-import { boardFromName, boardsOf, normalizeName, todoTitle } from '../todoLists';
+import { normalizeName, parseTitle, renderTitle } from '../naming';
+import { boardsOf, todoTitle } from '../todoLists';
 import { BOARD_TIERS, TODO_TIER } from '../tiers';
-import { selectPendingMoves, selectTierGroups } from '../store/selectors';
+import { selectNaming, selectPendingMoves, selectTierGroups } from '../store/selectors';
 import { setPlaylists } from '../store/authSlice';
 import { linkTodoList } from '../store/namingSlice';
 import { useApplyPlaylistTitles, useInvalidatePlaylists, useRenamePlaylistsMutation } from '../api/queries';
@@ -27,8 +28,7 @@ const QUOTA_PER_RENAME = 51; // playlists.list (1) + playlists.update (50)
 // Render with key={category}: a new board (or a finished rename) starts fresh.
 export default function BoardNameEditor({ category, onRenamed }) {
   const dispatch = useDispatch();
-  const template = useSelector((s) => s.naming.template);
-  const keyword = useSelector((s) => s.naming.todoKeyword);
+  const naming = useSelector(selectNaming);
   const links = useSelector((s) => s.naming.todoLinks);
   const tierGroups = useSelector(selectTierGroups);
   const pendingCount = useSelector(selectPendingMoves).length;
@@ -39,19 +39,22 @@ export default function BoardNameEditor({ category, onRenamed }) {
   const [draft, setDraft] = useState(category);
   const [focused, setFocused] = useState(false);
   const inputRef = useRef(null);
+  const { ref: measureRef, width: textWidth } = useElementSize();
   const confirmed = useRef(false);
   const name = draft.trim().replace(/\s+/g, ' ');
 
   const group = tierGroups[category] || {};
   const ranked = Object.values(tierGroups).flatMap((g) => BOARD_TIERS.filter((t) => t !== TODO_TIER && g[t]).map((t) => g[t]));
-  const board = boardsOf(ranked).find((b) => b.category === category) ?? { category, tags: [] };
+  const board = boardsOf(ranked).find((b) => b.category === category) ?? { category, fields: [] };
 
   const plan = BOARD_TIERS.filter((t) => group[t]).map((t) => {
     const p = group[t];
+    // A to-do list linked by hand takes the template shape (and the board's
+    // own token values); every other playlist keeps its own values.
     const to =
-      t === TODO_TIER
-        ? todoTitle(template, { ...board, category: name }, keyword)
-        : renderTitle(template, { ...p.parsed, category: name });
+      p.parsed.via === 'link'
+        ? todoTitle(naming, { ...board, category: name })
+        : renderTitle(naming, { ...p.parsed, category: name });
     return { id: p.id, tier: t, from: p.title, to };
   });
   const changes = plan.filter((r) => r.from !== r.to);
@@ -64,15 +67,10 @@ export default function BoardNameEditor({ category, onRenamed }) {
     if (taken) return `There's already a board called "${taken}"`;
     // Every new name must still read as this board + tier, or the playlist
     // would drop out of the app after the rename.
-    const renamedBoards = boardsOf(ranked).map((b) => (b.category === category ? { ...b, category: name } : b));
-    const unreadable = plan.find((r) =>
-      r.tier === TODO_TIER
-        ? boardFromName(r.to, keyword, renamedBoards, [template]) !== name
-        : (() => {
-            const back = parseTitle(r.to, [template]);
-            return !back || back.category !== name || back.tier !== r.tier;
-          })()
-    );
+    const unreadable = plan.find((r) => {
+      const back = parseTitle(r.to, [naming]);
+      return !back || back.category !== name || back.tier !== r.tier;
+    });
     if (unreadable) return `"${unreadable.to}" wouldn't be recognised by your naming template - try another name`;
     return null;
   }
@@ -124,7 +122,7 @@ export default function BoardNameEditor({ category, onRenamed }) {
         <Stack gap="md">
           <Text fz="sm">
             {changes.length} playlist{changes.length === 1 ? '' : 's'} will be renamed on YouTube, named by your template{' '}
-            <Code>{template}</Code>.
+            <Code>{naming.template}</Code>.
           </Text>
           <Table.ScrollContainer minWidth={520}>
             <Table striped highlightOnHover withTableBorder fz="sm" verticalSpacing={6}>
@@ -186,10 +184,13 @@ export default function BoardNameEditor({ category, onRenamed }) {
       withArrow
       position="bottom-start"
     >
-        {/* h1 holding the field: the hidden span sizes the box to the text
-            (see .board-name in App.css). */}
+        {/* h1 holding the field: a hidden copy of the text is measured
+            (useElementSize) and the input gets exactly that width - so the box
+            hugs the name at any length (see .board-name in App.css). */}
         <Title order={1} fz={{ base: 30, sm: 40 }} fw={900} lh={1.15} className="board-name" data-dirty={name !== category || undefined}>
-          <span aria-hidden="true">{draft || ' '}</span>
+          <span ref={measureRef} aria-hidden="true" className="board-name-measure">
+            {draft || ' '}
+          </span>
           <TextInput
             ref={inputRef}
             variant="unstyled"
@@ -215,7 +216,9 @@ export default function BoardNameEditor({ category, onRenamed }) {
             disabled={renameMutation.isPending}
             spellCheck={false}
             aria-label="Board name - click to rename"
-            classNames={{ root: 'board-name-field', wrapper: 'board-name-field', input: 'board-name-input' }}
+            classNames={{ input: 'board-name-input' }}
+            // Text width + the input's own padding (2 x 8px) and border (2 x 1px).
+            styles={{ input: { width: Math.ceil(textWidth) + 18 } }}
           />
         </Title>
     </Tooltip>

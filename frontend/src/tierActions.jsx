@@ -1,4 +1,5 @@
 import { useDispatch, useSelector } from 'react-redux';
+import { tierName } from './tierLabels';
 import { Button, Group, Kbd, Text } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 import {
@@ -13,7 +14,7 @@ import { REMOVED_TIER, TODO_TIER } from './tiers';
 
 // Every tier edit in the app (drag, tile menu, row chips, bulk bar, Tier
 // Rail, player tier pills/Shift+digit, duel) goes through these
-// thunks, so each one gets the same instant "Moved X -> T1 . Undo" feedback
+// thunks, so each one gets the same instant "Moved X -> S . Undo" feedback
 // and the same Ctrl+Z undo step, instead of each surface inventing its own.
 
 const TOAST_ID = 'tier-edit';
@@ -88,11 +89,11 @@ function describe(moves, tierItems) {
     const video = tierItems[m.fromTier]?.find((v) => v.videoId === m.videoId);
     const title = video ? `"${video.title}"` : 'Video';
     if (m.toTier === REMOVED_TIER) return `${title} will be removed on push`;
-    return m.fromTier === m.toTier ? `Reordered ${title}` : `${title} → ${m.toTier}`;
+    return m.fromTier === m.toTier ? `Reordered ${title}` : `${title} → ${tierName(m.toTier)}`;
   }
   if (moves.every((m) => m.toTier === REMOVED_TIER)) return `${moves.length} videos will be removed on push`;
   const targets = [...new Set(moves.map((m) => m.toTier))];
-  return `Moved ${moves.length} videos → ${targets.join(', ')}`;
+  return `Moved ${moves.length} videos → ${targets.map(tierName).join(', ')}`;
 }
 
 // moves: [{ fromTier, toTier, videoId, dropIndex? }] - applied as ONE undo step.

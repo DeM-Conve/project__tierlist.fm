@@ -1,118 +1,50 @@
-import { renderTitle } from './naming';
-import { TIER_ORDER } from './tiers';
+import { parseTitle, renderTitle } from './naming';
+import { TODO_TIER } from './tiers';
 
 // Which playlists are a board's to-do list (Settings -> Playlist naming ->
-// To-do lists). Separate from the naming template on purpose: people name
-// their to-do playlists freely ("[G] Rap TODO", "TODO - Rap", "rap todo"), so
-// instead of one fixed shape a to-do list is found in two steps:
-//
-//   1. the keyword (default "TODO") appears in the title as a whole word -
-//      anywhere, any case. That's what makes it a to-do list at all.
-//   2. which board it belongs to:
-//        a. an explicit link (playlist id -> board) the user set, else
-//        b. the title is the naming template with the keyword in the {tier}
-//           slot ("[Tierlist.fm] Rap TODO") - how the rename job names them -
-//           or the rest of the title, once the keyword is taken out, is
-//           exactly a board's name - optionally with its tag ("[G] Rap").
-//      Punctuation, brackets, "_" and case don't matter ("Jazz Cozy" =
-//      "Jazz_Cozy"). Anything else stays unplaced until it's linked by hand.
+// To-do lists). Exactly like a tier: the title is the naming template with
+// the to-do tier's name (`tierLabels.TODO`, e.g. "(**TODO**)") literally in
+// {tier}'s place - "[Chill] Rap (**TODO**)" is Rap's, "[Chill] Rap TODO" is
+// not (parseTitle does the matching). Any other playlist can be assigned to
+// a board by hand (an explicit link: playlist id -> board).
 //
 // A board has at most one to-do list: a linked one beats a name match; among
 // equals the first wins and the rest are reported as `duplicate`.
 
-export const DEFAULT_TODO_KEYWORD = 'TODO';
-export const TODO_KEYWORD_MAX = 20;
-
-// What was typed -> the keyword's words: symbols dropped, spaces collapsed
-// ("(**TODO**)" -> "TODO"). Matching ignores symbols anyway (normalizeName).
-export function keywordWords(text) {
-  return text.replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
+// A board's to-do list named by the naming: the to-do name fills {tier}, the
+// board's (first) values fill the user's own tokens.
+export function todoTitle(naming, { category, fields }) {
+  return renderTitle(naming, { fields: fields[0] ?? {}, category, tier: TODO_TIER });
 }
 
-// Mirrors the backend's @TodoKeyword - keep the two in step.
-export function validateTodoKeyword(keyword) {
-  const errors = [];
-  if (!keyword) errors.push('Enter a keyword');
-  else if (keyword.length > TODO_KEYWORD_MAX) errors.push(`At most ${TODO_KEYWORD_MAX} characters`);
-  else if (!/^[\p{L}\p{N}]+( [\p{L}\p{N}]+)*$/u.test(keyword))
-    errors.push('Letters and digits only (single spaces between words)');
-  else if (TIER_ORDER.includes(keyword.toUpperCase())) errors.push('That is a tier code - pick another word');
-  return errors;
-}
-
-// Title -> comparable words: case, accents, punctuation, brackets and "_"
-// all fold away ("[G] Jazz_Cozy - TODO" -> "g jazz cozy todo").
-export function normalizeName(text) {
-  return text
-    .normalize('NFKD')
-    .replace(/\p{Diacritic}/gu, '')
-    .toLowerCase()
-    .replace(/[^\p{L}\p{N}]+/gu, ' ')
-    .trim();
-}
-
-export function hasTodoKeyword(title, keyword) {
-  const k = normalizeName(keyword);
-  return !!k && ` ${normalizeName(title)} `.includes(` ${k} `);
-}
-
-// The title with the keyword taken out (first occurrence), normalized.
-function withoutKeyword(title, keyword) {
-  return ` ${normalizeName(title)} `.replace(` ${normalizeName(keyword)} `, ' ').trim().replace(/\s+/g, ' ');
-}
-
-// A board's to-do list named by the template: the keyword fills {tier}, the
-// board's (first) tag fills {tag}.
-export function todoTitle(template, { category, tags }, keyword) {
-  return renderTitle(template, { bracket: tags[0] ?? null, category, tier: keyword });
-}
-
-// boards: [{ category, tags: string[] }] -> the board this title names, or
-// null (no board, or two boards fit equally). `templates`: the naming
-// template(s) in use (see todoTitle).
-export function boardFromName(title, keyword, boards, templates = []) {
-  const rest = withoutKeyword(title, keyword);
-  const whole = normalizeName(title);
-  const hits = boards.filter(({ category, tags }) => {
-    const byTemplate = templates.some((tpl) =>
-      [null, ...tags].some((tag) => normalizeName(renderTitle(tpl, { bracket: tag, category, tier: keyword })) === whole)
-    );
-    if (byTemplate) return true;
-    const name = normalizeName(category);
-    if (rest === name) return true;
-    return tags.some((tag) => {
-      const t = normalizeName(tag);
-      return t && (rest === `${t} ${name}` || rest === `${name} ${t}`);
-    });
-  });
-  return hits.length === 1 ? hits[0].category : null;
-}
-
-// Every board (from the ranked tier playlists) with the tags its playlists use.
+// Every board (from the ranked tier playlists) with the distinct values its
+// playlists have for the user's own tokens ([{ mine: 'x' }, { mine: 'y' }]).
 export function boardsOf(rankedPlaylists) {
   const map = new Map();
   for (const p of rankedPlaylists) {
-    const entry = map.get(p.parsed.category) ?? { category: p.parsed.category, tags: [] };
-    if (p.parsed.bracket && !entry.tags.includes(p.parsed.bracket)) entry.tags.push(p.parsed.bracket);
+    const entry = map.get(p.parsed.category) ?? { category: p.parsed.category, fields: [] };
+    const f = p.parsed.fields ?? {};
+    if (Object.keys(f).length && !entry.fields.some((e) => JSON.stringify(e) === JSON.stringify(f))) entry.fields.push(f);
     map.set(p.parsed.category, entry);
   }
   return [...map.values()];
 }
 
 // playlists: every playlist that isn't a ranked tier playlist.
-// -> one row per candidate (has the keyword, or is linked):
-//    { playlist, category, via: 'link' | 'name' | null,
-//      status: 'active' | 'duplicate' | 'unplaced' | 'missingBoard' }
-export function resolveTodoLists(playlists, { keyword, links, boards, templates }) {
+// -> one row per candidate (named as a to-do list, or linked):
+//    { playlist, category, fields, via: 'link' | 'name',
+//      status: 'active' | 'duplicate' | 'missingBoard' }
+export function resolveTodoLists(playlists, { links, boards, namings }) {
   const known = new Set(boards.map((b) => b.category));
   const rows = [];
   for (const playlist of playlists) {
     const linked = links[playlist.id];
+    const parsed = parseTitle(playlist.title, namings);
     if (linked) {
-      rows.push({ playlist, category: linked, via: 'link', status: known.has(linked) ? 'active' : 'missingBoard' });
-    } else if (hasTodoKeyword(playlist.title, keyword)) {
-      const category = boardFromName(playlist.title, keyword, boards, templates);
-      rows.push({ playlist, category, via: category ? 'name' : null, status: category ? 'active' : 'unplaced' });
+      rows.push({ playlist, category: linked, fields: {}, via: 'link', status: known.has(linked) ? 'active' : 'missingBoard' });
+    } else if (parsed?.tier === TODO_TIER) {
+      const { category, fields } = parsed;
+      rows.push({ playlist, category, fields, via: 'name', status: known.has(category) ? 'active' : 'missingBoard' });
     }
   }
   // One per board: links first, then name matches, in playlist order.

@@ -10,7 +10,7 @@ import { TierAwareMergeStrategy } from './tierAwareMergeStrategy';
 // needs to change.
 //
 // Factories take { ids, runs }: ids is the flat pool (any order), runs is
-// the pool already grouped by current tier (T1's ids first, ... TZ's last).
+// the pool already grouped by current tier (S's ids first, ... D's last).
 // Each strategy only reads whichever shape its algorithm actually needs.
 export const DUEL_STRATEGIES = {
   tierAwareMerge: ({ runs }) => new TierAwareMergeStrategy(runs),

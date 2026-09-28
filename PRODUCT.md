@@ -24,9 +24,9 @@ and duel rankings are its own.
 ## Product Purpose
 
 Lets a user log into their own YouTube account, browse their playlists, and organize
-videos into a custom tier-list system. Playlists named with a
-`[G]/[GA]/[OG] <Category> T1/T2/T3/TE/TZ` convention are auto-grouped into a tier board
-per category, so the "product" is really a structured way to rank and re-rank videos
+videos into a custom tier-list system. Playlists named by the user's own naming
+template (`{category} {tier}`, with tier names they choose - `S A B C D` by default) are
+auto-grouped into a tier board per category, so the "product" is really a structured way to rank and re-rank videos
 already organized in YouTube, without leaving a tier-list mental model to do it in
 spreadsheets or manually reordering playlists.
 

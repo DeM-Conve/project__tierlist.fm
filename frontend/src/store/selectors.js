@@ -12,37 +12,54 @@ const selectFocusedVideo = (state) => state.focus.focusedVideo;
 const selectFocusedCategory = (state) => state.focus.focusedCategory;
 const selectLoadedCategory = (state) => state.tiers.loadedCategory;
 
-const selectNamingTemplate = (state) => state.naming.template;
-const selectMigratingFrom = (state) => state.naming.migratingFrom;
-const selectTodoKeyword = (state) => state.naming.todoKeyword;
 const selectTodoLinks = (state) => state.naming.todoLinks;
 
+// The naming in use ({ template, tierLabels }), then the one a half-finished
+// rename is migrating away from - titles matching either are recognised.
+export const selectNamings = createSelector(
+  [
+    (s) => s.naming.template,
+    (s) => s.naming.tierLabels,
+    (s) => s.naming.migratingFrom,
+    (s) => s.naming.migratingFromTierLabels,
+  ],
+  (template, tierLabels, fromTemplate, fromLabels) => [
+    { template, tierLabels },
+    ...(fromTemplate ? [{ template: fromTemplate, tierLabels: fromLabels ?? tierLabels }] : []),
+  ]
+);
+export const selectNaming = (state) => selectNamings(state)[0];
+const selectDisplayNames = (state) => state.naming.tierDisplayNames;
+// The naming as edited in Settings: + what the app shows for each tier.
+export const selectNamingSettings = createSelector([selectNaming, selectDisplayNames], (naming, tierDisplayNames) => ({
+  ...naming,
+  tierDisplayNames,
+}));
+
 // The only playlists the app ever shows: those whose title follows the
-// naming template (anything else - e.g. a private playlist - stays hidden
-// everywhere). Each gets `.parsed` = { bracket, category, tier, template }.
+// naming (anything else - e.g. a private playlist - stays hidden
+// everywhere). Each gets `.parsed` = { fields, category, tier, naming }.
 const selectRankedPlaylists = createSelector(
-  [selectPlaylists, selectNamingTemplate, selectMigratingFrom],
-  (playlists, template, migratingFrom) => {
+  [selectPlaylists, selectNamings],
+  (playlists, namings) => {
     if (!playlists) return null;
-    const templates = migratingFrom ? [template, migratingFrom] : [template];
     return playlists.flatMap((p) => {
-      const parsed = parseTitle(p.title, templates);
-      return parsed ? [{ ...p, parsed }] : [];
+      const parsed = parseTitle(p.title, namings);
+      // To-do lists are merged in below (selectTodoRows: one per board).
+      return parsed && parsed.tier !== TODO_TIER ? [{ ...p, parsed }] : [];
     });
   }
 );
 
-// Every to-do list candidate (keyword in the name, or linked by hand) and
-// where it landed - see todoLists.js. Settings -> To-do lists lists these.
+// Every to-do list candidate (named by the template with the to-do name, or
+// linked by hand)
+// and where it landed - see todoLists.js. Settings -> To-do lists lists these.
 export const selectTodoRows = createSelector(
-  [selectPlaylists, selectRankedPlaylists, selectTodoKeyword, selectTodoLinks, selectNamingTemplate, selectMigratingFrom],
-  (playlists, ranked, keyword, links, template, migratingFrom) => {
+  [selectPlaylists, selectRankedPlaylists, selectTodoLinks, selectNamings],
+  (playlists, ranked, links, namings) => {
     if (!playlists || !ranked) return [];
     const rankedIds = new Set(ranked.map((p) => p.id));
-    return resolveTodoLists(
-      playlists.filter((p) => !rankedIds.has(p.id)),
-      { keyword, links, boards: boardsOf(ranked), templates: migratingFrom ? [template, migratingFrom] : [template] }
-    );
+    return resolveTodoLists(playlists.filter((p) => !rankedIds.has(p.id)), { links, boards: boardsOf(ranked), namings });
   }
 );
 
@@ -54,7 +71,7 @@ export const selectTierPlaylists = createSelector(
     if (!ranked) return null;
     const todo = todoRows
       .filter((r) => r.status === 'active')
-      .map((r) => ({ ...r.playlist, parsed: { bracket: null, category: r.category, tier: TODO_TIER, via: r.via } }));
+      .map((r) => ({ ...r.playlist, parsed: { fields: r.fields, category: r.category, tier: TODO_TIER, via: r.via } }));
     return [...ranked, ...todo];
   }
 );
@@ -143,7 +160,7 @@ export const selectVideoLookup = createSelector([selectFocusSequence], (sequence
 // keeps playing while you browse other boards.
 export const selectFocusedVideoData = (state) => state.focus.current?.video ?? null;
 
-// Rating targets are the ranked tiers only (Shift+1-5 stay T1..TZ); a song
+// Rating targets are the ranked tiers only (Shift+1-5 stay S..D); a song
 // goes back to TODO via the Tier Rail, a menu or a drag.
 // Tier reassignment only works while the playing video's board is the one
 // loaded in `tiersSlice.tierItems` (the pills/shift+digit shortcut write

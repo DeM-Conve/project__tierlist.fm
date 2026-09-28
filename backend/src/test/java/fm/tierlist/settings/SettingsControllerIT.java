@@ -40,7 +40,7 @@ class SettingsControllerIT {
 
     private static final String BODY = """
         {"appearance": {"theme": "%s", "accent": "violet", "tierPalette": "heat"},
-         "naming": {"template": "%s", "migratingFrom": null, "todoKeyword": "%s", "todoLinks": %s},
+         "naming": {"template": "%s", "tierLabels": %s, "tierDisplayNames": %s, "migratingFrom": %s, "migratingFromTierLabels": %s, "todoLinks": %s},
          "prefs": {"duelStrategy": "elo"}}""";
 
     @Autowired
@@ -56,13 +56,30 @@ class SettingsControllerIT {
         jdbc.update("DELETE FROM app_user");
     }
 
-    private MockHttpServletRequestBuilder save(String theme, String template) {
-        return save(theme, template, "TODO", "{}");
+    private static final String DEFAULT_LABELS = labels("S", "A", "B", "C", "D", "TODO");
+
+    private static String labels(String s, String a, String b, String c, String d, String todo) {
+        return """
+            {"S": "%s", "A": "%s", "B": "%s", "C": "%s", "D": "%s", "TODO": "%s"}""".formatted(s, a, b, c, d, todo);
     }
 
-    private MockHttpServletRequestBuilder save(String theme, String template, String todoKeyword, String todoLinks) {
+    private MockHttpServletRequestBuilder save(String theme, String template) {
+        return save(theme, template, DEFAULT_LABELS, "{}");
+    }
+
+    private MockHttpServletRequestBuilder save(String theme, String template, String tierLabels, String todoLinks) {
+        return save(theme, template, tierLabels, "null", "null", todoLinks);
+    }
+
+    private MockHttpServletRequestBuilder save(String theme, String template, String tierLabels,
+                                               String migratingFrom, String migratingFromTierLabels, String todoLinks) {
+        return saveShown(theme, template, tierLabels, "null", migratingFrom, migratingFromTierLabels, todoLinks);
+    }
+
+    private MockHttpServletRequestBuilder saveShown(String theme, String template, String tierLabels, String shown,
+                                                    String migratingFrom, String migratingFromTierLabels, String todoLinks) {
         return put("/api/settings").with(alice).contentType(MediaType.APPLICATION_JSON)
-            .content(BODY.formatted(theme, template, todoKeyword, todoLinks));
+            .content(BODY.formatted(theme, template, tierLabels, shown, migratingFrom, migratingFromTierLabels, todoLinks));
     }
 
     @Test
@@ -114,38 +131,88 @@ class SettingsControllerIT {
     }
 
     @Test
-    void todoKeywordAndLinksRoundTripAndShareTheRowVersion() throws Exception {
-        mvc.perform(save("tokyo", "{category} {tier}", "To do", "{\"PLabc_123\": \"Rap\"}")
+    void tierNamesAndLinksRoundTripAndShareTheRowVersion() throws Exception {
+        // Kept as typed, symbols and all - that's how renames write them.
+        String mine = labels("T1", "T2", "T3", "TE", "TZ", "(**TODO**)");
+        mvc.perform(save("tokyo", "[{tag}] {category} {tier}", mine, "{\"PLabc_123\": \"Rap\"}")
                 .header(HttpHeaders.IF_NONE_MATCH, "*"))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$.naming.todoKeyword").value("To do"))
+            .andExpect(jsonPath("$.naming.tierLabels.S").value("T1"))
+            .andExpect(jsonPath("$.naming.tierLabels.D").value("TZ"))
+            .andExpect(jsonPath("$.naming.tierLabels.TODO").value("(**TODO**)"))
+            .andExpect(jsonPath("$.naming.migratingFromTierLabels").isEmpty())
             .andExpect(jsonPath("$.naming.todoLinks.PLabc_123").value("Rap"))
             .andExpect(header().string(HttpHeaders.ETAG, "\"0\""));
-        assertThat(jdbc.queryForObject("SELECT version FROM user_settings", Long.class)).isZero();
+        assertThat(jdbc.queryForObject("SELECT naming_tier_todo FROM user_settings", String.class)).isEqualTo("(**TODO**)");
 
         // Changing only the links is still a new version (the ETag moves).
-        mvc.perform(save("tokyo", "{category} {tier}", "To do", "{\"PLabc_123\": \"Jazz_Cozy\", \"PLxyz\": \"Rap\"}")
+        mvc.perform(save("tokyo", "[{tag}] {category} {tier}", mine, "{\"PLabc_123\": \"Jazz_Cozy\", \"PLxyz\": \"Rap\"}")
                 .header(HttpHeaders.IF_MATCH, "\"0\""))
             .andExpect(status().isOk())
             .andExpect(header().string(HttpHeaders.ETAG, "\"1\""));
         assertThat(jdbc.queryForObject("SELECT count(*) FROM todo_list_link", Integer.class)).isEqualTo(2);
-        assertThat(jdbc.queryForObject("SELECT version FROM user_settings", Long.class)).isEqualTo(1L);
 
-        mvc.perform(save("tokyo", "{category} {tier}", "To do", "{}").header(HttpHeaders.IF_MATCH, "\"1\""))
+        mvc.perform(save("tokyo", "[{tag}] {category} {tier}", mine, "{}").header(HttpHeaders.IF_MATCH, "\"1\""))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.naming.todoLinks").isEmpty());
         assertThat(jdbc.queryForObject("SELECT count(*) FROM todo_list_link", Integer.class)).isZero();
     }
 
     @Test
-    void badTodoKeywordsAndLinksAreRejected() throws Exception {
-        for (String keyword : new String[] {"T1", "tz", "to-do", "", "a  b", "averyveryverylongkeyword"}) {
-            mvc.perform(save("tokyo", "{category} {tier}", keyword, "{}").header(HttpHeaders.IF_NONE_MATCH, "*"))
+    void shownNamesAreOptionalMayRepeatAndRoundTrip() throws Exception {
+        String mine = labels("T1", "T2", "T3", "TE", "TZ", "(**TODO**)");
+        String shown = """
+            {"S": "S", "A": "S", "B": null, "C": null, "D": null, "TODO": "TODO"}""";
+        mvc.perform(saveShown("tokyo", "{category} {tier}", mine, shown, "null", "null", "{}").header(HttpHeaders.IF_NONE_MATCH, "*"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.naming.tierDisplayNames.TODO").value("TODO"))
+            .andExpect(jsonPath("$.naming.tierDisplayNames.A").value("S"))
+            .andExpect(jsonPath("$.naming.tierDisplayNames.B").isEmpty());
+        assertThat(jdbc.queryForObject("SELECT naming_tier_todo || '/' || naming_tier_todo_shown FROM user_settings", String.class))
+            .isEqualTo("(**TODO**)/TODO");
+        // None set comes back as all null, not missing.
+        mvc.perform(save("tokyo", "{category} {tier}", mine, "{}").header(HttpHeaders.IF_MATCH, "\"0\""))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.naming.tierDisplayNames.TODO").isEmpty());
+        mvc.perform(saveShown("tokyo", "{category} {tier}", mine, "{\"TODO\": \" x\"}", "null", "null", "{}")
+                .header(HttpHeaders.IF_MATCH, "\"1\""))
+            .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void anUnfinishedRenameKeepsTheWholePreviousNaming() throws Exception {
+        // Only the tier names changed: still a migration (old names stay recognised).
+        mvc.perform(save("tokyo", "{category} {tier}", labels("T1", "T2", "T3", "TE", "TZ", "TODO"),
+                "\"{category} {tier}\"", DEFAULT_LABELS, "{}").header(HttpHeaders.IF_NONE_MATCH, "*"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.naming.migratingFrom").value("{category} {tier}"))
+            .andExpect(jsonPath("$.naming.migratingFromTierLabels.S").value("S"));
+        // Half a previous naming, or the same one again, is refused.
+        mvc.perform(save("tokyo", "{category} {tier}", DEFAULT_LABELS, "\"{category} - {tier}\"", "null", "{}")
+                .header(HttpHeaders.IF_MATCH, "\"0\""))
+            .andExpect(status().isBadRequest());
+        mvc.perform(save("tokyo", "{category} {tier}", DEFAULT_LABELS, "\"{category} {tier}\"", DEFAULT_LABELS, "{}")
+                .header(HttpHeaders.IF_MATCH, "\"0\""))
+            .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void badTierNamesAndLinksAreRejected() throws Exception {
+        for (String bad : new String[] {
+            labels("S", "S", "B", "C", "D", "TODO"),          // two tiers called S
+            labels("S", "A", "B", "C", "D", "(**s**)"),       // same words as S
+            labels("S", "A", "B", "C", "D", ""),              // blank
+            labels("S", "A", "B", "C", "D", " TODO"),         // surrounding space
+            labels("S", "A", "{tier}", "C", "D", "TODO"),     // braces
+            labels("S", "A", "B", "C", "D", "averyveryverylongname"),
+            "{\"S\": \"S\"}",                                  // missing tiers
+        }) {
+            mvc.perform(save("tokyo", "{category} {tier}", bad, "{}").header(HttpHeaders.IF_NONE_MATCH, "*"))
                 .andExpect(status().isBadRequest());
         }
-        mvc.perform(save("tokyo", "{category} {tier}", "TODO", "{\"bad id!\": \"Rap\"}").header(HttpHeaders.IF_NONE_MATCH, "*"))
+        mvc.perform(save("tokyo", "{category} {tier}", DEFAULT_LABELS, "{\"bad id!\": \"Rap\"}").header(HttpHeaders.IF_NONE_MATCH, "*"))
             .andExpect(status().isBadRequest());
-        mvc.perform(save("tokyo", "{category} {tier}", "TODO", "{\"PLabc\": \" \"}").header(HttpHeaders.IF_NONE_MATCH, "*"))
+        mvc.perform(save("tokyo", "{category} {tier}", DEFAULT_LABELS, "{\"PLabc\": \" \"}").header(HttpHeaders.IF_NONE_MATCH, "*"))
             .andExpect(status().isBadRequest());
         mvc.perform(get("/api/settings").with(alice)).andExpect(status().isNoContent());
     }

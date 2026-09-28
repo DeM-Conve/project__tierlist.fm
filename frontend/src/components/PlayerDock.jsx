@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { tierName } from '../tierLabels';
 import { ActionIcon, Badge, Group, HoverCard, Slider, Stack, Text } from '@mantine/core';
 import {
   ChevronDown,
@@ -532,7 +533,7 @@ export default function PlayerDock({
                       size={24}
                       active={t === currentTier}
                       onClick={t === currentTier ? undefined : () => onChangeTier(t)}
-                      title={`Rate → ${t} (Shift+${i + 1})`}
+                      title={`Rate → ${tierName(t)} (Shift+${i + 1})`}
                     />
                   ))}
                   {currentTier !== REMOVED_TIER && (
@@ -588,7 +589,7 @@ export default function PlayerDock({
                       active={t === currentTier}
                       kbd={`⇧${i + 1}`}
                       onClick={t === currentTier ? undefined : () => onChangeTier(t)}
-                      title={`Move to ${t}`}
+                      title={`Move to ${tierName(t)}`}
                     />
                   ))}
                   {/* Staged like any move: nothing is deleted until you push,

@@ -18,7 +18,10 @@ import {
   UnstyledButton,
 } from '@mantine/core';
 import { Home, Keyboard, ListOrdered, ListPlus, LogOut, Search, Settings } from 'lucide-react';
-import { TIER_ORDER, TODO_TIER } from '../tiers';
+import { TIER_ORDER } from '../tiers';
+import { exampleTitle } from '../naming';
+import { useSelector } from 'react-redux';
+import { selectNaming } from '../store/selectors';
 import { SHELL_Y, SIDEBAR_X } from '../layout/spacing';
 
 // Each board shows its song total straight from the playlists' own item
@@ -42,6 +45,7 @@ export default function Sidebar({
   mobileOpen,
   onCloseMobile,
 }) {
+  const naming = useSelector(selectNaming);
   const location = useLocation();
   const q = query.trim().toLowerCase();
   const filteredCategories = tierCategories.filter((c) => c.toLowerCase().includes(q));
@@ -92,7 +96,7 @@ export default function Sidebar({
           description={loading ? 'Loading your playlists…' : `Boards & ${playlistCount} playlists`}
           leftSection={<Home size={16} />}
           variant="light"
-          active={location.pathname === '/' || location.pathname.startsWith('/playlist/')}
+          active={location.pathname === '/'}
         />
         <NavLink
           component={Link}
@@ -152,7 +156,6 @@ export default function Sidebar({
               const tiers = tierGroups[category] || {};
               const counts = boardCounts(tiers);
               const total = Object.values(counts).reduce((a, b) => a + b, 0);
-              const todo = tiers[TODO_TIER]?.itemCount ?? 0;
               return (
                 <NavLink
                   key={category}
@@ -168,18 +171,9 @@ export default function Sidebar({
                       <Text size="sm" truncate="end">
                         {category}
                       </Text>
-                      <Group gap={6} wrap="nowrap">
-                        {todo > 0 && (
-                          <Tooltip label={`${todo} to do - not rated yet`} withArrow>
-                            <Badge size="xs" variant="light" color="gray">
-                              {todo}
-                            </Badge>
-                          </Tooltip>
-                        )}
-                        <Text size="xs" c="dimmed">
-                          {total}
-                        </Text>
-                      </Group>
+                      <Text size="xs" c="dimmed">
+                        {total}
+                      </Text>
                     </Group>
                   }
                 />
@@ -195,7 +189,9 @@ export default function Sidebar({
               ))}
             {!loading && tierCategories.length === 0 && (
               <Text size="xs" c="dimmed" px={8}>
-                Name playlists like "[G] Rap T1" … "T3", "TE", "TZ" and they'll appear here as a tier list.
+                Name playlists like &quot;{exampleTitle(naming, 'Rap', TIER_ORDER[0])}&quot; … &quot;
+                {exampleTitle(naming, 'Rap', TIER_ORDER[TIER_ORDER.length - 1])}&quot; and they&apos;ll appear here as a tier
+                list.
               </Text>
             )}
           </Stack>

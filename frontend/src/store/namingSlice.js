@@ -1,37 +1,50 @@
 import { createSlice } from '@reduxjs/toolkit';
 import { SETTINGS, getSetting } from '../settings';
-import { DEFAULT_TEMPLATE, normalizeTemplate, validateTemplate } from '../naming';
-import { DEFAULT_TODO_KEYWORD, validateTodoKeyword } from '../todoLists';
+import { DEFAULT_TEMPLATE, NO_DISPLAY_NAMES, validateDisplayNames, validateTemplate, validateTierLabels } from '../naming';
+import { DEFAULT_TIER_LABELS } from '../tiers';
 import { settingsLoaded } from './settingsActions';
 
-// The playlist naming template (see naming.js). `migratingFrom` is set while
-// a rename job hasn't finished for every playlist: titles matching EITHER
-// template are recognised meanwhile, so a partial failure never makes boards
-// vanish. Persisted to localStorage by store.js.
-// `needsDetection`: nobody has chosen a template yet on this browser, so the
-// first playlist load picks the preset that fits the user's existing names
-// (detectTemplate) instead of assuming everyone uses one convention.
-// To-do lists (todoLists.js): `todoKeyword` marks a playlist as one,
-// `todoLinks` = { [playlistId]: category } for ones assigned by hand.
+// The playlist naming (see naming.js): `template` + `tierLabels` (what each
+// tier is called in playlist names) + `tierDisplayNames` (what the app shows,
+// per tier; null = the same). `migratingFrom` / `migratingFromTierLabels` are the
+// previous naming while a rename job hasn't finished for every playlist:
+// titles matching EITHER naming are recognised meanwhile, so a partial
+// failure never makes boards vanish. Persisted to localStorage by store.js.
+// `needsDetection`: nobody has chosen a naming yet on this browser, so the
+// first playlist load picks the one that fits the user's existing names
+// (detectNaming) instead of assuming everyone uses one convention.
+// `todoLinks` = { [playlistId]: category } for to-do lists assigned by hand
+// (todoLists.js).
+const validLabels = (l) => l && typeof l === 'object' && Object.keys(validateTierLabels(l)).length === 0;
+
 function fromSaved(saved) {
-  return saved && typeof saved.template === 'string' && validateTemplate(saved.template).length === 0
-    ? {
-        template: normalizeTemplate(saved.template),
-        migratingFrom: saved.migratingFrom ? normalizeTemplate(saved.migratingFrom) : null,
-        needsDetection: !!saved.needsDetection,
-        todoKeyword:
-          typeof saved.todoKeyword === 'string' && validateTodoKeyword(saved.todoKeyword).length === 0
-            ? saved.todoKeyword
-            : DEFAULT_TODO_KEYWORD,
-        todoLinks: saved.todoLinks && typeof saved.todoLinks === 'object' ? saved.todoLinks : {},
-      }
-    : null;
+  if (!saved || typeof saved.template !== 'string' || validateTemplate(saved.template).length) return null;
+  // No tier names saved yet: the defaults, and detect from the playlists.
+  const hasLabels = validLabels(saved.tierLabels);
+  const tierLabels = hasLabels ? saved.tierLabels : DEFAULT_TIER_LABELS;
+  const migratingFrom = saved.migratingFrom || null;
+  const fromLabels = validLabels(saved.migratingFromTierLabels) ? saved.migratingFromTierLabels : null;
+  return {
+    template: saved.template,
+    tierLabels,
+    tierDisplayNames:
+      saved.tierDisplayNames && !Object.keys(validateDisplayNames(saved.tierDisplayNames)).length
+        ? { ...NO_DISPLAY_NAMES, ...saved.tierDisplayNames }
+        : NO_DISPLAY_NAMES,
+    // A half-finished rename always has both halves of the old naming.
+    migratingFrom: migratingFrom || fromLabels ? migratingFrom ?? saved.template : null,
+    migratingFromTierLabels: migratingFrom || fromLabels ? fromLabels ?? tierLabels : null,
+    needsDetection: !!saved.needsDetection || !hasLabels,
+    todoLinks: saved.todoLinks && typeof saved.todoLinks === 'object' ? saved.todoLinks : {},
+  };
 }
 const initialState = fromSaved(getSetting(SETTINGS.naming, null)) ?? {
   template: DEFAULT_TEMPLATE,
+  tierLabels: DEFAULT_TIER_LABELS,
+  tierDisplayNames: NO_DISPLAY_NAMES,
   migratingFrom: null,
+  migratingFromTierLabels: null,
   needsDetection: true,
-  todoKeyword: DEFAULT_TODO_KEYWORD,
   todoLinks: {},
 };
 
@@ -39,28 +52,33 @@ const namingSlice = createSlice({
   name: 'naming',
   initialState,
   reducers: {
-    // Switch templates without renaming anything on YouTube.
-    setTemplate: (state, action) => {
-      state.template = action.payload;
+    // { template, tierLabels, tierDisplayNames } - nothing is renamed on YouTube.
+    setNaming: (state, action) => {
+      state.template = action.payload.template;
+      state.tierLabels = action.payload.tierLabels;
+      state.tierDisplayNames = action.payload.tierDisplayNames;
       state.migratingFrom = null;
+      state.migratingFromTierLabels = null;
       state.needsDetection = false;
     },
-    detectedTemplate: (state, action) => {
+    detectedNaming: (state, action) => {
       if (!state.needsDetection) return;
-      state.template = action.payload;
+      state.template = action.payload.template;
+      state.tierLabels = action.payload.tierLabels;
       state.needsDetection = false;
     },
+    // { from, to }: both { template, tierLabels }.
     startMigration: (state, action) => {
       const { from, to } = action.payload;
-      state.migratingFrom = from;
-      state.template = to;
+      state.migratingFrom = from.template;
+      state.migratingFromTierLabels = from.tierLabels;
+      state.template = to.template;
+      state.tierLabels = to.tierLabels;
       state.needsDetection = false;
     },
     finishMigration: (state) => {
       state.migratingFrom = null;
-    },
-    setTodoKeyword: (state, action) => {
-      state.todoKeyword = action.payload;
+      state.migratingFromTierLabels = null;
     },
     // { playlistId, category } - category null = back to automatic.
     linkTodoList: (state, action) => {
@@ -70,14 +88,13 @@ const namingSlice = createSlice({
     },
   },
   extraReducers: (builder) => {
-    // The account already has a template -> use it (no detection needed).
+    // The account already has a naming -> use it (no detection needed).
     builder.addCase(settingsLoaded, (state, action) => {
       const saved = fromSaved(action.payload.naming);
-      return saved ? { ...saved, needsDetection: false } : state;
+      return saved ? { ...saved, needsDetection: saved.needsDetection && !action.payload.naming.tierLabels } : state;
     });
   },
 });
 
-export const { setTemplate, detectedTemplate, startMigration, finishMigration, setTodoKeyword, linkTodoList } =
-  namingSlice.actions;
+export const { setNaming, detectedNaming, startMigration, finishMigration, linkTodoList } = namingSlice.actions;
 export default namingSlice.reducer;

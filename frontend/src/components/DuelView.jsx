@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { tierName } from '../tierLabels';
 import {
   Badge,
   Button,
@@ -46,7 +47,7 @@ function DuelCard({ video, tier, arrowKey, isPreviewing, onTogglePreview, onChoo
               color: TIER_INK,
             }}
           >
-            {tier}
+            {tierName(tier)}
           </Badge>
         )}
         <Kbd style={{ position: 'absolute', top: 8, right: 8, zIndex: 2 }}>{arrowKey}</Kbd>

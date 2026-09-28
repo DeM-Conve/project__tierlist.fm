@@ -53,11 +53,11 @@ body {
   --accent-on: #ffffff;
   --shadow: rgba(0, 0, 0, 0.55);
   --overlay: rgba(0, 0, 0, 0.72);
-  --tier-t1: #ff5a5f;
-  --tier-t2: #ff9f43;
-  --tier-t3: #ffd43b;
-  --tier-te: #7bd88f;
-  --tier-tz: #4dabf7;
+  --tier-s: #ff5a5f;
+  --tier-a: #ff9f43;
+  --tier-b: #ffd43b;
+  --tier-c: #7bd88f;
+  --tier-d: #4dabf7;
   --tier-todo: #c3c8d2;
   --tier-ink: #101114;
   --media-bg: #000000;

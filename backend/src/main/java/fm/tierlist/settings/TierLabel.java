@@ -9,17 +9,18 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
-// The to-do list keyword: one or more words of letters/digits (single spaces
-// between), at most MAX_LENGTH, and not a tier code. Mirrors the frontend's
-// todoLists.js validateTodoKeyword - keep the two in step.
+// A tier's name as the user wrote it ("S", "T1", "(**TODO**)"): at most
+// MAX_LENGTH, no spaces around it, at least one letter/digit, no template
+// braces. Null is valid (combine with @NotNull where required). Mirrors the
+// frontend's naming.js validateTierLabels - keep the two in step.
 @Documented
-@Constraint(validatedBy = TodoKeywordValidator.class)
+@Constraint(validatedBy = TierLabelValidator.class)
 @Target({ElementType.FIELD, ElementType.PARAMETER, ElementType.RECORD_COMPONENT, ElementType.TYPE_USE})
 @Retention(RetentionPolicy.RUNTIME)
-public @interface TodoKeyword {
+public @interface TierLabel {
     int MAX_LENGTH = 20;
 
-    String message() default "must be words of letters/digits, at most 20 characters, and not a tier code";
+    String message() default "must be at most 20 characters with a letter or digit, and no { } or surrounding spaces";
 
     Class<?>[] groups() default {};
 

@@ -17,11 +17,11 @@ import { TIER_INK } from '../tierUtils';
 import { DEMO_ART } from '../themes';
 
 const BOARD = {
-  T1: [0, 4, 7],
-  T2: [2, 5, 1, 3],
-  T3: [6, 0, 4],
-  TE: [3, 1],
-  TZ: [5],
+  S: [0, 4, 7],
+  A: [2, 5, 1, 3],
+  B: [6, 0, 4],
+  C: [3, 1],
+  D: [5],
 };
 
 const DURATIONS = ['3:42', '4:18', '2:57', '5:03', '3:21', '6:10', '4:44', '3:08'];
@@ -30,7 +30,7 @@ const FEATURES = [
   {
     icon: LayoutGrid,
     title: 'Tier boards',
-    body: 'Playlists named like "[G] Rap T1" group themselves into a board per category.',
+    body: 'Playlists named like "Rap S" or "Rap A" - in your own naming - group themselves into a board per category.',
   },
   {
     icon: Swords,
@@ -132,13 +132,13 @@ function BoardMock() {
                 wrap="nowrap"
                 style={{
                   flex: 1,
-                  background: tier === 'T1' ? 'color-mix(in srgb, var(--accent) 10%, transparent)' : undefined,
+                  background: tier === 'S' ? 'color-mix(in srgb, var(--accent) 10%, transparent)' : undefined,
                 }}
               >
                 {BOARD[tier].map((thumb, i) => (
                   <Thumb key={i} index={thumb} />
                 ))}
-                {tier === 'T1' && (
+                {tier === 'S' && (
                   <Box
                     w={72}
                     style={{
@@ -155,7 +155,7 @@ function BoardMock() {
         </Stack>
       </Paper>
 
-      {/* A thumbnail mid-drag from T2 up into T1's drop slot. */}
+      {/* A thumbnail mid-drag from A up into S's drop slot. */}
       <Box pos="absolute" top={72} right={34} className="anim-float" style={{ animationDelay: '0.6s' }}>
         <Thumb index={3} w={84} lifted />
       </Box>
@@ -208,7 +208,7 @@ export default function LoginView({ onLogin }) {
         overflow: 'hidden',
         background:
           'radial-gradient(900px 600px at 85% 30%, color-mix(in srgb, var(--accent) 16%, transparent), transparent 60%),' +
-          'radial-gradient(700px 500px at 10% 100%, color-mix(in srgb, var(--tier-tz) 8%, transparent), transparent 60%),' +
+          'radial-gradient(700px 500px at 10% 100%, color-mix(in srgb, var(--tier-d) 8%, transparent), transparent 60%),' +
           'var(--bg)',
       }}
     >

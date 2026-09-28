@@ -21,14 +21,15 @@ on top of the YouTube account you already have. Self-hosted, free for personal u
 A YouTube playlist is a flat list. After a few hundred songs, "which of these do I actually
 love?" has no answer - you can't rank, you can only scroll.
 
-Tierlist.fm turns your playlists into a **tier list**: `T1` for the songs you'd defend to the
-end, down to `TZ` for the ones you're keeping out of habit. The tiers **are** YouTube
-playlists (`Rap T1`, `Rap T2`, ...), so nothing is locked into this app - rank here, and
+Tierlist.fm turns your playlists into a **tier list**: `S` for the songs you'd defend to the
+end, down to `D` for the ones you're keeping out of habit (or name the tiers whatever you
+like). The tiers **are** YouTube playlists (`Rap S`, `Rap A`, ...), so nothing is locked
+into this app - rank here, and
 every YouTube / YouTube Music device you own plays the result.
 
 ## Features
 
-**Tier boards** - Playlists named by your template (`Rap T1` ... `Rap TZ`) group themselves
+**Tier boards** - Playlists named by your template (`Rap S` ... `Rap D`) group themselves
 into one board per category. The whole board fits on one screen as album-art tiles; drag a
 song between tiers, or onto the always-visible Tier Rail.
 
@@ -75,18 +76,20 @@ The full list, page by page, is in [docs/features.md](docs/features.md).
 
 ## How it works
 
-A **naming template** (Settings -> Playlist naming) decides which playlists are tiers:
+Your **naming** (Settings -> Playlist naming) decides which playlists are tiers: a
+template with `{category}` and `{tier}`, plus the names of your five tiers and your to-do
+list. Anything else in `{braces}` is a token of your own - kept as-is when renaming.
 
-| Template | Matches |
-|---|---|
-| `{category} {tier}` (default) | `Rap T1`, `Lo-fi TZ` |
-| `[{tag}] {category} {tier}` | `[G] Rap T1` |
-| `[Tierlist.fm] {category} {tier}` | `[Tierlist.fm] Rap T2` |
+| Template | Tier names | Matches |
+|---|---|---|
+| `{category} {tier}` (default) | `S A B C D` (default) | `Rap S`, `Lo-fi D` |
+| `{category} - {tier}` | `Gold Silver Bronze Meh Skip` | `Rap - Gold` |
+| `[{my_label}] {category} {tier}` | `1 2 3 4 5` | `[Chill] Rap 1` |
 
-Tiers are `T1`, `T2`, `T3`, `TE`, `TZ`, plus an unranked `TODO` list per board. The app
-auto-detects the template that fits your existing playlists, and can rename them all on
-YouTube if you switch templates (with a preview and a quota estimate first). Create a new
-board from Home -> **New tier list**.
+Each board also gets an unranked to-do list (`Rap TODO`, or whatever you call it). The
+app auto-detects the naming that fits your existing playlists, and can rename them all on
+YouTube if you change it (with a preview and a quota estimate first). Create a new board
+from Home -> **New tier list**.
 
 ## Self-host it
 

@@ -19,14 +19,6 @@ export function usePlaylistsQuery(enabled) {
   });
 }
 
-export function usePlaylistItemsQuery(playlistId) {
-  return useQuery({
-    queryKey: ['playlist-items', playlistId],
-    queryFn: async () => (await api.get(`/api/playlists/${playlistId}/items`)).data,
-    enabled: !!playlistId,
-  });
-}
-
 // One query per tier's underlying playlist, run in parallel and combined -
 // a tier board is really N independent playlists rendered as one page.
 // Each is cached by playlist id, so re-visiting a board (or a duel) that's

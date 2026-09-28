@@ -1,4 +1,5 @@
 import { useDispatch, useSelector, useStore } from 'react-redux';
+import { tierName } from '../tierLabels';
 import { Button, Group, Kbd, Text } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 import { useAddToPlaylistMutation, useRemovePlaylistItemMutation } from '../api/queries';
@@ -106,9 +107,9 @@ export function useAddSongsActions(addSongs) {
     pendingAdds.set(video.videoId, request);
     request.catch((error) => {
       dispatch(revertAction(entry));
-      toast(`Couldn't add "${song}" to ${category} · ${tier} - ${errorMessage(error, 'YouTube refused')}`, null, 'red');
+      toast(`Couldn't add "${song}" to ${category} · ${tierName(tier)} - ${errorMessage(error, 'YouTube refused')}`, null, 'red');
     });
-    toast(`"${song}" → ${category} · ${tier}`, () => undo(entry));
+    toast(`"${song}" → ${category} · ${tierName(tier)}`, () => undo(entry));
   }
 
   function skip(video) {
@@ -140,7 +141,7 @@ export function useAddSongsActions(addSongs) {
       }
       dispatch(revertAction(entry));
     } catch {
-      toast(`Couldn't undo - "${songLabel(entry.video).song}" is still in ${entry.category} · ${entry.tier}`, null, 'red');
+      toast(`Couldn't undo - "${songLabel(entry.video).song}" is still in ${entry.category} · ${tierName(entry.tier)}`, null, 'red');
     }
   }
 

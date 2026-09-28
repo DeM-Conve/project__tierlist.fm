@@ -1,4 +1,5 @@
 import { Box } from '@mantine/core';
+import { tierName } from './tierLabels';
 import { useContextMenu } from 'mantine-contextmenu';
 import { ArrowDownToLine, ArrowRightLeft, ArrowUpRight, ArrowUpToLine, ListEnd, ListStart, Trash2 } from 'lucide-react';
 import { useDispatch } from 'react-redux';
@@ -30,7 +31,7 @@ export function songMenuGroups({ video, tier, tiers, onMove, dispatch }) {
       .filter((t) => t !== tier)
       .map((t) => ({
         key: `move-${t}`,
-        title: t,
+        title: tierName(t),
         icon: <Box w={10} h={10} bg={TIER_COLORS[t]} style={{ borderRadius: 2 }} />,
         onClick: () => onMove(tier, t, video.videoId, null),
       })),
@@ -39,10 +40,10 @@ export function songMenuGroups({ video, tier, tiers, onMove, dispatch }) {
     groups.push({
       key: 'order',
       items: [
-        { key: 'top', title: `Top of ${tier}`, icon: <ArrowUpToLine size={14} />, onClick: () => onMove(tier, tier, video.videoId, 0) },
+        { key: 'top', title: `Top of ${tierName(tier)}`, icon: <ArrowUpToLine size={14} />, onClick: () => onMove(tier, tier, video.videoId, 0) },
         {
           key: 'bottom',
-          title: `Bottom of ${tier}`,
+          title: `Bottom of ${tierName(tier)}`,
           icon: <ArrowDownToLine size={14} />,
           onClick: () => onMove(tier, tier, video.videoId, Number.MAX_SAFE_INTEGER),
         },

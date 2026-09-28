@@ -9,15 +9,20 @@ const viewSlice = createSlice({
   name: 'view',
   initialState: {
     currentCategory: null,
-    query: '',
+    // Two independent filters: the sidebar's board list and Home's page.
+    sidebarQuery: '',
+    homeQuery: '',
     mobileSidebarOpen: false,
   },
   reducers: {
     setCurrentCategory: (state, action) => {
       state.currentCategory = action.payload;
     },
-    setQuery: (state, action) => {
-      state.query = action.payload;
+    setSidebarQuery: (state, action) => {
+      state.sidebarQuery = action.payload;
+    },
+    setHomeQuery: (state, action) => {
+      state.homeQuery = action.payload;
     },
     setMobileSidebarOpen: (state, action) => {
       state.mobileSidebarOpen = action.payload;
@@ -25,5 +30,5 @@ const viewSlice = createSlice({
   },
 });
 
-export const { setCurrentCategory, setQuery, setMobileSidebarOpen } = viewSlice.actions;
+export const { setCurrentCategory, setSidebarQuery, setHomeQuery, setMobileSidebarOpen } = viewSlice.actions;
 export default viewSlice.reducer;

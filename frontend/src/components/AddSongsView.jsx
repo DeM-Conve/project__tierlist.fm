@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { tierName } from '../tierLabels';
 import { useDispatch, useSelector } from 'react-redux';
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
@@ -41,7 +42,7 @@ function TierTarget({ tier, hotkey, disabled, onClick }) {
   const button = (
     <UnstyledButton
       onClick={disabled ? undefined : onClick}
-      aria-label={`Put it in ${tier}`}
+      aria-label={`Put it in ${tierName(tier)}`}
       aria-disabled={disabled}
       className="add-tier"
       bg={TIER_COLORS[tier]}
@@ -60,13 +61,13 @@ function TierTarget({ tier, hotkey, disabled, onClick }) {
       }}
     >
       <Text ff="var(--font-display)" fw={900} fz={tier === TODO_TIER ? 16 : 24} lh={1} c={TIER_INK}>
-        {tier === TODO_TIER ? 'Later' : tier}
+        {tier === TODO_TIER ? 'Later' : tierName(tier)}
       </Text>
       <Kbd size="xs">{hotkey}</Kbd>
     </UnstyledButton>
   );
   return disabled ? (
-    <Tooltip label={`This board has no ${tier} playlist`} withArrow>
+    <Tooltip label={`This board has no ${tierName(tier)} playlist`} withArrow>
       {button}
     </Tooltip>
   ) : (

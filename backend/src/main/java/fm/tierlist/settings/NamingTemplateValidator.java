@@ -11,13 +11,8 @@ import java.util.regex.Pattern;
 public class NamingTemplateValidator implements ConstraintValidator<NamingTemplate, String> {
 
     private static final Pattern TOKEN = Pattern.compile("\\{([^{}]*)}");
-
-    // token -> {min, max} occurrences
-    private static final Map<String, int[]> TOKENS = Map.of(
-        "category", new int[] {1, 1},
-        "tier", new int[] {1, 1},
-        "tag", new int[] {0, 1}
-    );
+    // A token of the user's own: a single word, named by them.
+    private static final Pattern OWN_TOKEN = Pattern.compile("^[A-Za-z][A-Za-z0-9_]{0,19}$");
 
     @Override
     public boolean isValid(String template, ConstraintValidatorContext context) {
@@ -27,18 +22,21 @@ public class NamingTemplateValidator implements ConstraintValidator<NamingTempla
         if (template.isBlank() || template.length() > NamingTemplate.MAX_LENGTH) {
             return false;
         }
+        // Braces only ever wrap a token.
+        if (TOKEN.matcher(template).replaceAll("").matches(".*[{}].*")) {
+            return false;
+        }
         Map<String, Integer> counts = new HashMap<>();
         Matcher m = TOKEN.matcher(template);
         while (m.find()) {
             String token = m.group(1);
-            if (!TOKENS.containsKey(token)) {
+            if (!OWN_TOKEN.matcher(token).matches()) {
                 return false;
             }
             counts.merge(token, 1, Integer::sum);
         }
-        return TOKENS.entrySet().stream().allMatch(e -> {
-            int n = counts.getOrDefault(e.getKey(), 0);
-            return n >= e.getValue()[0] && n <= e.getValue()[1];
-        });
+        return counts.getOrDefault("category", 0) == 1
+            && counts.getOrDefault("tier", 0) == 1
+            && counts.values().stream().allMatch(n -> n == 1);
     }
 }
