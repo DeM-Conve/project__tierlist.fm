@@ -16,6 +16,9 @@
 - "Save without renaming" switches the template only (with a warning about playlists that will stop matching).
 - New tier playlists are named by the template: Home -> **New tier list** (category, bracket, which tiers, Private/Unlisted/Public) and a board's **Add missing tiers**; both preview the exact names and refuse names the template wouldn't recognise.
 
+## Desktop app (PWA)
+- Installable as its own app window (Chrome/Edge: the install icon in the address bar, or menu -> Install Tierlist.fm): launcher/taskbar icon, no browser tabs or toolbar. `vite-plugin-pwa` (manifest + auto-updating service worker; icons generated from `favicon.svg` by `pwa-assets.config.js`). Same origin as the browser tab, so login and the YouTube player work unchanged. The server (Docker) still has to be running.
+
 ## Home & playlists
 - `/` is **Home**: every board drawn as a mini tier list (tier chip + that tier playlist's cover + a bar sized by its video count), with Open / Duel on each card; a "Now playing" card (with a link back to rate it on its board) while the player is active; then every tier playlist as a card (tier badge + board name). Playlists not following the naming template are never listed.
 - Home's filter box and the sidebar filter share the same query.

@@ -122,6 +122,9 @@ comes up alongside, and the schema is created on first start.
 On Google's consent screen, **tick the YouTube permission** - if it's left unticked, the app
 can't read your playlists and tells you to log in again.
 
+Want it as a desktop app? In Chrome or Edge, click the install icon in the address bar
+(or menu -> *Install Tierlist.fm*) - it opens in its own window with its own icon.
+
 <details>
 <summary>Development setup, tests, running without Docker</summary>
 
