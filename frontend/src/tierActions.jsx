@@ -8,7 +8,17 @@ import {
   undoLastEdit,
   setDraggedVideoId,
   setDragOverTier,
+  transferArrived,
+  transferUndone,
+  resetTierBoard,
+  setTierForCategory,
+  setLoadedCategory,
+  transfersOverlaid,
 } from './store/tiersSlice';
+import { dragEnded, dragStarted, transferCancelled, transferStaged, transfersCommitted } from './store/transfersSlice';
+import { effectiveTransfers } from './transfers';
+import { transferId } from './transfers';
+import { songLabel } from './tierUtils';
 import { setFocusedVideo } from './store/focusSlice';
 import { REMOVED_TIER, TODO_TIER } from './tiers';
 
@@ -124,12 +134,63 @@ export const undoEdit = ({ silent = false } = {}) => (dispatch, getState) => {
   }
 };
 
+// A song dragged in from another board (the drag started there, then its
+// sidebar entry opened this board) lands on `toTier` here: staged as a
+// transfer (transfers.js), one undo step like any drop. Dropped back on its
+// own board, it's just a move there again.
+export const transferWithFeedback = ({ video, fromCategory, fromTier }, toTier, dropIndex = null) => (dispatch, getState) => {
+  const toCategory = getState().tiers.loadedCategory;
+  if (!toCategory || toTier === REMOVED_TIER) return;
+  const id = video.transfer ?? transferId(video);
+  const staged = getState().transfers.list.find((t) => t.id === id);
+  const { transfer: _, ...plain } = video;
+  const home = staged ?? { id, video: plain, fromCategory, fromTier };
+  if (home.fromCategory === toCategory) {
+    // Back where it came from: no transfer - an ordinary (maybe no-op) move.
+    dispatch(transferCancelled(id));
+    dispatch(transferArrived({ tier: toTier, video: home.video, dropIndex }));
+    resyncFocusedTier(dispatch, getState);
+    showToast(dispatch, `"${songLabel(home.video).song}" is back in ${toCategory} · ${tierName(toTier)}`);
+    return;
+  }
+  dispatch(transferStaged({ ...home, toCategory, toTier }));
+  dispatch(transferArrived({ tier: toTier, video: { ...home.video, transfer: id }, dropIndex }));
+  resyncFocusedTier(dispatch, getState);
+  showToast(dispatch, `"${songLabel(home.video).song}" → ${toCategory} · ${tierName(toTier)} (from ${home.fromCategory}) - on push`);
+};
+
+// Puts a freshly fetched board into the draft. First the board being left
+// hands its transfers' current targets to the store (its draft - where an
+// arrived song was dragged since - is about to be replaced), then the new
+// board is shown with the staged transfers laid over it.
+export const loadBoard = ({ category, data }) => (dispatch, getState) => {
+  const { tiers, transfers } = getState();
+  if (tiers.loadedCategory) {
+    dispatch(transfersCommitted(effectiveTransfers(transfers.list, tiers.loadedCategory, tiers.tierItems)));
+  }
+  const presentTiers = Object.keys(data);
+  dispatch(resetTierBoard({ category, presentTiers }));
+  presentTiers.forEach((tier) => dispatch(setTierForCategory({ tier, videos: data[tier] })));
+  dispatch(transfersOverlaid({ category, transfers: getState().transfers.list }));
+  dispatch(setLoadedCategory(category));
+};
+
+// "Put back" on a staged transfer (the review list).
+export const cancelTransfer = (transfer) => (dispatch) => {
+  dispatch(transferCancelled(transfer.id));
+  dispatch(transferUndone(transfer));
+};
+
 // Native HTML5 drag-and-drop shared by every drop surface (board rows,
-// tier-focus list, Tier Rail): a drag carries { videoId, fromTier }.
+// tier-focus list, Tier Rail): a drag carries { videoId, fromTier }. The
+// dragged song is also kept in the store (transfers.drag), so it can be
+// dropped on another board after the sidebar opens it (see Sidebar).
 export function useTierDnd() {
   const dispatch = useDispatch();
   const dragOverTier = useSelector((s) => s.tiers.dragOverTier);
   const draggedVideoId = useSelector((s) => s.tiers.draggedVideoId);
+  const loadedCategory = useSelector((s) => s.tiers.loadedCategory);
+  const drag = useSelector((s) => s.transfers.drag);
 
   return {
     dragOverTier,
@@ -138,10 +199,12 @@ export function useTierDnd() {
       e.dataTransfer.setData('application/json', JSON.stringify({ videoId: video.videoId, fromTier }));
       e.dataTransfer.effectAllowed = 'move';
       dispatch(setDraggedVideoId(video.videoId));
+      dispatch(dragStarted({ video, fromCategory: loadedCategory, fromTier }));
     },
     onDragEnd() {
       dispatch(setDraggedVideoId(null));
       dispatch(setDragOverTier(null));
+      dispatch(dragEnded());
     },
     onDragOver(e, tier) {
       e.preventDefault();
@@ -162,6 +225,12 @@ export function useTierDnd() {
       }
       dispatch(setDragOverTier(null));
       dispatch(setDraggedVideoId(null));
+      const crossBoard = drag && drag.fromCategory && drag.fromCategory !== loadedCategory;
+      dispatch(dragEnded());
+      if (crossBoard) {
+        dispatch(transferWithFeedback(drag, toTier, dropIndex));
+        return;
+      }
       if (!data.videoId) return;
       dispatch(moveWithFeedback([{ fromTier: data.fromTier, toTier, videoId: data.videoId, dropIndex }]));
     },

@@ -23,11 +23,44 @@ import { exampleTitle } from '../naming';
 import { useSelector } from 'react-redux';
 import { selectNaming } from '../store/selectors';
 import { SHELL_Y, SIDEBAR_X } from '../layout/spacing';
+import { useBoardDropOpen } from '../layout/useBoardDropOpen';
 
 // Each board shows its song total straight from the playlists' own item
 // counts - no per-board fetch needed just to draw the sidebar.
 function boardCounts(tiers) {
   return Object.fromEntries(TIER_ORDER.filter((t) => tiers[t]).map((t) => [t, tiers[t].itemCount ?? 0]));
+}
+
+// One board in the list. A song dragged over it opens the board after a
+// moment, to be dropped on one of its tiers (useBoardDropOpen).
+function BoardLink({ category, tiers, active }) {
+  const base = `/tier/${encodeURIComponent(category)}`;
+  const counts = boardCounts(tiers);
+  const total = Object.values(counts).reduce((a, b) => a + b, 0);
+  const { hovering, handlers } = useBoardDropOpen(category);
+  return (
+    <NavLink
+      component={Link}
+      to={base}
+      variant={hovering ? 'filled' : 'light'}
+      // Compact rows so a typical library's boards all fit without
+      // the list scrolling.
+      py={4}
+      active={active || hovering}
+      data-drop-target={hovering || undefined}
+      {...handlers}
+      label={
+        <Group justify="space-between" wrap="nowrap" gap={6}>
+          <Text size="sm" truncate="end">
+            {category}
+          </Text>
+          <Text size="xs" c={hovering ? undefined : 'dimmed'}>
+            {total}
+          </Text>
+        </Group>
+      }
+    />
+  );
 }
 
 export default function Sidebar({
@@ -151,34 +184,17 @@ export default function Sidebar({
                 No boards match
               </Text>
             )}
-            {filteredCategories.map((category) => {
-              const base = `/tier/${encodeURIComponent(category)}`;
-              const tiers = tierGroups[category] || {};
-              const counts = boardCounts(tiers);
-              const total = Object.values(counts).reduce((a, b) => a + b, 0);
-              return (
-                <NavLink
-                  key={category}
-                  component={Link}
-                  to={base}
-                  variant="light"
-                  // Compact rows so a typical library's boards all fit without
-                  // the list scrolling.
-                  py={4}
-                  active={location.pathname === base || location.pathname.startsWith(`${base}/`)}
-                  label={
-                    <Group justify="space-between" wrap="nowrap" gap={6}>
-                      <Text size="sm" truncate="end">
-                        {category}
-                      </Text>
-                      <Text size="xs" c="dimmed">
-                        {total}
-                      </Text>
-                    </Group>
-                  }
-                />
-              );
-            })}
+            {filteredCategories.map((category) => (
+              <BoardLink
+                key={category}
+                category={category}
+                tiers={tierGroups[category] || {}}
+                active={
+                  location.pathname === `/tier/${encodeURIComponent(category)}` ||
+                  location.pathname.startsWith(`/tier/${encodeURIComponent(category)}/`)
+                }
+              />
+            ))}
             {/* Until playlists arrive we don't know the boards yet - placeholders,
                 not "0 boards" and the naming-convention hint. */}
             {loading &&

@@ -7,6 +7,7 @@ import appearanceReducer from './appearanceSlice';
 import namingReducer from './namingSlice';
 import prefsReducer from './prefsSlice';
 import addSongsReducer from './addSongsSlice';
+import transfersReducer from './transfersSlice';
 import { SETTINGS, setSetting } from '../settings';
 import { syncTierLabels } from '../tierLabels';
 
@@ -20,6 +21,7 @@ export const store = configureStore({
     naming: namingReducer,
     prefs: prefsReducer,
     addSongs: addSongsReducer,
+    transfers: transfersReducer,
   },
 });
 

@@ -5,12 +5,14 @@ import { useOutletContext } from 'react-router-dom';
 import { ActionIcon, Badge, Box, Button, Group, Image, Kbd, Modal, Paper, ScrollArea, Stack, Text, Tooltip } from '@mantine/core';
 import { useMediaQuery } from '@mantine/hooks';
 import { ArrowRight, Trash2, Undo2 } from 'lucide-react';
-import { selectPendingMoves } from '../store/selectors';
-import { moveWithFeedback } from '../tierActions';
+import { selectStagedChanges } from '../store/selectors';
+import { cancelTransfer, moveWithFeedback } from '../tierActions';
 import { songLabel } from '../tierUtils';
 import { TierChip } from './TierBits';
 
 const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
+const putBackLabel = (move) =>
+  move.kind === 'transfer' ? `Keep in ${move.fromCategory} · ${tierName(move.fromTier)}` : `Put back in ${tierName(move.from)}`;
 
 // One staged change: cover, song, and "from -> to" in tier chips. Moves can
 // (and removals) can be put back individually; auto-resolved duplicates
@@ -28,7 +30,20 @@ function ChangeRow({ move, first, onRevert }) {
           {move.kind === 'dedupe' ? `${artist} · duplicate copy` : artist}
         </Text>
       </Box>
-      {move.kind === 'move' ? (
+      {move.kind === 'transfer' ? (
+        // To another board: "Rock [T2] -> Nippo Normal [T3]".
+        <Group gap={6} wrap="nowrap" flex="none" maw="55%">
+          <Text fz="xs" c="dimmed" truncate="end" maw={110}>
+            {move.fromCategory}
+          </Text>
+          <TierChip tier={move.fromTier} size={20} />
+          <ArrowRight size={13} color="var(--text-faint)" />
+          <Text fz="xs" fw={600} truncate="end" maw={110}>
+            {move.toCategory}
+          </Text>
+          <TierChip tier={move.toTier} size={20} />
+        </Group>
+      ) : move.kind === 'move' ? (
         <Group gap={6} wrap="nowrap" flex="none">
           <TierChip tier={move.from} size={20} />
           <ArrowRight size={13} color="var(--text-faint)" />
@@ -67,8 +82,8 @@ function ChangeRow({ move, first, onRevert }) {
       )}
       <Box w={28} flex="none">
         {move.kind !== 'dedupe' && (
-          <Tooltip label={`Put back in ${tierName(move.from)}`} withArrow>
-            <ActionIcon variant="subtle" color="gray" onClick={onRevert} aria-label={`Put back in ${tierName(move.from)}`}>
+          <Tooltip label={putBackLabel(move)} withArrow>
+            <ActionIcon variant="subtle" color="gray" onClick={onRevert} aria-label={putBackLabel(move)}>
               <Undo2 size={15} />
             </ActionIcon>
           </Tooltip>
@@ -86,7 +101,10 @@ function ReviewChangesModal({ opened, onClose, moves, syncStatus, onPush, onDisc
     if (opened && moves.length === 0) onClose(); // everything put back / pushed
   }, [opened, moves.length, onClose]);
 
-  const revert = (m) => dispatch(moveWithFeedback([{ fromTier: m.to, toTier: m.from, videoId: m.video.videoId }]));
+  const revert = (m) =>
+    m.kind === 'transfer'
+      ? dispatch(cancelTransfer(m))
+      : dispatch(moveWithFeedback([{ fromTier: m.to, toTier: m.from, videoId: m.video.videoId }]));
 
   return (
     <Modal
@@ -101,7 +119,7 @@ function ReviewChangesModal({ opened, onClose, moves, syncStatus, onPush, onDisc
         <ScrollArea.Autosize mah="min(55vh, 480px)" offsetScrollbars="present" type="auto">
           <Stack gap={0}>
             {moves.map((m, i) => (
-              <ChangeRow key={`${m.kind}-${m.video.videoId}-${m.tier ?? m.to}`} move={m} first={i === 0} onRevert={() => revert(m)} />
+              <ChangeRow key={`${m.kind}-${m.id ?? m.video.videoId}-${m.tier ?? m.to ?? m.toTier}`} move={m} first={i === 0} onRevert={() => revert(m)} />
             ))}
           </Stack>
         </ScrollArea.Autosize>
@@ -125,7 +143,7 @@ function ReviewChangesModal({ opened, onClose, moves, syncStatus, onPush, onDisc
 // shortcut works on every one of those pages, not just the tier list.
 export default function PendingChanges() {
   const { syncChanges, discardChanges } = useOutletContext();
-  const moves = useSelector(selectPendingMoves);
+  const moves = useSelector(selectStagedChanges);
   const syncStatus = useSelector((s) => s.tiers.syncStatus);
   const category = useSelector((s) => s.view.currentCategory);
   const [reviewOpen, setReviewOpen] = useState(false);

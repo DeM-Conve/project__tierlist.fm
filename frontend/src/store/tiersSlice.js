@@ -1,5 +1,6 @@
 import { createSlice, original } from '@reduxjs/toolkit';
 import { REMOVED_TIER } from '../tiers';
+import { overlayTransfers, transferId } from '../transfers';
 
 const UNDO_LIMIT = 50;
 
@@ -182,6 +183,56 @@ const tiersSlice = createSlice({
       pushUndo(state);
       state.tierItems = { ...state.tierItems, ...action.payload };
     },
+    // A song arriving from another board (transfers.js), dropped on `tier`:
+    // one undoable edit, like any drop. Not in the baseline - it's staged.
+    transferArrived: (state, action) => {
+      const { tier, video, dropIndex } = action.payload;
+      pushUndo(state);
+      const list = [...(state.tierItems[tier] || [])];
+      const index = dropIndex == null ? list.length : Math.max(0, Math.min(dropIndex, list.length));
+      list.splice(index, 0, video);
+      state.tierItems[tier] = list;
+    },
+    // The board just loaded, as it looks with the staged transfers.
+    transfersOverlaid: (state, action) => {
+      const { transfers, category } = action.payload;
+      state.tierItems = overlayTransfers(state.tierItems, transfers, category);
+    },
+    // A transfer taken back on the open board: the arrived card leaves, or
+    // the song that left comes back to its tier.
+    transferUndone: (state, action) => {
+      const t = action.payload;
+      for (const tier of Object.keys(state.tierItems)) {
+        state.tierItems[tier] = state.tierItems[tier].filter((v) => v.transfer !== t.id);
+      }
+      if (state.loadedCategory === t.fromCategory && !(state.tierItems[t.fromTier] || []).some((v) => transferId(v) === t.id)) {
+        state.tierItems[t.fromTier] = [...(state.tierItems[t.fromTier] || []), t.video];
+      }
+    },
+    // Pushed transfers become the open board's new baseline: an arrived song
+    // is simply in its tier now; a song that left is gone from the baseline.
+    transfersApplied: (state, action) => {
+      for (const t of action.payload) {
+        if (state.loadedCategory === t.fromCategory) {
+          state.originalTierItems[t.fromTier] = (state.originalTierItems[t.fromTier] || []).filter((v) => transferId(v) !== t.id);
+          const left = (state.originalTierOf[t.video.videoId] || []).filter((x) => x !== t.fromTier);
+          if (left.length) state.originalTierOf[t.video.videoId] = left;
+          else delete state.originalTierOf[t.video.videoId];
+        }
+        if (state.loadedCategory === t.toCategory) {
+          for (const tier of Object.keys(state.tierItems)) {
+            state.tierItems[tier] = state.tierItems[tier].map((v) => {
+              if (v.transfer !== t.id) return v;
+              const { transfer: _, ...video } = v;
+              return video;
+            });
+          }
+          state.originalTierItems[t.toTier] = [...(state.originalTierItems[t.toTier] || []), t.video];
+          const was = state.originalTierOf[t.video.videoId] || [];
+          if (!was.includes(t.toTier)) state.originalTierOf[t.video.videoId] = [...was, t.toTier];
+        }
+      }
+    },
     undoLastEdit: (state) => {
       const previous = state.undoStack.pop();
       if (previous) state.tierItems = previous;
@@ -205,5 +256,9 @@ export const {
   moveVideos,
   applyTierOrder,
   undoLastEdit,
+  transferArrived,
+  transfersOverlaid,
+  transferUndone,
+  transfersApplied,
 } = tiersSlice.actions;
 export default tiersSlice.reducer;

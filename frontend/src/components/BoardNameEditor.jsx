@@ -6,7 +6,7 @@ import { notifications } from '@mantine/notifications';
 import { ArrowRight, Info } from 'lucide-react';
 import { TierChip } from './TierBits';
 import { planBoardRename } from '../boardRename';
-import { selectNaming, selectPendingMoves, selectTierGroups } from '../store/selectors';
+import { selectNaming, selectStagedChanges, selectTierGroups } from '../store/selectors';
 import { setPlaylists } from '../store/authSlice';
 import { linkTodoList } from '../store/namingSlice';
 import { useApplyPlaylistTitles, useInvalidatePlaylists, useRenamePlaylistsMutation } from '../api/queries';
@@ -28,7 +28,8 @@ export default function BoardNameEditor({ category, onRenamed }) {
   const naming = useSelector(selectNaming);
   const links = useSelector((s) => s.naming.todoLinks);
   const tierGroups = useSelector(selectTierGroups);
-  const pendingCount = useSelector(selectPendingMoves).length;
+  // Transfers name their boards, so they block a rename too.
+  const pendingCount = useSelector(selectStagedChanges).length;
   const renameMutation = useRenamePlaylistsMutation();
   const applyTitles = useApplyPlaylistTitles();
   const invalidatePlaylists = useInvalidatePlaylists();

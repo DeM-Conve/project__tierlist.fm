@@ -20,7 +20,7 @@ import { useElementSize, useMediaQuery } from '@mantine/hooks';
 import { ChevronDown, ChevronUp, ListTodo, Play, Plus, Search, Shuffle, Swords } from 'lucide-react';
 import { BOARD_TIERS, TIER_COLORS, TIER_ORDER, TODO_TIER } from '../tiers';
 import { moveWithFeedback, useTierDnd } from '../tierActions';
-import { selectPlayerCoversPage } from '../store/selectors';
+import { selectPlayerCoversPage, selectStagedChanges } from '../store/selectors';
 import { TierMixBar, TierTile } from './TierBits';
 import BoardNameEditor from './BoardNameEditor';
 import { TIER_INK, indexForPointInFlow, videoMatches } from '../tierUtils';
@@ -380,7 +380,8 @@ export default function TierBoardView({
   // Staged removals aren't a row: they live on the rail's Remove slot and in
   // the staged-changes review (Put back).
   const rowTiers = [...tiers, ...(hasTodo ? [TODO_TIER] : [])];
-  const pendingPad = pendingMoves.length > 0 ? 80 : 0;
+  const stagedCount = useSelector(selectStagedChanges).length;
+  const pendingPad = stagedCount > 0 ? 80 : 0;
   // Minus the canvas's own bottom padding (the shell standard); the TODO row
   // is a separate card (16px margin + its 2px of borders).
   const available = viewportHeight - rowsTop - footerHeight - pendingPad - spacingPx(SHELL_Y) - (hasTodo ? 18 : 0) - 1;

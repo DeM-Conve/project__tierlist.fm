@@ -28,7 +28,9 @@ import TierRail from './components/TierRail';
 import { CANVAS_TOP, CANVAS_X, SHELL_Y } from './layout/spacing';
 import { CanvasContext } from './layout/canvas';
 import PendingChanges from './components/PendingChanges';
-import { applyOrderWithFeedback, moveWithFeedback, undoEdit } from './tierActions';
+import { applyOrderWithFeedback, loadBoard, moveWithFeedback, undoEdit } from './tierActions';
+import { buildSyncPlan, succeeded, touchedPlaylists } from './syncPlan';
+import { dragEnded, transfersDiscarded, transfersPushed } from './store/transfersSlice';
 import TierBoardView from './components/TierBoardView';
 import PlayerDock from './components/PlayerDock';
 import CommandPalette from './components/CommandPalette';
@@ -49,11 +51,9 @@ import { useSettingsSync } from './api/useSettingsSync';
 import { detectNaming } from './naming';
 import { setCurrentCategory, setHomeQuery, setSidebarQuery, setMobileSidebarOpen } from './store/viewSlice';
 import {
-  resetTierBoard,
-  setLoadedCategory,
-  setTierForCategory,
   setTierItems,
   applySyncedMoves,
+  transfersApplied,
   discardTierChanges,
   setSyncStatus,
 } from './store/tiersSlice';
@@ -77,6 +77,8 @@ import {
   selectTierPlaylists,
   selectTierCategories,
   selectPendingMoves,
+  selectStagedChanges,
+  selectTransfers,
   selectPlayingVideoIdOnBoard,
   selectDuelPool,
   selectDuelRuns,
@@ -118,10 +120,7 @@ function useLoadTierBoard(category, tiers) {
     // empty result from "no tiers yet" got marked as this board's loaded
     // data, and the board stayed blank until you navigated away and back.
     if (!tiers || !data || loadedCategory === category) return;
-    const presentTiers = Object.keys(data);
-    dispatch(resetTierBoard({ category, presentTiers }));
-    presentTiers.forEach((tier) => dispatch(setTierForCategory({ tier, videos: data[tier] })));
-    dispatch(setLoadedCategory(category));
+    dispatch(loadBoard({ category, data }));
   }, [data, tiers, category, loadedCategory, dispatch]);
 
   // The top-of-page progress bar while switching boards (skeletons show in
@@ -219,7 +218,14 @@ function Layout() {
   const tierGroups = useSelector(selectTierGroups);
   const tierCategories = useSelector(selectTierCategories);
   const pendingMoves = useSelector(selectPendingMoves);
+  const transfers = useSelector(selectTransfers);
+  const stagedCount = useSelector(selectStagedChanges).length;
   const focusSequence = useSelector(selectFocusSequence);
+  // A song dragged to another board unmounts its own tile on the way (the
+  // sidebar opens that board), so its dragend never arrives - end the drag
+  // whenever any drag ends or drops, anywhere.
+  useWindowEvent('dragend', () => dispatch(dragEnded()));
+  useWindowEvent('drop', () => dispatch(dragEnded()));
   const videoLookup = useSelector(selectVideoLookup);
   const queueHistory = useSelector((s) => s.focus.history);
   const queueUpcoming = useSelector((s) => s.focus.upcoming);
@@ -310,34 +316,30 @@ function Layout() {
 
   async function syncChanges(category) {
     dispatch(setSyncStatus('syncing'));
-    const tiers = tierGroups[category] || {};
-    const payload = pendingMoves.map((m) => ({
-      videoId: m.video.videoId,
-      title: m.video.title,
-      fromItemId: m.video.id,
-      // A dedupe or a Remove-bin entry has nothing to insert - it only
-      // deletes that playlist item, so toPlaylistId is left out entirely.
-      toPlaylistId: m.kind === 'move' ? tiers[m.to]?.id : null,
-    }));
+    const plan = buildSyncPlan(pendingMoves, transfers, tierGroups, category);
 
     try {
-      const result = await tierSyncMutation.mutateAsync(payload);
+      const result = await tierSyncMutation.mutateAsync(plan.payload);
       const finishedStatus = result.applied < result.total ? 'partial' : 'done';
 
-      // Apply whichever moves actually succeeded (per-item, from the
+      // Apply whichever changes actually succeeded (per-item, from the
       // backend's own results) straight to the local draft, rather than
       // clearing it and waiting on a refetch of YouTube's playlist API to
       // reflect the change - that refetch can lag behind the write that
       // just happened, which used to leave the just-synced duplicate/moved
       // video sitting on screen looking unsynced. See the comment on
       // `tiersSlice.applySyncedMoves`.
-      const succeededMoves = pendingMoves.filter((_, i) => result.results?.[i]?.success);
-      dispatch(applySyncedMoves({ moves: succeededMoves }));
+      const done = succeeded(plan, result.results);
+      dispatch(applySyncedMoves({ moves: done.moves }));
+      dispatch(transfersApplied(done.transfers));
+      dispatch(transfersPushed(done.transfers.map((t) => t.id)));
 
       // Still invalidate the underlying query cache in the background so a
       // stale copy isn't served if the user leaves and comes back later -
-      // this no longer needs to be awaited before updating the UI.
-      invalidatePlaylistItems(Object.values(tiers).map((t) => t.id));
+      // this no longer needs to be awaited before updating the UI. A
+      // transfer also touched another board's playlists.
+      invalidatePlaylistItems(touchedPlaylists(plan, tierGroups, category));
+      if (done.transfers.length) queryClient.invalidateQueries({ queryKey: ['playlists'] });
 
       dispatch(setSyncStatus(finishedStatus));
       setTimeout(() => dispatch(setSyncStatus('idle')), 2500);
@@ -346,8 +348,10 @@ function Layout() {
     }
   }
 
+  // Discard drops this board's edits and every staged transfer.
   function discardChanges() {
     dispatch(discardTierChanges());
+    dispatch(transfersDiscarded());
   }
 
   function moveVideoToTier(fromTier, toTier, videoId, dropIndex) {
@@ -528,11 +532,11 @@ function Layout() {
         label: `Start a duel on ${currentCategory}`,
         action: () => navigate(`/tier/${encodeURIComponent(currentCategory)}/duel`),
       });
-      if (pendingMoves.length > 0) {
+      if (stagedCount > 0) {
         list.push({
           id: 'action-sync',
           section: 'Actions',
-          label: `Sync ${currentCategory} to YouTube (${pendingMoves.length} pending)`,
+          label: `Sync ${currentCategory} to YouTube (${stagedCount} pending)`,
           action: () => syncChanges(currentCategory),
         });
         list.push({
@@ -545,7 +549,7 @@ function Layout() {
     }
     return list;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tierCategories, tierPlaylists, currentCategory, pendingMoves, tierGroups, focusSequence]);
+  }, [tierCategories, tierPlaylists, currentCategory, stagedCount, tierGroups, focusSequence]);
 
   return (
     // The shell is a fixed-height column: the body row (sidebar | canvas |

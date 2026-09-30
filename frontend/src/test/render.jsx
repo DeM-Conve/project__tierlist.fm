@@ -11,6 +11,7 @@ import appearanceReducer from '../store/appearanceSlice';
 import namingReducer from '../store/namingSlice';
 import prefsReducer from '../store/prefsSlice';
 import addSongsReducer from '../store/addSongsSlice';
+import transfersReducer from '../store/transfersSlice';
 
 const reducer = {
   auth: authReducer,
@@ -21,6 +22,7 @@ const reducer = {
   naming: namingReducer,
   prefs: prefsReducer,
   addSongs: addSongsReducer,
+  transfers: transfersReducer,
 };
 
 // A real store (the app's reducers) with `playlists` loaded and `naming`

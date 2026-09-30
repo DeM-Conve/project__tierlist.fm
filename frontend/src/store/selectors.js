@@ -2,6 +2,7 @@ import { createSelector } from '@reduxjs/toolkit';
 import { BOARD_TIERS, REMOVED_TIER, TIER_ORDER, groupByTier } from '../tiers';
 import { parseTitle } from '../naming';
 import { boardsOf, resolveTodoLists } from '../todoLists';
+import { effectiveTransfers } from '../transfers';
 import { TODO_TIER } from '../tiers';
 
 const selectPlaylists = (state) => state.auth.playlists;
@@ -98,6 +99,8 @@ export const selectPendingMoves = createSelector(
     const stillIn = (t, videoId) => (tierItems[t] || []).some((v) => v.videoId === videoId);
     for (const tier of BOARD_TIERS) {
       for (const video of tierItems[tier] || []) {
+        // A song from another board is a transfer (selectStagedChanges).
+        if (video.transfer) continue;
         const originalTiers = originalTierOf[video.videoId];
         if (!originalTiers) continue;
 
@@ -190,3 +193,18 @@ export const selectPlayingVideoIdOnBoard = createSelector(
 // keys act while it's up.
 export const selectPlayerCoversPage = (state) =>
   !!state.focus.focusedVideo && state.focus.playerMode === 'expanded';
+
+// Songs staged to move to another board, each aimed where it really goes
+// right now (see transfers.js effectiveTransfers).
+const selectTransferList = (state) => state.transfers.list;
+export const selectTransfers = createSelector(
+  [selectTransferList, selectLoadedCategory, selectTierItems],
+  (list, loadedCategory, tierItems) => effectiveTransfers(list, loadedCategory, tierItems)
+);
+
+// Everything a Push would send: the open board's moves / removals /
+// duplicates, then the transfers (as { kind: 'transfer', ...transfer }).
+export const selectStagedChanges = createSelector([selectPendingMoves, selectTransfers], (moves, transfers) => [
+  ...moves,
+  ...transfers.map((t) => ({ kind: 'transfer', ...t })),
+]);

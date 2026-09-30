@@ -10,5 +10,7 @@ export default defineConfig({
     setupFiles: ['./src/test/setup.js'],
     include: ['src/**/*.test.{js,jsx}'],
     css: false,
+    // Two workers: the full parallel default ran the machine out of memory.
+    maxWorkers: 2,
   },
 })
