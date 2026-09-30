@@ -5,9 +5,7 @@ import { modals } from '@mantine/modals';
 import { notifications } from '@mantine/notifications';
 import { ArrowRight, Info } from 'lucide-react';
 import { TierChip } from './TierBits';
-import { normalizeName, parseTitle, renderTitle } from '../naming';
-import { boardsOf, todoTitle } from '../todoLists';
-import { BOARD_TIERS, TODO_TIER } from '../tiers';
+import { planBoardRename } from '../boardRename';
 import { selectNaming, selectPendingMoves, selectTierGroups } from '../store/selectors';
 import { setPlaylists } from '../store/authSlice';
 import { linkTodoList } from '../store/namingSlice';
@@ -39,40 +37,7 @@ export default function BoardNameEditor({ category, onRenamed }) {
   const [focused, setFocused] = useState(false);
   const inputRef = useRef(null);
   const confirmed = useRef(false);
-  const name = draft.trim().replace(/\s+/g, ' ');
-
-  const group = tierGroups[category] || {};
-  const ranked = Object.values(tierGroups).flatMap((g) => BOARD_TIERS.filter((t) => t !== TODO_TIER && g[t]).map((t) => g[t]));
-  const board = boardsOf(ranked).find((b) => b.category === category) ?? { category, fields: [] };
-
-  const plan = BOARD_TIERS.filter((t) => group[t]).map((t) => {
-    const p = group[t];
-    // A to-do list linked by hand takes the template shape (and the board's
-    // own token values); every other playlist keeps its own values.
-    const to =
-      p.parsed.via === 'link'
-        ? todoTitle(naming, { ...board, category: name })
-        : renderTitle(naming, { ...p.parsed, category: name });
-    return { id: p.id, tier: t, from: p.title, to };
-  });
-  const changes = plan.filter((r) => r.from !== r.to);
-
-  function problem() {
-    if (!name) return 'Enter a name';
-    if (name === category) return null;
-    if (pendingCount > 0) return `Push or discard the ${pendingCount} staged change${pendingCount === 1 ? '' : 's'} first`;
-    const taken = Object.keys(tierGroups).find((c) => c !== category && normalizeName(c) === normalizeName(name));
-    if (taken) return `There's already a board called "${taken}"`;
-    // Every new name must still read as this board + tier, or the playlist
-    // would drop out of the app after the rename.
-    const unreadable = plan.find((r) => {
-      const back = parseTitle(r.to, [naming]);
-      return !back || back.category !== name || back.tier !== r.tier;
-    });
-    if (unreadable) return `"${unreadable.to}" wouldn't be recognised by your naming template - try another name`;
-    return null;
-  }
-  const error = problem();
+  const { name, changes, error } = planBoardRename({ naming, tierGroups, category, rawName: draft, pendingCount });
   const revert = () => setDraft(category);
 
   async function run() {

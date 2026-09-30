@@ -1,0 +1,70 @@
+import { describe, expect, it } from 'vitest';
+import { SHORTCUTS, hotkeyForCommand } from './shortcuts';
+
+describe('SHORTCUTS', () => {
+  it('is a non-empty list', () => {
+    expect(SHORTCUTS.length).toBeGreaterThan(10);
+  });
+
+  it('every entry has an id, non-empty keys, a description and a category', () => {
+    for (const s of SHORTCUTS) {
+      expect(typeof s.id).toBe('string');
+      expect(s.id.length).toBeGreaterThan(0);
+      expect(Array.isArray(s.keys)).toBe(true);
+      expect(s.keys.length).toBeGreaterThan(0);
+      s.keys.forEach((k) => expect(typeof k === 'string' && k.length > 0).toBe(true));
+      expect(typeof s.description).toBe('string');
+      expect(s.description.length).toBeGreaterThan(0);
+      expect(typeof s.category).toBe('string');
+    }
+  });
+
+  it('ids are unique', () => {
+    const ids = SHORTCUTS.map((s) => s.id);
+    expect(new Set(ids).size).toBe(ids.length);
+  });
+
+  it('commandIds are unique', () => {
+    const ids = SHORTCUTS.map((s) => s.commandId).filter(Boolean);
+    expect(new Set(ids).size).toBe(ids.length);
+  });
+
+  it('no two shortcuts in the same category share the exact same keys', () => {
+    const seen = new Set();
+    for (const s of SHORTCUTS) {
+      const key = `${s.category}|${s.keys.join('+')}`;
+      expect(seen.has(key), key).toBe(false);
+      seen.add(key);
+    }
+  });
+
+  it('documents the core global shortcuts', () => {
+    const byId = Object.fromEntries(SHORTCUTS.map((s) => [s.id, s]));
+    expect(byId.palette.keys).toEqual(['Ctrl', 'K']);
+    expect(byId.undo.keys).toEqual(['Ctrl', 'Z']);
+    expect(byId.help.keys).toEqual(['?']);
+    expect(byId.push.keys).toEqual(['Shift', 'P']);
+  });
+
+  it('Vim sequences start with a registered prefix (g / y)', async () => {
+    const { SEQUENCE_PREFIXES } = await import('./keyboard/sequence');
+    const sequences = SHORTCUTS.filter((s) => s.category === 'Navigation (Vim)').flatMap((s) => s.keys).filter((k) => k.length === 2);
+    expect(sequences.length).toBeGreaterThan(0);
+    sequences.forEach((k) => expect(SEQUENCE_PREFIXES).toContain(k[0]));
+  });
+});
+
+describe('hotkeyForCommand', () => {
+  it('finds the keys for a command id', () => {
+    expect(hotkeyForCommand('action-sync')).toEqual(['Shift', 'P']);
+  });
+
+  it('undefined for an unknown command', () => {
+    expect(hotkeyForCommand('nope')).toBeUndefined();
+  });
+
+  it('documents: an undefined command id matches the first shortcut without a commandId', () => {
+    // `s.commandId === undefined` is true for every entry lacking one.
+    expect(hotkeyForCommand(undefined)).toEqual(SHORTCUTS[0].keys);
+  });
+});

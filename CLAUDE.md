@@ -138,6 +138,18 @@ category.
   (needs Docker; `testcontainers.version` is pinned in `pom.xml` because Boot 3.3's
   is too old for current Docker engines). New persistence/API behaviour gets an IT,
   not a mock. The Docker image build skips tests.
+- **Frontend tests**: `npm test` in `frontend/` (Vitest + Testing Library, jsdom;
+  `vitest.config.js`, test files next to their module as `*.test.js(x)`). Pure logic
+  lives in plain modules so it can be tested without React - e.g. the board rename
+  plan is `src/boardRename.js`, the component only calls it. A bug fix comes with a
+  test that fails without it.
+- **Tests gate every deploy (the user's explicit call).** Deploy only via
+  `scripts/deploy.sh` (all tests + build, then Compose, then checks the served
+  bundle) - `scripts/deploy.sh frontend` for a frontend-only redeploy that keeps
+  the login. Never run `docker compose up --build` by hand to ship a change, and
+  never report a fix as live if the script failed. No CI pipeline (the user's
+  call) - the tests run locally. The backend must keep >= 80% line coverage
+  (JaCoCo, enforced by `mvn verify`).
 - **Deploy**: Docker Compose. `docker-compose.yml` (prod-style multi-stage builds) and
   `docker-compose.local.yml` (dev, volume-mounted). Rebuilding either container clears
   the backend's in-memory session, so you'll need to log in again after a redeploy.
@@ -390,9 +402,8 @@ The user asked for these on top of the Mantine/Redux migration above. Tracked he
   commit messages or PR descriptions.** The user had these stripped from all existing
   history with `git filter-repo` and does not want Claude credited as an author
   anywhere in this repo's git history, going forward.
-- After changing frontend code, rebuild and redeploy before saying a fix is live:
-  `npx vite build` in `frontend/`, then `docker compose -f docker-compose.yml up -d
-  --build` (frontend, or both if backend also changed) from the project root. Verify the
-  served bundle hash actually changed via `curl -s http://localhost:80 | grep -o
-  'index-[^"]*\.\(js\|css\)'` before reporting something as fixed - this repo has a
-  history of "fixes" that were actually just a stale cached bundle.
+- After changing code, redeploy with `scripts/deploy.sh` (or `scripts/deploy.sh
+  frontend`) before saying a fix is live - it runs every test first and refuses to
+  deploy on a failure, then verifies the served bundle hash is the one just built
+  (this repo has a history of "fixes" that were actually just a stale cached
+  bundle).

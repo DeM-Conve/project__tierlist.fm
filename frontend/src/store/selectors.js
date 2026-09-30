@@ -39,7 +39,7 @@ export const selectNamingSettings = createSelector([selectNaming, selectDisplayN
 // The only playlists the app ever shows: those whose title follows the
 // naming (anything else - e.g. a private playlist - stays hidden
 // everywhere). Each gets `.parsed` = { fields, category, tier, naming }.
-const selectRankedPlaylists = createSelector(
+export const selectRankedPlaylists = createSelector(
   [selectPlaylists, selectNamings],
   (playlists, namings) => {
     if (!playlists) return null;

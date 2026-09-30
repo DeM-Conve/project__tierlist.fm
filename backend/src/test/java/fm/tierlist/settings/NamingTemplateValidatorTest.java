@@ -28,4 +28,34 @@ class NamingTemplateValidatorTest {
     void nullIsLeftToNotNull() {
         assertThat(validator.isValid(null, null)).isTrue();
     }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"{Category} {tier}", "{category} {TIER}", "{ category} {tier}", "{category } {tier}"})
+    void theTwoProductTokensAreExactAndCaseSensitive(String template) {
+        // "{Category}" is a token of the user's own, so {category} is missing.
+        assertThat(validator.isValid(template, null)).isFalse();
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"{category}{tier}", "{tier}{category}", "{category} {tier} {a}", "{category} {tier} {my_label}",
+        "{category} {tier} {Tag2}", "{category} {tier} {abcdefghijklmnopqrst}", "{category} {tier} {Category}",
+        "Été {category} {tier} ★", "{category}/{tier}%_"})
+    void ownTokensAreOneWordUpTo20CharsAndAnyOtherTextIsFree(String template) {
+        assertThat(validator.isValid(template, null)).isTrue();
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"{category} {tier} {abcdefghijklmnopqrstu}", "{category} {tier} {_x}", "{category} {tier} {x-y}",
+        "{category} {tier} {été}", "{{category}} {tier}", "{category} {tier} {", "{category} {tier} {{x}",
+        "{category} {tier} {x}}", "{category} {tier} {x} {x}", "{category}{category} {tier}"})
+    void rejectsOverlongOrNonWordTokensDoubledBracesAndRepeats(String template) {
+        assertThat(validator.isValid(template, null)).isFalse();
+    }
+
+    @Test
+    void atMost200Characters() {
+        String base = "{category} {tier} ";
+        assertThat(validator.isValid(base + "x".repeat(NamingTemplate.MAX_LENGTH - base.length()), null)).isTrue();
+        assertThat(validator.isValid(base + "x".repeat(NamingTemplate.MAX_LENGTH - base.length() + 1), null)).isFalse();
+    }
 }

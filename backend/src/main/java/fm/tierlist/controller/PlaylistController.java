@@ -1,5 +1,6 @@
 package fm.tierlist.controller;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
@@ -29,8 +30,17 @@ import java.util.Map;
 @RestController
 public class PlaylistController {
 
-    private static final String YOUTUBE_API_BASE = "https://www.googleapis.com/youtube/v3";
-    private final RestTemplate restTemplate = new RestTemplate();
+    private final String apiBase;
+    private final RestTemplate restTemplate;
+
+    // The base URL is a property only so tests can aim it elsewhere; the default is YouTube's.
+    public PlaylistController(
+            RestTemplate youtubeRestTemplate,
+            @Value("${app.youtube.api-base:https://www.googleapis.com/youtube/v3}") String youtubeApiBase
+    ) {
+        this.restTemplate = youtubeRestTemplate;
+        this.apiBase = youtubeApiBase;
+    }
 
     @GetMapping("/api/auth/status")
     public Map<String, Object> authStatus(Authentication authentication) {
@@ -44,7 +54,7 @@ public class PlaylistController {
     public List<Map<String, Object>> playlists(@RegisteredOAuth2AuthorizedClient("google") OAuth2AuthorizedClient client) {
         List<Map<String, Object>> allItems = fetchAllPages(
             client,
-            YOUTUBE_API_BASE + "/playlists?part=snippet,contentDetails&mine=true&maxResults=50"
+            apiBase + "/playlists?part=snippet,contentDetails&mine=true&maxResults=50"
         );
 
         List<Map<String, Object>> result = new ArrayList<>();
@@ -70,7 +80,7 @@ public class PlaylistController {
     ) {
         List<Map<String, Object>> allItems = fetchAllPages(
             client,
-            YOUTUBE_API_BASE + "/playlistItems?part=snippet,contentDetails&playlistId=" + id + "&maxResults=50"
+            apiBase + "/playlistItems?part=snippet,contentDetails&playlistId=" + id + "&maxResults=50"
         );
 
         return toVideos(allItems);
@@ -82,7 +92,7 @@ public class PlaylistController {
             @PathVariable String videoId,
             @RegisteredOAuth2AuthorizedClient("google") OAuth2AuthorizedClient client
     ) {
-        Map<String, Object> body = callYoutubeApi(client, YOUTUBE_API_BASE + "/videos?part=snippet&id=" + videoId);
+        Map<String, Object> body = callYoutubeApi(client, apiBase + "/videos?part=snippet&id=" + videoId);
         List<Map<String, Object>> items = (List<Map<String, Object>>) body.get("items");
         if (items == null || items.isEmpty()) return ResponseEntity.notFound().build();
         Map<String, Object> snippet = (Map<String, Object>) items.get(0).get("snippet");
@@ -212,7 +222,7 @@ public class PlaylistController {
             result.put("id", id);
             result.put("title", title);
             try {
-                Map<String, Object> body = callYoutubeApi(client, YOUTUBE_API_BASE + "/playlists?part=snippet&id=" + id);
+                Map<String, Object> body = callYoutubeApi(client, apiBase + "/playlists?part=snippet&id=" + id);
                 List<Map<String, Object>> items = (List<Map<String, Object>>) body.get("items");
                 if (items == null || items.isEmpty()) throw new IllegalStateException("Playlist not found");
                 Map<String, Object> snippet = new LinkedHashMap<>((Map<String, Object>) items.get(0).get("snippet"));
@@ -220,7 +230,7 @@ public class PlaylistController {
                 newSnippet.put("title", title);
                 if (snippet.get("description") != null) newSnippet.put("description", snippet.get("description"));
                 if (snippet.get("defaultLanguage") != null) newSnippet.put("defaultLanguage", snippet.get("defaultLanguage"));
-                sendJson(client, HttpMethod.PUT, YOUTUBE_API_BASE + "/playlists?part=snippet", Map.of("id", id, "snippet", newSnippet));
+                sendJson(client, HttpMethod.PUT, apiBase + "/playlists?part=snippet", Map.of("id", id, "snippet", newSnippet));
                 result.put("success", true);
                 applied++;
             } catch (Exception e) {
@@ -257,7 +267,7 @@ public class PlaylistController {
                 Map<String, Object> created = sendJson(
                     client,
                     HttpMethod.POST,
-                    YOUTUBE_API_BASE + "/playlists?part=snippet,status",
+                    apiBase + "/playlists?part=snippet,status",
                     Map.of("snippet", Map.of("title", title), "status", Map.of("privacyStatus", privacy))
                 );
                 result.put("id", created != null ? created.get("id") : null);
@@ -294,7 +304,7 @@ public class PlaylistController {
         Map<String, Object> body = Map.of("snippet", snippet);
 
         HttpEntity<Map<String, Object>> entity = new HttpEntity<>(body, headers);
-        return restTemplate.exchange(YOUTUBE_API_BASE + "/playlistItems?part=snippet", HttpMethod.POST, entity, Map.class).getBody();
+        return restTemplate.exchange(apiBase + "/playlistItems?part=snippet", HttpMethod.POST, entity, Map.class).getBody();
     }
 
     private void deletePlaylistItem(OAuth2AuthorizedClient client, String playlistItemId) {
@@ -302,7 +312,7 @@ public class PlaylistController {
         headers.setBearerAuth(client.getAccessToken().getTokenValue());
         HttpEntity<Void> entity = new HttpEntity<>(headers);
         restTemplate.exchange(
-            YOUTUBE_API_BASE + "/playlistItems?id=" + playlistItemId,
+            apiBase + "/playlistItems?id=" + playlistItemId,
             HttpMethod.DELETE,
             entity,
             Void.class
