@@ -17,7 +17,6 @@ import { ActionIcon, Affix, Box, Center, Flex, Loader } from '@mantine/core';
 import { Menu as MenuIcon } from 'lucide-react';
 import { useDisclosure, useElementSize, useHotkeys, useMergedRef, useWindowEvent } from '@mantine/hooks';
 import { notifications } from '@mantine/notifications';
-import { useProgress } from '@bprogress/react';
 import './App.css';
 import { BOARD_TIERS, TODO_TIER } from './tiers';
 import Sidebar from './components/Sidebar';
@@ -89,6 +88,7 @@ import {
   selectNaming,
 } from './store/selectors';
 import { api, API_BASE, errorMessage } from './api/client';
+import { useLoadProgress } from './layout/useLoadProgress';
 import {
   useAuthStatusQuery,
   usePlaylistsQuery,
@@ -124,15 +124,9 @@ function useLoadTierBoard(category, tiers) {
     dispatch(setLoadedCategory(category));
   }, [data, tiers, category, loadedCategory, dispatch]);
 
-  // Drives the top-of-page progress bar (@bprogress/react) while switching
-  // between tier boards - the actual "stale items still showing" bug this
-  // was added alongside is fixed in TierRow (only skeletons render while
-  // `loading` is true), this is just the accompanying visual feedback.
-  const { start, stop } = useProgress();
-  useEffect(() => {
-    if (boardLoading) start();
-    else stop();
-  }, [boardLoading, start, stop]);
+  // The top-of-page progress bar while switching boards (skeletons show in
+  // TierRow while `loading`; this is the accompanying visual feedback).
+  useLoadProgress(boardLoading, category);
 
   return { isLoading: boardLoading };
 }
