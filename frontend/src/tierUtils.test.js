@@ -61,6 +61,30 @@ describe('songLabel', () => {
     expect(songLabel({ title: 'Tune', channelTitle: 'Band Official' }).artist).toBe('Band');
   });
 
+  it('a "- Topic" channel names the song itself: the whole title is the song, the first part kept', () => {
+    expect(songLabel({ title: 'Sparkle - movie ver.', channelTitle: 'Radwimps - Topic' })).toEqual({
+      song: 'Sparkle - movie ver.',
+      artist: 'Radwimps',
+    });
+    expect(songLabel({ title: 'Nandemonaiya - movie ver.', channelTitle: 'RADWIMPS - Topic' }).song).toBe('Nandemonaiya - movie ver.');
+    expect(songLabel({ title: 'Zenzenzense - movie ver. (Official Audio)', channelTitle: 'Radwimps - Topic' }).song).toBe(
+      'Zenzenzense - movie ver.'
+    );
+  });
+
+  it('"Song - Artist" (the part after the dash is the channel) keeps the song first', () => {
+    expect(songLabel({ title: 'Sparkle - RADWIMPS', channelTitle: 'RADWIMPS' })).toEqual({ song: 'Sparkle', artist: 'RADWIMPS' });
+    expect(songLabel({ title: 'Tune – Band', channelTitle: 'BandVEVO' })).toEqual({ song: 'Tune', artist: 'Band' });
+    expect(songLabel({ title: 'Canción - Beyonce', channelTitle: 'Beyoncé' })).toEqual({ song: 'Canción', artist: 'Beyonce' });
+  });
+
+  it('"Artist - Song" from the artist\'s own channel still splits as before', () => {
+    expect(songLabel({ title: 'RADWIMPS - Sparkle (Official Video)', channelTitle: 'RADWIMPS' })).toEqual({
+      song: 'Sparkle',
+      artist: 'RADWIMPS',
+    });
+  });
+
   it('missing title / channel', () => {
     expect(songLabel({})).toEqual({ song: '', artist: '' });
     expect(songLabel({ title: 'Only' })).toEqual({ song: 'Only', artist: '' });

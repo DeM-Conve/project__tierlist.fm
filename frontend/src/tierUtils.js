@@ -38,13 +38,23 @@ const TITLE_NOISE =
 const CHANNEL_NOISE = /\s*(-\s*topic|vevo|official)\s*$/i;
 
 // What a tile shows: the song name and who it's by, from the video's own
-// metadata. Handles the common "Artist - Song (Official Video)" shape; any
-// other title is the song, with the channel as the artist.
+// metadata. "A - B" is read as:
+//   - on an auto-generated "Artist - Topic" channel: the whole title is the
+//     song ("Sparkle - movie ver."), the channel is the artist;
+//   - B is the channel ("Song - Artist"): A is the song;
+//   - otherwise the common "Artist - Song (Official Video)" shape.
+// Any other title is the song, with the channel as the artist.
 export function songLabel(video) {
   const clean = (video.title || '').replace(TITLE_NOISE, '').split(/\s[|｜]\s/)[0].trim();
+  const channel = video.channelTitle || '';
+  const channelArtist = channel.replace(CHANNEL_NOISE, '').trim();
+  const fallback = { song: clean || video.title || '', artist: channelArtist };
+  if (/-\s*topic\s*$/i.test(channel)) return fallback;
   const dash = clean.match(/^(.+?)\s[-–—]\s(.+)$/);
-  if (dash) return { song: dash[2].trim(), artist: dash[1].trim() };
-  return { song: clean || video.title || '', artist: (video.channelTitle || '').replace(CHANNEL_NOISE, '').trim() };
+  if (!dash) return fallback;
+  const [first, rest] = [dash[1].trim(), dash[2].trim()];
+  if (channelArtist && fold(rest) === fold(channelArtist)) return { song: first, artist: rest };
+  return { song: rest, artist: first };
 }
 
 const fold = (text) => text.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase();
