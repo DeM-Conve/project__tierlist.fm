@@ -1,7 +1,6 @@
 import { useRef, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { Alert, Code, Stack, Table, Text, TextInput, Title, Tooltip } from '@mantine/core';
-import { useElementSize } from '@mantine/hooks';
 import { modals } from '@mantine/modals';
 import { notifications } from '@mantine/notifications';
 import { ArrowRight, Info } from 'lucide-react';
@@ -39,7 +38,6 @@ export default function BoardNameEditor({ category, onRenamed }) {
   const [draft, setDraft] = useState(category);
   const [focused, setFocused] = useState(false);
   const inputRef = useRef(null);
-  const { ref: measureRef, width: textWidth } = useElementSize();
   const confirmed = useRef(false);
   const name = draft.trim().replace(/\s+/g, ' ');
 
@@ -184,13 +182,10 @@ export default function BoardNameEditor({ category, onRenamed }) {
       withArrow
       position="bottom-start"
     >
-        {/* h1 holding the field: a hidden copy of the text is measured
-            (useElementSize) and the input gets exactly that width - so the box
-            hugs the name at any length (see .board-name in App.css). */}
+        {/* The browser sizes the box to the text itself (field-sizing:
+            content), so it hugs the name at any length and in any font -
+            no measuring. See .board-name in App.css for the hover/focus look. */}
         <Title order={1} fz={{ base: 30, sm: 40 }} fw={900} lh={1.15} className="board-name" data-dirty={name !== category || undefined}>
-          <span ref={measureRef} aria-hidden="true" className="board-name-measure">
-            {draft || ' '}
-          </span>
           <TextInput
             ref={inputRef}
             variant="unstyled"
@@ -217,8 +212,7 @@ export default function BoardNameEditor({ category, onRenamed }) {
             spellCheck={false}
             aria-label="Board name - click to rename"
             classNames={{ input: 'board-name-input' }}
-            // Text width + the input's own padding (2 x 8px) and border (2 x 1px).
-            styles={{ input: { width: Math.ceil(textWidth) + 18 } }}
+            styles={{ input: { fieldSizing: 'content', width: 'auto' } }}
           />
         </Title>
     </Tooltip>

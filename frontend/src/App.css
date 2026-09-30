@@ -372,22 +372,14 @@
 
 /* Board name on a tier board (BoardNameEditor): renamed in place like an
    Office document name. CSS because no Mantine prop covers these: the
-   measured copy of the text is laid out but invisible, and the outline is
-   revealed by :hover / :focus. The negative margin keeps the text aligned
-   with the label above when the outline is invisible. */
+   outline is revealed by :hover / :focus (the width is field-sizing, set
+   via the input's Mantine styles prop). The -9px shift keeps the text aligned
+   with the label above when the outline is invisible - a translate, not a
+   negative margin: that shrank the title's width and max-width: 100% then
+   cut the name off. */
 .board-name {
-  position: relative;
   max-width: 100%;
   letter-spacing: -0.02em;
-}
-.board-name-measure {
-  position: absolute;
-  top: 0;
-  left: 0;
-  display: inline-block;
-  visibility: hidden;
-  white-space: pre;
-  pointer-events: none;
 }
 .board-name .board-name-input {
   max-width: 100%;
@@ -397,7 +389,7 @@
   font: inherit;
   letter-spacing: inherit;
   padding: 2px 8px;
-  margin-left: -9px;
+  translate: -9px 0;
   border: 1px solid transparent;
   border-radius: 6px;
   color: inherit;
