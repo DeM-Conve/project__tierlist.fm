@@ -9,7 +9,9 @@ import { TODO_TIER } from './tiers';
 // a board by hand (an explicit link: playlist id -> board).
 //
 // A board has at most one to-do list: a linked one beats a name match; among
-// equals the first wins and the rest are reported as `duplicate`.
+// equals the one holding the most songs wins (a same-named empty copy must
+// never hide the real list), ties go to the first, and the rest are reported
+// as `duplicate`.
 
 // A board's to-do list named by the naming: the to-do name fills {tier}, the
 // board's (first) values fill the user's own tokens.
@@ -47,10 +49,11 @@ export function resolveTodoLists(playlists, { links, boards, namings }) {
       rows.push({ playlist, category, fields, via: 'name', status: known.has(category) ? 'active' : 'missingBoard' });
     }
   }
-  // One per board: links first, then name matches, in playlist order.
+  // One per board: links first, then name matches, biggest first.
+  const bySize = [...rows].sort((a, b) => (b.playlist.itemCount ?? 0) - (a.playlist.itemCount ?? 0));
   const taken = new Set();
   for (const via of ['link', 'name']) {
-    for (const row of rows) {
+    for (const row of bySize) {
       if (row.via !== via || row.status !== 'active') continue;
       if (taken.has(row.category)) row.status = 'duplicate';
       else taken.add(row.category);

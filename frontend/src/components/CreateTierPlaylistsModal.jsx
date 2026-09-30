@@ -4,7 +4,7 @@ import { Alert, Autocomplete, Button, Chip, Group, Modal, SegmentedControl, Stac
 import { notifications } from '@mantine/notifications';
 import { BOARD_TIERS, TODO_TIER } from '../tiers';
 import { customTokens, parseTitle, renderTitle } from '../naming';
-import { selectNaming, selectTierGroups, selectTierPlaylists } from '../store/selectors';
+import { selectNaming, selectTierGroups, selectTierPlaylists, selectTodoRows } from '../store/selectors';
 import { useTierName } from '../tierLabels';
 import { useCreatePlaylistsMutation } from '../api/queries';
 import { TierChip } from './TierBits';
@@ -18,9 +18,18 @@ export default function CreateTierPlaylistsModal({ opened, onClose, category: fi
   const tierName = useTierName();
   const tierGroups = useSelector(selectTierGroups);
   const tierPlaylists = useSelector(selectTierPlaylists);
+  const todoRows = useSelector(selectTodoRows);
   const createMutation = useCreatePlaylistsMutation();
 
-  const existingTiers = fixedCategory ? Object.keys(tierGroups[fixedCategory] || {}) : [];
+  const [category, setCategory] = useState('');
+  const name = (fixedCategory ?? category).trim();
+  // A to-do list already named for this board counts as existing even while
+  // the board has no ranked tiers yet (its row is then `missingBoard`, not in
+  // tierGroups) - creating the board must not make a second, empty one.
+  const hasTodo = todoRows.some((r) => r.category === name);
+  const existingTiers = [
+    ...new Set([...(fixedCategory ? Object.keys(tierGroups[fixedCategory] || {}) : []), ...(hasTodo ? [TODO_TIER] : [])]),
+  ];
   // The user's own tokens (whatever they named them): one input each, suggesting the values
   // their playlists already use; a board's missing tiers reuse the board's.
   const tokens = useMemo(() => customTokens(naming.template), [naming.template]);
@@ -35,7 +44,6 @@ export default function CreateTierPlaylistsModal({ opened, onClose, category: fi
     ? Object.values(tierGroups[fixedCategory] || {}).find((p) => p.parsed.tier !== TODO_TIER)?.parsed?.fields ?? {}
     : {};
 
-  const [category, setCategory] = useState('');
   const [fieldValues, setFieldValues] = useState(() =>
     Object.fromEntries(tokens.map((t) => [t, boardFields[t] ?? known[t]?.[0] ?? '']))
   );
@@ -45,7 +53,6 @@ export default function CreateTierPlaylistsModal({ opened, onClose, category: fi
   );
   const [privacy, setPrivacy] = useState('private');
 
-  const name = (fixedCategory ?? category).trim();
   const titles = tiers
     .filter((t) => !existingTiers.includes(t))
     .sort((a, b) => BOARD_TIERS.indexOf(a) - BOARD_TIERS.indexOf(b))
