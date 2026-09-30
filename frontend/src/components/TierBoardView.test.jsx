@@ -1,0 +1,121 @@
+import { describe, expect, it, vi } from 'vitest';
+import { act, screen } from '@testing-library/react';
+import { useSelector } from 'react-redux';
+import { MemoryRouter } from 'react-router-dom';
+import { ContextMenuProvider } from 'mantine-contextmenu';
+import TierBoardView from './TierBoardView';
+import { CanvasContext } from '../layout/canvas';
+import { makeStore, renderWithApp } from '../test/render';
+import { loadBoard, moveWithFeedback } from '../tierActions';
+import { discardTierChanges } from '../store/tiersSlice';
+import { selectPendingMoves, selectTierGroups } from '../store/selectors';
+
+vi.mock('@mantine/notifications', () => ({ notifications: { show: vi.fn(), hide: vi.fn() } }));
+// jsdom has no layout: every row reports 1300px wide and the header/footer
+// 0px tall, so the board's fit maths runs against a known screen.
+vi.mock('@mantine/hooks', async (importOriginal) => ({
+  ...(await importOriginal()),
+  useElementSize: () => ({ ref: { current: null }, width: 1300, height: 0 }),
+}));
+
+const NAMING = { template: '{category} {tier}', tierLabels: { S: 'S', A: 'A', B: 'B', C: 'C', D: 'D', TODO: 'TODO' } };
+const TIERS = ['S', 'A', 'B', 'C', 'D', 'TODO'];
+const playlists = TIERS.map((t) => ({ id: `pl-${t}`, title: `Rock ${t}`, itemCount: 30 }));
+const songs = (tier, n) => Array.from({ length: n }, (_, i) => ({ videoId: `${tier}${i}`, id: `item-${tier}${i}`, title: `Band - Song ${tier}${i}` }));
+const data = Object.fromEntries(TIERS.map((t) => [t, songs(t, 30)]));
+
+function Board() {
+  const tierGroups = useSelector(selectTierGroups);
+  const tierItems = useSelector((s) => s.tiers.tierItems);
+  const tierLoading = useSelector((s) => s.tiers.tierLoading);
+  const pendingMoves = useSelector(selectPendingMoves);
+  const noop = () => {};
+  return (
+    <TierBoardView
+      category="Rock"
+      tierGroups={tierGroups}
+      tierItems={tierItems}
+      tierLoading={tierLoading}
+      boardLoading={false}
+      playingVideoId={null}
+      pendingMoves={pendingMoves}
+      onPlay={noop}
+      onPlayFrom={noop}
+      onShufflePlay={noop}
+      onStartDuel={noop}
+      onOpenTier={noop}
+      onAddMissingTiers={noop}
+      onRenameBoard={noop}
+    />
+  );
+}
+
+// A 700px canvas: six rows only just fit at the full 88px tile size - the
+// case where taking the bar's 80px out of the room shrank every tile.
+function renderBoard(height = 700) {
+  const store = makeStore({ playlists, naming: NAMING });
+  store.dispatch(loadBoard({ category: 'Rock', data }));
+  const canvas = { ref: { current: document.createElement('div') }, height };
+  renderWithApp(
+    <MemoryRouter>
+      <ContextMenuProvider>
+        <CanvasContext.Provider value={canvas}>
+          <Board />
+        </CanvasContext.Provider>
+      </ContextMenuProvider>
+    </MemoryRouter>,
+    { store }
+  );
+  return store;
+}
+// Mantine writes sizes as rem: "calc(5.5rem * var(--mantine-scale))" = 88px.
+const tileWidth = () => {
+  const css = document.querySelector('.tile[data-video-id="S0"]').style.width;
+  const m = /([\d.]+)rem/.exec(css);
+  return m ? Math.round(Number(m[1]) * 16) : Number.parseFloat(css);
+};
+const hiddenCount = () => screen.getAllByText(/^\+\d+$/).map((n) => n.textContent);
+
+describe('TierBoardView - the staged-changes bar never resizes the board', () => {
+  it('tile size and "+N" stay the same when a change is staged', () => {
+    const store = renderBoard();
+    const before = { width: tileWidth(), hidden: hiddenCount() };
+    expect(before.width).toBe(88);
+
+    act(() => {
+      store.dispatch(moveWithFeedback([{ fromTier: 'TODO', toTier: 'S', videoId: 'TODO0' }], { quiet: true }));
+    });
+    expect(selectPendingMoves(store.getState())).toHaveLength(1);
+    expect(tileWidth()).toBe(before.width);
+    // Same number of hidden songs per row (the moved song aside).
+    expect(hiddenCount().length).toBe(before.hidden.length);
+  });
+
+  it('...and when the change is discarded again', () => {
+    const store = renderBoard();
+    const before = tileWidth();
+    act(() => {
+      store.dispatch(moveWithFeedback([{ fromTier: 'TODO', toTier: 'S', videoId: 'TODO0' }], { quiet: true }));
+    });
+    act(() => {
+      store.dispatch(discardTierChanges());
+    });
+    expect(tileWidth()).toBe(before);
+  });
+
+  it('a genuinely short screen still shrinks the tiles (the fit itself still works)', () => {
+    renderBoard(560);
+    expect(tileWidth()).toBeLessThan(88);
+    expect(tileWidth()).toBeGreaterThanOrEqual(60);
+  });
+
+  it('the board keeps room to scroll the last row clear of the bar', () => {
+    const store = renderBoard();
+    const section = document.querySelector('section');
+    const padBefore = section.style.paddingBottom;
+    act(() => {
+      store.dispatch(moveWithFeedback([{ fromTier: 'TODO', toTier: 'S', videoId: 'TODO0' }], { quiet: true }));
+    });
+    expect(section.style.paddingBottom).not.toBe(padBefore);
+  });
+});
