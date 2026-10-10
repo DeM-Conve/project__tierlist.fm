@@ -76,6 +76,13 @@ describe('Sidebar', () => {
     expect(screen.queryByText('Rock S')).not.toBeInTheDocument();
   });
 
+  it('activity bar order: Home, Jump to, Tier lists, Playlists, Add songs, then shortcuts, settings, log out', () => {
+    draw(props());
+    const bar = screen.getByRole('navigation', { name: 'Activity bar' });
+    const names = Array.from(bar.querySelectorAll('a, button')).map((el) => el.getAttribute('aria-label'));
+    expect(names).toEqual(['Home', 'Jump to…', 'Tier lists', 'Playlists', 'Add songs', 'Keyboard shortcuts', 'Settings', 'Log out']);
+  });
+
   it('filters the boards', () => {
     draw(props({ query: 'ro' }));
     expect(screen.queryByText('Rap')).not.toBeInTheDocument();

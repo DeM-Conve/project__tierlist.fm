@@ -122,17 +122,17 @@ function ActivityBar({ openView, onShowView, onOpenPalette, waitingCount, onSele
   const { pathname } = useLocation();
   return (
     <Stack component="nav" aria-label="Activity bar" gap={6} align="center" px={6} py={SHELL_Y}>
+      <ActivityIcon label="Home" keys="g h" component={Link} to="/" marked={pathname === '/'}>
+        <Home size={22} />
+      </ActivityIcon>
+      <ActivityIcon label="Jump to…" keys="o / ⌘K" onClick={onOpenPalette}>
+        <Search size={22} />
+      </ActivityIcon>
       <ActivityIcon label="Tier lists" keys={TOGGLE_KEYS} marked={openView === 'boards'} aria-pressed={openView === 'boards'} onClick={() => onShowView('boards')}>
         <LayoutList size={22} />
       </ActivityIcon>
       <ActivityIcon label="Playlists" marked={openView === 'playlists'} aria-pressed={openView === 'playlists'} onClick={() => onShowView('playlists')}>
         <ListMusic size={22} />
-      </ActivityIcon>
-      <ActivityIcon label="Jump to…" keys="o / ⌘K" onClick={onOpenPalette}>
-        <Search size={22} />
-      </ActivityIcon>
-      <ActivityIcon label="Home" keys="g h" component={Link} to="/" marked={pathname === '/'}>
-        <Home size={22} />
       </ActivityIcon>
       <Indicator label={waitingCount} size={16} disabled={!waitingCount} offset={8}>
         <ActivityIcon label="Add songs" keys="a" component={Link} to="/add" state={{ focusInput: true }} marked={pathname === '/add'}>
