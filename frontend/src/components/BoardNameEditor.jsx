@@ -9,7 +9,7 @@ import { planBoardRename } from '../boardRename';
 import { selectNaming, selectStagedChanges, selectTierGroups } from '../store/selectors';
 import { setPlaylists } from '../store/authSlice';
 import { linkTodoList } from '../store/namingSlice';
-import { useApplyPlaylistTitles, useInvalidatePlaylists, useRenamePlaylistsMutation } from '../api/queries';
+import { useApplyPlaylistTitles, useInvalidatePlaylists, useRenameDuelBoardMutation, useRenamePlaylistsMutation } from '../api/queries';
 import { errorMessage } from '../api/client';
 
 const QUOTA_PER_RENAME = 51; // playlists.list (1) + playlists.update (50)
@@ -31,6 +31,7 @@ export default function BoardNameEditor({ category, onRenamed }) {
   // Transfers name their boards, so they block a rename too.
   const pendingCount = useSelector(selectStagedChanges).length;
   const renameMutation = useRenamePlaylistsMutation();
+  const renameDuels = useRenameDuelBoardMutation();
   const applyTitles = useApplyPlaylistTitles();
   const invalidatePlaylists = useInvalidatePlaylists();
 
@@ -47,6 +48,11 @@ export default function BoardNameEditor({ category, onRenamed }) {
       const done = changes.filter((_, i) => res.results[i]?.success);
       const failed = res.results.filter((r) => !r.success);
       if (done.length === 0) throw new Error(failed[0]?.error || 'YouTube refused the rename');
+      // Duel history is kept by board name too - it follows the board.
+      renameDuels.mutate(
+        { from: category, to: name },
+        { onError: (err) => notifications.show({ color: 'red', message: `Duel history couldn't follow the rename: ${errorMessage(err, err.message)}` }) }
+      );
       // A hand-assigned TODO list is linked by board name - move the link.
       Object.entries(links).forEach(([playlistId, c]) => {
         if (c === category) dispatch(linkTodoList({ playlistId, category: name }));

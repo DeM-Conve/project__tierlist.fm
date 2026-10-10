@@ -152,24 +152,34 @@ export default function DuelMatch({ category, sessionId, boardLoading, base }) {
     lastA.current = m.a;
   }, [m?.a, m?.b, answered]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const failed = (err) => notifications.show({ color: 'red', title: 'That didn’t save', message: errorMessage(err, 'The app couldn’t reach the server.') });
+  // 409: the session moved on (another tab, a double press - nothing was
+  // recorded twice) or it ended: show it as it is now.
+  const failed = (err) => {
+    if (err?.response?.status === 409) {
+      notifications.show({ title: err.response.data?.title ?? 'Session changed', message: errorMessage(err, '') });
+      setAnswered(null);
+      session.refetch();
+      return;
+    }
+    notifications.show({ color: 'red', title: 'That didn’t save', message: errorMessage(err, 'The app couldn’t reach the server.') });
+  };
 
   function pick(v) {
     if (!m || busy || answered) return;
     setAnswered(m);
-    verdict.mutate({ layout, a: m.a, b: m.b, verdict: v }, { onError: (e) => { setAnswered(null); failed(e); } });
+    verdict.mutate({ layout, a: m.a, b: m.b, verdict: v, seenDuels: s.duels.length }, { onError: (e) => { setAnswered(null); failed(e); } });
   }
   function next() {
     setAnswered(null);
   }
   function dontKnow() {
     if (!m || busy) return;
-    skip.mutate({ layout, videoId: m.b }, { onError: failed });
+    skip.mutate({ layout, videoId: m.b, seenDuels: s.duels.length }, { onError: failed });
   }
   function takeBack() {
     if (busy) return;
     setAnswered(null);
-    undo.mutate({ layout }, { onError: failed });
+    undo.mutate({ layout, seenDuels: s.duels.length }, { onError: failed });
   }
   function finish() {
     end.mutate({ layout }, { onSuccess: () => navigate(`${base}/duel/done/${sessionId}`), onError: failed });

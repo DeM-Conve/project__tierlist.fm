@@ -57,6 +57,11 @@ public class DuelDecision {
         this.decidedAt = at;
     }
 
+    // The same decision on a renamed board.
+    DuelDecision movedTo(String board) {
+        return new DuelDecision(new BoardSongId(id.userId(), board, id.videoId()), fromTier, toTier, confidence, decision, duelsAtDecision, decidedAt);
+    }
+
     public String getVideoId() {
         return id.videoId();
     }

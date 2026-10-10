@@ -177,12 +177,15 @@ CREATE TABLE duel_skip (
     CONSTRAINT skip_video_valid CHECK (video_id_valid(video_id))
 );
 
--- The score a song started from, stored the first time the engine saw it on
--- the board, so a replay of the log always starts from the same place.
+-- The score a song starts from, made from the tier it was in (`tier`), so a
+-- replay of the log always starts from the same place. Remade when the song's
+-- tier changes - a move the user made (by hand or by accepting a suggestion)
+-- is their call, and the duels still count on top of it.
 CREATE TABLE duel_prior (
     user_id     TEXT             NOT NULL REFERENCES app_user (id) ON DELETE CASCADE,
     board       VARCHAR(200)     NOT NULL,
     video_id    VARCHAR(11)      NOT NULL,
+    tier        tier_slot        NOT NULL,
     mu          DOUBLE PRECISION NOT NULL,
     sigma       DOUBLE PRECISION NOT NULL,
     created_at  TIMESTAMPTZ      NOT NULL DEFAULT now(),

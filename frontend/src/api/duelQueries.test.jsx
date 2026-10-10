@@ -3,7 +3,7 @@ import { act, renderHook, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import {
   duelKeys, useDuelAnalysisQuery, useDuelDecisionMutation, useDuelLockMutation, useDuelSessionQuery, useDuelSummaryQuery,
-  useDuelVerdictMutation, useEndDuelMutation, useStartDuelMutation,
+  useDuelVerdictMutation, useEndDuelMutation, useRenameDuelBoardMutation, useStartDuelMutation,
 } from './queries';
 
 const api = vi.hoisted(() => ({ post: vi.fn(), put: vi.fn(), delete: vi.fn(), get: vi.fn() }));
@@ -68,5 +68,12 @@ describe('duel API hooks', () => {
     expect(api.put).toHaveBeenLastCalledWith('/api/duels/Rock/locks/v');
     await act(() => lock.result.current.mutateAsync({ videoId: 'v', locked: false }));
     expect(api.delete).toHaveBeenLastCalledWith('/api/duels/Rock/locks/v');
+  });
+
+  it('a board rename moves its duel history to the new name', async () => {
+    api.post.mockResolvedValue({});
+    const rename = renderHook(() => useRenameDuelBoardMutation(), { wrapper });
+    await act(() => rename.result.current.mutateAsync({ from: 'Old Name', to: 'New' }));
+    expect(api.post).toHaveBeenCalledWith('/api/duels/Old%20Name/rename', { to: 'New' });
   });
 });

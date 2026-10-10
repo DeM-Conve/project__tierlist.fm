@@ -17,4 +17,6 @@ interface DuelRecordRepository extends JpaRepository<DuelRecord, Long> {
     List<DuelRecord> findBoardLog(@Param("userId") String userId, @Param("board") String board);
 
     Optional<DuelRecord> findFirstBySessionIdOrderByCreatedAtDescIdDesc(UUID sessionId);
+
+    long countBySessionId(UUID sessionId);
 }

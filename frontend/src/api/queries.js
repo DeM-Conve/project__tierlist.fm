@@ -233,18 +233,18 @@ export function useStartDuelMutation(board) {
 }
 
 export function useDuelVerdictMutation(board, id) {
-  return useSessionMutation(board, async ({ layout, a, b, verdict }) =>
-    (await api.post(`${duelPath(board)}/sessions/${id}/verdicts`, { layout, a, b, verdict })).data);
+  return useSessionMutation(board, async ({ layout, a, b, verdict, seenDuels }) =>
+    (await api.post(`${duelPath(board)}/sessions/${id}/verdicts`, { layout, a, b, verdict, seenDuels })).data);
 }
 
 export function useDuelSkipMutation(board, id) {
-  return useSessionMutation(board, async ({ layout, videoId }) =>
-    (await api.post(`${duelPath(board)}/sessions/${id}/skips`, { layout, videoId })).data);
+  return useSessionMutation(board, async ({ layout, videoId, seenDuels }) =>
+    (await api.post(`${duelPath(board)}/sessions/${id}/skips`, { layout, videoId, seenDuels })).data);
 }
 
 export function useDuelUndoMutation(board, id) {
-  return useSessionMutation(board, async ({ layout }) =>
-    (await api.post(`${duelPath(board)}/sessions/${id}/undo`, { layout })).data);
+  return useSessionMutation(board, async ({ layout, seenDuels }) =>
+    (await api.post(`${duelPath(board)}/sessions/${id}/undo`, { layout, seenDuels })).data);
 }
 
 export function useEndDuelMutation(board, id) {
@@ -268,6 +268,13 @@ export function useDuelSummaryQuery(board, id, { layout }, enabled = true) {
     enabled: enabled && !!board && !!id,
     staleTime: Infinity,
     retry: false,
+  });
+}
+
+// The board was renamed on YouTube: its duel history follows the new name.
+export function useRenameDuelBoardMutation() {
+  return useMutation({
+    mutationFn: async ({ from, to }) => api.post(`${duelPath(from)}/rename`, { to }),
   });
 }
 

@@ -42,65 +42,72 @@ public class DuelController {
         return users.current(auth).getId();
     }
 
+    // The board was renamed (its playlists, on YouTube): move its duel history.
+    @PostMapping("/rename")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void rename(@PathVariable String board, @Valid @RequestBody DuelDtos.RenameRequest req, Authentication auth) {
+        duels.renameBoard(user(auth), DuelService.requireBoard(board), req.to());
+    }
+
     // Board certainty, the score map, suggested moves, tier orders.
     @PostMapping("/analysis")
     public AnalysisDto analysis(@PathVariable String board, @Valid @RequestBody LayoutRequest req, Authentication auth) {
-        return duels.analyze(user(auth), board, req.layout().toLayout());
+        return duels.analyze(user(auth), DuelService.requireBoard(board), req.layout().toLayout());
     }
 
     @PostMapping("/sessions")
     @ResponseStatus(HttpStatus.CREATED)
     public SessionDto start(@PathVariable String board, @Valid @RequestBody StartRequest req, Authentication auth) {
-        return duels.start(user(auth), board, req);
+        return duels.start(user(auth), DuelService.requireBoard(board), req);
     }
 
     // The session as it stands, with the next duel (resuming after a reload).
     @PostMapping("/sessions/{id}")
     public SessionDto session(@PathVariable String board, @PathVariable UUID id, @Valid @RequestBody LayoutRequest req, Authentication auth) {
-        return duels.resume(user(auth), board, id, req.layout().toLayout());
+        return duels.resume(user(auth), DuelService.requireBoard(board), id, req.layout().toLayout());
     }
 
     @PostMapping("/sessions/{id}/verdicts")
     public SessionDto verdict(@PathVariable String board, @PathVariable UUID id, @Valid @RequestBody VerdictRequest req, Authentication auth) {
-        return duels.verdict(user(auth), board, id, req);
+        return duels.verdict(user(auth), DuelService.requireBoard(board), id, req);
     }
 
     @PostMapping("/sessions/{id}/skips")
     public SessionDto skip(@PathVariable String board, @PathVariable UUID id, @Valid @RequestBody SkipRequest req, Authentication auth) {
-        return duels.skip(user(auth), board, id, req);
+        return duels.skip(user(auth), DuelService.requireBoard(board), id, req);
     }
 
     @PostMapping("/sessions/{id}/undo")
-    public SessionDto undo(@PathVariable String board, @PathVariable UUID id, @Valid @RequestBody LayoutRequest req, Authentication auth) {
-        return duels.undo(user(auth), board, id, req.layout().toLayout());
+    public SessionDto undo(@PathVariable String board, @PathVariable UUID id, @Valid @RequestBody DuelDtos.UndoRequest req, Authentication auth) {
+        return duels.undo(user(auth), DuelService.requireBoard(board), id, req);
     }
 
     @PostMapping("/sessions/{id}/end")
     public SummaryDto end(@PathVariable String board, @PathVariable UUID id, @Valid @RequestBody LayoutRequest req, Authentication auth) {
-        return duels.end(user(auth), board, id, req.layout().toLayout());
+        return duels.end(user(auth), DuelService.requireBoard(board), id, req.layout().toLayout());
     }
 
     @PutMapping("/decisions/{videoId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void decide(@PathVariable String board, @PathVariable String videoId, @Valid @RequestBody DecisionRequest req, Authentication auth) {
-        duels.decide(user(auth), board, videoId, req);
+        duels.decide(user(auth), DuelService.requireBoard(board), videoId, req);
     }
 
     @DeleteMapping("/decisions/{videoId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void undoDecision(@PathVariable String board, @PathVariable String videoId, Authentication auth) {
-        duels.undoDecision(user(auth), board, videoId);
+        duels.undoDecision(user(auth), DuelService.requireBoard(board), videoId);
     }
 
     @PutMapping("/locks/{videoId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void lock(@PathVariable String board, @PathVariable String videoId, Authentication auth) {
-        duels.lock(user(auth), board, videoId);
+        duels.lock(user(auth), DuelService.requireBoard(board), videoId);
     }
 
     @DeleteMapping("/locks/{videoId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void unlock(@PathVariable String board, @PathVariable String videoId, Authentication auth) {
-        duels.unlock(user(auth), board, videoId);
+        duels.unlock(user(auth), DuelService.requireBoard(board), videoId);
     }
 }

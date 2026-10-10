@@ -67,6 +67,14 @@ public class DuelService {
         this.locks = locks;
     }
 
+    static final int MAX_BOARD = 200;
+
+    // A board is named by its playlists' {category}: not blank, as long as the column allows.
+    static String requireBoard(String board) {
+        if (board == null || board.isBlank() || board.length() > MAX_BOARD) throw new IllegalArgumentException("Not a board name: " + board);
+        return board;
+    }
+
     static String requireVideoId(String id) {
         if (id == null || !VIDEO_ID.matcher(id).matches()) throw new IllegalArgumentException("Not a YouTube video id: " + id);
         return id;
@@ -94,6 +102,32 @@ public class DuelService {
     @Transactional
     public void undoDecision(String userId, String board, String videoId) {
         decisions.deleteById(new BoardSongId(userId, board, requireVideoId(videoId)));
+    }
+
+    // The board was renamed: its duel history follows it. If the new name
+    // already has history, the two merge (its own starting scores, decisions
+    // and locks win where both have one).
+    @Transactional
+    public void renameBoard(String userId, String from, String to) {
+        requireBoard(to);
+        if (from.equals(to)) return;
+        Instant now = clock.instant();
+        sessions.moveBoard(userId, from, to);
+        Set<String> taken = priors.findByIdUserIdAndIdBoard(userId, to).stream().map(DuelPrior::getVideoId).collect(Collectors.toSet());
+        for (DuelPrior p : priors.findByIdUserIdAndIdBoard(userId, from)) {
+            if (!taken.contains(p.getVideoId())) priors.save(new DuelPrior(new BoardSongId(userId, to, p.getVideoId()), p.getTier(), p.toRating(), now));
+            priors.delete(p);
+        }
+        Set<String> decided = decisions.findByIdUserIdAndIdBoard(userId, to).stream().map(DuelDecision::getVideoId).collect(Collectors.toSet());
+        for (DuelDecision d : decisions.findByIdUserIdAndIdBoard(userId, from)) {
+            if (!decided.contains(d.getVideoId())) decisions.save(d.movedTo(to));
+            decisions.delete(d);
+        }
+        Set<String> locked = locks.findByIdUserIdAndIdBoard(userId, to).stream().map(DuelLock::getVideoId).collect(Collectors.toSet());
+        for (DuelLock l : locks.findByIdUserIdAndIdBoard(userId, from)) {
+            if (!locked.contains(l.getVideoId())) locks.save(new DuelLock(new BoardSongId(userId, to, l.getVideoId()), now));
+            locks.delete(l);
+        }
     }
 
     @Transactional
@@ -133,6 +167,7 @@ public class DuelService {
     @Transactional
     public SessionDto verdict(String userId, String board, UUID id, DuelDtos.VerdictRequest req) {
         DuelSession s = openSessionOrThrow(userId, board, id);
+        requireSeen(s, req.seenDuels());
         BoardLayout layout = req.layout().toLayout();
         Map<String, String> tierOf = layout.tierOf();
         if (requireVideoId(req.a()).equals(requireVideoId(req.b()))) throw new IllegalArgumentException("A duel needs two songs");
@@ -144,6 +179,7 @@ public class DuelService {
     @Transactional
     public SessionDto skip(String userId, String board, UUID id, DuelDtos.SkipRequest req) {
         DuelSession s = openSessionOrThrow(userId, board, id);
+        requireSeen(s, req.seenDuels());
         DuelSkip.Key key = new DuelSkip.Key(s.getId(), requireVideoId(req.videoId()));
         if (!skips.existsById(key)) skips.save(new DuelSkip(s.getId(), req.videoId()));
         return view(s, req.layout().toLayout(), null);
@@ -151,8 +187,10 @@ public class DuelService {
 
     // Takes back the session's last verdict and asks that pair again.
     @Transactional
-    public SessionDto undo(String userId, String board, UUID id, BoardLayout layout) {
+    public SessionDto undo(String userId, String board, UUID id, DuelDtos.UndoRequest req) {
+        BoardLayout layout = req.layout().toLayout();
         DuelSession s = session(userId, board, id);
+        requireSeen(s, req.seenDuels());
         Optional<DuelRecord> last = duels.findFirstBySessionIdOrderByCreatedAtDescIdDesc(s.getId());
         if (last.isEmpty()) return view(s, layout, null);
         Duel undone = last.get().toDuel();
@@ -209,19 +247,37 @@ public class DuelService {
         return sessions.findByIdAndUserIdAndBoard(id, userId, board).orElseThrow(DuelSessionNotFoundException::new);
     }
 
+    // The write must be based on the session as it is now (see VerdictRequest.seenDuels).
+    private void requireSeen(DuelSession s, int seenDuels) {
+        if (duels.countBySessionId(s.getId()) != seenDuels) throw new DuelSessionStaleException();
+    }
+
     private DuelSession openSessionOrThrow(String userId, String board, UUID id) {
         DuelSession s = session(userId, board, id);
         if (!s.isOpen(clock.instant())) throw new DuelSessionClosedException();
         return s;
     }
 
-    // The stored history, after saving starting scores for songs seen for the first time.
+    // The stored history, after making starting scores for songs seen for the
+    // first time and remaking them for songs whose tier has changed since.
     private DuelHistory history(String userId, String board, BoardLayout layout) {
+        Map<String, String> tierOf = layout.tierOf();
+        Map<String, DuelPrior> rows = new HashMap<>();
         Map<String, Rating> stored = new HashMap<>();
-        priors.findByIdUserIdAndIdBoard(userId, board).forEach(p -> stored.put(p.getVideoId(), p.toRating()));
+        for (DuelPrior p : priors.findByIdUserIdAndIdBoard(userId, board)) {
+            rows.put(p.getVideoId(), p);
+            String tier = tierOf.get(p.getVideoId());
+            // Songs no longer on the board keep theirs (old duels still replay).
+            if (tier == null || p.getTier().name().equals(tier)) stored.put(p.getVideoId(), p.toRating());
+        }
         Instant now = clock.instant();
         Map<String, Rating> fresh = engine.newPriors(layout, stored);
-        fresh.forEach((id, r) -> priors.save(new DuelPrior(new BoardSongId(userId, board, id), r, now)));
+        fresh.forEach((id, r) -> {
+            TierSlot tier = TierSlot.valueOf(tierOf.get(id));
+            DuelPrior row = rows.get(id);
+            if (row == null) priors.save(new DuelPrior(new BoardSongId(userId, board, id), tier, r, now));
+            else row.remake(tier, r);
+        });
         stored.putAll(fresh);
         List<Duel> log = duels.findBoardLog(userId, board).stream().map(DuelRecord::toDuel).toList();
         Map<String, Decision> decided = new HashMap<>();

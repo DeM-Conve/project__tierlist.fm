@@ -83,9 +83,17 @@ class DuelApiIT extends PostgresIT {
         return ok(call(post(BOARD + "/sessions"), body, alice).andExpect(status().isCreated()));
     }
 
+    private int seen(String session) {
+        return jdbc.queryForObject("SELECT count(*) FROM duel WHERE session_id = ?::uuid", Integer.class, session);
+    }
+
     private JsonNode verdict(String session, String a, String b, String v) throws Exception {
-        String body = "{\"layout\": %s, \"a\": \"%s\", \"b\": \"%s\", \"verdict\": \"%s\"}".formatted(layout(), a, b, v);
+        String body = "{\"layout\": %s, \"a\": \"%s\", \"b\": \"%s\", \"verdict\": \"%s\", \"seenDuels\": %d}".formatted(layout(), a, b, v, seen(session));
         return ok(call(post(BOARD + "/sessions/" + session + "/verdicts"), body, alice).andExpect(status().isOk()));
+    }
+
+    private String seenBody(String session) {
+        return "{\"layout\": " + layout() + ", \"seenDuels\": " + seen(session) + "}";
     }
 
     private String layoutBody() {
@@ -107,12 +115,12 @@ class DuelApiIT extends PostgresIT {
         assertThat(after.get("previous").get("a").get("id").asText()).isEqualTo(id("TD", 0));
         assertThat(after.get("matchup")).isNotNull();
 
-        JsonNode undone = ok(call(post(BOARD + "/sessions/" + sid + "/undo"), layoutBody(), alice).andExpect(status().isOk()));
+        JsonNode undone = ok(call(post(BOARD + "/sessions/" + sid + "/undo"), seenBody(sid), alice).andExpect(status().isOk()));
         assertThat(undone.get("duels")).isEmpty();
         assertThat(undone.get("matchup").get("b").asText()).isEqualTo(b);
-        assertThat(ok(call(post(BOARD + "/sessions/" + sid + "/undo"), layoutBody(), alice)).get("duels")).isEmpty();
+        assertThat(ok(call(post(BOARD + "/sessions/" + sid + "/undo"), seenBody(sid), alice)).get("duels")).isEmpty();
 
-        String skipBody = "{\"layout\": %s, \"videoId\": \"%s\"}".formatted(layout(), id("TD", 0));
+        String skipBody = "{\"layout\": %s, \"videoId\": \"%s\", \"seenDuels\": 0}".formatted(layout(), id("TD", 0));
         JsonNode skipped = ok(call(post(BOARD + "/sessions/" + sid + "/skips"), skipBody, alice).andExpect(status().isOk()));
         assertThat(skipped.get("skipped").get(0).asText()).isEqualTo(id("TD", 0));
         assertThat(skipped.get("matchup").get("a").asText()).isEqualTo(id("TD", 1));
@@ -126,6 +134,18 @@ class DuelApiIT extends PostgresIT {
 
         JsonNode resumed = ok(call(post(BOARD + "/sessions/" + sid), layoutBody(), alice).andExpect(status().isOk()));
         assertThat(resumed.get("id").asText()).isEqualTo(sid);
+    }
+
+    @Test
+    void aSongMovedToAnotherTierStartsFromThatTier() throws Exception {
+        call(post(BOARD + "/analysis"), layoutBody(), alice).andExpect(status().isOk());
+        double before = jdbc.queryForObject("SELECT mu FROM duel_prior WHERE video_id = ?", Double.class, id("C", 2));
+        // C_2 dragged up to S on the board (staged): the layout says so.
+        String moved = layout().replace("\"" + id("C", 2) + "\", ", "").replace("\"S\": [", "\"S\": [\"" + id("C", 2) + "\", ");
+        call(post(BOARD + "/analysis"), "{\"layout\": " + moved + "}", alice).andExpect(status().isOk());
+        assertThat(jdbc.queryForObject("SELECT tier::text FROM duel_prior WHERE video_id = ?", String.class, id("C", 2))).isEqualTo("S");
+        assertThat(jdbc.queryForObject("SELECT mu FROM duel_prior WHERE video_id = ?", Double.class, id("C", 2))).isGreaterThan(before + 6);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM duel_prior", Integer.class)).isEqualTo(27);
     }
 
     @Test
@@ -143,8 +163,21 @@ class DuelApiIT extends PostgresIT {
         assertThat(summary.get("upset").get("winner").asText()).isEqualTo(id("D", 0));
         assertThat(summary.get("undecided")).hasSize(1);
         call(post(BOARD + "/sessions/" + sid + "/verdicts"),
-            "{\"layout\": %s, \"a\": \"%s\", \"b\": \"%s\", \"verdict\": \"A\"}".formatted(layout(), id("A", 0), id("B", 0)), alice)
+            "{\"layout\": %s, \"a\": \"%s\", \"b\": \"%s\", \"verdict\": \"A\", \"seenDuels\": 4}".formatted(layout(), id("A", 0), id("B", 0)), alice)
             .andExpect(status().isConflict());
+    }
+
+    @Test
+    void aRepeatedOrStaleWriteIsRefusedNotRecordedTwice() throws Exception {
+        String sid = start("SMART_MIX", null).get("id").asText();
+        String body = "{\"layout\": %s, \"a\": \"%s\", \"b\": \"%s\", \"verdict\": \"A\", \"seenDuels\": 0}".formatted(layout(), id("A", 0), id("B", 0));
+        call(post(BOARD + "/sessions/" + sid + "/verdicts"), body, alice).andExpect(status().isOk());
+        call(post(BOARD + "/sessions/" + sid + "/verdicts"), body, alice)
+            .andExpect(status().isConflict())
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.stale").value(true));
+        assertThat(seen(sid)).isEqualTo(1);
+        call(post(BOARD + "/sessions/" + sid + "/undo"), "{\"layout\": " + layout() + ", \"seenDuels\": 0}", alice).andExpect(status().isConflict());
+        assertThat(seen(sid)).isEqualTo(1);
     }
 
     @Test
@@ -154,7 +187,7 @@ class DuelApiIT extends PostgresIT {
         JsonNode s = ok(call(post(BOARD + "/sessions/" + sid), layoutBody(), alice).andExpect(status().isOk()));
         assertThat(s.get("done").asBoolean()).isTrue();
         assertThat(s.get("matchup").isNull()).isTrue();
-        String skipBody = "{\"layout\": %s, \"videoId\": \"%s\"}".formatted(layout(), id("TD", 0));
+        String skipBody = "{\"layout\": %s, \"videoId\": \"%s\", \"seenDuels\": 0}".formatted(layout(), id("TD", 0));
         call(post(BOARD + "/sessions/" + sid + "/skips"), skipBody, alice).andExpect(status().isConflict());
     }
 
@@ -203,6 +236,45 @@ class DuelApiIT extends PostgresIT {
     }
 
     @Test
+    void renamingABoardTakesItsDuelHistoryAlong() throws Exception {
+        String sid = start("SMART_MIX", null).get("id").asText();
+        verdict(sid, id("A", 0), id("B", 0), "A");
+        call(put(BOARD + "/locks/" + id("A", 0)), "", alice).andExpect(status().isNoContent());
+        call(put(BOARD + "/decisions/" + id("B", 0)), "{\"from\": \"B\", \"to\": \"A\", \"confidence\": 0.9, \"decision\": \"KEPT\"}", alice)
+            .andExpect(status().isNoContent());
+        call(post(BOARD + "/rename"), "{\"to\": \"Hip Hop\"}", alice).andExpect(status().isNoContent());
+        assertThat(jdbc.queryForList("SELECT DISTINCT board FROM duel_session", String.class)).containsExactly("Hip Hop");
+        assertThat(jdbc.queryForList("SELECT DISTINCT board FROM duel_prior", String.class)).containsExactly("Hip Hop");
+        assertThat(jdbc.queryForObject("SELECT board FROM duel_lock", String.class)).isEqualTo("Hip Hop");
+        assertThat(jdbc.queryForObject("SELECT board FROM duel_decision", String.class)).isEqualTo("Hip Hop");
+        JsonNode moved = ok(call(post("/api/duels/Hip Hop/sessions/" + sid), layoutBody(), alice).andExpect(status().isOk()));
+        assertThat(moved.get("duels")).hasSize(1);
+        call(post("/api/duels/Hip Hop/rename"), "{\"to\": \"Hip Hop\"}", alice).andExpect(status().isNoContent());
+        call(post("/api/duels/Hip Hop/rename"), "{\"to\": \"  \"}", alice).andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void renamingOntoABoardWithHistoryMerges() throws Exception {
+        call(post(BOARD + "/analysis"), layoutBody(), alice).andExpect(status().isOk());
+        call(post("/api/duels/Other/analysis"), layoutBody(), alice).andExpect(status().isOk());
+        call(put(BOARD + "/locks/" + id("A", 0)), "", alice).andExpect(status().isNoContent());
+        call(put("/api/duels/Other/locks/" + id("A", 0)), "", alice).andExpect(status().isNoContent());
+        call(put(BOARD + "/decisions/" + id("B", 0)), "{\"from\": \"B\", \"to\": \"A\", \"confidence\": 0.9, \"decision\": \"KEPT\"}", alice);
+        call(put("/api/duels/Other/decisions/" + id("B", 0)), "{\"from\": \"B\", \"to\": \"S\", \"confidence\": 0.9, \"decision\": \"ACCEPTED\"}", alice);
+        call(post(BOARD + "/rename"), "{\"to\": \"Other\"}", alice).andExpect(status().isNoContent());
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM duel_prior WHERE board = 'Other'", Integer.class)).isEqualTo(27);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM duel_prior WHERE board <> 'Other'", Integer.class)).isZero();
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM duel_lock", Integer.class)).isEqualTo(1);
+        assertThat(jdbc.queryForObject("SELECT decision::text FROM duel_decision", String.class)).isEqualTo("ACCEPTED");
+    }
+
+    @Test
+    void boardNamesAreChecked() throws Exception {
+        call(post("/api/duels/" + "x".repeat(201) + "/analysis"), layoutBody(), alice).andExpect(status().isBadRequest());
+        call(post("/api/duels/%20/analysis"), layoutBody(), alice).andExpect(status().isBadRequest());
+    }
+
+    @Test
     void sessionsBelongToTheirUserAndBoard() throws Exception {
         String sid = start("SMART_MIX", null).get("id").asText();
         call(post(BOARD + "/sessions/" + sid), layoutBody(), bob).andExpect(status().isNotFound());
@@ -213,9 +285,9 @@ class DuelApiIT extends PostgresIT {
     void rejectsWhatTheFrontendNeverSends() throws Exception {
         call(post(BOARD + "/analysis"), "{\"layout\": {\"tiers\": {\"S\": [\"bad id\"]}}}", alice).andExpect(status().isBadRequest());
         String sid = start("SMART_MIX", null).get("id").asText();
-        String same = "{\"layout\": %s, \"a\": \"%s\", \"b\": \"%s\", \"verdict\": \"A\"}".formatted(layout(), id("A", 0), id("A", 0));
+        String same = "{\"layout\": %s, \"a\": \"%s\", \"b\": \"%s\", \"verdict\": \"A\", \"seenDuels\": 0}".formatted(layout(), id("A", 0), id("A", 0));
         call(post(BOARD + "/sessions/" + sid + "/verdicts"), same, alice).andExpect(status().isBadRequest());
-        String offBoard = "{\"layout\": %s, \"a\": \"%s\", \"b\": \"zzzzzzzzzzz\", \"verdict\": \"A\"}".formatted(layout(), id("A", 0));
+        String offBoard = "{\"layout\": %s, \"a\": \"%s\", \"b\": \"zzzzzzzzzzz\", \"verdict\": \"A\", \"seenDuels\": 0}".formatted(layout(), id("A", 0));
         call(post(BOARD + "/sessions/" + sid + "/verdicts"), offBoard, alice).andExpect(status().isBadRequest());
         call(post(BOARD + "/sessions"), "{\"layout\": %s, \"focus\": \"SMART_MIX\", \"minutes\": 99}".formatted(layout()), alice)
             .andExpect(status().isBadRequest());

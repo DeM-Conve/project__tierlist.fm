@@ -8,7 +8,7 @@ vi.mock('../EmbeddedPlayer', () => ({ default: () => null }));
 
 const h = vi.hoisted(() => ({ session: null, error: null, spies: {} }));
 vi.mock('../../api/queries', () => ({
-  useDuelSessionQuery: () => ({ data: h.session, isError: !!h.error, error: h.error, refetch: vi.fn() }),
+  useDuelSessionQuery: () => ({ data: h.session, isError: !!h.error, error: h.error, refetch: h.refetch ?? vi.fn() }),
   useDuelVerdictMutation: () => ({ mutate: h.spies.verdict, isPending: false }),
   useDuelSkipMutation: () => ({ mutate: h.spies.skip, isPending: false }),
   useDuelUndoMutation: () => ({ mutate: h.spies.undo, isPending: false }),
@@ -88,6 +88,17 @@ describe('DuelMatch', () => {
     fireEvent.keyDown(window, { key: ' ' });
     expect(screen.queryByText('Middle Song, clearly.')).not.toBeInTheDocument();
     expect(screen.getByText('Other Song', { selector: 'p' })).toBeInTheDocument();
+  });
+
+  it('sends how many duels it saw; a 409 (stale or ended) reloads the session instead of failing', () => {
+    h.session.duels = [{ id: 1, a: IDS.mid, b: IDS.top, verdict: 'A' }];
+    h.refetch = vi.fn();
+    h.spies.verdict.mockImplementation((_, { onError }) => onError({ response: { status: 409, data: { title: 'Duel session changed', detail: 'moved on' } } }));
+    page();
+    fireEvent.keyDown(window, { key: 'ArrowLeft' });
+    expect(h.spies.verdict.mock.calls[0][0].seenDuels).toBe(1);
+    expect(h.refetch).toHaveBeenCalled();
+    expect(screen.getByText('A, clearly')).toBeInTheDocument();
   });
 
   it('a verdict that fails to save brings the duel back', () => {

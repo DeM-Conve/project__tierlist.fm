@@ -52,9 +52,16 @@ public final class DuelDtos {
     public record StartRequest(@NotNull @Valid LayoutDto layout, @NotNull Focus focus, String songId,
                                @Min(1) @Max(60) int minutes) {}
 
-    public record VerdictRequest(@NotNull @Valid LayoutDto layout, @NotNull String a, @NotNull String b, @NotNull Verdict verdict) {}
+    // `seenDuels`: how many duels the session had when the browser asked - a
+    // write against an older state is refused (409), never recorded twice.
+    public record VerdictRequest(@NotNull @Valid LayoutDto layout, @NotNull String a, @NotNull String b, @NotNull Verdict verdict,
+                                 @Min(0) int seenDuels) {}
 
-    public record SkipRequest(@NotNull @Valid LayoutDto layout, @NotNull String videoId) {}
+    public record SkipRequest(@NotNull @Valid LayoutDto layout, @NotNull String videoId, @Min(0) int seenDuels) {}
+
+    public record UndoRequest(@NotNull @Valid LayoutDto layout, @Min(0) int seenDuels) {}
+
+    public record RenameRequest(@NotNull String to) {}
 
     public record DecisionRequest(@NotNull TierSlot from, @NotNull TierSlot to,
                                   @Min(0) @Max(1) double confidence, @NotNull Decision.Kind decision) {}
