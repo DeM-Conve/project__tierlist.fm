@@ -27,7 +27,7 @@
      strip alone is the card. Margin/radius are a CSS class because the
      phone drawer resets them below - no Mantine prop for that. */
   background: var(--activity);
-  margin: var(--mantine-spacing-xs) 0 var(--mantine-spacing-xs) var(--mantine-spacing-xs);
+  margin: var(--shell-gap) 0 var(--shell-gap) var(--shell-gap);
   border-radius: var(--mantine-radius-md) 0 0 var(--mantine-radius-md);
 }
 .sidebar-alone { border-radius: var(--mantine-radius-md); }
@@ -46,7 +46,7 @@
 .sash {
   position: relative;
   /* The gap between two cards (layout/spacing.js PART_GAP). */
-  width: var(--mantine-spacing-xs);
+  width: var(--shell-gap);
   overflow: visible;
   display: flex;
   align-items: center;
@@ -59,7 +59,7 @@
   position: absolute;
   top: 0;
   bottom: 0;
-  left: 3px;
+  left: calc(50% - 1px);
   width: 2px;
   border-radius: 1px;
   background: transparent;
