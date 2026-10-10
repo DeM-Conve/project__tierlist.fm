@@ -118,3 +118,106 @@ CREATE TABLE todo_list_link (
     CONSTRAINT playlist_id_format CHECK (playlist_id ~ '^[A-Za-z0-9_-]{1,64}$'),
     CONSTRAINT category_not_blank CHECK (btrim(category) <> '')
 );
+
+-- ---------------------------------------------------------------- Duels
+-- The duel log is the source of truth: the duel engine (fm.tierlist.duel.engine)
+-- rebuilds every score, tier probability and suggestion from it, the starting
+-- scores and the user's decisions. A board is identified by its name (the
+-- {category} in its playlists' titles); a video by its YouTube id.
+
+CREATE TYPE duel_verdict    AS ENUM ('A_CLEARLY', 'A', 'TOO_CLOSE', 'B', 'B_CLEARLY');
+CREATE TYPE duel_focus      AS ENUM ('SMART_MIX', 'PLACE_TODO', 'BORDERLINES', 'ONE_SONG');
+CREATE TYPE tier_slot       AS ENUM ('S', 'A', 'B', 'C', 'D', 'TODO');
+CREATE TYPE move_decision   AS ENUM ('ACCEPTED', 'KEPT');
+
+CREATE FUNCTION video_id_valid(id TEXT) RETURNS BOOLEAN
+    LANGUAGE sql IMMUTABLE STRICT
+    RETURN id ~ '^[A-Za-z0-9_-]{11}$';
+
+-- One sitting of duels on a board.
+CREATE TABLE duel_session (
+    id               UUID         PRIMARY KEY,
+    user_id          TEXT         NOT NULL REFERENCES app_user (id) ON DELETE CASCADE,
+    board            VARCHAR(200) NOT NULL,
+    focus            duel_focus   NOT NULL,
+    -- The pinned song (ONE_SONG only).
+    song_id          VARCHAR(11),
+    minutes          SMALLINT     NOT NULL,
+    started_at       TIMESTAMPTZ  NOT NULL,
+    ended_at         TIMESTAMPTZ,
+    -- Board certainty when it started, for the session summary.
+    certainty_start  REAL         NOT NULL,
+    CONSTRAINT session_board_not_blank CHECK (btrim(board) <> ''),
+    CONSTRAINT session_minutes_range   CHECK (minutes BETWEEN 1 AND 60),
+    CONSTRAINT session_certainty_range CHECK (certainty_start BETWEEN 0 AND 1),
+    CONSTRAINT session_song_for_one_song CHECK ((focus = 'ONE_SONG') = (song_id IS NOT NULL)),
+    CONSTRAINT session_song_valid      CHECK (video_id_valid(song_id)),
+    CONSTRAINT session_ends_after_start CHECK (ended_at IS NULL OR ended_at >= started_at)
+);
+CREATE INDEX duel_session_board ON duel_session (user_id, board, started_at);
+
+-- One verdict. `verdict` is from video_a's side.
+CREATE TABLE duel (
+    id          BIGSERIAL    PRIMARY KEY,
+    session_id  UUID         NOT NULL REFERENCES duel_session (id) ON DELETE CASCADE,
+    video_a     VARCHAR(11)  NOT NULL,
+    video_b     VARCHAR(11)  NOT NULL,
+    verdict     duel_verdict NOT NULL,
+    created_at  TIMESTAMPTZ  NOT NULL,
+    CONSTRAINT duel_two_songs   CHECK (video_a <> video_b),
+    CONSTRAINT duel_videos_valid CHECK (video_id_valid(video_a) AND video_id_valid(video_b))
+);
+CREATE INDEX duel_by_session ON duel (session_id, created_at);
+
+-- "Don't know one of them": the song isn't offered again in that session.
+CREATE TABLE duel_skip (
+    session_id  UUID        NOT NULL REFERENCES duel_session (id) ON DELETE CASCADE,
+    video_id    VARCHAR(11) NOT NULL,
+    PRIMARY KEY (session_id, video_id),
+    CONSTRAINT skip_video_valid CHECK (video_id_valid(video_id))
+);
+
+-- The score a song started from, stored the first time the engine saw it on
+-- the board, so a replay of the log always starts from the same place.
+CREATE TABLE duel_prior (
+    user_id     TEXT             NOT NULL REFERENCES app_user (id) ON DELETE CASCADE,
+    board       VARCHAR(200)     NOT NULL,
+    video_id    VARCHAR(11)      NOT NULL,
+    mu          DOUBLE PRECISION NOT NULL,
+    sigma       DOUBLE PRECISION NOT NULL,
+    created_at  TIMESTAMPTZ      NOT NULL DEFAULT now(),
+    PRIMARY KEY (user_id, board, video_id),
+    CONSTRAINT prior_sigma_positive CHECK (sigma > 0),
+    CONSTRAINT prior_video_valid    CHECK (video_id_valid(video_id))
+);
+
+-- The user's answer to a suggested move (pending suggestions are derived,
+-- never stored). One per song: a newer answer replaces the old one.
+CREATE TABLE duel_decision (
+    user_id            TEXT          NOT NULL REFERENCES app_user (id) ON DELETE CASCADE,
+    board              VARCHAR(200)  NOT NULL,
+    video_id           VARCHAR(11)   NOT NULL,
+    from_tier          tier_slot     NOT NULL,
+    to_tier            tier_slot     NOT NULL,
+    confidence         REAL          NOT NULL,
+    decision           move_decision NOT NULL,
+    -- How many duels the song had then - Keep counts fresh duels from here.
+    duels_at_decision  INTEGER       NOT NULL,
+    decided_at         TIMESTAMPTZ   NOT NULL DEFAULT now(),
+    PRIMARY KEY (user_id, board, video_id),
+    CONSTRAINT decision_moves          CHECK (from_tier <> to_tier),
+    CONSTRAINT decision_to_ranked      CHECK (to_tier <> 'TODO'),
+    CONSTRAINT decision_confidence     CHECK (confidence BETWEEN 0 AND 1),
+    CONSTRAINT decision_duels_positive CHECK (duels_at_decision >= 0),
+    CONSTRAINT decision_video_valid    CHECK (video_id_valid(video_id))
+);
+
+-- Songs locked in their tier: never suggested to move.
+CREATE TABLE duel_lock (
+    user_id    TEXT         NOT NULL REFERENCES app_user (id) ON DELETE CASCADE,
+    board      VARCHAR(200) NOT NULL,
+    video_id   VARCHAR(11)  NOT NULL,
+    locked_at  TIMESTAMPTZ  NOT NULL DEFAULT now(),
+    PRIMARY KEY (user_id, board, video_id),
+    CONSTRAINT lock_video_valid CHECK (video_id_valid(video_id))
+);
