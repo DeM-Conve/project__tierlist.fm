@@ -215,6 +215,8 @@ function Layout() {
   const mobileSidebarOpen = useSelector((s) => s.view.mobileSidebarOpen);
   const sidebarCollapsed = useSelector((s) => s.view.sidebarCollapsed);
   const sidebarView = useSelector((s) => s.view.sidebarView);
+  // Below Mantine's md breakpoint the sidebar is a drawer (App.css).
+  const narrow = useMediaQuery('(max-width: 61.99em)');
   // The panel's open/shut state lives in Redux (Ctrl+B, the activity bar);
   // the resizable panel follows it, and dragging it shut reports back.
   const sidebarPanelRef = usePanelRef();
@@ -226,8 +228,6 @@ function Layout() {
     if (sidebarCollapsed && !panel.isCollapsed()) panel.collapse();
     else if (!sidebarCollapsed && panel.isCollapsed()) panel.expand();
   }, [sidebarCollapsed, narrow, sidebarPanelRef]);
-  // Below Mantine's md breakpoint the sidebar is a drawer (App.css).
-  const narrow = useMediaQuery('(max-width: 61.99em)');
   const tierPlaylists = useSelector(selectTierPlaylists);
   const focusedVideo = useSelector((s) => s.focus.focusedVideo);
   const isShuffling = useSelector((s) => s.focus.isShuffling);
