@@ -147,6 +147,16 @@ describe('DuelMatch', () => {
     expect(screen.getByText('clearly')).toBeInTheDocument();
   });
 
+  it('e ends the session, before or after a verdict', () => {
+    page();
+    expect(screen.getByRole('button', { name: /End session/ })).toHaveTextContent('E');
+    fireEvent.keyDown(window, { key: 'e' });
+    expect(h.spies.end).toHaveBeenCalledTimes(1);
+    fireEvent.keyDown(window, { key: 'ArrowLeft' });
+    fireEvent.keyDown(window, { key: 'e' });
+    expect(h.spies.end).toHaveBeenCalledTimes(2);
+  });
+
   it('long song names truncate instead of resizing the layout', () => {
     h.session.duels = [{ id: 1, a: IDS.mid, b: IDS.top, verdict: 'A' }];
     page();

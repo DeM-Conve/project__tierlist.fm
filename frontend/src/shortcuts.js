@@ -116,6 +116,7 @@ export const SHORTCUTS = [
   { id: 'duel-skip', keys: ['s'], description: "Don't know one of them (skip the opponent)", category: 'Duel' },
   { id: 'duel-next', keys: ['Space'], description: 'Play / pause the clip (after a verdict: next duel)', category: 'Duel' },
   { id: 'duel-undo', keys: ['u'], description: 'Undo the last verdict', category: 'Duel' },
+  { id: 'duel-end', keys: ['e'], description: 'End the session and see the summary', category: 'Duel' },
   { id: 'duel-moves', keys: ['m', 'x', 'l', 'p'], description: 'Suggested moves: move / keep / lock / play (↑↓ browse)', category: 'Duel' },
 ];
 

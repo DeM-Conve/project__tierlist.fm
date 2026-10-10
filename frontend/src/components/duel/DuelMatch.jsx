@@ -200,6 +200,7 @@ export default function DuelMatch({ category, sessionId, boardLoading, base }) {
     undo.mutate({ layout, seenDuels: s.duels.length }, { onError: failed });
   }
   function finish() {
+    if (end.isPending) return;
     end.mutate({ layout }, { onSuccess: () => navigate(`${base}/duel/done/${sessionId}`), onError: failed });
   }
 
@@ -209,6 +210,10 @@ export default function DuelMatch({ category, sessionId, boardLoading, base }) {
       if (el?.tagName === 'INPUT' || el?.tagName === 'TEXTAREA' || e.ctrlKey || e.metaKey || e.altKey) return;
       // A held key repeats: one press, one verdict.
       if (e.repeat) return;
+      if (e.key === 'e') {
+        finish();
+        return;
+      }
       if (answered) {
         if (e.key === ' ' || e.key === 'Enter') {
           e.preventDefault();
@@ -282,7 +287,7 @@ export default function DuelMatch({ category, sessionId, boardLoading, base }) {
           </Stack>
           <Group gap={8}>
             <Button variant="default" onClick={takeBack} disabled={!s.duels.length || busy} rightSection={<Kbd size="xs">U</Kbd>}>Undo</Button>
-            <Button variant="light" color="gray" onClick={finish} loading={end.isPending}>End session</Button>
+            <Button variant="light" color="gray" onClick={finish} loading={end.isPending} rightSection={<Kbd size="xs">E</Kbd>}>End session</Button>
           </Group>
         </Group>
 
