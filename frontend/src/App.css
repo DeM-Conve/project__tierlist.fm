@@ -20,14 +20,23 @@
 .sidebar {
   flex-shrink: 0;
   display: flex;
-  /* VS Code-style: the icon strip sits on the app background and the
-     board panel floats beside it as a rounded card (Sidebar.jsx). */
-  background: var(--bg);
+  /* VS Code-style: the icon strip and the panel are one piece of window
+     chrome; the page is the rounded card beside it (App.jsx). */
+  background: var(--chrome);
 }
-/* The panel's resize edge (Sidebar.jsx ResizeEdge): an accent line on
-   hover - a :hover state Mantine has no prop for. */
-.sidebar-resizer { cursor: col-resize; z-index: 2; border-radius: 4px; transition: background 0.12s ease 0.1s; }
-.sidebar-resizer:hover, .sidebar-resizer:active { background: color-mix(in srgb, var(--accent) 55%, transparent); }
+/* The page as a rounded card on the window chrome (App.jsx) - a CSS
+   class because it goes flat on phones, an @media rule Mantine has no
+   prop for. */
+.canvas-card { border-radius: 12px; border: 1px solid var(--border-soft); }
+
+/* The panel | page separator (react-resizable-panels' <Separator>): a thin
+   accent line on hover / drag / keyboard focus (the library's
+   data-separator state), like VS Code's sash - no Mantine prop for it. */
+.sidebar-resizer { width: 4px; border-radius: 2px; transition: background 0.12s ease 0.15s; }
+.sidebar-resizer[data-separator='hover'], .sidebar-resizer[data-separator='active'], .sidebar-resizer[data-separator='focus'] {
+  background: color-mix(in srgb, var(--accent) 60%, transparent);
+  outline: none;
+}
 .sidebar-scrim { display: none; }
 
 /* Tier board lanes - layout/visuals are Mantine props; only what Mantine
@@ -82,6 +91,7 @@
     box-shadow: 0 0 32px var(--shadow);
   }
   .sidebar-open { left: 0; }
+  .canvas-card { border-radius: 0; border: 0; }
   .sidebar-scrim {
     display: block;
     position: absolute;

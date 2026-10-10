@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import appearance, { setAccent, setTheme, setTierPalette } from './appearanceSlice';
-import view, { setCurrentCategory, setHomeQuery, setMobileSidebarOpen, setSidebarQuery, toggleSidebarCollapsed, showSidebarView, setSidebarWidth } from './viewSlice';
+import view, { setCurrentCategory, setHomeQuery, setMobileSidebarOpen, setSidebarQuery, toggleSidebarCollapsed, showSidebarView, setSidebarCollapsed } from './viewSlice';
 import auth, { setLoggedIn, setPlaylists } from './authSlice';
 import { settingsLoaded } from './settingsActions';
 import { SETTINGS } from '../settings';
@@ -59,7 +59,7 @@ describe('boot cache for appearance', () => {
 
 describe('viewSlice', () => {
   it('initial state', () => {
-    expect(init(view)).toEqual({ currentCategory: null, sidebarQuery: '', homeQuery: '', mobileSidebarOpen: false, sidebarCollapsed: false, sidebarView: 'boards', sidebarWidth: 280 });
+    expect(init(view)).toEqual({ currentCategory: null, sidebarQuery: '', homeQuery: '', mobileSidebarOpen: false, sidebarCollapsed: false, sidebarView: 'boards' });
   });
 
   it('setters are independent', () => {
@@ -67,7 +67,7 @@ describe('viewSlice', () => {
     s = view(s, setSidebarQuery('ja'));
     s = view(s, setHomeQuery('ro'));
     s = view(s, setMobileSidebarOpen(true));
-    expect(s).toEqual({ currentCategory: 'Rap', sidebarQuery: 'ja', homeQuery: 'ro', mobileSidebarOpen: true, sidebarCollapsed: false, sidebarView: 'boards', sidebarWidth: 280 });
+    expect(s).toEqual({ currentCategory: 'Rap', sidebarQuery: 'ja', homeQuery: 'ro', mobileSidebarOpen: true, sidebarCollapsed: false, sidebarView: 'boards' });
   });
 
   it('showSidebarView: another view opens it, the open view closes the panel, a closed panel reopens', () => {
@@ -76,14 +76,12 @@ describe('viewSlice', () => {
     s = view(s, showSidebarView('playlists'));
     expect(s).toMatchObject({ sidebarCollapsed: true, sidebarView: 'playlists' });
     s = view(s, showSidebarView('boards'));
-    expect(s).toMatchObject({ sidebarCollapsed: false, sidebarView: 'boards', sidebarWidth: 280 });
+    expect(s).toMatchObject({ sidebarCollapsed: false, sidebarView: 'boards' });
   });
 
-  it('setSidebarWidth clamps to 200-520 px; null resets to 280', () => {
-    expect(view(init(view), setSidebarWidth(333.4)).sidebarWidth).toBe(333);
-    expect(view(init(view), setSidebarWidth(50)).sidebarWidth).toBe(200);
-    expect(view(init(view), setSidebarWidth(9999)).sidebarWidth).toBe(520);
-    expect(view(view(init(view), setSidebarWidth(400)), setSidebarWidth(null)).sidebarWidth).toBe(280);
+  it('setSidebarCollapsed follows the panel being dragged shut / open', () => {
+    expect(view(init(view), setSidebarCollapsed(true)).sidebarCollapsed).toBe(true);
+    expect(view(view(init(view), setSidebarCollapsed(true)), setSidebarCollapsed(false)).sidebarCollapsed).toBe(false);
   });
 
   it('toggleSidebarCollapsed folds and unfolds the sidebar', () => {

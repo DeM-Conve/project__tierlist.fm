@@ -315,6 +315,14 @@ The user asked for these on top of the Mantine/Redux migration above. Tracked he
   tier-board data on mount without checking `loadedCategory` first, and don't
   reintroduce a raw `fetch`/inline `axios` call in a component - add a hook in
   `api/queries.js` instead.
+- [ ] **Replace hand-rolled UI code with Mantine / proven libraries** (the user,
+  2026-10-10: "use the Mantine and other built-in things only, don't create your
+  own when we have already tested solutions and libraries"). Audit the frontend
+  for custom pointer/drag handlers, measuring code, keyboard listeners and CSS
+  that Mantine (`@mantine/core`/`hooks`), `react-resizable-panels` (the sidebar
+  split), `@tanstack/react-virtual`, `@hello-pangea/dnd` or another popular,
+  maintained library already covers, and swap them over one at a time with
+  tests. Done so far: the sidebar's resize edge (now `react-resizable-panels`).
 - [ ] **React Hook Form** - installed, still nothing to use it on (see Stack section
   above). Not a gap to close proactively.
 - [~] **Stop hand-writing CSS, use Mantine components instead** - in progress, real

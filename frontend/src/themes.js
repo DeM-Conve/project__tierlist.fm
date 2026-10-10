@@ -176,6 +176,10 @@ export function buildAppearance(choice) {
 
   const cssVars = {
     '--bg': t.bg,
+    // The app's frame (activity bar, side panel, tier rail), like VS Code's
+    // window chrome: a shade darker than the page, which sits on it as a
+    // rounded card.
+    '--chrome': dark ? mix(t.bg, '#000000', 0.3) : mix(t.bg, t.text, 0.05),
     '--surface': t.surface,
     '--surface-2': t.surface2,
     '--surface-3': t.surface3,

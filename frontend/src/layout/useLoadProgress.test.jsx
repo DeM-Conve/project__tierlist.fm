@@ -19,6 +19,13 @@ describe('useLoadProgress', () => {
     expect(bar.stop).toHaveBeenCalledTimes(1);
   });
 
+  it('leaving the page mid-load stops the bar', () => {
+    const { unmount } = renderHook(() => useLoadProgress(true, 'Rock'));
+    expect(bar.stop).not.toHaveBeenCalled();
+    unmount();
+    expect(bar.stop).toHaveBeenCalledTimes(1);
+  });
+
   it('switching boards mid-load restarts the bar from 0', () => {
     const { rerender } = renderHook(({ loading, key }) => useLoadProgress(loading, key), {
       initialProps: { loading: true, key: 'Rock' },

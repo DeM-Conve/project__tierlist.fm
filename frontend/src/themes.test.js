@@ -17,6 +17,7 @@ import {
 // Every variable CLAUDE.md promises buildAppearance() sets on <html>.
 const REQUIRED_VARS = [
   '--bg',
+  '--chrome',
   '--surface',
   '--surface-2',
   '--surface-3',
@@ -119,6 +120,14 @@ describe('resolveAppearance', () => {
 });
 
 describe('buildAppearance', () => {
+  it.each(Object.keys(THEMES))('%s: the window chrome is a shade apart from the page, darker in dark themes', (theme) => {
+    const { cssVars, scheme } = buildAppearance({ theme });
+    const chrome = colord(cssVars['--chrome']).brightness();
+    const page = colord(cssVars['--bg']).brightness();
+    expect(chrome).toBeLessThan(page);
+    if (scheme === 'dark') expect(page - chrome).toBeGreaterThan(0.01);
+  });
+
   it(`covers all ${combos.length} theme x accent x palette combinations`, () => {
     expect(combos).toHaveLength(6 * 8 * 3);
   });

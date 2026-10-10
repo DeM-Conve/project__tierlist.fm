@@ -14,4 +14,7 @@ export function useLoadProgress(loading, key) {
       start();
     } else stop();
   }, [loading, key, start, stop, set]);
+  // Leaving the page mid-load (e.g. Home before the board arrived) must
+  // not leave the bar running: nothing else would ever stop it.
+  useEffect(() => () => stop(), [stop]);
 }

@@ -96,42 +96,6 @@ function PlaylistLink({ category, tier, playlist, active }) {
   );
 }
 
-// The panel's right edge: drag to resize it, double-click to reset - like
-// VS Code's sidebar sash. Plain pointer events: Mantine has no resizable
-// panel, and a library for one edge would be more code than this.
-function ResizeEdge({ width, onResize }) {
-  function start(e) {
-    e.preventDefault();
-    const x0 = e.clientX;
-    const w0 = width;
-    const move = (ev) => onResize(w0 + ev.clientX - x0);
-    const stop = () => {
-      window.removeEventListener('pointermove', move);
-      window.removeEventListener('pointerup', stop);
-      document.body.style.cursor = '';
-    };
-    document.body.style.cursor = 'col-resize';
-    window.addEventListener('pointermove', move);
-    window.addEventListener('pointerup', stop);
-  }
-  return (
-    <Box
-      className="sidebar-resizer"
-      role="separator"
-      aria-orientation="vertical"
-      aria-label="Resize the panel (double-click to reset)"
-      aria-valuenow={width}
-      pos="absolute"
-      top={12}
-      bottom={12}
-      right={-6}
-      w={8}
-      onPointerDown={start}
-      onDoubleClick={() => onResize(null)}
-    />
-  );
-}
-
 // One activity-bar icon, labelled (with its key) on hover. `marked` draws
 // VS Code's accent bar on the left edge: the view that's open / the page
 // you're on.
@@ -161,7 +125,7 @@ function ActivityIcon({ label, keys, marked, children, ...props }) {
 // The permanent icon strip, like VS Code's activity bar. "Tier lists" and
 // "Playlists" open / close their view in the panel beside it (Ctrl+B
 // toggles the panel); the rest go places.
-function ActivityBar({ openView, onShowView, onOpenPalette, waitingCount, onSelectSettings, onOpenShortcuts, onLogout }) {
+export function ActivityBar({ openView, onShowView, onOpenPalette, waitingCount, onSelectSettings, onOpenShortcuts, onLogout }) {
   return (
     <Stack component="nav" aria-label="Activity bar" gap={6} align="center" px={6} py={SHELL_Y}>
       <ActivityIcon label="Home" keys="g h" component={Link} to="/">
@@ -195,26 +159,10 @@ function ActivityBar({ openView, onShowView, onOpenPalette, waitingCount, onSele
   );
 }
 
-export default function Sidebar({
-  query,
-  onQueryChange,
-  tierCategories,
-  tierGroups,
-  playlistCount,
-  waitingCount,
-  loading,
-  onSelectSettings,
-  onOpenShortcuts,
-  onLogout,
-  onOpenPalette,
-  mobileOpen,
-  onCloseMobile,
-  collapsed,
-  view = 'boards',
-  onShowView,
-  panelWidth = 280,
-  onResizePanel,
-}) {
+// The side panel: the open view (Tier lists or Playlists), its filter and
+// its list. On desktop it lives in App's resizable panel group; on a phone,
+// in the drawer beside the activity bar.
+export function SidebarPanel({ query, onQueryChange, tierCategories, tierGroups, playlistCount, loading, view = 'boards' }) {
   const naming = useSelector(selectNaming);
   const location = useLocation();
   const q = query.trim().toLowerCase();
@@ -236,6 +184,107 @@ export default function Sidebar({
   const playlists = playlistGroups.flatMap(([, rows]) => rows);
 
   return (
+    <Stack h="100%" gap={0} px={SIDEBAR_X} py={SHELL_Y} miw={0}>
+      <Group justify="space-between" px={8} mb={8} mt={6} wrap="nowrap">
+        <Text size="xs" fw={700} c="dimmed" tt="uppercase" style={{ letterSpacing: 1 }}>
+          {isPlaylists ? 'Playlists' : 'Tier lists'}
+        </Text>
+        {loading ? (
+          <Skeleton h={10} w={14} />
+        ) : (
+          <Text size="xs" c="dimmed">
+            {isPlaylists ? playlistCount : tierCategories.length}
+          </Text>
+        )}
+      </Group>
+      <TextInput
+        placeholder={isPlaylists ? 'Filter playlists…' : 'Filter boards…'}
+        value={query}
+        onChange={(e) => onQueryChange(e.target.value)}
+        leftSection={<Search size={13} />}
+        rightSection={query ? <CloseButton size="sm" onClick={() => onQueryChange('')} aria-label="Clear filter" /> : null}
+        size="xs"
+        mb="xs"
+      />
+
+      <ScrollArea style={{ flex: 1 }} type="hover" offsetScrollbars>
+        <Stack gap={0}>
+          {isPlaylists &&
+            playlistGroups.map(([category, rows]) => (
+              <Box key={category} mb={6}>
+                <Text size="xs" fw={700} c="dimmed" px={10} pt={6} pb={2} truncate="end">
+                  {category}
+                </Text>
+                {rows.map(({ tier, playlist }) => (
+                  <PlaylistLink
+                    key={playlist.id}
+                    category={category}
+                    tier={tier}
+                    playlist={playlist}
+                    active={location.pathname === tierPath(category, tier)}
+                  />
+                ))}
+              </Box>
+            ))}
+          {isPlaylists && !loading && tierCategories.length > 0 && playlists.length === 0 && (
+            <Text size="sm" c="dimmed" px={8}>
+              No playlists match
+            </Text>
+          )}
+          {!isPlaylists && tierCategories.length > 0 && filteredCategories.length === 0 && (
+            <Text size="sm" c="dimmed" px={8}>
+              No boards match
+            </Text>
+          )}
+          {!isPlaylists && filteredCategories.map((category) => (
+            <BoardLink
+              key={category}
+              category={category}
+              tiers={tierGroups[category] || {}}
+              active={
+                location.pathname === `/tier/${encodeURIComponent(category)}` ||
+                location.pathname.startsWith(`/tier/${encodeURIComponent(category)}/`)
+              }
+            />
+          ))}
+          {/* Until playlists arrive we don't know the boards yet - placeholders,
+              not "0 boards" and the naming-convention hint. */}
+          {loading &&
+            Array.from({ length: 7 }).map((_, i) => (
+              <Stack key={i} gap={7} px={12} py={9}>
+                <Skeleton h={10} w={`${55 + ((i * 17) % 35)}%`} />
+              </Stack>
+            ))}
+          {!loading && tierCategories.length === 0 && (
+            <Text size="xs" c="dimmed" px={8}>
+              Name playlists like &quot;{exampleTitle(naming, 'Rap', TIER_ORDER[0])}&quot; … &quot;
+              {exampleTitle(naming, 'Rap', TIER_ORDER[TIER_ORDER.length - 1])}&quot; and they&apos;ll appear here as a tier
+              list.
+            </Text>
+          )}
+        </Stack>
+      </ScrollArea>
+    </Stack>
+  );
+}
+
+// The activity bar (always), plus - on a phone, where it's a drawer - the
+// panel. On desktop App puts the panel in a resizable group beside it.
+export default function Sidebar({
+  waitingCount,
+  onSelectSettings,
+  onOpenShortcuts,
+  onLogout,
+  onOpenPalette,
+  mobileOpen,
+  onCloseMobile,
+  collapsed,
+  view = 'boards',
+  onShowView,
+  withPanel = false,
+  ...panelProps
+}) {
+  return (
     <>
       {mobileOpen && <div className="sidebar-scrim" onClick={onCloseMobile} />}
       <Box component="aside" className={`sidebar${mobileOpen ? ' sidebar-open' : ''}`}>
@@ -248,99 +297,10 @@ export default function Sidebar({
           onOpenShortcuts={onOpenShortcuts}
           onLogout={onLogout}
         />
-        {!collapsed && (
-          <Stack
-            pos="relative"
-            w={panelWidth}
-            gap={0}
-            px={SIDEBAR_X}
-            py={SHELL_Y}
-            my={8}
-            mr={8}
-            bg="var(--surface)"
-            style={{ borderRadius: 14, border: '1px solid var(--border-soft)', flexShrink: 0 }}
-          >
-            {onResizePanel && <ResizeEdge width={panelWidth} onResize={onResizePanel} />}
-            <Group justify="space-between" px={8} mb={8} mt={6} wrap="nowrap">
-              <Text size="xs" fw={700} c="dimmed" tt="uppercase" style={{ letterSpacing: 1 }}>
-                {isPlaylists ? 'Playlists' : 'Tier lists'}
-              </Text>
-              {loading ? (
-                <Skeleton h={10} w={14} />
-              ) : (
-                <Text size="xs" c="dimmed">
-                  {isPlaylists ? playlistCount : tierCategories.length}
-                </Text>
-              )}
-            </Group>
-            <TextInput
-              placeholder={isPlaylists ? 'Filter playlists…' : 'Filter boards…'}
-              value={query}
-              onChange={(e) => onQueryChange(e.target.value)}
-              leftSection={<Search size={13} />}
-              rightSection={query ? <CloseButton size="sm" onClick={() => onQueryChange('')} aria-label="Clear filter" /> : null}
-              size="xs"
-              mb="xs"
-            />
-
-            <ScrollArea style={{ flex: 1 }} type="hover" offsetScrollbars>
-              <Stack gap={0}>
-                {isPlaylists &&
-                  playlistGroups.map(([category, rows]) => (
-                    <Box key={category} mb={6}>
-                      <Text size="xs" fw={700} c="dimmed" px={10} pt={6} pb={2} truncate="end">
-                        {category}
-                      </Text>
-                      {rows.map(({ tier, playlist }) => (
-                        <PlaylistLink
-                          key={playlist.id}
-                          category={category}
-                          tier={tier}
-                          playlist={playlist}
-                          active={location.pathname === tierPath(category, tier)}
-                        />
-                      ))}
-                    </Box>
-                  ))}
-                {isPlaylists && !loading && tierCategories.length > 0 && playlists.length === 0 && (
-                  <Text size="sm" c="dimmed" px={8}>
-                    No playlists match
-                  </Text>
-                )}
-                {!isPlaylists && tierCategories.length > 0 && filteredCategories.length === 0 && (
-                  <Text size="sm" c="dimmed" px={8}>
-                    No boards match
-                  </Text>
-                )}
-                {!isPlaylists && filteredCategories.map((category) => (
-                  <BoardLink
-                    key={category}
-                    category={category}
-                    tiers={tierGroups[category] || {}}
-                    active={
-                      location.pathname === `/tier/${encodeURIComponent(category)}` ||
-                      location.pathname.startsWith(`/tier/${encodeURIComponent(category)}/`)
-                    }
-                  />
-                ))}
-                {/* Until playlists arrive we don't know the boards yet - placeholders,
-                    not "0 boards" and the naming-convention hint. */}
-                {loading &&
-                  Array.from({ length: 7 }).map((_, i) => (
-                    <Stack key={i} gap={7} px={12} py={9}>
-                      <Skeleton h={10} w={`${55 + ((i * 17) % 35)}%`} />
-                    </Stack>
-                  ))}
-                {!loading && tierCategories.length === 0 && (
-                  <Text size="xs" c="dimmed" px={8}>
-                    Name playlists like &quot;{exampleTitle(naming, 'Rap', TIER_ORDER[0])}&quot; … &quot;
-                    {exampleTitle(naming, 'Rap', TIER_ORDER[TIER_ORDER.length - 1])}&quot; and they&apos;ll appear here as a tier
-                    list.
-                  </Text>
-                )}
-              </Stack>
-            </ScrollArea>
-          </Stack>
+        {withPanel && !collapsed && (
+          <Box w={280}>
+            <SidebarPanel view={view} {...panelProps} />
+          </Box>
         )}
       </Box>
     </>

@@ -19,7 +19,8 @@ import { useDisclosure, useElementSize, useHotkeys, useMediaQuery, useMergedRef,
 import { notifications } from '@mantine/notifications';
 import './App.css';
 import { BOARD_TIERS, TODO_TIER } from './tiers';
-import Sidebar from './components/Sidebar';
+import Sidebar, { SidebarPanel } from './components/Sidebar';
+import { Group, Panel, Separator, usePanelRef } from 'react-resizable-panels';
 import HomeView from './components/HomeView';
 import TierFocusView from './components/TierFocusView';
 import CreateTierPlaylistsModal from './components/CreateTierPlaylistsModal';
@@ -52,7 +53,7 @@ import { setLoggedIn, setPlaylists } from './store/authSlice';
 import { detectedNaming } from './store/namingSlice';
 import { useSettingsSync } from './api/useSettingsSync';
 import { detectNaming } from './naming';
-import { setCurrentCategory, setHomeQuery, setSidebarQuery, setMobileSidebarOpen, toggleSidebarCollapsed, showSidebarView, setSidebarWidth } from './store/viewSlice';
+import { setCurrentCategory, setHomeQuery, setSidebarQuery, setMobileSidebarOpen, toggleSidebarCollapsed, showSidebarView, setSidebarCollapsed } from './store/viewSlice';
 import {
   setTierItems,
   applySyncedMoves,
@@ -214,7 +215,17 @@ function Layout() {
   const mobileSidebarOpen = useSelector((s) => s.view.mobileSidebarOpen);
   const sidebarCollapsed = useSelector((s) => s.view.sidebarCollapsed);
   const sidebarView = useSelector((s) => s.view.sidebarView);
-  const sidebarWidth = useSelector((s) => s.view.sidebarWidth);
+  // The panel's open/shut state lives in Redux (Ctrl+B, the activity bar);
+  // the resizable panel follows it, and dragging it shut reports back.
+  const sidebarPanelRef = usePanelRef();
+  const sidebarCollapsedRef = useRef(sidebarCollapsed);
+  sidebarCollapsedRef.current = sidebarCollapsed;
+  useEffect(() => {
+    const panel = sidebarPanelRef.current;
+    if (!panel || narrow) return;
+    if (sidebarCollapsed && !panel.isCollapsed()) panel.collapse();
+    else if (!sidebarCollapsed && panel.isCollapsed()) panel.expand();
+  }, [sidebarCollapsed, narrow, sidebarPanelRef]);
   // Below Mantine's md breakpoint the sidebar is a drawer (App.css).
   const narrow = useMediaQuery('(max-width: 61.99em)');
   const tierPlaylists = useSelector(selectTierPlaylists);
@@ -584,7 +595,8 @@ function Layout() {
 
       {/* pos="relative": the mobile sidebar drawer and the staged-changes
           bar are positioned against this row, i.e. above the dock. */}
-      <Flex pos="relative" flex={1} mih={0}>
+      <Flex pos="relative" flex={1} mih={0} bg="var(--chrome)">
+        {/* Activity bar always; on a phone the drawer also holds the panel. */}
         <Sidebar
           query={query}
           onQueryChange={(q) => dispatch(setSidebarQuery(q))}
@@ -602,33 +614,77 @@ function Layout() {
           collapsed={sidebarCollapsed && !narrow}
           view={sidebarView}
           onShowView={(v) => dispatch(showSidebarView(v))}
-          panelWidth={narrow ? undefined : sidebarWidth}
-          onResizePanel={narrow ? undefined : (w) => dispatch(setSidebarWidth(w))}
+          withPanel={narrow}
         />
 
-        {/* The canvas is the page's scroll container (see layout/canvas.js).
-            scrollbarGutter: the scrollbar's space is always reserved, so the
-            board (which sizes itself to the canvas) can't flicker between
-            "fits -> no scrollbar -> wider -> overflows -> scrollbar". */}
-        <Box component="main" ref={canvasRef} flex={1} miw={0} style={{ overflowY: 'auto', scrollbarGutter: 'stable' }}>
-          <Box pt={CANVAS_TOP} px={CANVAS_X} pb={SHELL_Y}>
-            <CanvasContext.Provider value={canvas}>
-              <Outlet
-                context={{
-                  syncChanges,
-                  discardChanges,
-                  moveVideoToTier,
-                  openFocus,
-                  startShufflePlay,
-                  playFrom,
-                  addSongs,
-                  addSongsActions,
-                  handleAddLinks,
-                }}
+        {/* VS Code's sidebar | editor split, from react-resizable-panels:
+            drag the separator to resize the panel (double-click resets it),
+            drag it shut to collapse it. */}
+        <Group orientation="horizontal" style={{ flex: 1, minWidth: 0 }}>
+          {!narrow && (
+            <Panel
+              id="sidebar-panel"
+              panelRef={sidebarPanelRef}
+              collapsible
+              collapsedSize={0}
+              defaultSize={280}
+              minSize={200}
+              maxSize={520}
+              groupResizeBehavior="preserve-pixel-size"
+              onResize={(size) => {
+                const shut = size.inPixels < 1;
+                if (shut !== sidebarCollapsedRef.current) dispatch(setSidebarCollapsed(shut));
+              }}
+            >
+              <SidebarPanel
+                query={query}
+                onQueryChange={(q) => dispatch(setSidebarQuery(q))}
+                tierCategories={tierCategories}
+                tierGroups={tierGroups}
+                playlistCount={tierPlaylists?.length ?? 0}
+                loading={tierPlaylists === null}
+                view={sidebarView}
               />
-            </CanvasContext.Provider>
-          </Box>
-        </Box>
+            </Panel>
+          )}
+          {!narrow && <Separator className="sidebar-resizer" />}
+          <Panel id="page" minSize={320}>
+            {/* VS Code-style: the page is a rounded card on the window chrome. */}
+            <Box h="100%" py={{ base: 0, md: 8 }} pr={{ base: 0, md: railCategory ? 0 : 8 }} style={{ display: 'flex' }}>
+              {/* The canvas is the page's scroll container (see layout/canvas.js).
+                  scrollbarGutter: the scrollbar's space is always reserved, so the
+                  board (which sizes itself to the canvas) can't flicker between
+                  "fits -> no scrollbar -> wider -> overflows -> scrollbar". */}
+              <Box
+                component="main"
+                ref={canvasRef}
+                flex={1}
+                miw={0}
+                bg="var(--bg)"
+                style={{ overflowY: 'auto', scrollbarGutter: 'stable' }}
+                className="canvas-card"
+              >
+                <Box pt={CANVAS_TOP} px={CANVAS_X} pb={SHELL_Y}>
+                  <CanvasContext.Provider value={canvas}>
+                    <Outlet
+                      context={{
+                        syncChanges,
+                        discardChanges,
+                        moveVideoToTier,
+                        openFocus,
+                        startShufflePlay,
+                        playFrom,
+                        addSongs,
+                        addSongsActions,
+                        handleAddLinks,
+                      }}
+                    />
+                  </CanvasContext.Provider>
+                </Box>
+              </Box>
+            </Box>
+          </Panel>
+        </Group>
 
         {railCategory && <TierRail category={railCategory} activeTier={tierPageMatch?.params.tier} />}
       </Flex>

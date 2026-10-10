@@ -140,10 +140,9 @@ export default function TierRail({ category, activeTier }) {
       w={RAIL_WIDTH}
       px={RAIL_X}
       py={SHELL_Y}
-      bg="var(--surface)"
+      bg="var(--chrome)"
       style={{
         flexShrink: 0,
-        borderLeft: '1px solid var(--border-soft)',
         zIndex: 20,
         display: 'flex',
         flexDirection: 'column',

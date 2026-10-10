@@ -5,8 +5,6 @@ import { createSlice } from '@reduxjs/toolkit';
 // the routed page component itself - PlayerDock's tier-reassignment needs to
 // know which board's tiers are selectable regardless of which page rendered
 // it (tier board or duel), and it lives at the layout level, above <Outlet/>.
-export const SIDEBAR_WIDTH = { min: 200, default: 280, max: 520 };
-
 const viewSlice = createSlice({
   name: 'view',
   initialState: {
@@ -19,8 +17,6 @@ const viewSlice = createSlice({
     sidebarCollapsed: false,
     // Which view the panel shows: 'boards' (tier lists) or 'playlists'.
     sidebarView: 'boards',
-    // The panel's width in px (dragged at its edge, like VS Code).
-    sidebarWidth: SIDEBAR_WIDTH.default,
   },
   reducers: {
     setCurrentCategory: (state, action) => {
@@ -40,10 +36,9 @@ const viewSlice = createSlice({
     },
     // VS Code's activity bar: clicking the open view's icon closes the
     // panel; any other icon opens the panel on that view.
-    // null resets; otherwise clamped to SIDEBAR_WIDTH.
-    setSidebarWidth: (state, action) => {
-      const w = action.payload;
-      state.sidebarWidth = w == null ? SIDEBAR_WIDTH.default : Math.round(Math.min(SIDEBAR_WIDTH.max, Math.max(SIDEBAR_WIDTH.min, w)));
+    // The panel dragged shut / open at its edge (react-resizable-panels).
+    setSidebarCollapsed: (state, action) => {
+      state.sidebarCollapsed = action.payload;
     },
     showSidebarView: (state, action) => {
       if (!state.sidebarCollapsed && state.sidebarView === action.payload) state.sidebarCollapsed = true;
@@ -55,5 +50,5 @@ const viewSlice = createSlice({
   },
 });
 
-export const { setCurrentCategory, setSidebarQuery, setHomeQuery, setMobileSidebarOpen, toggleSidebarCollapsed, showSidebarView, setSidebarWidth } = viewSlice.actions;
+export const { setCurrentCategory, setSidebarQuery, setHomeQuery, setMobileSidebarOpen, toggleSidebarCollapsed, showSidebarView, setSidebarCollapsed } = viewSlice.actions;
 export default viewSlice.reducer;
