@@ -1,9 +1,11 @@
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useNavigate } from 'react-router-dom';
+import { useSelector } from 'react-redux';
 import { spotlight } from '@mantine/spotlight';
 import { notifications } from '@mantine/notifications';
 import { TODO_TIER } from '../tiers';
 import { youtubeUrl } from '../tierUtils';
+import { selectPlayerCoversPage } from '../store/selectors';
 import './sequence';
 
 const board = (category, rest = '') => `/tier/${encodeURIComponent(category)}${rest}`;
@@ -18,11 +20,17 @@ export function useVimKeys({ hintsRef, canvasRef, categories, currentCategory, p
     navigate(path);
   };
   const deps = [categories, currentCategory, playingCategory, playingVideoId, hasTodo];
+  // The expanded player covers the page and takes `f` for fullscreen video.
+  const playerCoversPage = useSelector(selectPlayerCoversPage);
 
-  useHotkeys('f', (e) => {
-    e.preventDefault();
-    hintsRef.current?.open();
-  });
+  useHotkeys(
+    'f',
+    (e) => {
+      e.preventDefault();
+      hintsRef.current?.open();
+    },
+    { enabled: !playerCoversPage },
+  );
   useHotkeys('o', (e) => {
     e.preventDefault();
     spotlight.open();

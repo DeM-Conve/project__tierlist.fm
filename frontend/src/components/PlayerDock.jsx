@@ -233,6 +233,12 @@ export default function PlayerDock({
       } else if (e.key === 'm') {
         e.preventDefault();
         toggleMute();
+      } else if (expanded && e.key === 'f') {
+        // YouTube's own "f" - only while expanded (elsewhere `f` is link
+        // hints). Fullscreens the embed's iframe itself, so YouTube's
+        // controls come with it; the dock's DOM doesn't move.
+        e.preventDefault();
+        toggleFullscreen();
       } else if (e.shiftKey && e.code.startsWith('Digit')) {
         // Shift+digit, not a plain digit - plain 0-9 is the seek-to-percent
         // shortcut below, so tier-reassignment needs a modifier to stay
@@ -282,6 +288,14 @@ export default function PlayerDock({
     if (!player) return;
     if (isPlaying) player.pauseVideo?.();
     else player.playVideo?.();
+  }
+
+  function toggleFullscreen() {
+    if (document.fullscreenElement) {
+      document.exitFullscreen?.();
+      return;
+    }
+    playerRef.current?.getIframe?.()?.requestFullscreen?.();
   }
 
   function toggleMute() {
@@ -605,7 +619,7 @@ export default function PlayerDock({
                 </Group>
               )}
               <Text fz={11} c="dimmed" opacity={0.75}>
-                esc/j minimize · ← → seek 10s · h l navigate · space play/pause · m mute · 0-9 seek %
+                esc/j minimize · ← → seek 10s · h l navigate · space play/pause · m mute · f fullscreen · 0-9 seek %
                 {availableTiers.length > 0 && ` · shift+1-${availableTiers.length} set tier · del remove`}
               </Text>
             </Stack>

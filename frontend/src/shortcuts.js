@@ -76,6 +76,7 @@ export const SHORTCUTS = [
   },
   { id: 'player-play-pause', keys: ['Space'], description: 'Play / pause', category: 'Player' },
   { id: 'player-mute', keys: ['m'], description: 'Mute / unmute', category: 'Player' },
+  { id: 'player-fullscreen', keys: ['f'], description: 'Fullscreen video (expanded; elsewhere f is link hints)', category: 'Player' },
   {
     id: 'player-seek-percent',
     keys: ['0-9'],

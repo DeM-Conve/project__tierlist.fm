@@ -146,7 +146,7 @@ Source of truth is `frontend/src/shortcuts.js` (rendered by the `?` modal and Se
 - Add songs: `Shift+1`-`5` put in tier 1-5, `t` save to TODO, `Enter` listen, `s` skip, `x` remove, `b` pick board, `/` or `a` the input, `u` / `Ctrl+Z` undo.
 - Tier board: `/` search, `n` / `N` next/previous match, `Enter` play match (or step), `Esc` close search, `Shift+P` push to YouTube (any board page).
 - Tier page: `/` filter, `Esc` clear the filter.
-- Player: `h` / `l` prev/next track, `←`/`→` seek 10s (expanded), `Space` play/pause, `m` mute, `0`-`9` jump to that 10%, `j` minimize (expanded → mini → floating), `k` expand, `Esc` minimize from expanded, `Shift+1`-`9` rate the playing video (any mode, on its board), `Del` remove it from its playlist (staged until push).
+- Player: `h` / `l` prev/next track, `←`/`→` seek 10s (expanded), `Space` play/pause, `m` mute, `f` fullscreen video (expanded; elsewhere `f` is link hints), `0`-`9` jump to that 10%, `j` minimize (expanded → mini → floating), `k` expand, `Esc` minimize from expanded, `Shift+1`-`9` rate the playing video (any mode, on its board), `Del` remove it from its playlist (staged until push).
 - Duel: `←` / `→` pick left/right, `Space` skip, `u` undo.
 
 ## Architecture
