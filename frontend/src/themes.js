@@ -174,34 +174,37 @@ export function buildAppearance(choice) {
   const fill = a.scale[dark ? a.onDark : a.onLight];
   const accentText = a.scale[dark ? a.textDark : a.textLight];
   const editor = t.surface;
-  // VS Code's chrome is a shade darker than its editor in both schemes:
-  // #1F1F1F -> #181818 (22% toward black), #FFFFFF -> #F8F8F8 (3% toward
-  // the ink - mixing toward the text rather than black keeps a light theme's
-  // tint from turning saturated).
-  const chrome = dark ? mix(editor, '#000000', 0.22) : mix(editor, t.text, 0.03);
+  // The shell, measured off the user's own VS Code (their screenshots):
+  // the editor is the base (#1E1E1E), the side bar a rounded card one step
+  // toward the ink (#252525, ~4%), and the window frame around both - the
+  // activity bar and the gaps between the cards - furthest from it (#333,
+  // ~12%). So cards are islands on the frame, and the same rule (mix the
+  // editor toward the text) works for dark and light themes alike.
+  const side = mix(editor, t.text, 0.04);
+  // The activity bar: the left part of the side card, a step lighter.
+  const activity = mix(editor, t.text, 0.09);
+  // The frame the cards sit on: a step darker than the page in dark themes,
+  // a step greyer in light ones - so every card reads as its own object.
+  const chrome = dark ? mix(editor, '#000000', 0.3) : mix(editor, t.text, 0.1);
 
   const cssVars = {
     '--bg': t.bg,
-    // The shell, VS Code-style (relationships taken from VS Code's Dark /
-    // Light Modern themes, applied to each of our palettes):
-    //   --editor  the page: a rounded card, the brightest base surface
-    //             (VS Code editor.background) - and Mantine's body color, so
-    //             a Paper/Card inside it is flat, drawn by its border only.
-    //   --chrome  the frame around it (activity bar, side panel, tier rail,
-    //             mini player): one color, a shade darker than the page in
-    //             both schemes (#1F1F1F -> #181818, #FFFFFF -> #F8F8F8).
-    // Everything on the chrome is the chrome mixed toward the text by VS
-    // Code's ratios (scaled for our inks, which are darker/brighter than
-    // VS Code's #CCCCCC / #3B3B3B): borders ~10%, muted icons and counts
-    // ~60-70%, list hover / selection, the side panel's filter input.
+    //   --editor  the page card (VS Code editor) - and Mantine's body color,
+    //             so a Paper/Card inside it is flat, drawn by its border.
+    //   --side    the side panel card (VS Code side bar).
+    //   --chrome  the window frame: activity bar, gaps between the cards.
+    // List rows, the filter input, borders and muted text are the side card
+    // mixed toward the text, VS Code-style.
     '--editor': editor,
+    '--side': side,
+    '--activity': activity,
     '--chrome': chrome,
-    '--chrome-border': mix(chrome, t.text, dark ? 0.11 : 0.075),
-    '--chrome-fg-muted': mix(chrome, t.text, dark ? 0.6 : 0.68),
-    '--chrome-hover': mix(chrome, t.text, dark ? 0.07 : 0.03),
-    '--chrome-selected': mix(chrome, t.text, dark ? 0.13 : 0.07),
-    '--chrome-input': dark ? mix(chrome, t.text, 0.08) : editor,
-    '--chrome-input-border': mix(chrome, t.text, dark ? 0.16 : 0.15),
+    '--chrome-border': mix(side, t.text, 0.1),
+    '--chrome-fg-muted': mix(chrome, t.text, 0.7),
+    '--chrome-hover': mix(side, t.text, 0.05),
+    '--chrome-selected': mix(side, t.text, 0.1),
+    '--chrome-input': mix(side, t.text, 0.06),
+    '--chrome-input-border': mix(side, t.text, 0.14),
     '--surface': t.surface,
     '--surface-2': t.surface2,
     '--surface-3': t.surface3,

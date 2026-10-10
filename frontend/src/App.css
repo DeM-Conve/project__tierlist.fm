@@ -20,10 +20,16 @@
 .sidebar {
   flex-shrink: 0;
   display: flex;
-  /* VS Code-style: the icon strip and the panel are one piece of window
-     chrome; the page is the rounded card beside it (App.jsx). */
-  background: var(--chrome);
+  /* VS Code-style: the icon strip and the side panel are ONE card - the
+     strip is its slightly lighter left part, the panel (App.jsx) joins it
+     with no gap, and only the outside corners are rounded; with the panel
+     shut the strip is the whole card. Margin/radius are a CSS class
+     because the phone drawer resets them below - no Mantine prop. */
+  background: var(--activity);
+  margin: 8px 0 8px 8px;
+  border-radius: 10px 0 0 10px;
 }
+.sidebar-alone { border-radius: 10px; }
 /* The page as a rounded card on the window chrome (App.jsx), like VS
    Code's editor part: --editor on --chrome, a 1px chrome-toned border - a
    CSS class because it goes flat on phones, an @media rule Mantine has no
@@ -150,6 +156,8 @@
     z-index: 40;
     transition: left 0.2s ease;
     box-shadow: 0 0 32px var(--shadow);
+    margin: 0;
+    border-radius: 0;
   }
   .sidebar-open { left: 0; }
   .canvas-card { border-radius: 0; border: 0; }

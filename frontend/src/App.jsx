@@ -637,6 +637,10 @@ function Layout() {
                 if (shut !== sidebarCollapsedRef.current) dispatch(setSidebarCollapsed(shut));
               }}
             >
+              {/* The side panel is a card on the frame (VS Code's side bar). */}
+              <Box h="100%" py={PART_GAP}>
+                {/* The rest of the activity bar's card: joined on the left. */}
+                <Box h="100%" bg="var(--side)" style={{ borderRadius: '0 10px 10px 0', overflow: 'hidden' }}>
               <SidebarPanel
                 query={query}
                 onQueryChange={(q) => dispatch(setSidebarQuery(q))}
@@ -646,6 +650,8 @@ function Layout() {
                 loading={tierPlaylists === null}
                 view={sidebarView}
               />
+                </Box>
+              </Box>
             </Panel>
           )}
           {!narrow && <Sash />}

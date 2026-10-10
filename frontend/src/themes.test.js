@@ -23,6 +23,8 @@ const REQUIRED_VARS = [
   '--bg',
   '--editor',
   '--chrome',
+  '--side',
+  '--activity',
   '--chrome-border',
   '--chrome-fg-muted',
   '--chrome-hover',
@@ -131,28 +133,27 @@ describe('resolveAppearance', () => {
 });
 
 describe('buildAppearance', () => {
-  // The shell follows VS Code's Modern themes: the page (editor) is the
-  // brightest base, the chrome a shade darker in both schemes
-  // (#1F1F1F / #181818, #FFFFFF / #F8F8F8), and what sits on the chrome
-  // steps away from it in order: hover < selection < border-ish < muted text.
-  it.each(Object.keys(THEMES))('%s: the chrome is a shade darker than the page', (theme) => {
+  // The shell: the activity bar + side panel are one card (strip a step
+  // lighter than the panel), the page another, all on a frame that differs
+  // from every card so each reads as one object.
+  it.each(Object.keys(THEMES))('%s: frame, page card, side card and activity strip are all distinct', (theme) => {
     const { cssVars } = buildAppearance({ theme });
-    const L = (v) => colord(cssVars[v]).toHsl().l;
     expect(cssVars['--editor']).toBe(THEMES[theme].surface);
-    const delta = L('--editor') - L('--chrome');
-    expect(delta).toBeGreaterThan(1.5); // visible...
-    expect(delta).toBeLessThan(5); // ...but calm, like VS Code's ~2.8
+    const d = (a, b) => colord(cssVars[a]).delta(cssVars[b]);
+    expect(d('--editor', '--side')).toBeGreaterThan(0.005);
+    expect(d('--side', '--activity')).toBeGreaterThan(0.005);
+    expect(d('--chrome', '--editor')).toBeGreaterThan(0.01);
+    expect(d('--chrome', '--side')).toBeGreaterThan(0.01);
   });
 
-  it.each(Object.keys(THEMES))('%s: chrome hover < selection < muted text, all toward the ink', (theme) => {
+  it.each(Object.keys(THEMES))('%s: on the side card, hover < selection < muted text; icons readable on the frame', (theme) => {
     const { cssVars } = buildAppearance({ theme });
-    const dist = (v) => colord(cssVars['--chrome']).delta(cssVars[v]);
+    const dist = (v) => colord(cssVars['--side']).delta(cssVars[v]);
     expect(dist('--chrome-hover')).toBeGreaterThan(0);
     expect(dist('--chrome-selected')).toBeGreaterThan(dist('--chrome-hover'));
-    expect(dist('--chrome-border')).toBeGreaterThan(dist('--chrome-hover'));
     expect(dist('--chrome-fg-muted')).toBeGreaterThan(dist('--chrome-selected'));
-    // Muted chrome text stays readable on the chrome (WCAG AA for UI text).
-    expect(colord(cssVars['--chrome-fg-muted']).contrast(cssVars['--chrome'])).toBeGreaterThanOrEqual(3);
+    expect(colord(cssVars['--chrome-fg-muted']).contrast(cssVars['--activity'])).toBeGreaterThanOrEqual(3);
+    expect(colord(cssVars['--chrome-fg-muted']).contrast(cssVars['--side'])).toBeGreaterThanOrEqual(3);
   });
 
   it(`covers all ${combos.length} theme x accent x palette combinations`, () => {

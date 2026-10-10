@@ -64,10 +64,10 @@ function BoardLink({ category, tiers, active }) {
       {...handlers}
       label={
         <Group justify="space-between" wrap="nowrap" gap={6}>
-          <Text fz={13} truncate="end">
+          <Text fz={14} truncate="end">
             {category}
           </Text>
-          <Text size="xs" c={hovering ? undefined : MUTED} style={{ fontVariantNumeric: 'tabular-nums' }}>
+          <Text fz={13} c={hovering ? undefined : MUTED} style={{ fontVariantNumeric: 'tabular-nums' }}>
             {total}
           </Text>
         </Group>
@@ -98,10 +98,10 @@ function PlaylistLink({ category, tier, playlist, active }) {
       }
       label={
         <Group justify="space-between" wrap="nowrap" gap={8}>
-          <Text fz={13} truncate="end" title={playlist.title}>
+          <Text fz={14} truncate="end" title={playlist.title}>
             {playlist.title}
           </Text>
-          <Text size="xs" c={MUTED} style={{ fontVariantNumeric: 'tabular-nums' }}>
+          <Text fz={13} c={MUTED} style={{ fontVariantNumeric: 'tabular-nums' }}>
             {playlist.itemCount ?? 0}
           </Text>
         </Group>
@@ -110,10 +110,10 @@ function PlaylistLink({ category, tier, playlist, active }) {
   );
 }
 
-const ACTIVITY_SIZE = 48;
+const ACTIVITY_SIZE = 42;
 // VS Code's codicons are 24px line icons; lucide's default stroke reads
 // heavier than theirs at that size.
-const ICON = { size: 24, strokeWidth: 1.5 };
+const ICON = { size: 26, strokeWidth: 1.6 };
 
 // One activity-bar icon, labelled (with its key) on hover - VS Code's
 // activity bar: a 48px square per item, the icon muted on the chrome and the
@@ -121,22 +121,21 @@ const ICON = { size: 24, strokeWidth: 1.5 };
 // the full ink and the accent bar on the strip's left edge.
 function ActivityIcon({ label, keys, marked, children, ...props }) {
   return (
-    <Box pos="relative">
-      {marked && <Box pos="absolute" left={0} top={0} bottom={0} w={2} bg="var(--accent-fill)" style={{ zIndex: 1 }} />}
-      <Tooltip label={keys ? `${label} (${keys})` : label} position="right" withArrow>
-        <ActionIcon
-          variant="transparent"
-          size={ACTIVITY_SIZE}
-          radius={0}
-          className="activity-icon"
-          aria-label={label}
-          data-active={marked || undefined}
-          {...props}
-        >
-          {children}
-        </ActionIcon>
-      </Tooltip>
-    </Box>
+    <Tooltip label={keys ? `${label} (${keys})` : label} position="right" withArrow>
+      <ActionIcon
+        variant="transparent"
+        size={ACTIVITY_SIZE}
+        radius="md"
+        className="activity-icon"
+        aria-label={label}
+        data-active={marked || undefined}
+        // The open view: a rounded square in the page's color, as in VS Code.
+        bg={marked ? 'var(--editor)' : undefined}
+        {...props}
+      >
+        {children}
+      </ActionIcon>
+    </Tooltip>
   );
 }
 
@@ -145,7 +144,7 @@ function ActivityIcon({ label, keys, marked, children, ...props }) {
 // toggles the panel); the rest go places.
 export function ActivityBar({ openView, onShowView, onOpenPalette, waitingCount, onSelectSettings, onOpenShortcuts, onLogout }) {
   return (
-    <Stack component="nav" aria-label="Activity bar" gap={0} align="center" py={PART_GAP}>
+    <Stack component="nav" aria-label="Activity bar" gap={6} align="center" px={8} py={PART_GAP}>
       <ActivityIcon label="Home" keys="g h" component={Link} to="/">
         <Home {...ICON} />
       </ActivityIcon>
@@ -205,13 +204,13 @@ export function SidebarPanel({ query, onQueryChange, tierCategories, tierGroups,
     <Stack h="100%" gap={0} px={SIDEBAR_X} py={SHELL_Y} miw={0}>
       <Group justify="space-between" px={8} mb={8} mt={6} wrap="nowrap">
         {/* VS Code's side bar title: small caps-style, the secondary ink. */}
-        <Text fz={11} fw={600} c="var(--text-dim)" tt="uppercase" style={{ letterSpacing: 0.6 }}>
+        <Text fz={14} fw={700} c="var(--text)">
           {isPlaylists ? 'Playlists' : 'Tier lists'}
         </Text>
         {loading ? (
           <Skeleton h={10} w={14} />
         ) : (
-          <Text size="xs" c={MUTED}>
+          <Text fz={13} c={MUTED}>
             {isPlaylists ? playlistCount : tierCategories.length}
           </Text>
         )}
@@ -222,7 +221,7 @@ export function SidebarPanel({ query, onQueryChange, tierCategories, tierGroups,
         onChange={(e) => onQueryChange(e.target.value)}
         leftSection={<Search size={13} />}
         rightSection={query ? <CloseButton size="sm" onClick={() => onQueryChange('')} aria-label="Clear filter" /> : null}
-        size="xs"
+        size="sm"
         mb="xs"
         radius="sm"
         // VS Code's input on the side bar: a step lighter than the chrome
@@ -235,7 +234,7 @@ export function SidebarPanel({ query, onQueryChange, tierCategories, tierGroups,
           {isPlaylists &&
             playlistGroups.map(([category, rows]) => (
               <Box key={category} mb={6}>
-                <Text size="xs" fw={600} c={MUTED} px={10} pt={6} pb={2} truncate="end">
+                <Text fz={13} fw={600} c={MUTED} px={10} pt={6} pb={2} truncate="end">
                   {category}
                 </Text>
                 {rows.map(({ tier, playlist }) => (
@@ -310,7 +309,7 @@ export default function Sidebar({
   return (
     <>
       {mobileOpen && <div className="sidebar-scrim" onClick={onCloseMobile} />}
-      <Box component="aside" className={`sidebar${mobileOpen ? ' sidebar-open' : ''}`}>
+      <Box component="aside" className={`sidebar${mobileOpen ? ' sidebar-open' : ''}${collapsed ? ' sidebar-alone' : ''}`}>
         <ActivityBar
           openView={collapsed ? null : view}
           onShowView={onShowView}

@@ -8,7 +8,7 @@ import { selectFocusedVideoData, selectTierGroups } from '../store/selectors';
 import { moveWithFeedback, useTierDnd } from '../tierActions';
 import { EqualizerMark } from './TierBits';
 import { TIER_INK } from '../tierUtils';
-import { RAIL_X, SHELL_Y } from '../layout/spacing';
+import { RAIL_X, PART_GAP, SHELL_Y } from '../layout/spacing';
 
 const RAIL_WIDTH = 84;
 // TODO and Remove - the two rail slots that aren't ranked tiers.
@@ -140,8 +140,11 @@ export default function TierRail({ category, activeTier }) {
       w={RAIL_WIDTH}
       px={RAIL_X}
       py={SHELL_Y}
-      bg="var(--chrome)"
+      // A card on the window frame, like the side panel and the page.
+      m={PART_GAP}
+      bg="var(--side)"
       style={{
+        borderRadius: 8,
         flexShrink: 0,
         zIndex: 20,
         display: 'flex',
