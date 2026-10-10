@@ -28,7 +28,7 @@ const CLIP_SECONDS = { A: 30, B: 20 };
 // One side of the duel: a real YouTube player that plays its clip while it's
 // the side being heard, pauses (and keeps its place) otherwise, and calls
 // onClipEnd when the clip has played out.
-function ClipCard({ side, video, song, name, artist, active, onListen, onClipEnd }) {
+function ClipCard({ side, video, song, name, artist, active, paused, onListen, onClipEnd, onBlocked }) {
   const tierName = useTierName();
   const playerRef = useRef(null);
   const [ready, setReady] = useState(false);
@@ -41,11 +41,17 @@ function ClipCard({ side, video, song, name, artist, active, onListen, onClipEnd
   useEffect(() => {
     endRef.current = onClipEnd;
   });
+  const [blocked, setBlocked] = useState(false);
+  // Can't be played here (embedding off): hand straight over to the other side.
+  useEffect(() => {
+    if (blocked && active) endRef.current?.();
+  }, [blocked, active]);
 
   useEffect(() => {
     const p = playerRef.current;
     if (!ready || !p) return undefined;
-    if (!active) {
+    // Not heard, or paused (Space): hold the place.
+    if (!active || paused) {
       p.pauseVideo?.();
       return undefined;
     }
@@ -61,14 +67,14 @@ function ClipCard({ side, video, song, name, artist, active, onListen, onClipEnd
       if (now >= from + length) endRef.current?.();
     }, 250);
     return () => clearInterval(id);
-  }, [active, ready, length]);
+  }, [active, paused, ready, length]);
 
   return (
     <Paper withBorder radius={18} p={18} style={{ borderColor: active ? 'var(--accent)' : undefined, borderWidth: active ? 2 : 1 }}>
       <Stack gap={16}>
         <Group justify="space-between">
           <ThemeIcon variant="light" color="gray" size={34} radius="md" fw={900}>{side}</ThemeIcon>
-          <Text fz={13} fw={700} c={active ? 'accent' : 'dimmed'}>{active ? '▶ Playing' : 'Paused'}</Text>
+          <Text fz={13} fw={700} c={active && !paused ? 'accent' : 'dimmed'}>{active && !paused ? '▶ Playing' : 'Paused'}</Text>
         </Group>
         <Box pos="relative" style={{ aspectRatio: '16 / 9', borderRadius: 12, overflow: 'hidden', background: 'var(--media-bg)' }}>
           <EmbeddedPlayer
@@ -78,6 +84,10 @@ function ClipCard({ side, video, song, name, artist, active, onListen, onClipEnd
             onPlayerReady={(p) => {
               playerRef.current = p;
               setReady(!!p);
+            }}
+            onBlocked={() => {
+              setBlocked(true);
+              onBlocked?.();
             }}
           />
           {song?.tier && (
@@ -131,7 +141,15 @@ export default function DuelMatch({ category, sessionId, boardLoading, base }) {
   const skip = useDuelSkipMutation(category, sessionId);
   const undo = useDuelUndoMutation(category, sessionId);
   const end = useEndDuelMutation(category, sessionId);
-  const [listening, setListening] = useState('A');
+  const [listening, setListeningSide] = useState('A');
+  const [paused, setPaused] = useState(false);
+  // Hearing a side (Tab, "Hear A/B", a clip ending) always plays it.
+  const setListening = (side) => {
+    setPaused(false);
+    setListeningSide(side);
+  };
+  // Sides whose video can't be played here, by video id (a new pair starts clean).
+  const [blocked, setBlocked] = useState({});
   const [answered, setAnswered] = useState(null); // the matchup just answered, until "Next duel"
   const secondsLeft = useSecondsLeft(session.data?.endsAt);
 
@@ -189,6 +207,8 @@ export default function DuelMatch({ category, sessionId, boardLoading, base }) {
     function onKey(e) {
       const el = document.activeElement;
       if (el?.tagName === 'INPUT' || el?.tagName === 'TEXTAREA' || e.ctrlKey || e.metaKey || e.altKey) return;
+      // A held key repeats: one press, one verdict.
+      if (e.repeat) return;
       if (answered) {
         if (e.key === ' ' || e.key === 'Enter') {
           e.preventDefault();
@@ -200,9 +220,13 @@ export default function DuelMatch({ category, sessionId, boardLoading, base }) {
       if (v) {
         e.preventDefault();
         pick(v);
+      } else if (e.key === ' ') {
+        // Play / pause the clip being heard, like any player.
+        e.preventDefault();
+        setPaused((p) => !p);
       } else if (e.key === 'Tab') {
         e.preventDefault();
-        setListening((l) => (l === 'A' ? 'B' : 'A'));
+        setListening(listening === 'A' ? 'B' : 'A');
       } else if (e.key === 's') {
         dontKnow();
       } else if (e.key === 'u') {
@@ -283,9 +307,13 @@ export default function DuelMatch({ category, sessionId, boardLoading, base }) {
                 <Box pos="relative">
                   <SimpleGrid cols={{ base: 1, sm: 2 }} spacing={18}>
                     <ClipCard side="A" video={v(shown.a)} song={shown.songA} name={board.nameOf(shown.a)} artist={board.artistOf(shown.a)}
-                      active={listening === 'A'} onListen={() => setListening('A')} onClipEnd={() => setListening('B')} />
+                      active={listening === 'A'} paused={paused} onListen={() => setListening('A')}
+                      onClipEnd={() => !blocked[shown.b] && setListening('B')}
+                      onBlocked={() => setBlocked((x) => ({ ...x, [shown.a]: true }))} />
                     <ClipCard side="B" video={v(shown.b)} song={shown.songB} name={board.nameOf(shown.b)} artist={board.artistOf(shown.b)}
-                      active={listening === 'B'} onListen={() => setListening('B')} onClipEnd={() => setListening('A')} />
+                      active={listening === 'B'} paused={paused} onListen={() => setListening('B')}
+                      onClipEnd={() => !blocked[shown.a] && setListening('A')}
+                      onBlocked={() => setBlocked((x) => ({ ...x, [shown.b]: true }))} />
                   </SimpleGrid>
                   <ThemeIcon visibleFrom="sm" pos="absolute" left="50%" top="40%" size={52} radius="xl" variant="default" fw={900}
                     style={{ transform: 'translate(-50%, -50%)' }}>VS</ThemeIcon>
@@ -332,6 +360,7 @@ export default function DuelMatch({ category, sessionId, boardLoading, base }) {
                     </SimpleGrid>
                     <Group justify="center" gap={22}>
                       <Text fz={13} c="dimmed">Margin matters: “clearly” moves scores twice as far</Text>
+                      <Group gap={6}><Kbd size="xs">Space</Kbd><Text fz={13} c="dimmed">play / pause</Text></Group>
                       <UnstyledButton onClick={dontKnow}>
                         <Group gap={6}><Text fz={13} c="dimmed">Don’t know one of them</Text><Kbd size="xs">S</Kbd></Group>
                       </UnstyledButton>

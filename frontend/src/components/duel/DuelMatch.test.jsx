@@ -4,7 +4,10 @@ import DuelMatch from './DuelMatch';
 import { IDS, renderDuel, song } from '../../test/duelFixtures';
 
 vi.mock('@mantine/notifications', () => ({ notifications: { show: vi.fn(), hide: vi.fn() } }));
-vi.mock('../EmbeddedPlayer', () => ({ default: () => null }));
+// A stand-in player: a button that reports its video as unplayable here.
+vi.mock('../EmbeddedPlayer', () => ({
+  default: ({ videoId, onBlocked }) => <button type="button" onClick={onBlocked}>{`block ${videoId}`}</button>,
+}));
 
 const h = vi.hoisted(() => ({ session: null, error: null, spies: {} }));
 vi.mock('../../api/queries', () => ({
@@ -108,6 +111,19 @@ describe('DuelMatch', () => {
     expect(screen.getByText('A, clearly')).toBeInTheDocument();
   });
 
+  it('Space pauses and resumes the clip being heard; switching sides plays again', () => {
+    page();
+    expect(screen.getAllByText('▶ Playing')).toHaveLength(1);
+    fireEvent.keyDown(window, { key: ' ' });
+    expect(screen.queryByText('▶ Playing')).not.toBeInTheDocument();
+    expect(h.spies.verdict).not.toHaveBeenCalled();
+    fireEvent.keyDown(window, { key: ' ' });
+    expect(screen.getAllByText('▶ Playing')).toHaveLength(1);
+    fireEvent.keyDown(window, { key: ' ' });
+    fireEvent.keyDown(window, { key: 'Tab' });
+    expect(screen.getAllByText('▶ Playing')).toHaveLength(1);
+  });
+
   it('Tab switches which clip plays, and only the paused side shows the Tab hint', () => {
     page();
     expect(screen.getAllByText('▶ Playing')).toHaveLength(1);
@@ -140,6 +156,21 @@ describe('DuelMatch', () => {
     const row = screen.getByText((_, el) => el?.tagName === 'P' && el.textContent === 'Middle Song over Top Song');
     expect(row).toHaveAttribute('data-truncate');
     expect(parseFloat(row.style.minWidth)).toBe(0);
+  });
+
+  it('a video that can\'t be played here hands over to the other side; both blocked stops switching', () => {
+    page();
+    fireEvent.click(screen.getByText(`block ${IDS.mid}`)); // A, the side playing
+    expect(screen.getByRole('button', { name: /Hear A/ })).toBeInTheDocument();
+    fireEvent.click(screen.getByText(`block ${IDS.top}`)); // B too
+    expect(screen.getByRole('button', { name: /Hear A/ })).toBeInTheDocument();
+  });
+
+  it('a held key gives one verdict, not many', () => {
+    page();
+    fireEvent.keyDown(window, { key: 'ArrowLeft' });
+    fireEvent.keyDown(window, { key: 'ArrowLeft', repeat: true });
+    expect(h.spies.verdict).toHaveBeenCalledTimes(1);
   });
 
   it('Undo is off before the first verdict', () => {

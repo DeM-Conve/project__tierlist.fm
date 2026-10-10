@@ -114,7 +114,7 @@ export const SHORTCUTS = [
   { id: 'duel-close', keys: ['↓'], description: 'Too close to call', category: 'Duel' },
   { id: 'duel-listen', keys: ['Tab'], description: 'Switch which clip is playing', category: 'Duel' },
   { id: 'duel-skip', keys: ['s'], description: "Don't know one of them (skip the opponent)", category: 'Duel' },
-  { id: 'duel-next', keys: ['Space'], description: 'Next duel (after a verdict)', category: 'Duel' },
+  { id: 'duel-next', keys: ['Space'], description: 'Play / pause the clip (after a verdict: next duel)', category: 'Duel' },
   { id: 'duel-undo', keys: ['u'], description: 'Undo the last verdict', category: 'Duel' },
   { id: 'duel-moves', keys: ['m', 'x', 'l', 'p'], description: 'Suggested moves: move / keep / lock / play (↑↓ browse)', category: 'Duel' },
 ];

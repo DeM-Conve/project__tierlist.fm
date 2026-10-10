@@ -8,7 +8,7 @@ import { loadYouTubeApi } from '../youtubePlayer';
 // element were the one React manages directly, React would later try to
 // clean up a node that's already gone. So the API is only ever handed a
 // plain child we create and manage ourselves, one layer below React's div.
-export default function EmbeddedPlayer({ videoId, autoplay = true, onEnded, onPlayerReady, onPlayingChange }) {
+export default function EmbeddedPlayer({ videoId, autoplay = true, onEnded, onPlayerReady, onPlayingChange, onBlocked }) {
   const containerRef = useRef(null);
   const playerRef = useRef(null);
   const [status, setStatus] = useState('loading'); // loading | ready | blocked
@@ -21,6 +21,8 @@ export default function EmbeddedPlayer({ videoId, autoplay = true, onEnded, onPl
   onPlayerReadyRef.current = onPlayerReady;
   const onPlayingChangeRef = useRef(onPlayingChange);
   onPlayingChangeRef.current = onPlayingChange;
+  const onBlockedRef = useRef(onBlocked);
+  onBlockedRef.current = onBlocked;
 
   useEffect(() => {
     let cancelled = false;
@@ -42,7 +44,11 @@ export default function EmbeddedPlayer({ videoId, autoplay = true, onEnded, onPl
             setStatus('ready');
             onPlayerReadyRef.current?.(playerRef.current);
           },
-          onError: () => !cancelled && setStatus('blocked'),
+          onError: () => {
+            if (cancelled) return;
+            setStatus('blocked');
+            onBlockedRef.current?.();
+          },
           onStateChange: (e) => {
             if (cancelled) return;
             if (e.data === window.YT.PlayerState.ENDED) onEndedRef.current?.();
