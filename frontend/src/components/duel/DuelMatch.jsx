@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useDispatch } from 'react-redux';
 import {
-  Alert, Anchor, Box, Button, Container, Group, Kbd, Paper, Progress, SimpleGrid, Skeleton, Stack, Text, ThemeIcon, Title,
+  Alert, Anchor, Box, Button, Container, Grid, Group, Kbd, Paper, Progress, SimpleGrid, Skeleton, Stack, Text, ThemeIcon, Title,
   UnstyledButton,
 } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
@@ -87,7 +87,7 @@ function ClipCard({ side, video, song, name, artist, active, onListen, onClipEnd
           )}
         </Box>
         <Stack gap={3}>
-          <Text ff="var(--font-display)" fw={800} fz={24} lh={1.15} lineClamp={2}>{name}</Text>
+          <Text ff="var(--font-display)" fw={800} fz={24} lh={1.15} truncate="end" title={name}>{name}</Text>
           <Text fz={15} c="dimmed" truncate="end">{artist}{song && !song.tier ? ' · new to this board' : song ? ` · ${tierName(song.tier)}` : ''}</Text>
         </Stack>
         <Stack gap={6}>
@@ -252,8 +252,10 @@ export default function DuelMatch({ category, sessionId, boardLoading, base }) {
           </Group>
         </Group>
 
-        <Group align="flex-start" gap={28} wrap="wrap">
-          <Stack gap={22} style={{ flex: '999 1 640px', minWidth: 0 }}>
+        {/* Fixed columns (Grid), so long song names never resize the layout between duels. */}
+        <Grid gutter={28}>
+          <Grid.Col span={{ base: 12, lg: 8 }}>
+          <Stack gap={22}>
             {!shown ? (
               <Paper withBorder radius="lg" p={40}>
                 <Stack align="center" gap="sm">
@@ -286,9 +288,12 @@ export default function DuelMatch({ category, sessionId, boardLoading, base }) {
                         <Text ff="var(--font-display)" fw={800} fz={18}>
                           {verdictHeadline(prev.duel.verdict, board.nameOf(prev.duel.a), board.nameOf(prev.duel.b))}
                         </Text>
-                        <Group gap={18} ff="monospace" fz={14}>
-                          <Text ff="monospace" fz={14}>{board.nameOf(prev.duel.a)} <b>{scoreDelta(answered.songA.mu, prev.a.mu)}</b></Text>
-                          <Text ff="monospace" fz={14}>{board.nameOf(prev.duel.b)} <b>{scoreDelta(answered.songB.mu, prev.b.mu)}</b></Text>
+                        <Group gap={18} wrap="nowrap">
+                          {[[prev.duel.a, answered.songA.mu, prev.a.mu], [prev.duel.b, answered.songB.mu, prev.b.mu]].map(([id, before, after]) => (
+                            <Text key={id} fz={14} truncate="end" miw={0}>
+                              {board.nameOf(id)} <Text span ff="monospace" fw={700} inherit>{scoreDelta(before, after)}</Text>
+                            </Text>
+                          ))}
                         </Group>
                         <Text fz={14}>{outcomeText(prev.a, board.nameOf(prev.duel.a), tierName)}</Text>
                       </Stack>
@@ -326,8 +331,10 @@ export default function DuelMatch({ category, sessionId, boardLoading, base }) {
               </>
             )}
           </Stack>
+          </Grid.Col>
 
-          <Stack gap={16} style={{ flex: '1 1 320px' }}>
+          <Grid.Col span={{ base: 12, lg: 4 }}>
+          <Stack gap={16}>
             {shown && (
               <>
                 <Paper withBorder radius="md" p={18}>
@@ -354,7 +361,7 @@ export default function DuelMatch({ category, sessionId, boardLoading, base }) {
                   const draw = d.verdict === 'TOO_CLOSE';
                   return (
                     <Group key={d.id} justify="space-between" gap={8} wrap="nowrap">
-                      <Text fz={14} truncate="end">
+                      <Text fz={14} truncate="end" style={{ flex: 1, minWidth: 0 }}>
                         <b>{board.nameOf(aWins || draw ? d.a : d.b)}</b> {draw ? '≈' : 'over'} {board.nameOf(aWins || draw ? d.b : d.a)}
                       </Text>
                       <Text fz={13} c="dimmed" style={{ flexShrink: 0 }}>{draw ? 'too close' : d.verdict.endsWith('CLEARLY') ? 'clearly' : ''}</Text>
@@ -366,7 +373,8 @@ export default function DuelMatch({ category, sessionId, boardLoading, base }) {
             </Paper>
             <Anchor component={Link} to={`${base}/duel/moves`} fz={14} fw={700}>Review suggested moves →</Anchor>
           </Stack>
-        </Group>
+          </Grid.Col>
+        </Grid>
       </Stack>
     </Container>
   );

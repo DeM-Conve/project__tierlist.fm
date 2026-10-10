@@ -1,0 +1,101 @@
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { fireEvent, screen } from '@testing-library/react';
+import { useLocation } from 'react-router-dom';
+import DuelHub from './DuelHub';
+import { IDS, analysis, renderDuel } from '../../test/duelFixtures';
+
+vi.mock('@mantine/notifications', () => ({ notifications: { show: vi.fn(), hide: vi.fn() } }));
+
+const h = vi.hoisted(() => ({ analysis: null, error: null, start: null, decision: null }));
+vi.mock('../../api/queries', () => ({
+  useDuelAnalysisQuery: () => ({ data: h.analysis, isError: !!h.error, error: h.error, refetch: vi.fn() }),
+  useStartDuelMutation: () => ({ mutate: h.start, isPending: false, isError: false }),
+  useDuelDecisionMutation: () => ({ mutate: h.decision }),
+  useDuelLockMutation: () => ({ mutate: vi.fn() }),
+}));
+
+function Where() {
+  return <span data-testid="where">{useLocation().pathname}</span>;
+}
+const page = () => renderDuel(<><DuelHub category="Rock" boardLoading={false} base="/tier/Rock" /><Where /></>);
+
+beforeEach(() => {
+  h.error = null;
+  h.analysis = analysis();
+  h.start = vi.fn((_, { onSuccess }) => onSuccess({ id: 'new-session' }));
+  h.decision = vi.fn();
+});
+
+describe('DuelHub', () => {
+  it('shows certainty, moves waiting, the fence and the score map', () => {
+    page();
+    expect(screen.getByText('Settle the board.')).toBeInTheDocument();
+    expect(screen.getByText('64%')).toBeInTheDocument();
+    expect(screen.getByText('12 duels so far')).toBeInTheDocument();
+    expect(screen.getByText('1 at ≥90% confidence')).toBeInTheDocument();
+    expect(screen.queryByText(/unplaced/)).not.toBeInTheDocument();
+    expect(screen.getByText('Score map')).toBeInTheDocument();
+    expect(screen.getByText('S · 1')).toBeInTheDocument();
+    expect(screen.getByText('A · 2')).toBeInTheDocument();
+  });
+
+  it('starts a Smart mix session for the chosen length and opens it', () => {
+    page();
+    fireEvent.click(screen.getByText('Deep · 15 min'));
+    fireEvent.click(screen.getByRole('button', { name: /Start duelling/ }));
+    expect(h.start.mock.calls[0][0]).toEqual({
+      layout: { tiers: { S: [IDS.top], A: [IDS.mid, IDS.mid2], TODO: [IDS.todo] } },
+      focus: 'SMART_MIX', songId: null, minutes: 15,
+    });
+    expect(screen.getByTestId('where')).toHaveTextContent('/tier/Rock/duel/play/new-session');
+  });
+
+  it('Enter starts too, with the chosen focus', () => {
+    page();
+    fireEvent.click(screen.getByText('Borderlines only'));
+    fireEvent.keyDown(document, { key: 'Enter', code: 'Enter' });
+    expect(h.start.mock.calls[0][0]).toMatchObject({ focus: 'BORDERLINES', minutes: 5 });
+  });
+
+  it('One song needs a song before it can start, and only offers ranked songs', () => {
+    page();
+    fireEvent.click(screen.getByText('One song'));
+    expect(screen.getByRole('button', { name: /Start duelling/ })).toBeDisabled();
+    fireEvent.click(screen.getByPlaceholderText('Search Rock…'));
+    expect(screen.getByRole('option', { name: 'Middle Song' })).toBeInTheDocument();
+    expect(screen.queryByRole('option', { name: 'New Song' })).not.toBeInTheDocument();
+  });
+
+  it('Place TODO is off when nothing is waiting', () => {
+    h.analysis = analysis({ unplaced: 0 });
+    page();
+    expect(screen.getByText('Place TODO songs').closest('button')).toBeDisabled();
+  });
+
+  it('offers to resume a session in progress', () => {
+    h.analysis = analysis({ activeSession: 'open-one' });
+    page();
+    expect(screen.getByText('Resume the session in progress →')).toHaveAttribute('href', '/tier/Rock/duel/play/open-one');
+    expect(screen.getByRole('button', { name: /Start a new session/ })).toBeInTheDocument();
+  });
+
+  it('Ready to move: Move records the decision', () => {
+    page();
+    expect(screen.getByText('Ready to move')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Move' }));
+    expect(h.decision.mock.calls[0][0]).toMatchObject({ videoId: IDS.todo, decision: 'ACCEPTED' });
+  });
+
+  it('while loading there is nothing to start', () => {
+    h.analysis = undefined;
+    page();
+    expect(screen.getByRole('button', { name: /Start duelling/ })).toBeDisabled();
+  });
+
+  it('a failed load says why', () => {
+    h.analysis = undefined;
+    h.error = { response: { data: { detail: 'Login expired.' } } };
+    page();
+    expect(screen.getByText('Login expired.')).toBeInTheDocument();
+  });
+});

@@ -152,6 +152,8 @@ category.
   staged edits included). The frontend's duel screens (`components/duel/`) only show
   what the API returns - add ranking logic to the engine, never to the frontend.
   Every duel/user datum lives in Postgres (the user's call), not localStorage.
+  **To-do songs only come up in a Place TODO session** (the user's call: they "aren't
+  done yet") - Smart mix, Borderlines, One song and every opponent are ranked songs.
 - **Backend tests**: `mvn verify` - unit tests (`*Test`, surefire) plus
   Testcontainers integration tests (`*IT`, failsafe) against a real `postgres:17-alpine`
   (needs Docker; `testcontainers.version` is pinned in `pom.xml` because Boot 3.3's

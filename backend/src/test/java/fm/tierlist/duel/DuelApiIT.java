@@ -173,6 +173,8 @@ class DuelApiIT extends PostgresIT {
         call(post(BOARD + "/sessions"), body, alice).andExpect(status().isBadRequest());
         call(post(BOARD + "/sessions"), "{\"layout\": %s, \"focus\": \"ONE_SONG\", \"songId\": null, \"minutes\": 5}".formatted(layout()), alice)
             .andExpect(status().isBadRequest());
+        String todo = "{\"layout\": %s, \"focus\": \"ONE_SONG\", \"songId\": \"%s\", \"minutes\": 5}".formatted(layout(), id("TD", 0));
+        call(post(BOARD + "/sessions"), todo, alice).andExpect(status().isBadRequest());
     }
 
     @Test

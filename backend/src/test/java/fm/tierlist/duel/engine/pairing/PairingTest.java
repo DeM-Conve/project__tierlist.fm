@@ -44,6 +44,17 @@ class PairingTest {
     }
 
     @Test
+    void smartMixAndBorderlinesNeverBringInToDoSongs() {
+        BoardAnalysis a = analyze(List.of(), Set.of());
+        for (Focus focus : List.of(Focus.SMART_MIX, Focus.BORDERLINES)) {
+            for (int i = 0; i < 20; i++) {
+                engine.next(a, new SessionContext(focus, null, List.of(), Set.of(), List.of(), new Random(i)))
+                    .ifPresent(m -> assertThat(Set.of(m.a(), m.b())).noneMatch(id -> id.startsWith("TD")));
+            }
+        }
+    }
+
+    @Test
     void lockedAndSkippedSongsAreLeftOut() {
         Set<String> skipped = Set.of(id("TD", 0), id("TD", 1));
         BoardAnalysis a = analyze(List.of(), Set.of(id("TD", 2)));

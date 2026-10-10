@@ -18,8 +18,10 @@ public final class PairingStrategies {
 
     public static PairingStrategies standard() {
         Map<Focus, PairingStrategy> m = new EnumMap<>(Focus.class);
-        // Smart mix: whatever settles the most - borderlines, fresh placements, shaky rankings.
-        m.put(Focus.SMART_MIX, new BorderPairing((s, a) -> true));
+        // Smart mix: whatever settles the most among ranked songs - borderlines,
+        // shaky rankings. To-do songs aren't done yet: only Place TODO duels them
+        // (the user's call).
+        m.put(Focus.SMART_MIX, new BorderPairing((s, a) -> s.tier() != null));
         m.put(Focus.PLACE_TODO, new PlaceTodoPairing());
         m.put(Focus.BORDERLINES, new BorderPairing(PairingStrategies::onFence));
         m.put(Focus.ONE_SONG, new OneSongPairing());

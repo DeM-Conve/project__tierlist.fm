@@ -113,7 +113,10 @@ public class DuelService {
     public SessionDto start(String userId, String board, DuelDtos.StartRequest req) {
         BoardLayout layout = req.layout().toLayout();
         String song = req.focus() == Focus.ONE_SONG ? requireVideoId(req.songId()) : null;
-        if (song != null && !layout.tierOf().containsKey(song)) throw new IllegalArgumentException("That song isn't on this board");
+        if (song != null && !layout.isRanked(layout.tierOf().get(song))) {
+            // To-do songs aren't done yet: only a Place TODO session duels them.
+            throw new IllegalArgumentException("Pick a song from a ranked tier - to-do songs are placed with Place TODO songs");
+        }
         Instant now = clock.instant();
         openSession(userId, board).ifPresent(s -> s.end(now));
         DuelHistory history = history(userId, board, layout);
