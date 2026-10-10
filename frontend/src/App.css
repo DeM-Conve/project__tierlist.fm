@@ -26,6 +26,7 @@
   background: var(--surface);
   border-right: 1px solid var(--border-soft);
 }
+.sidebar-collapsed { width: auto; }
 .sidebar-scrim { display: none; }
 
 /* Tier board lanes - layout/visuals are Mantine props; only what Mantine

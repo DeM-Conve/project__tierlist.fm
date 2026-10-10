@@ -15,7 +15,7 @@ import {
 import { spotlight } from '@mantine/spotlight';
 import { ActionIcon, Affix, Box, Center, Flex, Loader } from '@mantine/core';
 import { Menu as MenuIcon } from 'lucide-react';
-import { useDisclosure, useElementSize, useHotkeys, useMergedRef, useWindowEvent } from '@mantine/hooks';
+import { useDisclosure, useElementSize, useHotkeys, useMediaQuery, useMergedRef, useWindowEvent } from '@mantine/hooks';
 import { notifications } from '@mantine/notifications';
 import './App.css';
 import { BOARD_TIERS, TODO_TIER } from './tiers';
@@ -52,7 +52,7 @@ import { setLoggedIn, setPlaylists } from './store/authSlice';
 import { detectedNaming } from './store/namingSlice';
 import { useSettingsSync } from './api/useSettingsSync';
 import { detectNaming } from './naming';
-import { setCurrentCategory, setHomeQuery, setSidebarQuery, setMobileSidebarOpen } from './store/viewSlice';
+import { setCurrentCategory, setHomeQuery, setSidebarQuery, setMobileSidebarOpen, toggleSidebarCollapsed } from './store/viewSlice';
 import {
   setTierItems,
   applySyncedMoves,
@@ -212,6 +212,9 @@ function Layout() {
 
   const query = useSelector((s) => s.view.sidebarQuery);
   const mobileSidebarOpen = useSelector((s) => s.view.mobileSidebarOpen);
+  const sidebarCollapsed = useSelector((s) => s.view.sidebarCollapsed);
+  // Below Mantine's md breakpoint the sidebar is a drawer (App.css).
+  const narrow = useMediaQuery('(max-width: 61.99em)');
   const tierPlaylists = useSelector(selectTierPlaylists);
   const focusedVideo = useSelector((s) => s.focus.focusedVideo);
   const isShuffling = useSelector((s) => s.focus.isShuffling);
@@ -315,6 +318,8 @@ function Layout() {
     ['shift+?', () => shortcutsHandlers.open()],
     // Every tier edit is one undo step (see tierActions.jsx).
     ['mod+Z', () => dispatch(undoEdit())],
+    // Like VS Code: fold the sidebar to icons (on a phone: the drawer).
+    ['mod+B', () => dispatch(narrow ? setMobileSidebarOpen(!mobileSidebarOpen) : toggleSidebarCollapsed())],
   ]);
 
   async function syncChanges(category) {
@@ -592,6 +597,8 @@ function Layout() {
           onOpenPalette={() => spotlight.open()}
           mobileOpen={mobileSidebarOpen}
           onCloseMobile={() => dispatch(setMobileSidebarOpen(false))}
+          collapsed={sidebarCollapsed && !narrow}
+          onToggleCollapsed={() => dispatch(toggleSidebarCollapsed())}
         />
 
         {/* The canvas is the page's scroll container (see layout/canvas.js).

@@ -14,6 +14,7 @@
 export const SHORTCUTS = [
   { id: 'palette', keys: ['Ctrl', 'K'], description: 'Open command palette', category: 'Global' },
   { id: 'help', keys: ['?'], description: 'Show this shortcut list', category: 'Global' },
+  { id: 'sidebar', keys: ['Ctrl', 'B'], description: 'Fold the sidebar to icons / unfold it (on a phone: open the menu)', category: 'Global' },
   { id: 'undo', keys: ['Ctrl', 'Z'], description: 'Undo the last tier edit (drag, move, rating, bulk, duel result)', category: 'Global' },
 
   { id: 'hints', keys: ['f'], description: 'Link hints: label everything clickable, type a label to click it', category: 'Navigation (Vim)' },

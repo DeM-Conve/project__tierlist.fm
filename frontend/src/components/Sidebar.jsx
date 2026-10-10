@@ -6,6 +6,7 @@ import {
   Button,
   CloseButton,
   Group,
+  Indicator,
   Kbd,
   Skeleton,
   NavLink,
@@ -17,7 +18,7 @@ import {
   Tooltip,
   UnstyledButton,
 } from '@mantine/core';
-import { Home, Keyboard, ListOrdered, ListPlus, LogOut, Search, Settings } from 'lucide-react';
+import { Home, Keyboard, ListOrdered, ListPlus, LogOut, PanelLeftClose, PanelLeftOpen, Search, Settings } from 'lucide-react';
 import { TIER_ORDER } from '../tiers';
 import { exampleTitle } from '../naming';
 import { useSelector } from 'react-redux';
@@ -63,6 +64,61 @@ function BoardLink({ category, tiers, active }) {
   );
 }
 
+const TOGGLE_KEYS = 'Ctrl+B';
+
+// One icon of the folded sidebar, labelled on hover.
+function RailIcon({ label, children, ...props }) {
+  return (
+    <Tooltip label={label} position="right" withArrow>
+      <ActionIcon variant="subtle" color="gray" size="xl" aria-label={label.replace(/ \(.*\)$/, '')} {...props}>
+        {children}
+      </ActionIcon>
+    </Tooltip>
+  );
+}
+
+// The sidebar folded to an icon strip, like VS Code's activity bar: the
+// shortcuts stay a click away and the canvas gets the width back.
+function CollapsedSidebar({ onExpand, onOpenPalette, waitingCount, onSelectSettings, onOpenShortcuts, onLogout }) {
+  const location = useLocation();
+  return (
+    <Box component="aside" className="sidebar sidebar-collapsed" px={6} py={SHELL_Y}>
+      <Stack gap={6} align="center" h="100%">
+        <RailIcon label={`Show sidebar (${TOGGLE_KEYS})`} onClick={onExpand}>
+          <PanelLeftOpen size={20} />
+        </RailIcon>
+        <RailIcon label="Jump to… (o)" onClick={onOpenPalette}>
+          <Search size={20} />
+        </RailIcon>
+        <RailIcon label="Home (g h)" component={Link} to="/" variant={location.pathname === '/' ? 'light' : 'subtle'}>
+          <Home size={20} />
+        </RailIcon>
+        <Indicator label={waitingCount} size={16} disabled={!waitingCount} offset={6}>
+          <RailIcon
+            label="Add songs (a)"
+            component={Link}
+            to="/add"
+            state={{ focusInput: true }}
+            variant={location.pathname === '/add' ? 'light' : 'subtle'}
+          >
+            <ListPlus size={20} />
+          </RailIcon>
+        </Indicator>
+        <Box style={{ flex: 1 }} />
+        <RailIcon label="Settings (g s)" onClick={onSelectSettings}>
+          <Settings size={20} />
+        </RailIcon>
+        <RailIcon label="Keyboard shortcuts (?)" onClick={onOpenShortcuts}>
+          <Keyboard size={20} />
+        </RailIcon>
+        <RailIcon label="Log out" onClick={onLogout}>
+          <LogOut size={20} />
+        </RailIcon>
+      </Stack>
+    </Box>
+  );
+}
+
 export default function Sidebar({
   query,
   onQueryChange,
@@ -77,11 +133,26 @@ export default function Sidebar({
   onOpenPalette,
   mobileOpen,
   onCloseMobile,
+  collapsed,
+  onToggleCollapsed,
 }) {
   const naming = useSelector(selectNaming);
   const location = useLocation();
   const q = query.trim().toLowerCase();
   const filteredCategories = tierCategories.filter((c) => c.toLowerCase().includes(q));
+
+  if (collapsed) {
+    return (
+      <CollapsedSidebar
+        onExpand={onToggleCollapsed}
+        onOpenPalette={onOpenPalette}
+        waitingCount={waitingCount}
+        onSelectSettings={onSelectSettings}
+        onOpenShortcuts={onOpenShortcuts}
+        onLogout={onLogout}
+      />
+    );
+  }
 
   return (
     <>
@@ -91,9 +162,14 @@ export default function Sidebar({
           <ThemeIcon size={30} radius="sm" variant="filled">
             <ListOrdered size={18} />
           </ThemeIcon>
-          <Text fw={800} fz={17}>
+          <Text fw={800} fz={17} style={{ flex: 1 }}>
             Tierlist.fm
           </Text>
+          <Tooltip label={`Hide sidebar (${TOGGLE_KEYS})`} withArrow>
+            <ActionIcon variant="subtle" color="gray" onClick={onToggleCollapsed} aria-label="Hide sidebar" visibleFrom="md">
+              <PanelLeftClose size={18} />
+            </ActionIcon>
+          </Tooltip>
         </Group>
 
         <UnstyledButton

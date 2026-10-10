@@ -13,6 +13,8 @@ const viewSlice = createSlice({
     sidebarQuery: '',
     homeQuery: '',
     mobileSidebarOpen: false,
+    // Desktop: the sidebar folded to an icon strip (Ctrl+B, like VS Code).
+    sidebarCollapsed: false,
   },
   reducers: {
     setCurrentCategory: (state, action) => {
@@ -27,8 +29,11 @@ const viewSlice = createSlice({
     setMobileSidebarOpen: (state, action) => {
       state.mobileSidebarOpen = action.payload;
     },
+    toggleSidebarCollapsed: (state) => {
+      state.sidebarCollapsed = !state.sidebarCollapsed;
+    },
   },
 });
 
-export const { setCurrentCategory, setSidebarQuery, setHomeQuery, setMobileSidebarOpen } = viewSlice.actions;
+export const { setCurrentCategory, setSidebarQuery, setHomeQuery, setMobileSidebarOpen, toggleSidebarCollapsed } = viewSlice.actions;
 export default viewSlice.reducer;

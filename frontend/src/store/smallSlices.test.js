@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import appearance, { setAccent, setTheme, setTierPalette } from './appearanceSlice';
-import view, { setCurrentCategory, setHomeQuery, setMobileSidebarOpen, setSidebarQuery } from './viewSlice';
+import view, { setCurrentCategory, setHomeQuery, setMobileSidebarOpen, setSidebarQuery, toggleSidebarCollapsed } from './viewSlice';
 import auth, { setLoggedIn, setPlaylists } from './authSlice';
 import { settingsLoaded } from './settingsActions';
 import { SETTINGS } from '../settings';
@@ -59,7 +59,7 @@ describe('boot cache for appearance', () => {
 
 describe('viewSlice', () => {
   it('initial state', () => {
-    expect(init(view)).toEqual({ currentCategory: null, sidebarQuery: '', homeQuery: '', mobileSidebarOpen: false });
+    expect(init(view)).toEqual({ currentCategory: null, sidebarQuery: '', homeQuery: '', mobileSidebarOpen: false, sidebarCollapsed: false });
   });
 
   it('setters are independent', () => {
@@ -67,7 +67,14 @@ describe('viewSlice', () => {
     s = view(s, setSidebarQuery('ja'));
     s = view(s, setHomeQuery('ro'));
     s = view(s, setMobileSidebarOpen(true));
-    expect(s).toEqual({ currentCategory: 'Rap', sidebarQuery: 'ja', homeQuery: 'ro', mobileSidebarOpen: true });
+    expect(s).toEqual({ currentCategory: 'Rap', sidebarQuery: 'ja', homeQuery: 'ro', mobileSidebarOpen: true, sidebarCollapsed: false });
+  });
+
+  it('toggleSidebarCollapsed folds and unfolds the sidebar', () => {
+    let s = view(init(view), toggleSidebarCollapsed());
+    expect(s.sidebarCollapsed).toBe(true);
+    s = view(s, toggleSidebarCollapsed());
+    expect(s.sidebarCollapsed).toBe(false);
   });
 });
 

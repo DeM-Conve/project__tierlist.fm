@@ -33,7 +33,7 @@
 
 ## Sidebar
 - Brand, "Jump to… ⌘K" (command palette), Home, Add songs (with a count of songs waiting for a tier), and every board with its video total (from playlist item counts - no per-board fetch). Filter box, empty-state hint explaining the playlist naming convention.
-- Footer: Settings, Keyboard shortcuts (`?`), Log out. On narrow screens the sidebar is a drawer opened from a burger button.
+- Footer: Settings, Keyboard shortcuts (`?`), Log out. On narrow screens the sidebar is a drawer opened from a burger button. `Ctrl+B` (`⌘B`) folds the sidebar to an icon strip (Jump to, Home, Add songs, Settings, Shortcuts, Log out), like VS Code's activity bar, and unfolds it again (also the fold/unfold button by the logo); on a phone it opens/closes the drawer.
 
 ## Tier boards (the tier list)
 - Playlists named by your naming (default `<Category> S` … `<Category> D`) are auto-grouped into a per-category tier board (plus an optional `<Category> TODO` list - see below).
