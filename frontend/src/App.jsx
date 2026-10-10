@@ -639,7 +639,7 @@ function Layout() {
             >
               {/* The side panel is a card on the frame (VS Code's side bar). */}
               <Box h="100%" py={PART_GAP}>
-                <Box h="100%" bg="var(--side)" style={{ borderRadius: 8, overflow: 'hidden' }}>
+                <Box h="100%" bg="var(--side)" style={{ borderRadius: 'var(--mantine-radius-md)', overflow: 'hidden' }}>
               <SidebarPanel
                 query={query}
                 onQueryChange={(q) => dispatch(setSidebarQuery(q))}

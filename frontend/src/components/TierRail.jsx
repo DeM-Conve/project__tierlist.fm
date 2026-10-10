@@ -144,7 +144,7 @@ export default function TierRail({ category, activeTier }) {
       m={PART_GAP}
       bg="var(--side)"
       style={{
-        borderRadius: 8,
+        borderRadius: 'var(--mantine-radius-md)',
         flexShrink: 0,
         zIndex: 20,
         display: 'flex',

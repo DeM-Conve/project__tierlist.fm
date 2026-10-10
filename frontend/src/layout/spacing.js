@@ -11,12 +11,13 @@ import { DEFAULT_THEME, px } from '@mantine/core';
 export const SHELL_Y = 'md';
 export const SIDEBAR_X = 'md';
 export const CANVAS_X = { base: 'lg', md: 'xl' };
-// The gap between the page card and everything around it (the panel's
+// The gap between the shell's cards (a Mantine spacing key, so it's the
+// theme's --mantine-spacing-xs variable) and everything around it (the panel's
 // edge - the resize sash fills it -, the tier rail, the window edge, the
 // dock), like the gap between VS Code's editor and side panels. Also the
 // tier rail's side padding, so the card sits the same distance from the
 // rail's tiles as from the window's edge.
-export const PART_GAP = 8;
+export const PART_GAP = 'xs';
 export const RAIL_X = PART_GAP;
 // Below md the sidebar is a drawer and a menu button floats at the top-left
 // of the canvas, so the canvas starts under it.

@@ -30,7 +30,7 @@
    Code's editor part: --editor on --chrome, a 1px chrome-toned border - a
    CSS class because it goes flat on phones, an @media rule Mantine has no
    prop for. */
-.canvas-card { border-radius: 8px; border: 1px solid var(--chrome-border); }
+.canvas-card { border-radius: var(--mantine-radius-md); border: 1px solid var(--chrome-border); }
 
 /* The resize sash (layout/Sash.jsx, react-resizable-panels' <Separator>):
    an 8px hit area (PART_GAP) on the chrome with a centred grip; on hover /
@@ -40,7 +40,8 @@
    The short delay keeps the line from flashing as the pointer passes. */
 .sash {
   position: relative;
-  width: 8px;
+  /* The gap between two cards (layout/spacing.js PART_GAP). */
+  width: var(--mantine-spacing-xs);
   overflow: visible;
   display: flex;
   align-items: center;

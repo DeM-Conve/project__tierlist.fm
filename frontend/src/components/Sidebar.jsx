@@ -19,7 +19,7 @@ import { TierChip } from './TierBits';
 import { exampleTitle } from '../naming';
 import { useSelector } from 'react-redux';
 import { selectNaming } from '../store/selectors';
-import { PART_GAP, SHELL_Y, SIDEBAR_X } from '../layout/spacing';
+import { SHELL_Y, SIDEBAR_X } from '../layout/spacing';
 import { useBoardDropOpen } from '../layout/useBoardDropOpen';
 
 const TOGGLE_KEYS = 'Ctrl+B';
