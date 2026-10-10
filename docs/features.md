@@ -115,15 +115,12 @@
 - It also opens every page and Settings tab (**Go to**: Home, Add songs, Settings, Settings → Appearance / Playlist naming / Duels / Keyboard shortcuts, Show keyboard shortcuts) and Log out. Each carries search keywords, so `sett`, `theme`, `dark mode`, `todo`, `rename`, `elo` or `inbox` find the right one.
 
 ## Duels (pairwise ranking)
-- Duel on a tier board (or a Home card) opens a **mode picker** - duels by goal, no algorithm menu (`frontend/src/duel/sessions.js`):
-  - **Place to-do songs** (Beli-style): pick each TODO song's tier (`1`-`5` or the chips), then a few duels binary-search its exact spot in that tier (~log2(n)+1). Landing on the top of a tier asks once more against the bottom of the tier above (and the bottom against the top of the tier below), so a song can climb or drop a tier.
-  - **Tune the borders**: the bottom of each tier against the top of the one below, 3 deep; the lower song winning swaps the two.
-  - **Order a tier**: a merge sort of one tier (robust: one wrong pick can't misplace everything after it).
-- Two song cards side by side, each a real embedded player: the song you're listening to plays from ~35% in (near the hook), the other waits; `Tab` / "Listen" switches and each resumes where it was. In Place the new song keeps playing through all its duels.
-- **The board, live** (right panel): one bar per tier, a sliver per song - the two contenders marked, and in Place the range the new song can still land in lit up. Under it, **Changes** lists every song that moved (new tier / new place among its tier-mates).
-- Keyboard: `←` / `→` pick, `↓` can't decide (placed right next to that song), `Tab` switch song, `u` undo (any number of steps - a session is a replay of its answers).
-- **Apply N changes** any time (stopping early keeps what's done) writes the live board as one undoable edit; it's staged like any move until you push. Exit discards.
-- The Settings "default duel strategy" isn't used by the new modes yet (proof of concept).
+Duels collect evidence; a single duel never moves a song. Every duel feeds a hidden score, and a tier change is only *suggested* once enough results agree - you approve it. All the ranking runs in the backend (`fm.tierlist.duel.engine`); everything is stored in Postgres per account and board, so scores carry over between sessions and devices.
+- **Hub** (`/tier/<board>/duel`, the board's Duel button / a Home card): board certainty (how sure the model is each song sits in its tier), moves waiting, songs on the fence (+ unplaced to-do songs), a **score map** (every song a dot by score over tier bands at the learned borders; ringed = near a neighbouring tier; hover for the song), session length (Quick 2 / Session 5 / Deep 15 min), what to sharpen - **Smart mix** (default: whichever duel settles the most), **Place TODO songs** (no tier guess: binary search against anchors from across the board, ~5 duels each), **Borderlines only**, **One song** (search a song, find its spot) - and the top moves ready (Move / Keep). `Enter` starts; a session in progress can be resumed.
+- **Matchup** (`.../duel/play/<session>`): two real players; clips from 0:30 (A 30 s, then B 20 s, looping) - `Tab` switches, each keeps its place; the mini player pauses. **Five-step verdict**: A clearly / A / Too close / B / B clearly (`⇧←` `←` `↓` `→` `⇧→`; "clearly" counts double, a draw still counts). After a verdict: the headline, both songs' score change and what it did ("now 81% T1 - leaning up"), then `Space` for the next duel. "Don't know one of them" (`s`) skips the opponent for the session; `u` undoes. Side panel: **why this duel**, the song's **where it belongs** probabilities, this session's verdicts. Top bar: certainty gained, duels, time left, End session.
+- **Suggested moves** (`.../duel/moves`): every move the evidence supports (≥85% for the new tier, ≥4 duels, ≥2 opponents near that border), filter All / Up / Down / New placements, **Move** (staged on the board like any edit - toast, Ctrl+Z, push), **Keep** (not suggested again until 5 fresh duels point the same way), **Lock** (never suggested), **Move all at ≥90%**; per song: probabilities, score over its duels (dashed = nearest border), key head-to-heads, play. **Tighten tier order**: sort a tier by score (positions are ranks). Keys: `↑↓` browse, `m` move, `x` keep, `l` lock, `p` play.
+- **Session summary** (`.../duel/done/<session>`): duels and time, certainty before → after, borders settled / TODO songs placed / tier orders to tighten, new moves from the session, the biggest upset ("one upset moves scores, never tiers"), pairs marked equal after three "too close" in a row (never asked again). Review moves / Another session / Back to board.
+- Algorithms (the design brief's): OpenSkill / Weng-Lin Bradley-Terry rating (implemented in Java, β 2.0) for each duel's odds and score trends; a Davidson-Bradley-Terry refit of the whole log on every analysis (ties, "clearly" = two wins, ~1%/week decay of old duels, uncertainty from the Fisher information, σ grows with time since a song's last duel); tier probabilities from an ordinal probit regression of your current tiers on the scores; pairing by p(1-p) × closeness to a border with Thompson sampling and repeat penalties, noisy binary search for to-do / one-song. The Settings duel-strategy choice is no longer used.
 
 ## Settings
 - **Appearance** tab (default): pick a **theme** (Tokyo Night, Dracula, Warm charcoal - dark; Paper, Sand, Solarized Light - light; picking one also applies its signature accent), an **accent** (Blue, Violet, Teal, Green, Pink, Red, Orange, Amber - works with any theme; Warm charcoal + Amber is the original look) and a **tier palette** (Vivid, TierMaker classic, Heat). Each option shows a live mini preview, changes apply instantly across the whole app and are saved to your account. All colors come from one file, `frontend/src/themes.js`.
@@ -133,7 +130,7 @@
 - "Keyboard shortcuts" tab: the full shortcut list (same source as the `?` modal).
 
 ## Routing
-- Real, refreshable URLs (React Router): `/`, `/playlist/<id>` (redirects to its tier page), `/tier/<category>`, `/tier/<category>/t/<tier>`, `/tier/<category>/duel`, `/settings`. Refreshing directly on any board URL loads it correctly (previously a refresh could leave a board blank until you navigated away and back).
+- Real, refreshable URLs (React Router): `/`, `/playlist/<id>` (redirects to its tier page), `/tier/<category>`, `/tier/<category>/t/<tier>`, `/tier/<category>/duel` (+ `/duel/play/<session>`, `/duel/moves`, `/duel/done/<session>`), `/settings`. Refreshing directly on any board URL loads it correctly (previously a refresh could leave a board blank until you navigated away and back).
 - Refreshing or using browser back/forward lands back on the exact board, playlist, or duel you were on.
 
 ## Keyboard shortcuts (full list)
@@ -145,7 +142,7 @@ Source of truth is `frontend/src/shortcuts.js` (rendered by the `?` modal and Se
 - Tier board: `/` search, `n` / `N` next/previous match, `Enter` play match (or step), `Esc` close search, `Shift+P` push to YouTube (any board page).
 - Tier page: `/` filter, `Esc` clear the filter.
 - Player: `h` / `l` prev/next track, `←`/`→` seek 10s (expanded), `Space` play/pause, `m` mute, `f` fullscreen video (expanded; elsewhere `f` is link hints), `0`-`9` jump to that 10%, `j` minimize (expanded → mini → floating), `k` expand, `Esc` minimize from expanded, `Shift+1`-`9` rate the playing video (any mode, on its board), `Del` remove it from its playlist (staged until push).
-- Duel: `←` / `→` pick, `↓` can't decide, `Tab` switch song, `1`-`5` tier (Place), `u` undo.
+- Duel: `⇧←` / `←` / `↓` / `→` / `⇧→` verdict, `Tab` switch clip, `s` don't know one, `Space` next, `u` undo; suggested moves `↑↓` `m` `x` `l` `p`.
 
 ## Architecture
 - React (Vite) frontend + Spring Boot (Java 21, Maven) backend, fully separated.

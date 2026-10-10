@@ -208,3 +208,17 @@ export const selectStagedChanges = createSelector([selectPendingMoves, selectTra
   ...moves,
   ...transfers.map((t) => ({ kind: 'transfer', ...t })),
 ]);
+
+// The board as the duel API wants it - tier -> video ids, in board order,
+// staged edits included - plus a short key that changes when it does (for
+// query keys; the full id list would be a huge key).
+export const selectDuelLayout = createSelector([selectTierItems], (tierItems) => {
+  const tiers = {};
+  let hash = 0;
+  for (const t of BOARD_TIERS) {
+    if (!tierItems[t]) continue;
+    tiers[t] = tierItems[t].map((v) => v.videoId);
+    for (const ch of `${t}:${tiers[t].join(',')};`) hash = (hash * 31 + ch.charCodeAt(0)) | 0;
+  }
+  return { layout: { tiers }, key: (hash >>> 0).toString(36) };
+});

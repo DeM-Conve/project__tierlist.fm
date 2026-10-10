@@ -14,7 +14,17 @@ echo "==> Frontend: lint, tests, build"
 
 if [ "$target" != "frontend" ]; then
   echo "==> Backend: unit + integration tests with coverage gate (needs Docker)"
-  (cd backend && mvn -q verify)
+  if command -v mvn >/dev/null && command -v javac >/dev/null; then
+    (cd backend && mvn -q verify)
+  else
+    # No local JDK + Maven: the same `mvn verify` in the image the backend's
+    # Dockerfile builds with, given Docker for the Testcontainers ITs.
+    docker run --rm -u "$(id -u):$(id -g)" --group-add "$(stat -c %g /var/run/docker.sock)" --network host \
+      -e HOME=/tmp -e TESTCONTAINERS_RYUK_DISABLED=true -v /var/run/docker.sock:/var/run/docker.sock \
+      -v "$PWD/backend:/app" -v "$HOME/.m2:/tmp/m2" -w /app maven:3.9-eclipse-temurin-21 \
+      mvn -q -B -Dmaven.repo.local=/tmp/m2/repository verify
+    docker ps -aq --filter ancestor=postgres:17-alpine | xargs -r docker rm -f >/dev/null
+  fi
 fi
 
 echo "==> All tests passed - deploying"

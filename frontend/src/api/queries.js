@@ -180,3 +180,114 @@ export function useRemovePlaylistItemMutation() {
     },
   });
 }
+
+// ------------------------------------------------------------------- Duels
+// The ranking engine runs in the backend (fm.tierlist.duel.engine); every
+// call sends the board as this browser has it (`layout`, from
+// selectDuelLayout - staged edits included). Sessions live in Postgres; the
+// session's latest state is kept in the query cache under duelKeys.session.
+
+const duelPath = (board) => `/api/duels/${encodeURIComponent(board)}`;
+
+export const duelKeys = {
+  all: (board) => ['duels', board],
+  analysis: (board, layoutKey) => ['duels', board, 'analysis', layoutKey],
+  session: (board, id) => ['duels', board, 'session', id],
+  summary: (board, id) => ['duels', board, 'summary', id],
+};
+
+export function useDuelAnalysisQuery(board, { layout, key }, enabled = true) {
+  return useQuery({
+    queryKey: duelKeys.analysis(board, key),
+    queryFn: async () => (await api.post(`${duelPath(board)}/analysis`, { layout })).data,
+    enabled: enabled && !!board,
+  });
+}
+
+// The session as it stands (resuming after a reload); verdicts etc. replace it in the cache.
+export function useDuelSessionQuery(board, id, { layout }, enabled = true) {
+  return useQuery({
+    queryKey: duelKeys.session(board, id),
+    queryFn: async () => (await api.post(`${duelPath(board)}/sessions/${id}`, { layout })).data,
+    enabled: enabled && !!board && !!id,
+    staleTime: Infinity,
+    retry: false,
+  });
+}
+
+// A session call that returns the session: its answer becomes the cached session.
+function useSessionMutation(board, request) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: request,
+    onSuccess: (session) => {
+      queryClient.setQueryData(duelKeys.session(board, session.id), session);
+      queryClient.invalidateQueries({ queryKey: [...duelKeys.all(board), 'analysis'] });
+    },
+  });
+}
+
+export function useStartDuelMutation(board) {
+  return useSessionMutation(board, async ({ layout, focus, songId, minutes }) =>
+    (await api.post(`${duelPath(board)}/sessions`, { layout, focus, songId, minutes })).data);
+}
+
+export function useDuelVerdictMutation(board, id) {
+  return useSessionMutation(board, async ({ layout, a, b, verdict }) =>
+    (await api.post(`${duelPath(board)}/sessions/${id}/verdicts`, { layout, a, b, verdict })).data);
+}
+
+export function useDuelSkipMutation(board, id) {
+  return useSessionMutation(board, async ({ layout, videoId }) =>
+    (await api.post(`${duelPath(board)}/sessions/${id}/skips`, { layout, videoId })).data);
+}
+
+export function useDuelUndoMutation(board, id) {
+  return useSessionMutation(board, async ({ layout }) =>
+    (await api.post(`${duelPath(board)}/sessions/${id}/undo`, { layout })).data);
+}
+
+export function useEndDuelMutation(board, id) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ layout }) => (await api.post(`${duelPath(board)}/sessions/${id}/end`, { layout })).data,
+    onSuccess: (summary) => {
+      queryClient.setQueryData(duelKeys.summary(board, id), summary);
+      queryClient.removeQueries({ queryKey: duelKeys.session(board, id) });
+      queryClient.invalidateQueries({ queryKey: [...duelKeys.all(board), 'analysis'] });
+    },
+  });
+}
+
+// The session summary is what ending the session returns; ending again is
+// harmless (the first end time stays), so after a reload it's just asked again.
+export function useDuelSummaryQuery(board, id, { layout }, enabled = true) {
+  return useQuery({
+    queryKey: duelKeys.summary(board, id),
+    queryFn: async () => (await api.post(`${duelPath(board)}/sessions/${id}/end`, { layout })).data,
+    enabled: enabled && !!board && !!id,
+    staleTime: Infinity,
+    retry: false,
+  });
+}
+
+// Move / Keep on a suggested move (`decision`: 'ACCEPTED' | 'KEPT'), or null to take it back.
+export function useDuelDecisionMutation(board) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ videoId, decision, from, to, confidence }) =>
+      decision
+        ? api.put(`${duelPath(board)}/decisions/${videoId}`, { decision, from, to, confidence })
+        : api.delete(`${duelPath(board)}/decisions/${videoId}`),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: [...duelKeys.all(board), 'analysis'] }),
+  });
+}
+
+export function useDuelLockMutation(board) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ videoId, locked }) =>
+      locked ? api.put(`${duelPath(board)}/locks/${videoId}`) : api.delete(`${duelPath(board)}/locks/${videoId}`),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: [...duelKeys.all(board), 'analysis'] }),
+  });
+}

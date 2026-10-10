@@ -133,6 +133,25 @@ category.
   in flight) and on 412 refetches and `rebase()`s (three-way merge: this browser's
   edits on top of the newer row). localStorage (`settings.js`) is only a boot cache
   so the theme applies before first paint - the account's row wins.
+- **Duels: the algorithm lives only in the backend, in `fm.tierlist.duel.engine`**
+  (the user's call: "the algorithm logic should be in our backend", its own package).
+  Plain Java - no Spring/JPA/HTTP imports there - built from swappable parts (Strategy
+  pattern) behind the `DuelEngine` facade (`DuelEngine.builder()`): `RatingModel`
+  (`WengLinBradleyTerry`, OpenSkill's model implemented from the paper - no
+  third-party rating lib), `Refitter` (`DavidsonBradleyTerryRefit`, run over the
+  whole log on every analysis), `PriorPolicy` (`TierPriorPolicy`: a song starts from
+  the tier it's in), `TierModel` (`OrdinalProbitTierModel`, Commons Math),
+  `pairing.PairingStrategy` per `Focus` (registry `PairingStrategies`), and
+  `policy.SuggestionPolicy`, a composite of `SuggestionRule`s (the 85% / 4 duels /
+  2 border opponents gate, Keep hysteresis, locks). Tunables: `EngineConfig`. The duel
+  log is the source of truth (event sourcing): scores are always rebuilt from priors +
+  log, never stored. `fm.tierlist.duel` is the layered rest: entities/repositories on
+  the `duel_session`, `duel`, `duel_skip`, `duel_prior`, `duel_decision`, `duel_lock`
+  tables (V1), `DuelService` (history in, engine, results out), `DuelController`
+  (`/api/duels/{board}/...`; reads are POSTs carrying the browser's board layout,
+  staged edits included). The frontend's duel screens (`components/duel/`) only show
+  what the API returns - add ranking logic to the engine, never to the frontend.
+  Every duel/user datum lives in Postgres (the user's call), not localStorage.
 - **Backend tests**: `mvn verify` - unit tests (`*Test`, surefire) plus
   Testcontainers integration tests (`*IT`, failsafe) against a real `postgres:17-alpine`
   (needs Docker; `testcontainers.version` is pinned in `pom.xml` because Boot 3.3's

@@ -28,13 +28,16 @@ import TierRail from './components/TierRail';
 import { CANVAS_TOP, CANVAS_X, SHELL_Y } from './layout/spacing';
 import { CanvasContext } from './layout/canvas';
 import PendingChanges from './components/PendingChanges';
-import { applyOrderWithFeedback, loadBoard, moveWithFeedback, undoEdit } from './tierActions';
+import { loadBoard, moveWithFeedback, undoEdit } from './tierActions';
 import { buildSyncPlan, succeeded, touchedPlaylists } from './syncPlan';
 import { dragEnded, transfersDiscarded, transfersPushed } from './store/transfersSlice';
 import TierBoardView from './components/TierBoardView';
 import PlayerDock from './components/PlayerDock';
 import CommandPalette from './components/CommandPalette';
-import DuelView from './components/DuelView';
+import DuelHub from './components/duel/DuelHub';
+import DuelMatch from './components/duel/DuelMatch';
+import DuelMoves from './components/duel/DuelMoves';
+import DuelWrap from './components/duel/DuelWrap';
 import AddSongsView from './components/AddSongsView';
 import { useAddSongs } from './addSongs/useAddSongs';
 import { useAddSongsActions } from './addSongs/useAddSongsActions';
@@ -185,7 +188,10 @@ export default function App() {
         <Route path="playlist/:id" element={<PlaylistRedirect />} />
         <Route path="tier/:category" element={<TierBoardPage />} />
         <Route path="tier/:category/t/:tier" element={<TierFocusPage />} />
-        <Route path="tier/:category/duel" element={<DuelPage />} />
+        <Route path="tier/:category/duel" element={<DuelPage view={DuelHub} />} />
+        <Route path="tier/:category/duel/play/:sessionId" element={<DuelPage view={DuelMatch} />} />
+        <Route path="tier/:category/duel/moves" element={<DuelPage view={DuelMoves} />} />
+        <Route path="tier/:category/duel/done/:sessionId" element={<DuelPage view={DuelWrap} />} />
         <Route path="add" element={<AddSongsPage />} />
         <Route path="settings" element={<SettingsPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
@@ -235,7 +241,7 @@ function Layout() {
   const tierMatch = useMatch('/tier/:category/*');
   const currentCategory = tierMatch ? decodeURIComponent(tierMatch.params.category) : null;
   const tierPageMatch = useMatch('/tier/:category/t/:tier');
-  const duelMatch = useMatch('/tier/:category/duel');
+  const duelMatch = useMatch('/tier/:category/duel/*');
   const addMatch = useMatch('/add');
   const focusedCategory = useSelector((s) => s.focus.focusedCategory);
   // The Tier Rail is global like the player: on a board page it shows that
@@ -861,31 +867,13 @@ function TierFocusPage() {
   );
 }
 
-function DuelPage() {
+// Every duel screen (hub, matchup, moves, summary): the board loaded the same
+// way the tier list loads it (deep links work), then the screen itself.
+function DuelPage({ view: View }) {
   const category = useCategoryParam();
-  const dispatch = useDispatch();
-  const navigate = useNavigate();
-  const tierItems = useSelector((s) => s.tiers.tierItems);
-
-  // Supports deep-linking straight to a duel: fetches (and caches) the
-  // board's data the same way the tier list does. Coming from "Rank → Duel"
-  // on an already-open board serves straight from the query cache.
+  const { sessionId } = useParams();
   const { isLoading } = useBoardPage(category);
-  const board = `/tier/${encodeURIComponent(category)}`;
-
-  function applyDuelResult(result) {
-    dispatch(applyOrderWithFeedback(result));
-    navigate(board);
-  }
-
-  return (
-    <DuelView
-      tierItems={tierItems}
-      isLoading={isLoading}
-      onApply={applyDuelResult}
-      onExit={() => navigate(board)}
-    />
-  );
+  return <View category={category} sessionId={sessionId} boardLoading={isLoading} base={`/tier/${encodeURIComponent(category)}`} />;
 }
 
 function AddSongsPage() {

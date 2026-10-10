@@ -109,12 +109,14 @@ export const SHORTCUTS = [
     category: 'Player',
   },
 
-  { id: 'duel-left', keys: ['←'], description: 'Pick the left video', category: 'Duel' },
-  { id: 'duel-right', keys: ['→'], description: 'Pick the right video', category: 'Duel' },
-  { id: 'duel-skip', keys: ['↓'], description: "Can't decide - too close to call", category: 'Duel' },
-  { id: 'duel-listen', keys: ['Tab'], description: 'Switch which song is playing', category: 'Duel' },
-  { id: 'duel-tier', keys: ['1-5'], description: 'Place: pick the to-do song\'s tier', category: 'Duel' },
-  { id: 'duel-undo', keys: ['u'], description: 'Undo the last pick', category: 'Duel' },
+  { id: 'duel-a', keys: ['←'], description: 'A wins (Shift+← A, clearly)', category: 'Duel' },
+  { id: 'duel-b', keys: ['→'], description: 'B wins (Shift+→ B, clearly)', category: 'Duel' },
+  { id: 'duel-close', keys: ['↓'], description: 'Too close to call', category: 'Duel' },
+  { id: 'duel-listen', keys: ['Tab'], description: 'Switch which clip is playing', category: 'Duel' },
+  { id: 'duel-skip', keys: ['s'], description: "Don't know one of them (skip the opponent)", category: 'Duel' },
+  { id: 'duel-next', keys: ['Space'], description: 'Next duel (after a verdict)', category: 'Duel' },
+  { id: 'duel-undo', keys: ['u'], description: 'Undo the last verdict', category: 'Duel' },
+  { id: 'duel-moves', keys: ['m', 'x', 'l', 'p'], description: 'Suggested moves: move / keep / lock / play (↑↓ browse)', category: 'Duel' },
 ];
 
 export function hotkeyForCommand(commandId) {

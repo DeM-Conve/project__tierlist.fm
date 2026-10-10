@@ -93,8 +93,14 @@ const focusSlice = createSlice({
     // 'expanded' (full-screen), 'mini' (bottom bar), or 'floating' (small
     // corner box) - see PlayerDock's j/k state machine.
     playerMode: 'expanded',
+    // Bumped to ask the dock to pause (another player - a duel clip - is
+    // about to play). A counter, so asking twice pauses twice.
+    pauseRequest: 0,
   },
   reducers: {
+    requestPlayerPause: (state) => {
+      state.pauseRequest += 1;
+    },
     openFocus: (state, action) => {
       if (!startContext(state, action.payload)) return;
       state.isShuffling = false;
@@ -237,6 +243,7 @@ const focusSlice = createSlice({
 });
 
 export const {
+  requestPlayerPause,
   openFocus,
   closeFocus,
   minimizePlayer,

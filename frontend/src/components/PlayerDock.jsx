@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useSelector } from 'react-redux';
 import { tierName } from '../tierLabels';
 import { ActionIcon, Badge, Group, HoverCard, Slider, Stack, Text } from '@mantine/core';
 import {
@@ -114,6 +115,11 @@ export default function PlayerDock({
 }) {
   const cardRef = useRef(null);
   const playerRef = useRef(null);
+  // Another player (a duel clip) asked for quiet - see focusSlice.requestPlayerPause.
+  const pauseRequest = useSelector((s) => s.focus.pauseRequest);
+  useEffect(() => {
+    if (pauseRequest) playerRef.current?.pauseVideo?.();
+  }, [pauseRequest]);
   const [isPlaying, setIsPlaying] = useState(true);
   // Playback position, polled (see below) for the edge progress line.
   const [time, setTime] = useState({ cur: 0, dur: 0 });
