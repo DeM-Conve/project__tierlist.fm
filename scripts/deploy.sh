@@ -23,7 +23,7 @@ if [ "$target" != "frontend" ]; then
       -e HOME=/tmp -e TESTCONTAINERS_RYUK_DISABLED=true -v /var/run/docker.sock:/var/run/docker.sock \
       -v "$PWD/backend:/app" -v "$HOME/.m2:/tmp/m2" -w /app maven:3.9-eclipse-temurin-21 \
       mvn -q -B -Dmaven.repo.local=/tmp/m2/repository verify
-    docker ps -aq --filter ancestor=postgres:17-alpine | xargs -r docker rm -f >/dev/null
+    docker ps -aq --filter label=org.testcontainers=true | xargs -r docker rm -f >/dev/null
   fi
 fi
 
