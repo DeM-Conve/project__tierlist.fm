@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import appearance, { setAccent, setTheme, setTierPalette } from './appearanceSlice';
-import view, { setCurrentCategory, setHomeQuery, setMobileSidebarOpen, setSidebarQuery, toggleSidebarCollapsed } from './viewSlice';
+import view, { setCurrentCategory, setHomeQuery, setMobileSidebarOpen, setSidebarQuery, toggleSidebarCollapsed, showSidebarView } from './viewSlice';
 import auth, { setLoggedIn, setPlaylists } from './authSlice';
 import { settingsLoaded } from './settingsActions';
 import { SETTINGS } from '../settings';
@@ -59,7 +59,7 @@ describe('boot cache for appearance', () => {
 
 describe('viewSlice', () => {
   it('initial state', () => {
-    expect(init(view)).toEqual({ currentCategory: null, sidebarQuery: '', homeQuery: '', mobileSidebarOpen: false, sidebarCollapsed: false });
+    expect(init(view)).toEqual({ currentCategory: null, sidebarQuery: '', homeQuery: '', mobileSidebarOpen: false, sidebarCollapsed: false, sidebarView: 'boards' });
   });
 
   it('setters are independent', () => {
@@ -67,7 +67,16 @@ describe('viewSlice', () => {
     s = view(s, setSidebarQuery('ja'));
     s = view(s, setHomeQuery('ro'));
     s = view(s, setMobileSidebarOpen(true));
-    expect(s).toEqual({ currentCategory: 'Rap', sidebarQuery: 'ja', homeQuery: 'ro', mobileSidebarOpen: true, sidebarCollapsed: false });
+    expect(s).toEqual({ currentCategory: 'Rap', sidebarQuery: 'ja', homeQuery: 'ro', mobileSidebarOpen: true, sidebarCollapsed: false, sidebarView: 'boards' });
+  });
+
+  it('showSidebarView: another view opens it, the open view closes the panel, a closed panel reopens', () => {
+    let s = view(init(view), showSidebarView('playlists'));
+    expect(s).toMatchObject({ sidebarCollapsed: false, sidebarView: 'playlists' });
+    s = view(s, showSidebarView('playlists'));
+    expect(s).toMatchObject({ sidebarCollapsed: true, sidebarView: 'playlists' });
+    s = view(s, showSidebarView('boards'));
+    expect(s).toMatchObject({ sidebarCollapsed: false, sidebarView: 'boards' });
   });
 
   it('toggleSidebarCollapsed folds and unfolds the sidebar', () => {

@@ -8,7 +8,10 @@ const props = (over) => ({
   query: '',
   onQueryChange: vi.fn(),
   tierCategories: ['Rap', 'Rock'],
-  tierGroups: {},
+  tierGroups: {
+    Rap: { S: { id: 'p1', title: 'Rap S', itemCount: 12 }, A: { id: 'p2', title: 'Rap A', itemCount: 30 } },
+    Rock: { S: { id: 'p3', title: 'Rock S', itemCount: 4 } },
+  },
   playlistCount: 10,
   waitingCount: 2,
   loading: false,
@@ -19,7 +22,8 @@ const props = (over) => ({
   mobileOpen: false,
   onCloseMobile: vi.fn(),
   collapsed: false,
-  onToggleCollapsed: vi.fn(),
+  view: 'boards',
+  onShowView: vi.fn(),
   ...over,
 });
 
@@ -33,7 +37,7 @@ describe('Sidebar', () => {
     const toggle = screen.getByRole('button', { name: 'Tier lists' });
     expect(toggle).toHaveAttribute('aria-pressed', 'true');
     fireEvent.click(toggle);
-    expect(p.onToggleCollapsed).toHaveBeenCalled();
+    expect(p.onShowView).toHaveBeenCalledWith('boards');
   });
 
   it('panel closed: only the activity bar - every shortcut still one click away', () => {
@@ -50,6 +54,8 @@ describe('Sidebar', () => {
     expect(p.onSelectSettings).toHaveBeenCalled();
     fireEvent.click(screen.getByRole('button', { name: 'Keyboard shortcuts' }));
     expect(p.onOpenShortcuts).toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: 'Playlists' }));
+    expect(p.onShowView).toHaveBeenCalledWith('playlists');
     fireEvent.click(screen.getByRole('button', { name: 'Log out' }));
     expect(p.onLogout).toHaveBeenCalled();
   });
@@ -59,6 +65,15 @@ describe('Sidebar', () => {
     expect(screen.getByRole('link', { name: 'Add songs' })).toHaveAttribute('data-active', 'true');
     expect(screen.getByRole('link', { name: 'Home' })).not.toHaveAttribute('data-active');
     expect(screen.getByRole('button', { name: 'Tier lists' })).toHaveAttribute('data-active', 'true');
+  });
+
+  it('the Playlists view lists every tier playlist, each opening its tier page', () => {
+    draw(props({ view: 'playlists', query: 'rap' }), '/tier/Rap/t/A');
+    expect(screen.getByRole('button', { name: 'Playlists' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: 'Tier lists' })).toHaveAttribute('aria-pressed', 'false');
+    expect(screen.getByRole('link', { name: /Rap S/ })).toHaveAttribute('href', '/tier/Rap/t/S');
+    expect(screen.getByRole('link', { name: /Rap A/ })).toHaveAttribute('data-active', 'true');
+    expect(screen.queryByText('Rock S')).not.toBeInTheDocument();
   });
 
   it('filters the boards', () => {

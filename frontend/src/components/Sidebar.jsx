@@ -11,11 +11,11 @@ import {
   Stack,
   Text,
   TextInput,
-  ThemeIcon,
   Tooltip,
 } from '@mantine/core';
-import { Home, Keyboard, LayoutList, ListOrdered, ListPlus, LogOut, Search, Settings } from 'lucide-react';
-import { TIER_ORDER } from '../tiers';
+import { Home, Keyboard, LayoutList, ListMusic, ListPlus, LogOut, Search, Settings } from 'lucide-react';
+import { BOARD_TIERS, TIER_ORDER } from '../tiers';
+import { TierChip } from './TierBits';
 import { exampleTitle } from '../naming';
 import { useSelector } from 'react-redux';
 import { selectNaming } from '../store/selectors';
@@ -62,6 +62,33 @@ function BoardLink({ category, tiers, active }) {
   );
 }
 
+const tierPath = (category, tier) => `/tier/${encodeURIComponent(category)}/t/${tier}`;
+
+// One tier playlist: its tier, its YouTube title and song count; opens
+// that tier's page.
+function PlaylistLink({ category, tier, playlist, active }) {
+  return (
+    <NavLink
+      component={Link}
+      to={tierPath(category, tier)}
+      variant="light"
+      py={4}
+      active={active}
+      leftSection={<TierChip tier={tier} size={20} />}
+      label={
+        <Group justify="space-between" wrap="nowrap" gap={6}>
+          <Text size="sm" truncate="end" title={playlist.title}>
+            {playlist.title}
+          </Text>
+          <Text size="xs" c="dimmed">
+            {playlist.itemCount ?? 0}
+          </Text>
+        </Group>
+      }
+    />
+  );
+}
+
 // One activity-bar icon, labelled (with its key) on hover. `marked` draws
 // VS Code's accent bar on the left edge: the view that's open / the page
 // you're on.
@@ -88,17 +115,18 @@ function ActivityIcon({ label, keys, marked, children, ...props }) {
   );
 }
 
-// The permanent icon strip, like VS Code's activity bar. "Tier lists"
-// opens / closes the board panel beside it (Ctrl+B); the rest go places.
-function ActivityBar({ panelOpen, onTogglePanel, onOpenPalette, waitingCount, onSelectSettings, onOpenShortcuts, onLogout }) {
+// The permanent icon strip, like VS Code's activity bar. "Tier lists" and
+// "Playlists" open / close their view in the panel beside it (Ctrl+B
+// toggles the panel); the rest go places.
+function ActivityBar({ openView, onShowView, onOpenPalette, waitingCount, onSelectSettings, onOpenShortcuts, onLogout }) {
   const { pathname } = useLocation();
   return (
     <Stack component="nav" aria-label="Activity bar" gap={6} align="center" px={6} py={SHELL_Y}>
-      <ThemeIcon size={34} radius="sm" variant="filled" mb={8} aria-label="Tierlist.fm">
-        <ListOrdered size={20} />
-      </ThemeIcon>
-      <ActivityIcon label="Tier lists" keys={TOGGLE_KEYS} marked={panelOpen} aria-pressed={panelOpen} onClick={onTogglePanel}>
+      <ActivityIcon label="Tier lists" keys={TOGGLE_KEYS} marked={openView === 'boards'} aria-pressed={openView === 'boards'} onClick={() => onShowView('boards')}>
         <LayoutList size={22} />
+      </ActivityIcon>
+      <ActivityIcon label="Playlists" marked={openView === 'playlists'} aria-pressed={openView === 'playlists'} onClick={() => onShowView('playlists')}>
+        <ListMusic size={22} />
       </ActivityIcon>
       <ActivityIcon label="Jump to…" keys="o / ⌘K" onClick={onOpenPalette}>
         <Search size={22} />
@@ -140,20 +168,29 @@ export default function Sidebar({
   mobileOpen,
   onCloseMobile,
   collapsed,
-  onToggleCollapsed,
+  view = 'boards',
+  onShowView,
 }) {
   const naming = useSelector(selectNaming);
   const location = useLocation();
   const q = query.trim().toLowerCase();
   const filteredCategories = tierCategories.filter((c) => c.toLowerCase().includes(q));
+  const isPlaylists = view === 'playlists';
+  // Every tier playlist (template-matching only - see selectTierPlaylists),
+  // board by board, best tier first.
+  const playlists = isPlaylists
+    ? tierCategories.flatMap((c) =>
+        BOARD_TIERS.filter((t) => tierGroups[c]?.[t]).map((t) => ({ category: c, tier: t, playlist: tierGroups[c][t] }))
+      ).filter((p) => p.playlist.title.toLowerCase().includes(q))
+    : [];
 
   return (
     <>
       {mobileOpen && <div className="sidebar-scrim" onClick={onCloseMobile} />}
       <Box component="aside" className={`sidebar${mobileOpen ? ' sidebar-open' : ''}`}>
         <ActivityBar
-          panelOpen={!collapsed}
-          onTogglePanel={onToggleCollapsed}
+          openView={collapsed ? null : view}
+          onShowView={onShowView}
           onOpenPalette={onOpenPalette}
           waitingCount={waitingCount}
           onSelectSettings={onSelectSettings}
@@ -173,18 +210,18 @@ export default function Sidebar({
           >
             <Group justify="space-between" px={8} mb={8} mt={6} wrap="nowrap">
               <Text size="xs" fw={700} c="dimmed" tt="uppercase" style={{ letterSpacing: 1 }}>
-                Tier lists
+                {isPlaylists ? 'Playlists' : 'Tier lists'}
               </Text>
               {loading ? (
                 <Skeleton h={10} w={14} />
               ) : (
-                <Text size="xs" c="dimmed" title={`${playlistCount} tier playlists`}>
-                  {tierCategories.length}
+                <Text size="xs" c="dimmed">
+                  {isPlaylists ? playlistCount : tierCategories.length}
                 </Text>
               )}
             </Group>
             <TextInput
-              placeholder="Filter…"
+              placeholder={isPlaylists ? 'Filter playlists…' : 'Filter boards…'}
               value={query}
               onChange={(e) => onQueryChange(e.target.value)}
               leftSection={<Search size={13} />}
@@ -195,12 +232,27 @@ export default function Sidebar({
 
             <ScrollArea style={{ flex: 1 }} type="hover" offsetScrollbars>
               <Stack gap={0}>
-                {tierCategories.length > 0 && filteredCategories.length === 0 && (
+                {isPlaylists &&
+                  playlists.map(({ category, tier, playlist }) => (
+                    <PlaylistLink
+                      key={playlist.id}
+                      category={category}
+                      tier={tier}
+                      playlist={playlist}
+                      active={location.pathname === tierPath(category, tier)}
+                    />
+                  ))}
+                {isPlaylists && !loading && tierCategories.length > 0 && playlists.length === 0 && (
+                  <Text size="sm" c="dimmed" px={8}>
+                    No playlists match
+                  </Text>
+                )}
+                {!isPlaylists && tierCategories.length > 0 && filteredCategories.length === 0 && (
                   <Text size="sm" c="dimmed" px={8}>
                     No boards match
                   </Text>
                 )}
-                {filteredCategories.map((category) => (
+                {!isPlaylists && filteredCategories.map((category) => (
                   <BoardLink
                     key={category}
                     category={category}

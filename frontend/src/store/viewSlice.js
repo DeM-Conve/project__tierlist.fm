@@ -15,6 +15,8 @@ const viewSlice = createSlice({
     mobileSidebarOpen: false,
     // Desktop: the sidebar folded to an icon strip (Ctrl+B, like VS Code).
     sidebarCollapsed: false,
+    // Which view the panel shows: 'boards' (tier lists) or 'playlists'.
+    sidebarView: 'boards',
   },
   reducers: {
     setCurrentCategory: (state, action) => {
@@ -32,8 +34,17 @@ const viewSlice = createSlice({
     toggleSidebarCollapsed: (state) => {
       state.sidebarCollapsed = !state.sidebarCollapsed;
     },
+    // VS Code's activity bar: clicking the open view's icon closes the
+    // panel; any other icon opens the panel on that view.
+    showSidebarView: (state, action) => {
+      if (!state.sidebarCollapsed && state.sidebarView === action.payload) state.sidebarCollapsed = true;
+      else {
+        state.sidebarCollapsed = false;
+        state.sidebarView = action.payload;
+      }
+    },
   },
 });
 
-export const { setCurrentCategory, setSidebarQuery, setHomeQuery, setMobileSidebarOpen, toggleSidebarCollapsed } = viewSlice.actions;
+export const { setCurrentCategory, setSidebarQuery, setHomeQuery, setMobileSidebarOpen, toggleSidebarCollapsed, showSidebarView } = viewSlice.actions;
 export default viewSlice.reducer;
