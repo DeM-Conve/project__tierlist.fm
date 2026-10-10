@@ -21,11 +21,6 @@ class SettingsValueObjectsTest {
     }
 
     @Test
-    void prefsNeedADuelStrategy() {
-        assertThatNullPointerException().isThrownBy(() -> new Prefs(null)).withMessage("duelStrategy");
-    }
-
-    @Test
     void everyTierNeedsAName() {
         assertThatNullPointerException().isThrownBy(() -> new TierLabels(null, "A", "B", "C", "D", "TODO")).withMessage("s");
         assertThatNullPointerException().isThrownBy(() -> new TierLabels("S", null, "B", "C", "D", "TODO")).withMessage("a");
@@ -51,7 +46,7 @@ class SettingsValueObjectsTest {
     void aSettingsRowReplacesEverythingAndHandsOutACopyOfItsLinks() {
         Naming naming = new Naming("{category} {tier}", LABELS, null, null, null);
         UserSettings row = new UserSettings("alice", new Appearance(Theme.TOKYO, Accent.BLUE, TierPalette.VIVID), naming,
-            Map.of("PL1", "Rap"), new Prefs(DuelStrategy.TIER_AWARE_MERGE));
+            Map.of("PL1", "Rap"));
 
         assertThat(row.getUserId()).isEqualTo("alice");
         assertThat(row.getVersion()).isZero(); // never saved: no version yet
@@ -59,12 +54,11 @@ class SettingsValueObjectsTest {
 
         Map<String, String> newLinks = new HashMap<>(Map.of("PL2", "Jazz"));
         Naming newNaming = new Naming("[{tag}] {category} {tier}", LABELS, null, null, null);
-        row.replace(new Appearance(Theme.PAPER, Accent.RED, TierPalette.HEAT), newNaming, newLinks, new Prefs(DuelStrategy.ELO));
+        row.replace(new Appearance(Theme.PAPER, Accent.RED, TierPalette.HEAT), newNaming, newLinks);
 
         assertThat(row.getAppearance()).isEqualTo(new Appearance(Theme.PAPER, Accent.RED, TierPalette.HEAT));
         assertThat(row.getNaming()).isEqualTo(newNaming);
         assertThat(row.getTodoLinks()).containsExactly(Map.entry("PL2", "Jazz")); // the old link is gone
-        assertThat(row.getPrefs()).isEqualTo(new Prefs(DuelStrategy.ELO));
 
         newLinks.put("PL3", "Pop"); // the row keeps its own copy
         assertThat(row.getTodoLinks()).containsOnlyKeys("PL2");

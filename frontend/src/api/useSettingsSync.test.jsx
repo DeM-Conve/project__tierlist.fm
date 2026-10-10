@@ -18,9 +18,8 @@ import { useSettingsSync } from './useSettingsSync';
 import { toServer } from './settingsMapping';
 import appearanceReducer, { setTheme } from '../store/appearanceSlice';
 import namingReducer from '../store/namingSlice';
-import prefsReducer from '../store/prefsSlice';
 
-const makeStore = () => configureStore({ reducer: { appearance: appearanceReducer, naming: namingReducer, prefs: prefsReducer } });
+const makeStore = () => configureStore({ reducer: { appearance: appearanceReducer, naming: namingReducer } });
 
 function mount(store) {
   const wrapper = ({ children }) => <Provider store={store}>{children}</Provider>;
@@ -87,7 +86,7 @@ describe('useSettingsSync', () => {
     const store = makeStore();
     const base = toServer(store.getState());
     Object.assign(query, { data: { settings: base, etag: '"1"' }, isSuccess: true });
-    const newer = { ...base, prefs: { duelStrategy: 'elo' } };
+    const newer = { ...base, appearance: { ...base.appearance, tierPalette: 'heat' } };
     query.refetch.mockResolvedValue({ data: { settings: newer, etag: '"2"' } });
     mutateAsync
       .mockRejectedValueOnce({ response: { status: 412 } })
@@ -99,13 +98,13 @@ describe('useSettingsSync', () => {
     });
     await settle();
     await settle();
-    // Both changes survive: ours (theme) and the other device's (strategy).
+    // Both changes survive: ours (theme) and the other device's (tier palette).
     expect(store.getState().appearance.theme).toBe('sand');
-    expect(store.getState().prefs.duelStrategy).toBe('elo');
+    expect(store.getState().appearance.tierPalette).toBe('heat');
     expect(mutateAsync).toHaveBeenCalledTimes(2);
     expect(mutateAsync.mock.calls[1][0].etag).toBe('"2"');
     expect(mutateAsync.mock.calls[1][0].settings.appearance.theme).toBe('sand');
-    expect(mutateAsync.mock.calls[1][0].settings.prefs.duelStrategy).toBe('elo');
+    expect(mutateAsync.mock.calls[1][0].settings.appearance.tierPalette).toBe('heat');
   });
 
   it('a non-412 failure shows a notice and keeps settings locally', async () => {

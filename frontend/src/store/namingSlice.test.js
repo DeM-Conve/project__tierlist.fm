@@ -117,7 +117,7 @@ describe('linkTodoList', () => {
 });
 
 describe('settingsLoaded', () => {
-  const account = (naming) => settingsLoaded({ appearance: null, naming, prefs: null });
+  const account = (naming) => settingsLoaded({ appearance: null, naming });
 
   it('adopts the account’s naming and skips detection', () => {
     const s = reducer(

@@ -96,7 +96,7 @@ export function useCreatePlaylistsMutation() {
 }
 
 // The account's saved settings (Postgres `user_settings` row) as
-// `{ settings, etag }`: settings is `{ appearance, naming, prefs }` (backend
+// `{ settings, etag }`: settings is `{ appearance, naming }` (backend
 // SettingsDto) or null if the account has never saved (204); etag is the
 // row's version, which every save must quote back (see useSettingsSync).
 export function useSettingsQuery(enabled) {

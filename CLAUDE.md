@@ -96,7 +96,7 @@ category.
   applied migration.
   Tables: `app_user` (Google `sub` as id, recorded on every login by the success
   handler in `SecurityConfig`) and `user_settings` (one row per user: `theme_option`,
-  `accent_option`, `tier_palette_option`, `duel_strategy_option` enums, the naming
+  `accent_option`, `tier_palette_option` enums, the naming
   template and the six tier names `naming_tier_s..d/todo` - plus the same seven
   nullable `naming_migrating_from*` columns for an unfinished rename, all or none -
   (+ CHECK constraints via the `tier_label_valid` / `tier_labels_distinct` SQL
@@ -105,14 +105,15 @@ category.
   from Hibernate's auto-versioning - it bumped the version on insert - so
   `SettingsService` force-increments when links change). Backend package
   `fm.tierlist.settings`, layered and SOLID:
-  - enums `Theme`/`Accent`/`TierPalette`/`DuelStrategy`: constant name = Postgres
+  - enums `Theme`/`Accent`/`TierPalette`: constant name = Postgres
     enum label (Hibernate `@JdbcTypeCode(SqlTypes.NAMED_ENUM)` + `columnDefinition`
     naming the type so `validate` matches), `@JsonValue key()` = the frontend's id
-    (`tokyo`, `tierAwareMerge`) - the API speaks frontend keys, the DB its labels;
-  - `@Embeddable` records `Appearance`/`Naming`/`Prefs` (same grouping as the Redux
+    (`tokyo`, `vivid`) - the API speaks frontend keys, the DB its labels;
+  - `@Embeddable` records `Appearance`/`Naming` (same grouping as the Redux
     slices) inside the `UserSettings` entity; `SettingsDto` is the separate wire
     contract with `from()`/`toX()` conversions (the DTO depends on the domain, never
-    the reverse);
+    the reverse); unknown JSON properties are ignored (Boot's Jackson default), so
+    an older tab still sending the retired `prefs` group saves fine;
   - `@NamingTemplate` is a Bean Validation constraint mirroring `naming.js`
     `validateTemplate` - keep the two grammars in step;
   - `SettingsController` (thin, HTTP only) -> `SettingsService` (transactions, rules)
@@ -128,7 +129,7 @@ category.
   in the migration, Java constant, and the frontend catalogue entry - the three
   must match or the API rejects it (400).
   Frontend side: `api/useSettingsSync.js` (called in `App()`) loads the row into the
-  `appearance`/`naming`/`prefs` slices via the `settingsLoaded` action, uploads this
+  `appearance`/`naming` slices via the `settingsLoaded` action, uploads this
   browser's settings when the account has no row yet, PUTs changes (debounced, one
   in flight) and on 412 refetches and `rebase()`s (three-way merge: this browser's
   edits on top of the newer row). localStorage (`settings.js`) is only a boot cache
@@ -286,10 +287,9 @@ category.
   candidate (the board's "Add a to-do list" modal uses it; Settings has no to-do
   section - the user removed it). Keep `validateTemplate`/`@NamingTemplate` and
   `validateTierLabels`/`@TierLabel` + `TierLabelsDto.isDistinct` in step.
-- **Duel ranking uses the Strategy pattern** (`frontend/src/duel/`): multiple
-  interchangeable ranking algorithms (`tierAwareMerge` default, `mergeSort`, `elo`)
-  behind a common interface, swappable at runtime from the duel screen or persisted as a
-  default from Settings.
+- **Duel ranking is the backend engine** (`fm.tierlist.duel.engine`, see the Duels
+  bullet in the Stack section) - no ranking algorithm and no strategy setting on the
+  frontend (the old Settings -> Duels "default strategy" was removed).
 - Full feature list: `docs/features.md`. Keep it updated when you add a user-facing
   feature. It doubles as the no-regression checklist (the user asked for this) -
   before redesigning/rewriting any page, check every item listed for it (and the

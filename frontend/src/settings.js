@@ -5,10 +5,6 @@
 const PREFIX = 'ytTierApp:';
 
 export const SETTINGS = {
-  // legacy: the duel strategy on its own (now inside `prefs`)
-  duelStrategy: `${PREFIX}duelStrategy`,
-  // { duelStrategy } - see prefsSlice
-  prefs: `${PREFIX}prefs`,
   // { theme, accent, tierPalette } - see themes.js
   appearance: `${PREFIX}appearance`,
   // { template, tierLabels, migratingFrom, migratingFromTierLabels, todoLinks } - see naming.js / namingSlice

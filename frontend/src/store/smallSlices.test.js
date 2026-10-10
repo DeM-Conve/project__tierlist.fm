@@ -1,6 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import appearance, { setAccent, setTheme, setTierPalette } from './appearanceSlice';
-import prefs, { setDuelStrategy } from './prefsSlice';
 import view, { setCurrentCategory, setHomeQuery, setMobileSidebarOpen, setSidebarQuery } from './viewSlice';
 import auth, { setLoggedIn, setPlaylists } from './authSlice';
 import { settingsLoaded } from './settingsActions';
@@ -44,39 +43,7 @@ describe('appearanceSlice', () => {
   });
 });
 
-describe('prefsSlice', () => {
-  it('defaults to tierAwareMerge', () => {
-    expect(init(prefs)).toEqual({ duelStrategy: 'tierAwareMerge' });
-  });
-
-  it('setDuelStrategy accepts known strategies only', () => {
-    let s = prefs(init(prefs), setDuelStrategy('elo'));
-    expect(s.duelStrategy).toBe('elo');
-    s = prefs(s, setDuelStrategy('bogus'));
-    expect(s.duelStrategy).toBe('elo');
-    s = prefs(s, setDuelStrategy('mergeSort'));
-    expect(s.duelStrategy).toBe('mergeSort');
-  });
-
-  it('settingsLoaded adopts / normalises / ignores', () => {
-    const base = init(prefs);
-    expect(prefs(base, settingsLoaded({ prefs: { duelStrategy: 'elo' } })).duelStrategy).toBe('elo');
-    expect(prefs(base, settingsLoaded({ prefs: { duelStrategy: 'weird' } })).duelStrategy).toBe('tierAwareMerge');
-    expect(prefs(base, settingsLoaded({}))).toBe(base);
-  });
-
-  // BUG (minor): DUEL_STRATEGIES is a plain object and the check is a
-  // truthy lookup, so inherited keys like `toString` / `constructor` are
-  // accepted as a strategy (and a cached `{ duelStrategy: 'toString' }`
-  // would too); DuelView would then call Object.prototype.toString as a
-  // strategy factory. Should be an own-key check (Object.hasOwn).
-  it.fails('does not accept inherited object keys as strategies', () => {
-    const s = prefs(init(prefs), setDuelStrategy('toString'));
-    expect(s.duelStrategy).toBe('tierAwareMerge');
-  });
-});
-
-describe('boot cache for appearance / prefs', () => {
+describe('boot cache for appearance', () => {
   afterEach(() => {
     localStorage.clear();
     vi.resetModules();
@@ -87,21 +54,6 @@ describe('boot cache for appearance / prefs', () => {
     vi.resetModules();
     const { default: fresh } = await import('./appearanceSlice');
     expect(init(fresh)).toEqual({ theme: 'solarized', accent: 'green', tierPalette: 'heat' });
-  });
-
-  it('prefs reads the legacy duel-strategy key', async () => {
-    localStorage.setItem(SETTINGS.duelStrategy, JSON.stringify('elo'));
-    vi.resetModules();
-    const { default: fresh } = await import('./prefsSlice');
-    expect(init(fresh)).toEqual({ duelStrategy: 'elo' });
-  });
-
-  it('prefs key wins over the legacy key', async () => {
-    localStorage.setItem(SETTINGS.duelStrategy, JSON.stringify('elo'));
-    localStorage.setItem(SETTINGS.prefs, JSON.stringify({ duelStrategy: 'mergeSort' }));
-    vi.resetModules();
-    const { default: fresh } = await import('./prefsSlice');
-    expect(init(fresh)).toEqual({ duelStrategy: 'mergeSort' });
   });
 });
 

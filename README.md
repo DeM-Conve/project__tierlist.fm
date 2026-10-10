@@ -33,9 +33,10 @@ every YouTube / YouTube Music device you own plays the result.
 into one board per category. The whole board fits on one screen as album-art tiles; drag a
 song between tiers, or onto the always-visible Tier Rail.
 
-**Duels** - Can't decide between two songs? Pick the better of two, over and over, and the
-ranking sorts itself out. Three strategies: a tier-aware merge that uses your existing tiers
-to ask far fewer questions, a full re-sort, or Elo.
+**Duels** - Hear two songs' hooks back to back and say which hits harder (clearly, a bit, or
+too close). Every verdict feeds a hidden score; the app picks the duels that settle the most,
+places your to-do songs, and suggests a tier move only once the evidence is overwhelming - you
+approve each one, then push to YouTube as usual.
 
 **A player that never stops** - A YouTube-Music-style player with a real queue (play next,
 add to queue, shuffle, repeat). Minimize it to a mini bar or a floating corner; it keeps

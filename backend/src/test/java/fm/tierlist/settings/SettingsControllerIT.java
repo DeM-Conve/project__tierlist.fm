@@ -40,8 +40,7 @@ class SettingsControllerIT {
 
     private static final String BODY = """
         {"appearance": {"theme": "%s", "accent": "violet", "tierPalette": "heat"},
-         "naming": {"template": "%s", "tierLabels": %s, "tierDisplayNames": %s, "migratingFrom": %s, "migratingFromTierLabels": %s, "todoLinks": %s},
-         "prefs": {"duelStrategy": "elo"}}""";
+         "naming": {"template": "%s", "tierLabels": %s, "tierDisplayNames": %s, "migratingFrom": %s, "migratingFromTierLabels": %s, "todoLinks": %s}}""";
 
     @Autowired
     MockMvc mvc;
@@ -90,7 +89,7 @@ class SettingsControllerIT {
             .andExpect(status().isOk())
             .andExpect(header().string(HttpHeaders.ETAG, "\"0\""))
             .andExpect(jsonPath("$.appearance.theme").value("dracula"))
-            .andExpect(jsonPath("$.prefs.duelStrategy").value("elo"));
+            .andExpect(jsonPath("$.prefs").doesNotExist());
 
         mvc.perform(get("/api/settings").with(alice))
             .andExpect(status().isOk())
@@ -104,6 +103,21 @@ class SettingsControllerIT {
         // Stored as the native enum, labelled by the Java constant.
         assertThat(jdbc.queryForObject("SELECT pg_typeof(theme)::text || ':' || theme FROM user_settings", String.class))
             .isEqualTo("theme_option:PAPER");
+    }
+
+    // Settings -> Duels (the `prefs` group) was retired; a tab loaded before
+    // that still sends it, and the save must not fail because of it.
+    @Test
+    void anOldClientStillSendingPrefsIsAccepted() throws Exception {
+        String old = BODY.formatted("sand", "{category} {tier}", DEFAULT_LABELS, "null", "null", "null", "{}")
+            .replaceFirst("}}$", "}, \"prefs\": {\"duelStrategy\": \"elo\"}}");
+        assertThat(old).contains("\"prefs\"");
+
+        mvc.perform(put("/api/settings").with(alice).contentType(MediaType.APPLICATION_JSON).content(old)
+                .header(HttpHeaders.IF_NONE_MATCH, "*"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.appearance.theme").value("sand"))
+            .andExpect(jsonPath("$.prefs").doesNotExist());
     }
 
     @Test

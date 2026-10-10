@@ -1,9 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { configureStore } from '@reduxjs/toolkit';
 import { rebase, sameSettings, toServer } from './settingsMapping';
-import appearanceReducer, { setAccent, setTheme } from '../store/appearanceSlice';
+import appearanceReducer, { setAccent, setTheme, setTierPalette } from '../store/appearanceSlice';
 import namingReducer, { linkTodoList } from '../store/namingSlice';
-import prefsReducer, { setDuelStrategy } from '../store/prefsSlice';
 import { settingsLoaded } from '../store/settingsActions';
 import { DEFAULT_TIER_LABELS } from '../tiers';
 import { NO_DISPLAY_NAMES } from '../naming';
@@ -21,10 +20,9 @@ const dto = (over = {}) => ({
     todoLinks: {},
     ...over.naming,
   },
-  prefs: { duelStrategy: 'tierAwareMerge', ...over.prefs },
 });
 
-const makeStore = () => configureStore({ reducer: { appearance: appearanceReducer, naming: namingReducer, prefs: prefsReducer } });
+const makeStore = () => configureStore({ reducer: { appearance: appearanceReducer, naming: namingReducer } });
 
 describe('toServer', () => {
   it('maps the default Redux state to the full DTO shape', () => {
@@ -34,24 +32,23 @@ describe('toServer', () => {
   it('drops client-only fields (needsDetection)', () => {
     const body = toServer(makeStore().getState());
     expect(body.naming).not.toHaveProperty('needsDetection');
-    expect(Object.keys(body)).toEqual(['appearance', 'naming', 'prefs']);
+    expect(Object.keys(body)).toEqual(['appearance', 'naming']);
   });
 
   it('undefined / missing fields become null', () => {
-    const body = toServer({ appearance: {}, naming: {}, prefs: {} });
+    const body = toServer({ appearance: {}, naming: {} });
     expect(body.appearance).toEqual({ theme: null, accent: null, tierPalette: null });
-    expect(body.prefs).toEqual({ duelStrategy: null });
     expect(Object.values(body.naming).every((x) => x === null)).toBe(true);
   });
 
   it('reflects edits', () => {
     const s = makeStore();
     s.dispatch(setTheme('paper'));
-    s.dispatch(setDuelStrategy('elo'));
+    s.dispatch(setTierPalette('heat'));
     s.dispatch(linkTodoList({ playlistId: 'p', category: 'Rap' }));
     const body = toServer(s.getState());
     expect(body.appearance.theme).toBe('paper');
-    expect(body.prefs.duelStrategy).toBe('elo');
+    expect(body.appearance.tierPalette).toBe('heat');
     expect(body.naming.todoLinks).toEqual({ p: 'Rap' });
   });
 
@@ -64,7 +61,6 @@ describe('toServer', () => {
         tierDisplayNames: { ...NO_DISPLAY_NAMES, S: 'Gold' },
         todoLinks: { p1: 'Rap', p2: 'Música' },
       },
-      prefs: { duelStrategy: 'mergeSort' },
     });
     const s = makeStore();
     s.dispatch(settingsLoaded(account));
@@ -100,7 +96,7 @@ describe('sameSettings', () => {
 
   it('detects a primitive change in any group', () => {
     expect(sameSettings(dto(), dto({ appearance: { accent: 'red' } }))).toBe(false);
-    expect(sameSettings(dto(), dto({ prefs: { duelStrategy: 'elo' } }))).toBe(false);
+    expect(sameSettings(dto(), dto({ appearance: { tierPalette: 'heat' } }))).toBe(false);
     expect(sameSettings(dto(), dto({ naming: { template: '{tier} | {category}' } }))).toBe(false);
   });
 
@@ -118,7 +114,7 @@ describe('sameSettings', () => {
   });
 
   it('a missing group compares as all-undefined', () => {
-    const a = { appearance: dto().appearance, naming: dto().naming };
+    const a = { appearance: dto().appearance };
     expect(sameSettings(a, dto())).toBe(false);
   });
 });
@@ -139,15 +135,15 @@ describe('rebase (three-way merge after a 412)', () => {
 
   it('nothing changed locally: take the server', () => {
     const base = dto();
-    const fresh = dto({ appearance: { accent: 'teal' }, prefs: { duelStrategy: 'elo' } });
+    const fresh = dto({ appearance: { accent: 'teal', tierPalette: 'heat' } });
     expect(rebase(dto(), base, fresh)).toEqual(fresh);
   });
 
   it('this browser’s edits sit on top of the newer row', () => {
     const base = dto();
     const local = dto({ appearance: { theme: 'paper' } });
-    const fresh = dto({ appearance: { accent: 'teal' }, prefs: { duelStrategy: 'elo' } });
-    expect(rebase(local, base, fresh)).toEqual(dto({ appearance: { theme: 'paper', accent: 'teal' }, prefs: { duelStrategy: 'elo' } }));
+    const fresh = dto({ appearance: { accent: 'teal', tierPalette: 'heat' } });
+    expect(rebase(local, base, fresh)).toEqual(dto({ appearance: { theme: 'paper', accent: 'teal', tierPalette: 'heat' } }));
   });
 
   it('the same field changed on both sides: this browser wins', () => {
@@ -176,16 +172,16 @@ describe('rebase (three-way merge after a 412)', () => {
   it('a change back to null locally is kept', () => {
     const base = dto({ naming: { migratingFrom: '{category} - {tier}', migratingFromTierLabels: CUSTOM } });
     const local = dto();
-    const fresh = dto({ naming: { migratingFrom: '{category} - {tier}', migratingFromTierLabels: CUSTOM }, prefs: { duelStrategy: 'elo' } });
+    const fresh = dto({ naming: { migratingFrom: '{category} - {tier}', migratingFromTierLabels: CUSTOM }, appearance: { tierPalette: 'heat' } });
     const merged = rebase(local, base, fresh);
     expect(merged.naming.migratingFrom).toBeNull();
     expect(merged.naming.migratingFromTierLabels).toBeNull();
-    expect(merged.prefs.duelStrategy).toBe('elo');
+    expect(merged.appearance.tierPalette).toBe('heat');
   });
 
   it('only schema fields appear in the result', () => {
     const merged = rebase({ ...dto(), junk: 1 }, dto(), dto());
-    expect(Object.keys(merged)).toEqual(['appearance', 'naming', 'prefs']);
+    expect(Object.keys(merged)).toEqual(['appearance', 'naming']);
   });
 
   // BUG (merge granularity): rebase merges per *field*, so the object-valued
@@ -213,9 +209,9 @@ describe('rebase (three-way merge after a 412)', () => {
     s.dispatch(setAccent('pink'));
     const local = toServer(s.getState());
     const base = dto();
-    const fresh = dto({ prefs: { duelStrategy: 'elo' } });
+    const fresh = dto({ appearance: { tierPalette: 'heat' } });
     s.dispatch(settingsLoaded(rebase(local, base, fresh)));
     expect(s.getState().appearance.accent).toBe('pink');
-    expect(s.getState().prefs.duelStrategy).toBe('elo');
+    expect(s.getState().appearance.tierPalette).toBe('heat');
   });
 });

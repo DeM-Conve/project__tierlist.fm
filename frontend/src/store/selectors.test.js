@@ -12,7 +12,6 @@ import tiersReducer, {
 import focusReducer, { closeFocus, expandPlayer, minimizePlayer, openFocus, playNextInQueue } from './focusSlice';
 import appearanceReducer from './appearanceSlice';
 import namingReducer, { linkTodoList, setNaming, startMigration } from './namingSlice';
-import prefsReducer from './prefsSlice';
 import addSongsReducer from './addSongsSlice';
 import {
   selectDuelPool,
@@ -46,7 +45,6 @@ const makeStore = () =>
       focus: focusReducer,
       appearance: appearanceReducer,
       naming: namingReducer,
-      prefs: prefsReducer,
       addSongs: addSongsReducer,
     },
   });

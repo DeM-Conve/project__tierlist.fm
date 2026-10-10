@@ -4,7 +4,6 @@
 const SCHEMA = {
   appearance: ['theme', 'accent', 'tierPalette'],
   naming: ['template', 'tierLabels', 'tierDisplayNames', 'migratingFrom', 'migratingFromTierLabels', 'todoLinks'],
-  prefs: ['duelStrategy'],
 };
 
 // Fields are primitives except tierLabels / tierDisplayNames ({ slot: name }) and todoLinks

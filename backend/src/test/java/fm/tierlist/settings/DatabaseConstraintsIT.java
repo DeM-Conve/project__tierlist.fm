@@ -45,7 +45,6 @@ class DatabaseConstraintsIT extends PostgresIT {
         r.put("naming_tier_c", "'C'");
         r.put("naming_tier_d", "'D'");
         r.put("naming_tier_todo", "'TODO'");
-        r.put("duel_strategy", "'ELO'");
         return r;
     }
 
@@ -75,7 +74,7 @@ class DatabaseConstraintsIT extends PostgresIT {
     void enumLabelsAreExactlyTheJavaConstantNames() {
         Map<String, Enum<?>[]> types = Map.of(
             "theme_option", Theme.values(), "accent_option", Accent.values(),
-            "tier_palette_option", TierPalette.values(), "duel_strategy_option", DuelStrategy.values());
+            "tier_palette_option", TierPalette.values());
         types.forEach((type, values) -> assertThat(
                 jdbc.queryForList("SELECT unnest(enum_range(NULL::" + type + "))::text", String.class))
             .as(type)
@@ -83,7 +82,7 @@ class DatabaseConstraintsIT extends PostgresIT {
     }
 
     @ParameterizedTest
-    @CsvSource({"theme, tokyo", "accent, CYAN", "tier_palette, vivid", "duel_strategy, tierAwareMerge"})
+    @CsvSource({"theme, tokyo", "accent, CYAN", "tier_palette, vivid"})
     void anUnknownEnumLabelIsRefused(String column, String value) {
         assertThatThrownBy(() -> insertWith(column, sql(value)))
             .isInstanceOf(DataAccessException.class).hasMessageContaining("invalid input value for enum");

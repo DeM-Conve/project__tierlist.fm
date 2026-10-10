@@ -11,13 +11,12 @@ CREATE TABLE app_user (
 -- Every settings option set is a native Postgres enum, so the database itself
 -- refuses a value the app doesn't know. Labels are the Java enum constant
 -- names (Hibernate NAMED_ENUM); the API speaks the frontend's keys ("tokyo",
--- "tierAwareMerge") - see the enums in fm.tierlist.settings.
+-- "vivid") - see the enums in fm.tierlist.settings.
 -- New option = `ALTER TYPE ... ADD VALUE` in a new migration + Java constant
 -- + frontend catalogue entry.
 CREATE TYPE theme_option         AS ENUM ('TOKYO', 'DRACULA', 'CHARCOAL', 'PAPER', 'SAND', 'SOLARIZED');
 CREATE TYPE accent_option        AS ENUM ('BLUE', 'VIOLET', 'TEAL', 'GREEN', 'PINK', 'RED', 'ORANGE', 'AMBER');
 CREATE TYPE tier_palette_option  AS ENUM ('VIVID', 'CLASSIC', 'HEAT');
-CREATE TYPE duel_strategy_option AS ENUM ('TIER_AWARE_MERGE', 'MERGE_SORT', 'ELO');
 
 -- A tier's name as the user wrote it ("S", "T1", "(**TODO**)"). Mirrors
 -- @TierLabel / naming.js validateTierLabels: no surrounding spaces, a
@@ -67,8 +66,6 @@ CREATE TABLE user_settings (
     naming_migrating_from_tier_c    VARCHAR(20),
     naming_migrating_from_tier_d    VARCHAR(20),
     naming_migrating_from_tier_todo VARCHAR(20),
-    -- Settings -> Duels
-    duel_strategy          duel_strategy_option NOT NULL,
     -- Optimistic lock, served as the ETag: a save based on a version the
     -- client never saw gets 412 instead of overwriting another device's change.
     version                BIGINT               NOT NULL DEFAULT 0,

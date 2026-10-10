@@ -14,15 +14,16 @@ import java.util.Objects;
 import java.util.stream.Stream;
 
 // The API contract for GET/PUT /api/settings, grouped like the frontend's
-// slices (appearance / naming / prefs - see frontend/src/api/settingsMapping.js).
-// Enums (de)serialise as their frontend keys, so an unknown theme, accent,
-// palette or strategy is a 400 before it gets anywhere near the database.
+// slices (appearance / naming - see frontend/src/api/settingsMapping.js).
+// Enums (de)serialise as their frontend keys, so an unknown theme, accent or
+// palette is a 400 before it gets anywhere near the database. Unknown
+// properties are ignored (Spring Boot's Jackson default), so an older tab still
+// sending the retired `prefs` group is accepted.
 // Kept separate from the @Embeddable value objects so the wire format and
 // the table can evolve independently; conversion lives here, pointing inward.
 public record SettingsDto(
     @Valid @NotNull AppearanceDto appearance,
-    @Valid @NotNull NamingDto naming,
-    @Valid @NotNull PrefsDto prefs
+    @Valid @NotNull NamingDto naming
 ) {
 
     public record AppearanceDto(@NotNull Theme theme, @NotNull Accent accent, @NotNull TierPalette tierPalette) {
@@ -101,9 +102,6 @@ public record SettingsDto(
         }
     }
 
-    public record PrefsDto(@NotNull DuelStrategy duelStrategy) {
-    }
-
     public static SettingsDto from(UserSettings row) {
         Appearance a = row.getAppearance();
         Naming n = row.getNaming();
@@ -111,8 +109,7 @@ public record SettingsDto(
             new AppearanceDto(a.theme(), a.accent(), a.tierPalette()),
             new NamingDto(n.template(), TierLabelsDto.from(n.tierLabels()), TierDisplayNamesDto.from(n.tierDisplayNames()),
                 n.migratingFrom(),
-                TierLabelsDto.from(n.migratingFromTierLabels()), row.getTodoLinks()),
-            new PrefsDto(row.getPrefs().duelStrategy())
+                TierLabelsDto.from(n.migratingFromTierLabels()), row.getTodoLinks())
         );
     }
 
@@ -129,9 +126,5 @@ public record SettingsDto(
 
     public Map<String, String> toTodoLinks() {
         return Map.copyOf(naming.todoLinks());
-    }
-
-    public Prefs toPrefs() {
-        return new Prefs(prefs.duelStrategy());
     }
 }

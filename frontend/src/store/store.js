@@ -5,7 +5,6 @@ import tiersReducer from './tiersSlice';
 import focusReducer from './focusSlice';
 import appearanceReducer from './appearanceSlice';
 import namingReducer from './namingSlice';
-import prefsReducer from './prefsSlice';
 import addSongsReducer from './addSongsSlice';
 import transfersReducer from './transfersSlice';
 import { SETTINGS, setSetting } from '../settings';
@@ -19,7 +18,6 @@ export const store = configureStore({
     focus: focusReducer,
     appearance: appearanceReducer,
     naming: namingReducer,
-    prefs: prefsReducer,
     addSongs: addSongsReducer,
     transfers: transfersReducer,
   },
@@ -27,7 +25,7 @@ export const store = configureStore({
 
 // Cache user preferences held in Redux in localStorage whenever they change
 // (the account's copy in Postgres is synced by api/useSettingsSync.js).
-const PERSISTED = { appearance: SETTINGS.appearance, naming: SETTINGS.naming, prefs: SETTINGS.prefs };
+const PERSISTED = { appearance: SETTINGS.appearance, naming: SETTINGS.naming };
 const last = {};
 Object.keys(PERSISTED).forEach((k) => (last[k] = store.getState()[k]));
 syncTierLabels(store.getState().naming);

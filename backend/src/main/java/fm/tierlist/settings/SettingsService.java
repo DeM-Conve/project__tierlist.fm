@@ -30,19 +30,19 @@ public class SettingsService {
     // loser at flush - see SettingsExceptionHandler.
     @Transactional
     public UserSettings save(String userId, WritePrecondition precondition,
-                             Appearance appearance, Naming naming, Map<String, String> todoLinks, Prefs prefs) {
+                             Appearance appearance, Naming naming, Map<String, String> todoLinks) {
         Optional<UserSettings> existing = settings.findById(userId);
         if (!precondition.isSatisfiedBy(existing.map(UserSettings::getVersion))) {
             throw new SettingsConflictException();
         }
-        UserSettings row = existing.orElseGet(() -> new UserSettings(userId, appearance, naming, todoLinks, prefs));
+        UserSettings row = existing.orElseGet(() -> new UserSettings(userId, appearance, naming, todoLinks));
         // The links table is excluded from Hibernate's automatic versioning
         // (it bumped the version on every insert), so a links change bumps it
         // here - immediately, so the ETag returned below is already the new one.
         if (existing.isPresent() && !row.getTodoLinks().equals(todoLinks)) {
             entityManager.lock(row, LockModeType.PESSIMISTIC_FORCE_INCREMENT);
         }
-        row.replace(appearance, naming, todoLinks, prefs);
+        row.replace(appearance, naming, todoLinks);
         return settings.saveAndFlush(row); // flush now so the new version is the ETag we return
     }
 }

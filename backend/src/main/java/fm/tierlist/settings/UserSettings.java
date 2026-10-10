@@ -45,9 +45,6 @@ public class UserSettings {
     @Column(name = "category", nullable = false, length = NamingTemplate.MAX_LENGTH)
     private Map<String, String> todoLinks = new HashMap<>();
 
-    @Embedded
-    private Prefs prefs;
-
     // Optimistic lock + ETag. A wrapper type so Spring Data treats a fresh
     // entity (null version) as new and INSERTs it instead of merging.
     @Version
@@ -60,18 +57,17 @@ public class UserSettings {
     protected UserSettings() {
     }
 
-    UserSettings(String userId, Appearance appearance, Naming naming, Map<String, String> todoLinks, Prefs prefs) {
+    UserSettings(String userId, Appearance appearance, Naming naming, Map<String, String> todoLinks) {
         this.userId = userId;
-        replace(appearance, naming, todoLinks, prefs);
+        replace(appearance, naming, todoLinks);
     }
 
-    void replace(Appearance appearance, Naming naming, Map<String, String> todoLinks, Prefs prefs) {
+    void replace(Appearance appearance, Naming naming, Map<String, String> todoLinks) {
         this.appearance = appearance;
         this.naming = naming;
         // Mutated in place: Hibernate tracks (and diffs) its own collection.
         this.todoLinks.clear();
         this.todoLinks.putAll(todoLinks);
-        this.prefs = prefs;
     }
 
     public String getUserId() {
@@ -88,10 +84,6 @@ public class UserSettings {
 
     public Map<String, String> getTodoLinks() {
         return Map.copyOf(todoLinks);
-    }
-
-    public Prefs getPrefs() {
-        return prefs;
     }
 
     public long getVersion() {

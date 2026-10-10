@@ -9,7 +9,6 @@ import tiersReducer from '../store/tiersSlice';
 import focusReducer from '../store/focusSlice';
 import appearanceReducer from '../store/appearanceSlice';
 import namingReducer from '../store/namingSlice';
-import prefsReducer from '../store/prefsSlice';
 import addSongsReducer from '../store/addSongsSlice';
 import transfersReducer from '../store/transfersSlice';
 
@@ -20,7 +19,6 @@ const reducer = {
   focus: focusReducer,
   appearance: appearanceReducer,
   naming: namingReducer,
-  prefs: prefsReducer,
   addSongs: addSongsReducer,
   transfers: transfersReducer,
 };

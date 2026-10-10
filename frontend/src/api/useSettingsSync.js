@@ -75,10 +75,9 @@ export function useSettingsSync(enabled) {
 
   const appearance = useSelector((s) => s.appearance);
   const naming = useSelector((s) => s.naming);
-  const prefs = useSelector((s) => s.prefs);
   useEffect(() => {
     flush();
-  }, [appearance, naming, prefs, flush]);
+  }, [appearance, naming, flush]);
 
   return { ready: isSuccess || isError };
 }

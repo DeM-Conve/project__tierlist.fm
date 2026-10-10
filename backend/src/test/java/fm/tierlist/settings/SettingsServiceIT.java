@@ -27,7 +27,6 @@ class SettingsServiceIT extends PostgresIT {
     private static final Appearance LOOK = new Appearance(Theme.TOKYO, Accent.BLUE, TierPalette.VIVID);
     private static final Naming NAMING = new Naming("{category} {tier}", new TierLabels("S", "A", "B", "C", "D", "TODO"),
         null, null, null);
-    private static final Prefs PREFS = new Prefs(DuelStrategy.TIER_AWARE_MERGE);
 
     @BeforeEach
     void clean() {
@@ -40,7 +39,7 @@ class SettingsServiceIT extends PostgresIT {
     }
 
     private UserSettings save(WritePrecondition p, Appearance look, Map<String, String> links) {
-        return service.save("alice", p, look, NAMING, links, PREFS);
+        return service.save("alice", p, look, NAMING, links);
     }
 
     @Test
@@ -58,7 +57,6 @@ class SettingsServiceIT extends PostgresIT {
         assertThat(found.getAppearance()).isEqualTo(LOOK);
         assertThat(found.getNaming()).isEqualTo(NAMING);
         assertThat(found.getTodoLinks()).containsExactly(Map.entry("PL1", "Rap"));
-        assertThat(found.getPrefs()).isEqualTo(PREFS);
     }
 
     @Test
@@ -106,7 +104,7 @@ class SettingsServiceIT extends PostgresIT {
     @Test
     void settingsNeedARecordedUser() {
         // The FK to app_user; the controller records the user first (AppUserService.current).
-        assertThatThrownBy(() -> service.save("stranger", new MustNotExist(), LOOK, NAMING, Map.of(), PREFS))
+        assertThatThrownBy(() -> service.save("stranger", new MustNotExist(), LOOK, NAMING, Map.of()))
             .isInstanceOf(DataIntegrityViolationException.class);
     }
 }

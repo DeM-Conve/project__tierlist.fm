@@ -2,7 +2,6 @@ package fm.tierlist.settings;
 
 import fm.tierlist.settings.SettingsDto.AppearanceDto;
 import fm.tierlist.settings.SettingsDto.NamingDto;
-import fm.tierlist.settings.SettingsDto.PrefsDto;
 import fm.tierlist.settings.SettingsDto.TierDisplayNamesDto;
 import fm.tierlist.settings.SettingsDto.TierLabelsDto;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -51,8 +50,7 @@ class SettingsDtoTest {
     }
 
     private static SettingsDto dto(NamingDto naming) {
-        return new SettingsDto(new AppearanceDto(Theme.DRACULA, Accent.TEAL, TierPalette.CLASSIC), naming,
-            new PrefsDto(DuelStrategy.MERGE_SORT));
+        return new SettingsDto(new AppearanceDto(Theme.DRACULA, Accent.TEAL, TierPalette.CLASSIC), naming);
     }
 
     private static Set<String> violations(Object o) {
@@ -69,7 +67,7 @@ class SettingsDtoTest {
             new TierDisplayNames("S", null, null, null, null, "TODO"),
             "{category} {tier}", new TierLabels("S", "A", "B", "C", "D", "TODO"));
         UserSettings row = new UserSettings("alice", new Appearance(Theme.SAND, Accent.AMBER, TierPalette.HEAT), naming,
-            Map.of("PLabc", "Rap"), new Prefs(DuelStrategy.ELO));
+            Map.of("PLabc", "Rap"));
 
         SettingsDto dto = SettingsDto.from(row);
 
@@ -80,12 +78,10 @@ class SettingsDtoTest {
         assertThat(dto.naming().migratingFrom()).isEqualTo("{category} {tier}");
         assertThat(dto.naming().migratingFromTierLabels()).isEqualTo(DEFAULT);
         assertThat(dto.naming().todoLinks()).containsExactly(Map.entry("PLabc", "Rap"));
-        assertThat(dto.prefs().duelStrategy()).isEqualTo(DuelStrategy.ELO);
 
         assertThat(dto.toAppearance()).isEqualTo(row.getAppearance());
         assertThat(dto.toNaming()).isEqualTo(naming);
         assertThat(dto.toTodoLinks()).isEqualTo(row.getTodoLinks());
-        assertThat(dto.toPrefs()).isEqualTo(row.getPrefs());
     }
 
     @Test
@@ -97,13 +93,12 @@ class SettingsDtoTest {
         assertThat(naming.migratingFromTierLabels()).isNull();
         assertThat(naming.tierDisplayNames()).isEqualTo(TierDisplayNames.NONE);
 
-        UserSettings row = new UserSettings("bob", dto.toAppearance(), naming, dto.toTodoLinks(), dto.toPrefs());
+        UserSettings row = new UserSettings("bob", dto.toAppearance(), naming, dto.toTodoLinks());
         SettingsDto back = SettingsDto.from(row);
         assertThat(back.naming().migratingFromTierLabels()).isNull();
         assertThat(back.naming().tierDisplayNames()).isEqualTo(new TierDisplayNamesDto(null, null, null, null, null, null));
         assertThat(back).isEqualTo(new SettingsDto(dto.appearance(),
-            new NamingDto("{category} {tier}", DEFAULT, new TierDisplayNamesDto(null, null, null, null, null, null), null, null, Map.of()),
-            dto.prefs()));
+            new NamingDto("{category} {tier}", DEFAULT, new TierDisplayNamesDto(null, null, null, null, null, null), null, null, Map.of())));
     }
 
     @Test
@@ -123,15 +118,13 @@ class SettingsDtoTest {
         ObjectMapper json = new ObjectMapper();
         SettingsDto dto = new SettingsDto(new AppearanceDto(Theme.TOKYO, Accent.BLUE, TierPalette.VIVID),
             new NamingDto("{category} {tier}", MINE, new TierDisplayNamesDto(null, null, null, null, null, "TODO"), null, null,
-                Map.of("PL1", "Rap")),
-            new PrefsDto(DuelStrategy.TIER_AWARE_MERGE));
+                Map.of("PL1", "Rap")));
 
         JsonNode tree = json.valueToTree(dto);
 
         assertThat(tree.at("/appearance/theme").asText()).isEqualTo("tokyo");
         assertThat(tree.at("/appearance/accent").asText()).isEqualTo("blue");
         assertThat(tree.at("/appearance/tierPalette").asText()).isEqualTo("vivid");
-        assertThat(tree.at("/prefs/duelStrategy").asText()).isEqualTo("tierAwareMerge");
         assertThat(tree.at("/naming/tierLabels").fieldNames()).toIterable().containsExactly("S", "A", "B", "C", "D", "TODO");
         assertThat(tree.at("/naming/tierLabels/TODO").asText()).isEqualTo("(**TODO**)");
         assertThat(tree.at("/naming/tierDisplayNames/TODO").asText()).isEqualTo("TODO");
@@ -153,10 +146,9 @@ class SettingsDtoTest {
 
     @Test
     void everyGroupIsRequired() {
-        assertThat(violations(new SettingsDto(null, null, null)))
-            .containsExactlyInAnyOrder("appearance: must not be null", "naming: must not be null", "prefs: must not be null");
+        assertThat(violations(new SettingsDto(null, null)))
+            .containsExactlyInAnyOrder("appearance: must not be null", "naming: must not be null");
         assertThat(violations(new AppearanceDto(null, null, null))).hasSize(3);
-        assertThat(violations(new PrefsDto(null))).containsExactly("duelStrategy: must not be null");
     }
 
     @Test
@@ -169,15 +161,13 @@ class SettingsDtoTest {
     void validationCascadesIntoEveryNestedGroup() {
         SettingsDto bad = new SettingsDto(new AppearanceDto(null, Accent.BLUE, TierPalette.VIVID),
             new NamingDto("{category}", new TierLabelsDto("S", "A", "B", "C", "D", null),
-                new TierDisplayNamesDto(" x", null, null, null, null, null), null, null, Map.of()),
-            new PrefsDto(null));
+                new TierDisplayNamesDto(" x", null, null, null, null, null), null, null, Map.of()));
 
         assertThat(violations(bad)).containsExactlyInAnyOrder(
             "appearance.theme: must not be null",
             "naming.template: must use {category} and {tier} once each, and other tokens ({word}) at most once each",
             "naming.tierLabels.todo: must not be null",
-            "naming.tierDisplayNames.s: must be at most 20 characters with a letter or digit, and no { } or surrounding spaces",
-            "prefs.duelStrategy: must not be null");
+            "naming.tierDisplayNames.s: must be at most 20 characters with a letter or digit, and no { } or surrounding spaces");
     }
 
     @Test

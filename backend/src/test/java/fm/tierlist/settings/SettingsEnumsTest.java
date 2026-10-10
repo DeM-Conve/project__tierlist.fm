@@ -14,7 +14,7 @@ import java.util.Map;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-// The API speaks the frontend's ids (themes.js / duel/index.js); the constant
+// The API speaks the frontend's ids (themes.js); the constant
 // names are the Postgres enum labels (checked against the DB in SettingsEnumsIT).
 class SettingsEnumsTest {
 
@@ -47,21 +47,15 @@ class SettingsEnumsTest {
     }
 
     @Test
-    void duelStrategyKeysAreTheFrontendIds() {
-        assertThat(keys(DuelStrategy.values(), v -> ((DuelStrategy) v).key())).containsExactly(
-            Map.entry("TIER_AWARE_MERGE", "tierAwareMerge"), Map.entry("MERGE_SORT", "mergeSort"), Map.entry("ELO", "elo"));
-    }
-
-    @Test
     void everyConstantSerialisesAsItsKeyAndReadsBack() throws Exception {
-        for (Enum<?>[] values : new Enum<?>[][] {Theme.values(), Accent.values(), TierPalette.values(), DuelStrategy.values()}) {
+        for (Enum<?>[] values : new Enum<?>[][] {Theme.values(), Accent.values(), TierPalette.values()}) {
             for (Enum<?> value : values) {
                 String written = json.writeValueAsString(value);
                 assertThat(json.readValue(written, value.getDeclaringClass())).isSameAs(value);
                 assertThat(written).isNotEqualTo("\"" + value.name() + "\"").doesNotContain("_");
             }
         }
-        assertThat(json.writeValueAsString(DuelStrategy.TIER_AWARE_MERGE)).isEqualTo("\"tierAwareMerge\"");
+        assertThat(json.writeValueAsString(TierPalette.VIVID)).isEqualTo("\"vivid\"");
     }
 
     @ParameterizedTest
@@ -71,21 +65,20 @@ class SettingsEnumsTest {
     }
 
     @Test
-    void strategyConstantNamesAreNotAcceptedEither() {
-        assertThatThrownBy(() -> json.readValue("\"TIER_AWARE_MERGE\"", DuelStrategy.class)).isInstanceOf(InvalidFormatException.class);
+    void otherConstantNamesAreNotAcceptedEither() {
         assertThatThrownBy(() -> json.readValue("\"BLUE\"", Accent.class)).isInstanceOf(InvalidFormatException.class);
         assertThatThrownBy(() -> json.readValue("\"VIVID\"", TierPalette.class)).isInstanceOf(InvalidFormatException.class);
     }
 
     @Test
     @Disabled("BUG (minor): Jackson's default FAIL_ON_NUMBERS_FOR_ENUMS=false still reads a bare JSON number as the "
-        + "constant's ordinal, @JsonValue or not - {\"theme\": 0} (or \"0\") is accepted as tokyo and {\"duelStrategy\": 2} as elo, "
+        + "constant's ordinal, @JsonValue or not - {\"theme\": 0} (or \"0\") is accepted as tokyo and {\"tierPalette\": 2} as heat, "
         + "so the API does not only speak the frontend keys, and reordering a Java enum silently changes what a "
         + "number means. Out-of-range numbers are refused. Fix: spring.jackson.deserialization.fail-on-numbers-for-enums=true "
         + "(see SettingsApiIT for the HTTP side).")
     void aBareNumberIsNotAnOption() {
         assertThatThrownBy(() -> json.readValue("0", Theme.class)).isInstanceOf(InvalidFormatException.class);
         assertThatThrownBy(() -> json.readValue("\"0\"", Theme.class)).isInstanceOf(InvalidFormatException.class);
-        assertThatThrownBy(() -> json.readValue("2", DuelStrategy.class)).isInstanceOf(InvalidFormatException.class);
+        assertThatThrownBy(() -> json.readValue("2", TierPalette.class)).isInstanceOf(InvalidFormatException.class);
     }
 }

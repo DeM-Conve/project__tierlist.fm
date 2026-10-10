@@ -56,8 +56,9 @@ are the source of truth.
 
 - Duplicate videos across a board's tier playlists are auto-resolved (highest tier kept,
   others staged as pending removal) - no manual dedupe UI.
-- Duel ranking supports multiple interchangeable algorithms (tier-aware merge, merge
-  sort, Elo), swappable per-duel or set as a default in Settings.
+- Duel ranking is the backend engine: OpenSkill ratings per duel, a Bradley-Terry refit
+  of the whole duel log, ordinal tier probabilities, and suggested tier moves that you
+  approve - a single duel never moves a song.
 - An embedded video player persists across navigation (mini bar / expanded / floating
   corner modes) and must never unmount/remount to change layout, since that would
   interrupt playback.

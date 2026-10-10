@@ -44,18 +44,17 @@ class SettingsApiIT extends PostgresIT {
         jdbc.update("DELETE FROM app_user");
     }
 
-    private static String body(String theme, String accent, String palette, String strategy, String tierLabels,
+    private static String body(String theme, String accent, String palette, String tierLabels,
                                String migratingFrom, String migratingFromTierLabels, String links) {
         return """
             {"appearance": {"theme": %s, "accent": %s, "tierPalette": %s},
              "naming": {"template": "{category} {tier}", "tierLabels": %s, "migratingFrom": %s,
-                        "migratingFromTierLabels": %s, "todoLinks": %s},
-             "prefs": {"duelStrategy": %s}}""".formatted(theme, accent, palette, tierLabels, migratingFrom,
-            migratingFromTierLabels, links, strategy);
+                        "migratingFromTierLabels": %s, "todoLinks": %s}}""".formatted(theme, accent, palette, tierLabels, migratingFrom,
+            migratingFromTierLabels, links);
     }
 
     private static String body(String links) {
-        return body("\"tokyo\"", "\"blue\"", "\"vivid\"", "\"tierAwareMerge\"", LABELS, "null", "null", links);
+        return body("\"tokyo\"", "\"blue\"", "\"vivid\"", LABELS, "null", "null", links);
     }
 
     private MockHttpServletRequestBuilder save(RequestPostProcessor who, String json) {
@@ -111,14 +110,13 @@ class SettingsApiIT extends PostgresIT {
         mvc.perform(save(alice, body("{}")).header(HttpHeaders.IF_NONE_MATCH, "*")).andExpect(status().isOk());
         mvc.perform(save(alice, body("{\"PL1\": \"Rap\"}")).header(HttpHeaders.IF_MATCH, "\"0\"")).andExpect(status().isOk());
 
-        mvc.perform(save(alice, body("\"sand\"", "\"blue\"", "\"vivid\"", "\"elo\"", LABELS, "null", "null", "{}"))
+        mvc.perform(save(alice, body("\"sand\"", "\"blue\"", "\"vivid\"", LABELS, "null", "null", "{}"))
                 .header(HttpHeaders.IF_MATCH, "\"0\""))
             .andExpect(status().isPreconditionFailed())
             .andExpect(jsonPath("$.title").value("Settings changed elsewhere"));
 
         mvc.perform(get("/api/settings").with(alice))
             .andExpect(jsonPath("$.appearance.theme").value("tokyo"))
-            .andExpect(jsonPath("$.prefs.duelStrategy").value("tierAwareMerge"))
             .andExpect(jsonPath("$.naming.todoLinks.PL1").value("Rap"));
     }
 
@@ -136,7 +134,7 @@ class SettingsApiIT extends PostgresIT {
     void changingSettingsAndLinksTogetherReturnsTheStoredVersion() throws Exception {
         mvc.perform(save(alice, body("{}")).header(HttpHeaders.IF_NONE_MATCH, "*")).andExpect(status().isOk());
 
-        String etag = mvc.perform(save(alice, body("\"paper\"", "\"red\"", "\"heat\"", "\"elo\"", LABELS, "null", "null",
+        String etag = mvc.perform(save(alice, body("\"paper\"", "\"red\"", "\"heat\"", LABELS, "null", "null",
                     "{\"PL1\": \"Rap\"}")).header(HttpHeaders.IF_MATCH, "\"0\""))
             .andExpect(status().isOk())
             .andReturn().getResponse().getHeader(HttpHeaders.ETAG);
@@ -155,7 +153,7 @@ class SettingsApiIT extends PostgresIT {
 
         mvc.perform(get("/api/settings").with(bob)).andExpect(status().isNoContent());
         mvc.perform(save(bob, body("{}")).header(HttpHeaders.IF_MATCH, "\"0\"")).andExpect(status().isPreconditionFailed());
-        mvc.perform(save(bob, body("\"dracula\"", "\"blue\"", "\"vivid\"", "\"elo\"", LABELS, "null", "null", "{\"PL1\": \"Jazz\"}"))
+        mvc.perform(save(bob, body("\"dracula\"", "\"blue\"", "\"vivid\"", LABELS, "null", "null", "{\"PL1\": \"Jazz\"}"))
                 .header(HttpHeaders.IF_NONE_MATCH, "*"))
             .andExpect(status().isOk());
 
@@ -178,18 +176,17 @@ class SettingsApiIT extends PostgresIT {
 
     @ParameterizedTest
     @CsvSource(delimiter = '|', value = {
-        "\"neon\"|\"blue\"|\"vivid\"|\"elo\"",          // theme
-        "\"tokyo\"|\"cyan\"|\"vivid\"|\"elo\"",         // accent
-        "\"tokyo\"|\"blue\"|\"pastel\"|\"elo\"",        // palette
-        "\"tokyo\"|\"blue\"|\"vivid\"|\"random\"",      // strategy
-        "\"TOKYO\"|\"blue\"|\"vivid\"|\"elo\"",         // DB label, not the key
-        "\"tokyo\"|\"blue\"|\"vivid\"|\"TIER_AWARE_MERGE\"",
-        "\"Tokyo\"|\"blue\"|\"vivid\"|\"elo\"",
-        "null|\"blue\"|\"vivid\"|\"elo\"",
-        "\"tokyo\"|\"blue\"|\"vivid\"|null",
+        "\"neon\"|\"blue\"|\"vivid\"",          // theme
+        "\"tokyo\"|\"cyan\"|\"vivid\"",         // accent
+        "\"tokyo\"|\"blue\"|\"pastel\"",        // palette
+        "\"TOKYO\"|\"blue\"|\"vivid\"",         // DB label, not the key
+        "\"tokyo\"|\"blue\"|\"VIVID\"",
+        "\"Tokyo\"|\"blue\"|\"vivid\"",
+        "null|\"blue\"|\"vivid\"",
+        "\"tokyo\"|\"blue\"|null",
     })
-    void anOptionTheFrontendDoesNotKnowIs400(String theme, String accent, String palette, String strategy) throws Exception {
-        mvc.perform(save(alice, body(theme, accent, palette, strategy, LABELS, "null", "null", "{}"))
+    void anOptionTheFrontendDoesNotKnowIs400(String theme, String accent, String palette) throws Exception {
+        mvc.perform(save(alice, body(theme, accent, palette, LABELS, "null", "null", "{}"))
                 .header(HttpHeaders.IF_NONE_MATCH, "*"))
             .andExpect(status().isBadRequest())
             .andExpect(problemJson());
@@ -199,9 +196,9 @@ class SettingsApiIT extends PostgresIT {
     @Test
     @Disabled("BUG (minor): Boot's ObjectMapper leaves FAIL_ON_NUMBERS_FOR_ENUMS off, so an enum option sent as a "
         + "number (or numeric string) is read as the Java constant's ordinal: {\"theme\": 0} saves tokyo, "
-        + "{\"duelStrategy\": \"2\"} saves elo. Only frontend keys should be accepted (400 otherwise).")
+        + "{\"tierPalette\": \"2\"} saves heat. Only frontend keys should be accepted (400 otherwise).")
     void anOptionSentAsANumberIs400() throws Exception {
-        mvc.perform(save(alice, body("0", "\"blue\"", "\"vivid\"", "\"2\"", LABELS, "null", "null", "{}"))
+        mvc.perform(save(alice, body("0", "\"blue\"", "\"2\"", LABELS, "null", "null", "{}"))
                 .header(HttpHeaders.IF_NONE_MATCH, "*"))
             .andExpect(status().isBadRequest());
     }
@@ -213,8 +210,8 @@ class SettingsApiIT extends PostgresIT {
             "",
             "[]",
             "{\"appearance\": {\"theme\": \"tokyo\", \"accent\": \"blue\", \"tierPalette\": \"vivid\"}}",
-            body("\"tokyo\"", "\"blue\"", "\"vivid\"", "\"elo\"", LABELS, "null", "null", "null"),   // no todoLinks
-            body("\"tokyo\"", "\"blue\"", "\"vivid\"", "\"elo\"", "null", "null", "null", "{}"),     // no tier names
+            body("\"tokyo\"", "\"blue\"", "\"vivid\"", LABELS, "null", "null", "null"),   // no todoLinks
+            body("\"tokyo\"", "\"blue\"", "\"vivid\"", "null", "null", "null", "{}"),     // no tier names
         }) {
             mvc.perform(save(alice, bad).header(HttpHeaders.IF_NONE_MATCH, "*")).andExpect(status().isBadRequest());
         }
@@ -223,7 +220,7 @@ class SettingsApiIT extends PostgresIT {
 
     @Test
     void aValidationFailureSaysWhichFieldIsWrong() throws Exception {
-        mvc.perform(save(alice, body("\"tokyo\"", "\"blue\"", "\"vivid\"", "\"elo\"",
+        mvc.perform(save(alice, body("\"tokyo\"", "\"blue\"", "\"vivid\"",
                     "{\"S\": \"S\", \"A\": \"S\", \"B\": \"B\", \"C\": \"C\", \"D\": \"D\", \"TODO\": \"TODO\"}", "null", "null", "{}"))
                 .header(HttpHeaders.IF_NONE_MATCH, "*"))
             .andExpect(status().isBadRequest())
@@ -236,7 +233,7 @@ class SettingsApiIT extends PostgresIT {
         + "migratingFromTierLabels is null; Bean Validation wraps it in a ValidationException, so this half-a-migration "
         + "body is a 500 instead of the 400 its sibling cases get.")
     void halfAMigrationFromTheCurrentTemplateIs400() throws Exception {
-        mvc.perform(save(alice, body("\"tokyo\"", "\"blue\"", "\"vivid\"", "\"elo\"", LABELS, "\"{category} {tier}\"", "null", "{}"))
+        mvc.perform(save(alice, body("\"tokyo\"", "\"blue\"", "\"vivid\"", LABELS, "\"{category} {tier}\"", "null", "{}"))
                 .header(HttpHeaders.IF_NONE_MATCH, "*"))
             .andExpect(status().isBadRequest());
     }
@@ -253,7 +250,7 @@ class SettingsApiIT extends PostgresIT {
             "{\"S\": \"S\", \"A\": \"A\", \"B\": \"B\", \"C\": \"C\", \"D\": \"D\", \"TODO\": \"①\"}",
             "{\"S\": \"S\", \"A\": \"S²\", \"B\": \"B\", \"C\": \"C\", \"D\": \"D\", \"TODO\": \"TODO\"}",
         }) {
-            mvc.perform(save(alice, body("\"tokyo\"", "\"blue\"", "\"vivid\"", "\"elo\"", labels, "null", "null", "{}"))
+            mvc.perform(save(alice, body("\"tokyo\"", "\"blue\"", "\"vivid\"", labels, "null", "null", "{}"))
                     .header(HttpHeaders.IF_NONE_MATCH, "*"))
                 .andExpect(status().isBadRequest());
         }
