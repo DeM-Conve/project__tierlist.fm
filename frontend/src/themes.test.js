@@ -1,5 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { colord } from 'colord';
+import { colord, extend } from 'colord';
+import a11yPlugin from 'colord/plugins/a11y';
+import labPlugin from 'colord/plugins/lab';
 import { DEFAULT_THEME, mergeMantineTheme } from '@mantine/core';
 import {
   ACCENTS,
@@ -14,10 +16,19 @@ import {
   resolveAppearance,
 } from './themes';
 
+extend([a11yPlugin, labPlugin]);
+
 // Every variable CLAUDE.md promises buildAppearance() sets on <html>.
 const REQUIRED_VARS = [
   '--bg',
+  '--editor',
   '--chrome',
+  '--chrome-border',
+  '--chrome-fg-muted',
+  '--chrome-hover',
+  '--chrome-selected',
+  '--chrome-input',
+  '--chrome-input-border',
   '--surface',
   '--surface-2',
   '--surface-3',
@@ -120,12 +131,28 @@ describe('resolveAppearance', () => {
 });
 
 describe('buildAppearance', () => {
-  it.each(Object.keys(THEMES))('%s: the window chrome is a shade apart from the page, darker in dark themes', (theme) => {
-    const { cssVars, scheme } = buildAppearance({ theme });
-    const chrome = colord(cssVars['--chrome']).brightness();
-    const page = colord(cssVars['--bg']).brightness();
-    expect(chrome).toBeLessThan(page);
-    if (scheme === 'dark') expect(page - chrome).toBeGreaterThan(0.01);
+  // The shell follows VS Code's Modern themes: the page (editor) is the
+  // brightest base, the chrome a shade darker in both schemes
+  // (#1F1F1F / #181818, #FFFFFF / #F8F8F8), and what sits on the chrome
+  // steps away from it in order: hover < selection < border-ish < muted text.
+  it.each(Object.keys(THEMES))('%s: the chrome is a shade darker than the page', (theme) => {
+    const { cssVars } = buildAppearance({ theme });
+    const L = (v) => colord(cssVars[v]).toHsl().l;
+    expect(cssVars['--editor']).toBe(THEMES[theme].surface);
+    const delta = L('--editor') - L('--chrome');
+    expect(delta).toBeGreaterThan(1.5); // visible...
+    expect(delta).toBeLessThan(5); // ...but calm, like VS Code's ~2.8
+  });
+
+  it.each(Object.keys(THEMES))('%s: chrome hover < selection < muted text, all toward the ink', (theme) => {
+    const { cssVars } = buildAppearance({ theme });
+    const dist = (v) => colord(cssVars['--chrome']).delta(cssVars[v]);
+    expect(dist('--chrome-hover')).toBeGreaterThan(0);
+    expect(dist('--chrome-selected')).toBeGreaterThan(dist('--chrome-hover'));
+    expect(dist('--chrome-border')).toBeGreaterThan(dist('--chrome-hover'));
+    expect(dist('--chrome-fg-muted')).toBeGreaterThan(dist('--chrome-selected'));
+    // Muted chrome text stays readable on the chrome (WCAG AA for UI text).
+    expect(colord(cssVars['--chrome-fg-muted']).contrast(cssVars['--chrome'])).toBeGreaterThanOrEqual(3);
   });
 
   it(`covers all ${combos.length} theme x accent x palette combinations`, () => {
@@ -220,7 +247,7 @@ describe('cssVariablesResolver', () => {
   it('points Mantine’s colors at our variables, same in both schemes', () => {
     const r = cssVariablesResolver();
     expect(r.dark).toEqual(r.light);
-    expect(r.dark['--mantine-color-body']).toBe('var(--bg)');
+    expect(r.dark['--mantine-color-body']).toBe('var(--editor)');
     expect(r.dark['--mantine-color-text']).toBe('var(--text)');
     Object.values(r.dark).forEach((val) => expect(val).toMatch(/^var\(--[a-z0-9-]+\)$/));
   });

@@ -19,10 +19,21 @@ import { TierChip } from './TierBits';
 import { exampleTitle } from '../naming';
 import { useSelector } from 'react-redux';
 import { selectNaming } from '../store/selectors';
-import { SHELL_Y, SIDEBAR_X } from '../layout/spacing';
+import { PART_GAP, SHELL_Y, SIDEBAR_X } from '../layout/spacing';
 import { useBoardDropOpen } from '../layout/useBoardDropOpen';
 
 const TOGGLE_KEYS = 'Ctrl+B';
+
+// A row of a list on the window chrome, VS Code's way: the full ink, a
+// neutral chrome-toned selection (list.inactiveSelectionBackground) rather
+// than an accent fill, a slightly darker hover (App.css .chrome-row) and the
+// counts muted.
+const CHROME_ROW = {
+  className: 'chrome-row',
+  vars: () => ({ root: { '--nl-bg': 'var(--chrome-selected)', '--nl-hover': 'var(--chrome-selected)', '--nl-color': 'var(--text)' } }),
+  styles: { root: { borderRadius: 'var(--mantine-radius-sm)' } },
+};
+const MUTED = 'var(--chrome-fg-muted)';
 
 // Each board shows its song total straight from the playlists' own item
 // counts - no per-board fetch needed just to draw the sidebar.
@@ -41,7 +52,10 @@ function BoardLink({ category, tiers, active }) {
     <NavLink
       component={Link}
       to={base}
-      variant={hovering ? 'filled' : 'light'}
+      {...CHROME_ROW}
+      // A song dragged over it: the accent fill, so the drop target is loud.
+      variant={hovering ? 'filled' : undefined}
+      vars={hovering ? undefined : CHROME_ROW.vars}
       // Compact rows so a typical library's boards all fit without
       // the list scrolling.
       py={4}
@@ -50,10 +64,10 @@ function BoardLink({ category, tiers, active }) {
       {...handlers}
       label={
         <Group justify="space-between" wrap="nowrap" gap={6}>
-          <Text size="sm" truncate="end">
+          <Text fz={13} truncate="end">
             {category}
           </Text>
-          <Text size="xs" c={hovering ? undefined : 'dimmed'}>
+          <Text size="xs" c={hovering ? undefined : MUTED} style={{ fontVariantNumeric: 'tabular-nums' }}>
             {total}
           </Text>
         </Group>
@@ -71,7 +85,7 @@ function PlaylistLink({ category, tier, playlist, active }) {
     <NavLink
       component={Link}
       to={tierPath(category, tier)}
-      variant="light"
+      {...CHROME_ROW}
       py={3}
       pl={10}
       active={active}
@@ -84,10 +98,10 @@ function PlaylistLink({ category, tier, playlist, active }) {
       }
       label={
         <Group justify="space-between" wrap="nowrap" gap={8}>
-          <Text size="sm" truncate="end" title={playlist.title}>
+          <Text fz={13} truncate="end" title={playlist.title}>
             {playlist.title}
           </Text>
-          <Text size="xs" c="dimmed" style={{ fontVariantNumeric: 'tabular-nums' }}>
+          <Text size="xs" c={MUTED} style={{ fontVariantNumeric: 'tabular-nums' }}>
             {playlist.itemCount ?? 0}
           </Text>
         </Group>
@@ -96,21 +110,25 @@ function PlaylistLink({ category, tier, playlist, active }) {
   );
 }
 
-// One activity-bar icon, labelled (with its key) on hover. `marked` draws
-// VS Code's accent bar on the left edge: the view that's open / the page
-// you're on.
+const ACTIVITY_SIZE = 48;
+// VS Code's codicons are 24px line icons; lucide's default stroke reads
+// heavier than theirs at that size.
+const ICON = { size: 24, strokeWidth: 1.5 };
+
+// One activity-bar icon, labelled (with its key) on hover - VS Code's
+// activity bar: a 48px square per item, the icon muted on the chrome and the
+// full ink on hover (App.css .activity-icon); `marked` (the open view) gets
+// the full ink and the accent bar on the strip's left edge.
 function ActivityIcon({ label, keys, marked, children, ...props }) {
   return (
-    // The bar sits outside the button (which clips its overflow), on the
-    // strip's left edge.
     <Box pos="relative">
-      {marked && <Box pos="absolute" left={-6} top={6} bottom={6} w={3} bg="accent" style={{ borderRadius: 2 }} />}
+      {marked && <Box pos="absolute" left={0} top={0} bottom={0} w={2} bg="var(--accent-fill)" style={{ zIndex: 1 }} />}
       <Tooltip label={keys ? `${label} (${keys})` : label} position="right" withArrow>
         <ActionIcon
-          variant={marked ? 'light' : 'subtle'}
-          color={marked ? undefined : 'gray'}
-          size={42}
-          radius="md"
+          variant="transparent"
+          size={ACTIVITY_SIZE}
+          radius={0}
+          className="activity-icon"
           aria-label={label}
           data-active={marked || undefined}
           {...props}
@@ -127,33 +145,33 @@ function ActivityIcon({ label, keys, marked, children, ...props }) {
 // toggles the panel); the rest go places.
 export function ActivityBar({ openView, onShowView, onOpenPalette, waitingCount, onSelectSettings, onOpenShortcuts, onLogout }) {
   return (
-    <Stack component="nav" aria-label="Activity bar" gap={6} align="center" px={6} py={SHELL_Y}>
+    <Stack component="nav" aria-label="Activity bar" gap={0} align="center" py={PART_GAP}>
       <ActivityIcon label="Home" keys="g h" component={Link} to="/">
-        <Home size={22} />
+        <Home {...ICON} />
       </ActivityIcon>
       <ActivityIcon label="Jump to…" keys="o / ⌘K" onClick={onOpenPalette}>
-        <Search size={22} />
+        <Search {...ICON} />
       </ActivityIcon>
       <ActivityIcon label="Tier lists" keys={TOGGLE_KEYS} marked={openView === 'boards'} aria-pressed={openView === 'boards'} onClick={() => onShowView('boards')}>
-        <LayoutList size={22} />
+        <LayoutList {...ICON} />
       </ActivityIcon>
       <ActivityIcon label="Playlists" marked={openView === 'playlists'} aria-pressed={openView === 'playlists'} onClick={() => onShowView('playlists')}>
-        <ListMusic size={22} />
+        <ListMusic {...ICON} />
       </ActivityIcon>
-      <Indicator label={waitingCount} size={16} disabled={!waitingCount} offset={8}>
+      <Indicator label={waitingCount} size={16} disabled={!waitingCount} offset={12}>
         <ActivityIcon label="Add songs" keys="a" component={Link} to="/add" state={{ focusInput: true }}>
-          <ListPlus size={22} />
+          <ListPlus {...ICON} />
         </ActivityIcon>
       </Indicator>
       <Box style={{ flex: 1 }} />
       <ActivityIcon label="Keyboard shortcuts" keys="?" onClick={onOpenShortcuts}>
-        <Keyboard size={22} />
+        <Keyboard {...ICON} />
       </ActivityIcon>
       <ActivityIcon label="Settings" keys="g s" onClick={onSelectSettings}>
-        <Settings size={22} />
+        <Settings {...ICON} />
       </ActivityIcon>
       <ActivityIcon label="Log out" onClick={onLogout}>
-        <LogOut size={22} />
+        <LogOut {...ICON} />
       </ActivityIcon>
     </Stack>
   );
@@ -186,13 +204,14 @@ export function SidebarPanel({ query, onQueryChange, tierCategories, tierGroups,
   return (
     <Stack h="100%" gap={0} px={SIDEBAR_X} py={SHELL_Y} miw={0}>
       <Group justify="space-between" px={8} mb={8} mt={6} wrap="nowrap">
-        <Text size="xs" fw={700} c="dimmed" tt="uppercase" style={{ letterSpacing: 1 }}>
+        {/* VS Code's side bar title: small caps-style, the secondary ink. */}
+        <Text fz={11} fw={600} c="var(--text-dim)" tt="uppercase" style={{ letterSpacing: 0.6 }}>
           {isPlaylists ? 'Playlists' : 'Tier lists'}
         </Text>
         {loading ? (
           <Skeleton h={10} w={14} />
         ) : (
-          <Text size="xs" c="dimmed">
+          <Text size="xs" c={MUTED}>
             {isPlaylists ? playlistCount : tierCategories.length}
           </Text>
         )}
@@ -205,6 +224,10 @@ export function SidebarPanel({ query, onQueryChange, tierCategories, tierGroups,
         rightSection={query ? <CloseButton size="sm" onClick={() => onQueryChange('')} aria-label="Clear filter" /> : null}
         size="xs"
         mb="xs"
+        radius="sm"
+        // VS Code's input on the side bar: a step lighter than the chrome
+        // in dark themes, the page color in light ones.
+        styles={{ input: { background: 'var(--chrome-input)', borderColor: 'var(--chrome-input-border)' } }}
       />
 
       <ScrollArea style={{ flex: 1 }} type="hover" offsetScrollbars>
@@ -212,7 +235,7 @@ export function SidebarPanel({ query, onQueryChange, tierCategories, tierGroups,
           {isPlaylists &&
             playlistGroups.map(([category, rows]) => (
               <Box key={category} mb={6}>
-                <Text size="xs" fw={700} c="dimmed" px={10} pt={6} pb={2} truncate="end">
+                <Text size="xs" fw={600} c={MUTED} px={10} pt={6} pb={2} truncate="end">
                   {category}
                 </Text>
                 {rows.map(({ tier, playlist }) => (

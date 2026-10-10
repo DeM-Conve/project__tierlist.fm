@@ -173,13 +173,35 @@ export function buildAppearance(choice) {
   const dark = t.scheme === 'dark';
   const fill = a.scale[dark ? a.onDark : a.onLight];
   const accentText = a.scale[dark ? a.textDark : a.textLight];
+  const editor = t.surface;
+  // VS Code's chrome is a shade darker than its editor in both schemes:
+  // #1F1F1F -> #181818 (22% toward black), #FFFFFF -> #F8F8F8 (3% toward
+  // the ink - mixing toward the text rather than black keeps a light theme's
+  // tint from turning saturated).
+  const chrome = dark ? mix(editor, '#000000', 0.22) : mix(editor, t.text, 0.03);
 
   const cssVars = {
     '--bg': t.bg,
-    // The app's frame (activity bar, side panel, tier rail), like VS Code's
-    // window chrome: a shade darker than the page, which sits on it as a
-    // rounded card.
-    '--chrome': dark ? mix(t.bg, '#000000', 0.3) : mix(t.bg, t.text, 0.05),
+    // The shell, VS Code-style (relationships taken from VS Code's Dark /
+    // Light Modern themes, applied to each of our palettes):
+    //   --editor  the page: a rounded card, the brightest base surface
+    //             (VS Code editor.background) - and Mantine's body color, so
+    //             a Paper/Card inside it is flat, drawn by its border only.
+    //   --chrome  the frame around it (activity bar, side panel, tier rail,
+    //             mini player): one color, a shade darker than the page in
+    //             both schemes (#1F1F1F -> #181818, #FFFFFF -> #F8F8F8).
+    // Everything on the chrome is the chrome mixed toward the text by VS
+    // Code's ratios (scaled for our inks, which are darker/brighter than
+    // VS Code's #CCCCCC / #3B3B3B): borders ~10%, muted icons and counts
+    // ~60-70%, list hover / selection, the side panel's filter input.
+    '--editor': editor,
+    '--chrome': chrome,
+    '--chrome-border': mix(chrome, t.text, dark ? 0.11 : 0.075),
+    '--chrome-fg-muted': mix(chrome, t.text, dark ? 0.6 : 0.68),
+    '--chrome-hover': mix(chrome, t.text, dark ? 0.07 : 0.03),
+    '--chrome-selected': mix(chrome, t.text, dark ? 0.13 : 0.07),
+    '--chrome-input': dark ? mix(chrome, t.text, 0.08) : editor,
+    '--chrome-input-border': mix(chrome, t.text, dark ? 0.16 : 0.15),
     '--surface': t.surface,
     '--surface-2': t.surface2,
     '--surface-3': t.surface3,
@@ -245,7 +267,7 @@ function variantColorResolver(input) {
 // of color variables in the app (ours) and Mantine just reads them.
 export function cssVariablesResolver() {
   const shared = {
-    '--mantine-color-body': 'var(--bg)',
+    '--mantine-color-body': 'var(--editor)',
     '--mantine-color-text': 'var(--text)',
     '--mantine-color-dimmed': 'var(--text-dim)',
     '--mantine-color-placeholder': 'var(--text-faint)',

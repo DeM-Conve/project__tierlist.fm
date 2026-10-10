@@ -39,7 +39,14 @@ body {
    Never hard-code a color in a component or App.css - use these. */
 :root {
   --bg: #16161e;
-  --chrome: #0f0f15;
+  --editor: #1a1b26;
+  --chrome: #16171f;
+  --chrome-border: #262733;
+  --chrome-fg-muted: #767c97;
+  --chrome-hover: #20212b;
+  --chrome-selected: #292b36;
+  --chrome-input: #21232d;
+  --chrome-input-border: #2d2f3c;
   --surface: #1a1b26;
   --surface-2: #24283b;
   --surface-3: #292e42;

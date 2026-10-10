@@ -20,13 +20,14 @@ import { notifications } from '@mantine/notifications';
 import './App.css';
 import { BOARD_TIERS, TODO_TIER } from './tiers';
 import Sidebar, { SidebarPanel } from './components/Sidebar';
-import { Group, Panel, Separator, usePanelRef } from 'react-resizable-panels';
+import { Group, Panel, usePanelRef } from 'react-resizable-panels';
+import Sash from './layout/Sash';
 import HomeView from './components/HomeView';
 import TierFocusView from './components/TierFocusView';
 import CreateTierPlaylistsModal from './components/CreateTierPlaylistsModal';
 import TodoListModal from './components/TodoListModal';
 import TierRail from './components/TierRail';
-import { CANVAS_TOP, CANVAS_X, SHELL_Y } from './layout/spacing';
+import { CANVAS_TOP, CANVAS_X, PART_GAP, SHELL_Y } from './layout/spacing';
 import { CanvasContext } from './layout/canvas';
 import PendingChanges from './components/PendingChanges';
 import { loadBoard, moveWithFeedback, undoEdit } from './tierActions';
@@ -647,10 +648,17 @@ function Layout() {
               />
             </Panel>
           )}
-          {!narrow && <Separator className="sidebar-resizer" />}
+          {!narrow && <Sash />}
           <Panel id="page" minSize={320}>
-            {/* VS Code-style: the page is a rounded card on the window chrome. */}
-            <Box h="100%" py={{ base: 0, md: 8 }} pr={{ base: 0, md: railCategory ? 0 : 8 }} style={{ display: 'flex' }}>
+            {/* VS Code-style: the page is a rounded card on the window chrome,
+                PART_GAP from everything around it - the sash fills the gap
+                on its left, the rail's own padding the one on its right. */}
+            <Box
+              h="100%"
+              py={{ base: 0, md: PART_GAP }}
+              pr={{ base: 0, md: railCategory ? 0 : PART_GAP }}
+              style={{ display: 'flex' }}
+            >
               {/* The canvas is the page's scroll container (see layout/canvas.js).
                   scrollbarGutter: the scrollbar's space is always reserved, so the
                   board (which sizes itself to the canvas) can't flicker between
@@ -660,7 +668,7 @@ function Layout() {
                 ref={canvasRef}
                 flex={1}
                 miw={0}
-                bg="var(--bg)"
+                bg="var(--editor)"
                 style={{ overflowY: 'auto', scrollbarGutter: 'stable' }}
                 className="canvas-card"
               >

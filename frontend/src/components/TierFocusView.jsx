@@ -381,7 +381,8 @@ export default function TierFocusView({
         </Tabs.List>
       </Tabs>
 
-      <Paper withBorder radius="md" p={4} bg="var(--surface)">
+      {/* The list sits straight on the page, VS Code-style - no box around it. */}
+      <Paper radius="md" p={4} bg="var(--editor)">
         <Box
           ref={listRef}
           pos="relative"

@@ -24,19 +24,80 @@
      chrome; the page is the rounded card beside it (App.jsx). */
   background: var(--chrome);
 }
-/* The page as a rounded card on the window chrome (App.jsx) - a CSS
-   class because it goes flat on phones, an @media rule Mantine has no
+/* The page as a rounded card on the window chrome (App.jsx), like VS
+   Code's editor part: --editor on --chrome, a 1px chrome-toned border - a
+   CSS class because it goes flat on phones, an @media rule Mantine has no
    prop for. */
-.canvas-card { border-radius: 12px; border: 1px solid var(--border-soft); }
+.canvas-card { border-radius: 8px; border: 1px solid var(--chrome-border); }
 
-/* The panel | page separator (react-resizable-panels' <Separator>): a thin
-   accent line on hover / drag / keyboard focus (the library's
-   data-separator state), like VS Code's sash - no Mantine prop for it. */
-.sidebar-resizer { width: 4px; border-radius: 2px; transition: background 0.12s ease 0.15s; }
-.sidebar-resizer[data-separator='hover'], .sidebar-resizer[data-separator='active'], .sidebar-resizer[data-separator='focus'] {
-  background: color-mix(in srgb, var(--accent) 60%, transparent);
+/* The resize sash (layout/Sash.jsx, react-resizable-panels' <Separator>):
+   an 8px hit area (PART_GAP) on the chrome with a centred grip; on hover /
+   drag / keyboard focus (the library's data-separator state - no Mantine
+   prop for it) the grip brightens and a 2px accent line runs its length,
+   like VS Code's sash.hoverBorder (= its focusBorder, our accent fill).
+   The short delay keeps the line from flashing as the pointer passes. */
+.sash {
+  position: relative;
+  width: 8px;
+  overflow: visible;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: col-resize;
   outline: none;
 }
+.sash::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 3px;
+  width: 2px;
+  border-radius: 1px;
+  background: transparent;
+  transition: background 0.1s ease;
+}
+.sash-grip {
+  /* On a chrome-colored pill, so the accent line runs behind it, not
+     through it. */
+  position: relative;
+  background: var(--chrome);
+  border-radius: 4px;
+  padding: 3px 0;
+  /* Never squeezed by the 8px hit area, and readable at rest. */
+  flex-shrink: 0;
+  overflow: visible;
+  color: var(--text-dim);
+  opacity: 1;
+  transition: opacity 0.1s ease, color 0.1s ease;
+}
+.sash[data-separator='hover']::before,
+.sash[data-separator='active']::before,
+.sash[data-separator='focus']::before {
+  background: var(--accent-fill);
+  transition-delay: 0.15s;
+}
+.sash[data-separator='hover'] .sash-grip,
+.sash[data-separator='active'] .sash-grip,
+.sash[data-separator='focus'] .sash-grip {
+  color: var(--text);
+  opacity: 1;
+}
+
+/* Lists on the window chrome (Sidebar.jsx's NavLinks): VS Code's
+   list.hoverBackground. Mantine's NavLink hard-codes its inactive hover to
+   a gray shade (the active one is the --nl-* vars, set via its vars prop),
+   so this :hover stays CSS. */
+.chrome-row:not([data-active]) { color: var(--text); }
+@media (hover: hover) {
+  .chrome-row:not([data-active]):hover { background-color: var(--chrome-hover); }
+}
+
+/* Activity bar icons: muted on the chrome, the full ink on hover or when
+   their view is open (VS Code's activityBar.inactiveForeground /
+   foreground) - a :hover state, no Mantine prop for it. */
+.activity-icon { color: var(--chrome-fg-muted); transition: color 0.1s ease; }
+.activity-icon:hover, .activity-icon[data-active] { color: var(--text); }
 .sidebar-scrim { display: none; }
 
 /* Tier board lanes - layout/visuals are Mantine props; only what Mantine
@@ -205,6 +266,10 @@
   /* Sides on the shell standard (layout/spacing.js SIDEBAR_X = md), so the
      cover art lines up with the sidebar's content above it. */
   padding: 6px var(--mantine-spacing-md);
+  /* On the window chrome, like VS Code's status bar: one frame color
+     around the page card, a chrome-toned top border. */
+  background: var(--chrome);
+  border-color: var(--chrome-border);
   border-width: 1px 0 0;
   border-radius: 0;
   /* In flow (not overlaying the page), so the top border is the only

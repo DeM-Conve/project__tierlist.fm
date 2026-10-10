@@ -149,7 +149,7 @@ export default function TierRail({ category, activeTier }) {
         gap: 6,
       }}
     >
-      <Text fz={10} fw={800} tt="uppercase" c={playingHere ? 'accent' : 'dimmed'} ta="center" style={{ letterSpacing: 1 }}>
+      <Text fz={10} fw={700} tt="uppercase" c={playingHere ? 'accent' : 'var(--chrome-fg-muted)'} ta="center" style={{ letterSpacing: 0.6 }}>
         {caption}
       </Text>
 
@@ -163,7 +163,7 @@ export default function TierRail({ category, activeTier }) {
 
       {(todo || loaded) && (
         <>
-          <Divider color="var(--border-soft)" my={2} />
+          <Divider color="var(--chrome-border)" my={2} />
           <Stack gap={6} style={{ flexShrink: 0 }}>
             {todo && renderTier(todo, ranked.length)}
             {loaded && (

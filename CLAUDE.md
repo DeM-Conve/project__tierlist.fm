@@ -20,7 +20,7 @@ category.
     `TIER_PALETTES` (3), `MEDIA` (colors drawn over art/video) and `DEMO_ART`. The user
     picks theme/accent/tier palette in Settings -> Appearance (`appearanceSlice`,
     persisted per account in Postgres - see the Database bullet). `buildAppearance()` turns the choice into CSS variables
-    on `<html>` (`--bg`, `--surface*`, `--border*`, `--text*`, `--accent*`, `--shadow`,
+    on `<html>` (`--bg`, `--editor` (the page card, also Mantine's body color) and the `--chrome*` shell tokens (`--chrome`, `--chrome-border`, `--chrome-fg-muted`, `--chrome-hover`, `--chrome-selected`, `--chrome-input*` - derived from the theme by VS Code's Dark/Light Modern ratios, see the comment in `buildAppearance`), `--surface*`, `--border*`, `--text*`, `--accent*`, `--shadow`,
     `--overlay`, `--tier-s..d` + `--tier-todo`, `--tier-ink`, `--media-*`) plus the Mantine theme;
     `AppearanceRoot.jsx` wraps `MantineProvider` and re-applies both live.
     `cssVariablesResolver` points Mantine's own color variables at ours and
@@ -63,7 +63,8 @@ category.
     somewhere it doesn't fit; use it if/when a real form with validation appears.
   - **Shell spacing is one standard: `src/layout/spacing.js`** (Mantine spacing
     keys - `SHELL_Y` top/bottom of every shell column, `SIDEBAR_X`/`CANVAS_X`/
-    `RAIL_X` sides). Sidebar, canvas and rail pass these to Mantine `p*` props;
+    `RAIL_X` sides, `PART_GAP` the 8px gap around the page card). Resizable
+    edges are `layout/Sash.jsx` (react-resizable-panels `Separator` + grip). Sidebar, canvas and rail pass these to Mantine `p*` props;
     layout maths reads them via `spacingPx()`. Don't hand-pick a padding number
     for a shell column - change the token.
   - **Right-click menus are `mantine-contextmenu`** (`ContextMenuProvider` in

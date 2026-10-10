@@ -405,7 +405,7 @@ export default function PlayerDock({
         onClick={(e) => e.stopPropagation()}
         // The bar carries a faint wash of the playing song's tier color -
         // the tier list is the product, so the dock wears it too.
-        style={!expanded && currentTier ? { background: `color-mix(in srgb, ${TIER_COLORS[currentTier]} 7%, var(--surface))` } : undefined}
+        style={!expanded && currentTier ? { background: `color-mix(in srgb, ${TIER_COLORS[currentTier]} 7%, var(--chrome))` } : undefined}
       >
         {!expanded && (
           <div className="player-dock-progress-track" onClick={seek}>
