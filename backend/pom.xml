@@ -60,6 +60,12 @@
       <groupId>org.flywaydb</groupId>
       <artifactId>flyway-database-postgresql</artifactId>
     </dependency>
+    <!-- Duel engine maths: the normal CDF and a 1-D optimiser (Apache-2.0). -->
+    <dependency>
+      <groupId>org.apache.commons</groupId>
+      <artifactId>commons-math3</artifactId>
+      <version>3.6.1</version>
+    </dependency>
 
     <dependency>
       <groupId>org.springframework.boot</groupId>
