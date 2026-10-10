@@ -34,6 +34,36 @@ const NO_ITEMS = [];
 export const TRACK_ROW_HEIGHT = 56;
 // Rows rendered beyond the visible window on each side.
 const OVERSCAN = 8;
+// A row's grid (rank, cover, title, tier chips, menu) - shared by the
+// loading rows so they line up with the real ones.
+const TRACK_ROW_GRID = {
+  height: TRACK_ROW_HEIGHT,
+  display: 'grid',
+  gridTemplateColumns: '22px 44px minmax(0, 1fr) auto 30px',
+  alignItems: 'center',
+  gap: 12,
+};
+// Loading placeholders: enough rows to fill a typical screen.
+const SKELETON_ROWS = 10;
+
+// A TrackRow-shaped loading row: same height and columns, Skeleton blocks
+// for the rank, cover, title/artist, one chip per tier and the menu.
+function TrackRowSkeleton({ tiers }) {
+  return (
+    <Box px="sm" py={6} style={TRACK_ROW_GRID} data-testid="track-row-skeleton">
+      <Skeleton h={10} w={14} style={{ justifySelf: 'end' }} />
+      <Skeleton w={44} h={44} radius={4} />
+      <Stack gap={8}>
+        <Skeleton h={10} w="60%" />
+        <Skeleton h={8} w="30%" />
+      </Stack>
+      <Group gap={4} wrap="nowrap">
+        {tiers.map((t) => <Skeleton key={t} w={24} h={24} radius={4} />)}
+      </Group>
+      <Skeleton w={28} h={28} radius="sm" />
+    </Box>
+  );
+}
 
 // Memoized: a tier holds hundreds of songs, and a page re-render (drag
 // hover, the playing song changing) must only redraw the rows it touches.
@@ -75,11 +105,7 @@ const TrackRow = memo(function TrackRow({
       py={6}
       style={{
         // Exact px (not Mantine's rem-scaled h): the virtualizer positions rows in px.
-        height: TRACK_ROW_HEIGHT,
-        display: 'grid',
-        gridTemplateColumns: '22px 44px minmax(0, 1fr) auto 30px',
-        alignItems: 'center',
-        gap: 12,
+        ...TRACK_ROW_GRID,
         borderRadius: 6,
         cursor: 'grab',
         opacity: isDragging ? 0.35 : isPendingRemoval ? 0.5 : 1,
@@ -374,16 +400,7 @@ export default function TierFocusView({
             dnd.onDrop(e, tier, idx);
           }}
         >
-          {loading &&
-            Array.from({ length: 8 }).map((_, i) => (
-              <Group key={i} p="sm" gap="md" wrap="nowrap">
-                <Skeleton w={44} h={44} radius={4} />
-                <Stack gap={6} style={{ flex: 1 }}>
-                  <Skeleton h={10} w="60%" />
-                  <Skeleton h={8} w="30%" />
-                </Stack>
-              </Group>
-            ))}
+          {loading && Array.from({ length: SKELETON_ROWS }).map((_, i) => <TrackRowSkeleton key={i} tiers={rowTiers} />)}
           {!loading && visible.length === 0 && (
             <Text ta="center" c="dimmed" fz="sm" py="xl">
               {q ? `Nothing in ${tierName(tier)} matches "${filter}".` : `${tierName(tier)} is empty - drag videos onto ${tierName(tier)} in the rail, or use a row's tier chips on another tier.`}

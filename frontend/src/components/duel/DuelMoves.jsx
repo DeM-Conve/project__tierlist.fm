@@ -69,6 +69,100 @@ export function MoveRow({ s, board, selected, decided, onSelect, onMove, onKeep,
   );
 }
 
+// MoveRow's exact shape (same Group, paddings and column widths) with
+// Skeleton blocks for the song, the tier change, the bar and the buttons.
+function MoveRowSkeleton() {
+  return (
+    <Group wrap="wrap" gap={14} px={18} py={12} style={{ borderBottom: '1px solid var(--border)' }} data-testid="move-row-skeleton">
+      <Group gap={14} wrap="nowrap" style={{ flex: '1 1 260px', minWidth: 0 }}>
+        <Skeleton w={44} h={44} radius="sm" style={{ flexShrink: 0 }} />
+        <Stack gap={10} style={{ flex: 1 }}>
+          <Skeleton h={12} w="55%" />
+          <Skeleton h={10} w="35%" />
+        </Stack>
+      </Group>
+      <Group gap={8} w={130} wrap="nowrap">
+        <Skeleton w={20} h={20} radius={4} />
+        <Text c="dimmed">→</Text>
+        <Skeleton w={20} h={20} radius={4} />
+      </Group>
+      <Group gap={8} w={130} wrap="nowrap">
+        <Skeleton h={6} style={{ flex: 1 }} />
+        <Skeleton h={10} w={30} />
+      </Group>
+      <Group gap={6} miw={150}>
+        <Skeleton h={36} w={68} radius="sm" />
+        <Skeleton h={36} w={64} radius="sm" />
+      </Group>
+    </Group>
+  );
+}
+
+// The evidence panel's sections (real labels) with Skeleton content.
+function EvidenceSkeleton() {
+  return (
+    <Paper withBorder radius="lg" p={22} style={{ flex: '1 1 380px' }} data-testid="evidence-skeleton">
+      <Stack gap={20}>
+        <Group gap={14} wrap="nowrap">
+          <Skeleton w={60} h={60} radius="sm" style={{ flexShrink: 0 }} />
+          <Stack gap={10} style={{ flex: 1 }}>
+            <Skeleton h={18} w="70%" />
+            <Skeleton h={12} w="40%" />
+          </Stack>
+          <Skeleton w={48} h={48} circle />
+        </Group>
+        <Stack gap={10}>
+          <SectionLabel>Where it belongs</SectionLabel>
+          <Stack gap={8}>
+            {[0, 1, 2].map((i) => (
+              <Group key={i} gap={10} wrap="nowrap">
+                <Skeleton w={22} h={22} radius={4} />
+                <Skeleton h={10} style={{ flex: 1 }} />
+                <Skeleton h={10} w={40} />
+              </Group>
+            ))}
+          </Stack>
+        </Stack>
+        <Stack gap={8}>
+          <Group justify="space-between">
+            <SectionLabel>Score over duels</SectionLabel>
+            <Text fz={12} c="dimmed">dashed = tier border</Text>
+          </Group>
+          <Skeleton h={80} />
+        </Stack>
+        <Stack gap={4}>
+          <SectionLabel>Key results</SectionLabel>
+          {[0, 1].map((i) => (
+            <Group key={i} justify="space-between" py={6} style={{ borderBottom: '1px solid var(--border-soft)' }} wrap="nowrap">
+              <Skeleton h={12} w="50%" />
+              <Skeleton w={20} h={20} radius={4} />
+            </Group>
+          ))}
+        </Stack>
+        <Group gap={8} grow>
+          <Skeleton h={42} radius="sm" />
+          <Skeleton h={42} radius="sm" />
+        </Group>
+      </Stack>
+    </Paper>
+  );
+}
+
+const KEY_HINTS = [['↑', '↓', 'browse'], ['M', 'move'], ['X', 'keep'], ['L', 'lock tier'], ['P', 'play']];
+
+function KeyHints() {
+  return (
+    <Group gap={18} px={18} py={14} wrap="wrap">
+      {KEY_HINTS.map((k) => (
+        <Group key={k.at(-1)} gap={4}>
+          {k.slice(0, -1).map((x) => <Kbd key={x} size="xs">{x}</Kbd>)}
+          <Text fz={13} c="dimmed">{k.at(-1)}</Text>
+        </Group>
+      ))}
+    </Group>
+  );
+}
+
 const FILTERS = [
   { value: 'all', label: 'All' },
   { value: 'up', label: 'Up a tier' },
@@ -178,8 +272,16 @@ export default function DuelMoves({ category, boardLoading, base }) {
           </Group>
         </Chip.Group>
 
+        {/* Loading keeps the two-column layout: skeleton rows on the left,
+            the evidence panel's sections on the right. */}
         {!data ? (
-          <Skeleton h={360} radius="md" />
+          <Group align="flex-start" gap={24} wrap="wrap">
+            <Paper withBorder radius="lg" style={{ flex: '999 1 560px', minWidth: 0, overflow: 'hidden' }}>
+              {[0, 1, 2, 3, 4].map((i) => <MoveRowSkeleton key={i} />)}
+              <KeyHints />
+            </Paper>
+            <EvidenceSkeleton />
+          </Group>
         ) : (
           <Group align="flex-start" gap={24} wrap="wrap">
             <Paper withBorder radius="lg" style={{ flex: '999 1 560px', minWidth: 0, overflow: 'hidden' }}>
@@ -201,14 +303,7 @@ export default function DuelMoves({ category, boardLoading, base }) {
                   onUndo={() => undo(s)}
                 />
               ))}
-              <Group gap={18} px={18} py={14} wrap="wrap">
-                {[['↑', '↓', 'browse'], ['M', 'move'], ['X', 'keep'], ['L', 'lock tier'], ['P', 'play']].map((k) => (
-                  <Group key={k.at(-1)} gap={4}>
-                    {k.slice(0, -1).map((x) => <Kbd key={x} size="xs">{x}</Kbd>)}
-                    <Text fz={13} c="dimmed">{k.at(-1)}</Text>
-                  </Group>
-                ))}
-              </Group>
+              <KeyHints />
             </Paper>
 
             {current && (

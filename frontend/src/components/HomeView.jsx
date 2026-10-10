@@ -92,6 +92,49 @@ function BoardCard({ category, tiers, onOpen, onDuel }) {
   );
 }
 
+// BoardCard's shape (same Paper, header row, five tier lines, button row)
+// with Skeleton blocks, so the grid doesn't jump when the playlists arrive.
+function BoardCardSkeleton() {
+  return (
+    <Paper withBorder radius="md" p="md" bg="var(--surface)" h="100%" data-testid="board-card-skeleton"
+      style={{ display: 'flex', flexDirection: 'column' }}>
+      <Group justify="space-between" mb="sm" wrap="nowrap" h={31}>
+        <Skeleton h={20} w="45%" />
+        <Skeleton h={10} w={60} />
+      </Group>
+      <Stack gap={5}>
+        {TIER_ORDER.map((t, i) => (
+          <Group key={t} gap={8} wrap="nowrap">
+            <Skeleton w={22} h={22} radius={4} style={{ flexShrink: 0 }} />
+            <Skeleton w={40} h={22} radius={3} style={{ flexShrink: 0 }} />
+            <Box style={{ flex: 1 }}>
+              <Skeleton h={8} w={`${90 - i * 15}%`} radius={2} />
+            </Box>
+            <Skeleton h={10} w={20} ml={8} />
+          </Group>
+        ))}
+      </Stack>
+      <Group gap={6} mt="auto" pt="md">
+        <Skeleton h={26} w={56} radius="sm" />
+        <Skeleton h={26} w={68} radius="sm" />
+      </Group>
+    </Paper>
+  );
+}
+
+// A playlist card's shape: the 100px art section, title and count lines.
+function PlaylistCardSkeleton() {
+  return (
+    <Card withBorder radius="md" padding="xs" bg="var(--surface)" data-testid="playlist-card-skeleton">
+      <Card.Section>
+        <Skeleton h={100} radius={0} />
+      </Card.Section>
+      <Skeleton h={12} w="85%" mt={12} />
+      <Skeleton h={10} w="50%" mt={9} mb={4} />
+    </Card>
+  );
+}
+
 export default function HomeView({
   playlists,
   loadError,
@@ -210,7 +253,7 @@ export default function HomeView({
         {!loadError && playlists === null && (
           <SimpleGrid cols={{ base: 1, sm: 2, xl: 3 }} spacing="md">
             {Array.from({ length: 6 }).map((_, i) => (
-              <Skeleton key={i} h={200} radius="md" />
+              <BoardCardSkeleton key={i} />
             ))}
           </SimpleGrid>
         )}
@@ -269,7 +312,7 @@ export default function HomeView({
         )}
         <SimpleGrid cols={{ base: 2, sm: 3, lg: 4, xl: 6 }} spacing="sm">
           {playlists === null &&
-            Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} h={150} radius="md" />)}
+            Array.from({ length: 6 }).map((_, i) => <PlaylistCardSkeleton key={i} />)}
           {shownPlaylists.map((p) => {
             const { parsed } = p;
             return (

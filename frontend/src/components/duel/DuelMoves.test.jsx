@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, screen, within } from '@testing-library/react';
+import { cleanup, fireEvent, screen, within } from '@testing-library/react';
 import DuelMoves from './DuelMoves';
 import { IDS, analysis, renderDuel, suggestion } from '../../test/duelFixtures';
 
@@ -108,5 +108,22 @@ describe('DuelMoves', () => {
     page();
     expect(screen.getByText('YouTube says no.')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument();
+  });
+
+  it('loading keeps the layout: same heading and filters, a row list and an evidence panel with the same sections', () => {
+    page();
+    const panel = screen.getByRole('button', { name: 'Move to A' }).closest('.mantine-Paper-root');
+    const labels = ['Where it belongs', 'Key results'].map((l) => !!within(panel).queryByText(l));
+    const columns = panel.parentElement.children.length;
+    cleanup();
+    h.analysis = undefined;
+    page();
+    expect(screen.getByText('Suggested moves')).toBeInTheDocument();
+    expect(screen.getByText('All · 0')).toBeInTheDocument();
+    expect(screen.getAllByTestId('move-row-skeleton').length).toBeGreaterThan(0);
+    const skeleton = screen.getByTestId('evidence-skeleton');
+    expect(skeleton.parentElement.children.length).toBe(columns);
+    expect(['Where it belongs', 'Key results'].map((l) => !!within(skeleton).queryByText(l))).toEqual(labels);
+    expect(within(skeleton.parentElement).getByText('browse')).toBeInTheDocument();
   });
 });

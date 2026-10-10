@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { act, screen } from '@testing-library/react';
+import { act, cleanup, screen } from '@testing-library/react';
 import { useSelector } from 'react-redux';
 import { MemoryRouter } from 'react-router-dom';
 import { ContextMenuProvider } from 'mantine-contextmenu';
@@ -24,7 +24,7 @@ const playlists = TIERS.map((t) => ({ id: `pl-${t}`, title: `Rock ${t}`, itemCou
 const songs = (tier, n) => Array.from({ length: n }, (_, i) => ({ videoId: `${tier}${i}`, id: `item-${tier}${i}`, title: `Band - Song ${tier}${i}` }));
 const data = Object.fromEntries(TIERS.map((t) => [t, songs(t, 30)]));
 
-function Board() {
+function Board({ boardLoading = false }) {
   const tierGroups = useSelector(selectTierGroups);
   const tierItems = useSelector((s) => s.tiers.tierItems);
   const tierLoading = useSelector((s) => s.tiers.tierLoading);
@@ -36,7 +36,7 @@ function Board() {
       tierGroups={tierGroups}
       tierItems={tierItems}
       tierLoading={tierLoading}
-      boardLoading={false}
+      boardLoading={boardLoading}
       playingVideoId={null}
       pendingMoves={pendingMoves}
       onPlay={noop}
@@ -52,15 +52,16 @@ function Board() {
 
 // A 700px canvas: six rows only just fit at the full 88px tile size - the
 // case where taking the bar's 80px out of the room shrank every tile.
-function renderBoard(height = 700) {
-  const store = makeStore({ playlists, naming: NAMING });
-  store.dispatch(loadBoard({ category: 'Rock', data }));
+function renderBoard(height = 700, { loading = false } = {}) {
+  // Loading: the playlists list hasn't arrived, so not even the tiers are known.
+  const store = makeStore({ playlists: loading ? [] : playlists, naming: NAMING });
+  if (!loading) store.dispatch(loadBoard({ category: 'Rock', data }));
   const canvas = { ref: { current: document.createElement('div') }, height };
   renderWithApp(
     <MemoryRouter>
       <ContextMenuProvider>
         <CanvasContext.Provider value={canvas}>
-          <Board />
+          <Board boardLoading={loading} />
         </CanvasContext.Provider>
       </ContextMenuProvider>
     </MemoryRouter>,
@@ -117,5 +118,24 @@ describe('TierBoardView - the staged-changes bar never resizes the board', () =>
       store.dispatch(moveWithFeedback([{ fromTier: 'TODO', toTier: 'S', videoId: 'TODO0' }], { quiet: true }));
     });
     expect(section.style.paddingBottom).not.toBe(padBefore);
+  });
+});
+
+describe('TierBoardView - the loading board is the real board, loading', () => {
+  it('draws the same ranked tier rows (labels, tile size, full line of tiles) before the tiers are known', () => {
+    renderBoard();
+    const loadedRows = TIERS.filter((t) => t !== 'TODO').map((t) => !!screen.queryByRole('button', { name: `Open ${t}` }));
+    const loadedTile = tileWidth();
+    cleanup();
+
+    renderBoard(700, { loading: true });
+    expect(screen.getByText('Loading videos…')).toBeInTheDocument();
+    expect(TIERS.filter((t) => t !== 'TODO').map((t) => !!screen.queryByRole('button', { name: `Open ${t}` }))).toEqual(loadedRows);
+    // Each row's skeleton tiles are the loaded tile size.
+    const row = screen.getByRole('button', { name: 'Open S' }).parentElement;
+    const tiles = row.querySelectorAll('.mantine-Skeleton-root');
+    expect(tiles.length).toBeGreaterThan(1);
+    const m = /([\d.]+)rem/.exec(tiles[0].style.width);
+    expect(m ? Math.round(Number(m[1]) * 16) : Number.parseFloat(tiles[0].style.width)).toBe(loadedTile);
   });
 });

@@ -20,12 +20,15 @@ const LENGTHS = [
 ];
 
 // What a session sharpens - the backend picks pairs per focus (fm.tierlist.duel.engine.pairing).
+// Before the analysis arrives (`data` null) the cards keep their titles and
+// layout; the hub draws their data-dependent text as Skeleton lines.
 function focusCards(data, minutes) {
+  if (!data) data = { unplaced: 0, onFence: 0, loading: true };
   return [
     { focus: 'SMART_MIX', title: 'Smart mix', recommended: true, body: 'We choose whichever duel would settle the most among your ranked songs - borderlines, shaky rankings. To-do songs stay out.', meta: `~${minutes * 6} duels` },
-    { focus: 'PLACE_TODO', title: 'Place TODO songs', body: 'No tier guess needed. Each new song meets anchors from across the board and lands where it wins.', meta: `${data.unplaced} waiting · 5–10 duels each`, disabled: !data.unplaced },
-    { focus: 'BORDERLINES', title: 'Borderlines only', body: `Just the ${data.onFence} ringed dots. The fastest way to clean up songs filed a tier off.`, meta: `${data.onFence} songs · ~3 duels each`, disabled: !data.onFence },
-    { focus: 'ONE_SONG', title: 'One song', body: 'Pin a track and find its true spot - tier and rank - in a handful of duels.' },
+    { focus: 'PLACE_TODO', title: 'Place TODO songs', body: 'No tier guess needed. Each new song meets anchors from across the board and lands where it wins.', meta: `${data.unplaced} waiting · 5–10 duels each`, disabled: data.loading || !data.unplaced },
+    { focus: 'BORDERLINES', title: 'Borderlines only', body: `Just the ${data.onFence} ringed dots. The fastest way to clean up songs filed a tier off.`, meta: `${data.onFence} songs · ~3 duels each`, disabled: data.loading || !data.onFence },
+    { focus: 'ONE_SONG', title: 'One song', body: 'Pin a track and find its true spot - tier and rank - in a handful of duels.', disabled: data.loading },
   ];
 }
 
@@ -92,89 +95,88 @@ export default function DuelHub({ category, boardLoading, base }) {
         </Group>
         {start.isError && <Alert color="red">{errorMessage(start.error, 'Couldn’t start the session.')}</Alert>}
 
-        {!data ? (
-          <Stack gap={16}>
-            <SimpleGrid cols={{ base: 1, sm: 3 }}>{[0, 1, 2].map((i) => <Skeleton key={i} h={130} radius="md" />)}</SimpleGrid>
-            <Skeleton h={230} radius="md" />
+        {/* Loading draws the same sections (headings, cards, map) with
+            Skeleton blocks where the numbers go, so nothing jumps when they land. */}
+        <SimpleGrid cols={{ base: 1, sm: 3 }} spacing={16}>
+          <StatCard label="Board certainty" loading={!data} value={data && pct(data.certainty)} aside={data ? `${data.duelsTotal} duels so far` : ''}>
+            <Text fz={14} c="dimmed">How sure the model is that each song sits in the right tier.</Text>
+          </StatCard>
+          <StatCard label="Moves waiting" loading={!data} value={data?.suggestions.length} highlight={data?.suggestions.length > 0}
+            aside={data ? `${data.suggestions.filter((s) => s.confidence >= 0.9).length} at ≥90% confidence` : ''}
+            onClick={data ? () => navigate(`${base}/duel/moves`) : undefined}>
+            <Text fz={14} fw={600}>Review suggestions →</Text>
+          </StatCard>
+          <StatCard label="On the fence" loading={!data} value={data?.onFence}>
+            <Text fz={14} c="dimmed">Songs within reach of a neighbouring tier.</Text>
+          </StatCard>
+        </SimpleGrid>
+
+        <Paper withBorder radius="lg" p={28} pb={40}>
+          <Stack gap={18}>
+            <Group justify="space-between" align="baseline" wrap="wrap">
+              <Stack gap={4}>
+                <Title order={2} fz={22} ff="var(--font-display)">Score map</Title>
+                <Text fz={14} c="dimmed">Each dot is a song, placed by its score. Ringed dots sit on a border - that is where duels go first.</Text>
+              </Stack>
+            </Group>
+            {data ? <ScoreMap analysis={data} nameOf={board.nameOf} /> : <Skeleton h={150} radius={10} data-testid="score-map-skeleton" />}
+            <Text fz={13} c="dimmed" mt={8}>Lower score ← → Higher score · borders are learned from where you already put songs</Text>
           </Stack>
-        ) : (
-          <>
-            <SimpleGrid cols={{ base: 1, sm: 3 }} spacing={16}>
-              <StatCard label="Board certainty" value={pct(data.certainty)} aside={`${data.duelsTotal} duels so far`}>
-                <Text fz={14} c="dimmed">How sure the model is that each song sits in the right tier.</Text>
-              </StatCard>
-              <StatCard label="Moves waiting" value={data.suggestions.length} highlight={data.suggestions.length > 0}
-                aside={`${data.suggestions.filter((s) => s.confidence >= 0.9).length} at ≥90% confidence`}
-                onClick={() => navigate(`${base}/duel/moves`)}>
-                <Text fz={14} fw={600}>Review suggestions →</Text>
-              </StatCard>
-              <StatCard label="On the fence" value={data.onFence}>
-                <Text fz={14} c="dimmed">Songs within reach of a neighbouring tier.</Text>
-              </StatCard>
-            </SimpleGrid>
+        </Paper>
 
-            <Paper withBorder radius="lg" p={28} pb={40}>
-              <Stack gap={18}>
-                <Group justify="space-between" align="baseline" wrap="wrap">
-                  <Stack gap={4}>
-                    <Title order={2} fz={22} ff="var(--font-display)">Score map</Title>
-                    <Text fz={14} c="dimmed">Each dot is a song, placed by its score. Ringed dots sit on a border - that is where duels go first.</Text>
+        <Stack gap={14}>
+          <Title order={2} fz={22} ff="var(--font-display)">What should this session sharpen?</Title>
+          <SimpleGrid cols={{ base: 1, sm: 2, lg: 4 }} spacing={14}>
+            {focusCards(data, Number(minutes)).map((c) => (
+              <UnstyledButton key={c.focus} disabled={c.disabled} onClick={() => setFocus(c.focus)}
+                style={{ opacity: c.disabled && data ? 0.5 : 1 }}>
+                <Paper withBorder radius="lg" p={20} h="100%" className={c.disabled ? undefined : 'duel-card'}
+                  style={{
+                    borderColor: focus === c.focus ? 'var(--accent)' : undefined,
+                    borderWidth: focus === c.focus ? 2 : undefined,
+                    background: focus === c.focus ? 'color-mix(in srgb, var(--accent) 10%, var(--surface))' : undefined,
+                  }}>
+                  <Stack gap={10}>
+                    <Group justify="space-between">
+                      <Text ff="var(--font-display)" fw={800} fz={18}>{c.title}</Text>
+                      {c.recommended && <Badge>Recommended</Badge>}
+                    </Group>
+                    {data ? (
+                      <Text fz={14} c="dimmed">{c.body}</Text>
+                    ) : (
+                      <Stack gap={8} py={4}>{[100, 92, 60].map((w) => <Skeleton key={w} h={12} w={`${w}%`} />)}</Stack>
+                    )}
+                    {c.meta && (data
+                      ? <Text fz={13} fw={700} c={focus === c.focus ? 'accent' : 'dimmed'}>{c.meta}</Text>
+                      : <Skeleton h={12} w="45%" my={4} />)}
+                    {c.focus === 'ONE_SONG' && (
+                      <Select searchable placeholder={`Search ${category}…`} data={songOptions} value={songId} disabled={!data}
+                        onChange={(v) => { setSongId(v); setFocus('ONE_SONG'); }} onClick={(e) => e.stopPropagation()}
+                        limit={50} nothingFoundMessage="No song by that name" />
+                    )}
                   </Stack>
-                </Group>
-                <ScoreMap analysis={data} nameOf={board.nameOf} />
-                <Text fz={13} c="dimmed" mt={8}>Lower score ← → Higher score · borders are learned from where you already put songs</Text>
-              </Stack>
-            </Paper>
-
-            <Stack gap={14}>
-              <Title order={2} fz={22} ff="var(--font-display)">What should this session sharpen?</Title>
-              <SimpleGrid cols={{ base: 1, sm: 2, lg: 4 }} spacing={14}>
-                {focusCards(data, Number(minutes)).map((c) => (
-                  <UnstyledButton key={c.focus} disabled={c.disabled} onClick={() => setFocus(c.focus)}
-                    style={{ opacity: c.disabled ? 0.5 : 1 }}>
-                    <Paper withBorder radius="lg" p={20} h="100%" className={c.disabled ? undefined : 'duel-card'}
-                      style={{
-                        borderColor: focus === c.focus ? 'var(--accent)' : undefined,
-                        borderWidth: focus === c.focus ? 2 : undefined,
-                        background: focus === c.focus ? 'color-mix(in srgb, var(--accent) 10%, var(--surface))' : undefined,
-                      }}>
-                      <Stack gap={10}>
-                        <Group justify="space-between">
-                          <Text ff="var(--font-display)" fw={800} fz={18}>{c.title}</Text>
-                          {c.recommended && <Badge>Recommended</Badge>}
-                        </Group>
-                        <Text fz={14} c="dimmed">{c.body}</Text>
-                        {c.meta && <Text fz={13} fw={700} c={focus === c.focus ? 'accent' : 'dimmed'}>{c.meta}</Text>}
-                        {c.focus === 'ONE_SONG' && (
-                          <Select searchable placeholder={`Search ${category}…`} data={songOptions} value={songId}
-                            onChange={(v) => { setSongId(v); setFocus('ONE_SONG'); }} onClick={(e) => e.stopPropagation()}
-                            limit={50} nothingFoundMessage="No song by that name" />
-                        )}
-                      </Stack>
-                    </Paper>
-                  </UnstyledButton>
-                ))}
-              </SimpleGrid>
-            </Stack>
-
-            {data.suggestions.length > 0 && (
-              <Stack gap={14}>
-                <Group justify="space-between" align="baseline">
-                  <Title order={2} fz={22} ff="var(--font-display)">Ready to move</Title>
-                  <Anchor component={Link} to={`${base}/duel/moves`} fw={700} fz={14}>Review all {data.suggestions.length} →</Anchor>
-                </Group>
-                <Paper withBorder radius="lg" style={{ overflow: 'hidden' }}>
-                  {data.suggestions.slice(0, 3).map((s) => (
-                    <MoveRow key={s.song} s={s} board={board}
-                      detail={`won ${s.wins} of ${s.wins + s.losses + s.draws}`}
-                      onSelect={() => navigate(`${base}/duel/moves`)}
-                      onMove={() => board.accept(s, muOf)}
-                      onKeep={() => board.keep(s)} />
-                  ))}
                 </Paper>
-              </Stack>
-            )}
-          </>
+              </UnstyledButton>
+            ))}
+          </SimpleGrid>
+        </Stack>
+
+        {data?.suggestions.length > 0 && (
+          <Stack gap={14}>
+            <Group justify="space-between" align="baseline">
+              <Title order={2} fz={22} ff="var(--font-display)">Ready to move</Title>
+              <Anchor component={Link} to={`${base}/duel/moves`} fw={700} fz={14}>Review all {data.suggestions.length} →</Anchor>
+            </Group>
+            <Paper withBorder radius="lg" style={{ overflow: 'hidden' }}>
+              {data.suggestions.slice(0, 3).map((s) => (
+                <MoveRow key={s.song} s={s} board={board}
+                  detail={`won ${s.wins} of ${s.wins + s.losses + s.draws}`}
+                  onSelect={() => navigate(`${base}/duel/moves`)}
+                  onMove={() => board.accept(s, muOf)}
+                  onKeep={() => board.keep(s)} />
+              ))}
+            </Paper>
+          </Stack>
         )}
       </Stack>
     </Container>

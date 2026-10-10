@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, screen } from '@testing-library/react';
+import { cleanup, fireEvent, screen } from '@testing-library/react';
 import { useLocation } from 'react-router-dom';
 import DuelHub from './DuelHub';
 import { IDS, analysis, renderDuel } from '../../test/duelFixtures';
@@ -90,6 +90,22 @@ describe('DuelHub', () => {
     h.analysis = undefined;
     page();
     expect(screen.getByRole('button', { name: /Start duelling/ })).toBeDisabled();
+  });
+
+  it('loading draws the loaded layout: same headings, stat cards and focus cards, skeletons for the data', () => {
+    const structure = () => ({
+      headings: screen.getAllByRole('heading').map((x) => x.textContent).filter((t) => t !== 'Ready to move'),
+      stats: ['Board certainty', 'Moves waiting', 'On the fence'].map((l) => !!screen.queryByText(l)),
+      focus: ['Smart mix', 'Place TODO songs', 'Borderlines only', 'One song'].map((l) => !!screen.queryByText(l)),
+    });
+    page();
+    const after = structure();
+    cleanup();
+    h.analysis = undefined;
+    page();
+    expect(structure()).toEqual(after);
+    expect(after.stats.every(Boolean) && after.focus.every(Boolean)).toBe(true);
+    expect(screen.getByTestId('score-map-skeleton')).toBeInTheDocument();
   });
 
   it('a failed load says why', () => {

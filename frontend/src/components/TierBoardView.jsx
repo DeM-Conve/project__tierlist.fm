@@ -171,7 +171,7 @@ function TierRow({
       <Box ref={sizeRef} style={{ flex: 1, minWidth: 0 }} p={GAP - 4}>
         <Group ref={contentRef} gap={GAP} wrap={searchActive || expanded || lines > 1 ? 'wrap' : 'nowrap'} mih={size} p={4} style={{ overflow: 'hidden' }}>
           {loading &&
-            Array.from({ length: Math.min(perLine, 8) }).map((_, i) => <Skeleton key={i} w={size} h={size} radius={6} />)}
+            Array.from({ length: perLine }).map((_, i) => <Skeleton key={i} w={size} h={size} radius={6} style={{ flexShrink: 0 }} />)}
           {!loading && total === 0 && (
             <Box
               h={size}
@@ -317,6 +317,9 @@ export default function TierBoardView({
   // Before the playlists list itself has loaded we don't even know which
   // tiers this board has - show a neutral placeholder board, not "0 tiers".
   const unknownTiers = tiers.length === 0 && anyLoading;
+  // ...but still draw it as the real rows (loading), so the board doesn't
+  // jump when the tiers become known: a full ladder until then.
+  const shownTiers = unknownTiers ? TIER_ORDER : tiers;
   const counts = Object.fromEntries(tiers.map((t) => [t, tierItems[t]?.length ?? 0]));
   const total = tiers.reduce((sum, t) => sum + counts[t], 0);
   const todoCount = tierItems[TODO_TIER]?.length ?? 0;
@@ -355,7 +358,7 @@ export default function TierBoardView({
     footerHeight,
     bottomPad: spacingPx(SHELL_Y),
     hasTodo,
-    rowCount: rowTiers.length,
+    rowCount: unknownTiers ? shownTiers.length : rowTiers.length,
     rowWidth,
     baseTileSize,
   });
@@ -544,7 +547,8 @@ export default function TierBoardView({
         </Group>
       </Group>
 
-      {hasVideos && (
+      {/* Shown (empty) while loading too, so the rows below don't drop when it fills. */}
+      {(hasVideos || anyLoading) && (
         <Box mb="md">
           <TierMixBar tiers={tiers} counts={counts} size={18} labels onSegmentClick={onOpenTier} />
         </Box>
@@ -553,27 +557,14 @@ export default function TierBoardView({
 
       <Box ref={rowsRef}>
 
-      {unknownTiers && (
-        <Paper withBorder radius="md" style={{ overflow: 'clip' }} bg="var(--surface)">
-          {Array.from({ length: 5 }).map((_, i) => (
-            <Group key={i} gap={GAP} p={GAP} wrap="nowrap" style={{ borderTop: i ? '1px solid var(--border-soft)' : undefined }}>
-              <Skeleton w={60} h={tileSize} radius={6} style={{ flexShrink: 0 }} />
-              {Array.from({ length: 8 }).map((__, j) => (
-                <Skeleton key={j} w={tileSize} h={tileSize} radius={6} style={{ flexShrink: 0 }} />
-              ))}
-            </Group>
-          ))}
-        </Paper>
-      )}
-
-      <Paper withBorder radius="md" style={{ overflow: 'clip', borderTop: 'none', display: unknownTiers ? 'none' : undefined }} bg="var(--surface)">
-        {tiers.map((t) => (
+      <Paper withBorder radius="md" style={{ overflow: 'clip', borderTop: 'none' }} bg="var(--surface)">
+        {shownTiers.map((t) => (
           <TierRow
             key={`${category}:${t}`}
             tier={t}
             tiers={boardTiers}
             items={tierItems[t]}
-            loading={tierLoading[t]}
+            loading={unknownTiers || tierLoading[t]}
             size={tileSize}
             lines={rowLines[t]}
             onMeasure={setRowWidth}

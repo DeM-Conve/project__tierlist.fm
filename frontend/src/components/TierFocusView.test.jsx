@@ -1,5 +1,5 @@
 import { beforeAll, describe, expect, it, vi } from 'vitest';
-import { act, fireEvent, screen } from '@testing-library/react';
+import { act, cleanup, fireEvent, screen } from '@testing-library/react';
 import { useSelector } from 'react-redux';
 import { ContextMenuProvider } from 'mantine-contextmenu';
 import TierFocusView, { TRACK_ROW_HEIGHT } from './TierFocusView';
@@ -20,7 +20,7 @@ const playlists = ['S', 'A'].map((t) => ({ id: `pl-${t}`, title: `Rock ${t}`, it
 const songs = (n) => Array.from({ length: n }, (_, i) => ({ videoId: `S${i}`, id: `item-S${i}`, title: `Band - Song S${i}` }));
 const CANVAS_HEIGHT = 600;
 
-function Page() {
+function Page({ loading = false }) {
   const tierItems = useSelector((s) => s.tiers.tierItems);
   const noop = () => {};
   return (
@@ -29,7 +29,7 @@ function Page() {
       tier="S"
       tiers={['S', 'A']}
       tierItems={tierItems}
-      loading={false}
+      loading={loading}
       playingVideoId={null}
       pendingRemovalKeys={new Set()}
       onPlay={noop}
@@ -42,7 +42,7 @@ function Page() {
 }
 
 // A 600px canvas (the scroll container) over a 500-song tier.
-function renderPage(n = 500) {
+function renderPage(n = 500, { loading = false } = {}) {
   const store = makeStore({ playlists, naming: NAMING });
   store.dispatch(loadBoard({ category: 'Rock', data: { S: songs(n), A: [] } }));
   const canvasEl = document.createElement('div');
@@ -52,7 +52,7 @@ function renderPage(n = 500) {
   renderWithApp(
     <ContextMenuProvider>
       <CanvasContext.Provider value={{ ref: { current: canvasEl }, height: CANVAS_HEIGHT }}>
-        <Page />
+        <Page loading={loading} />
       </CanvasContext.Provider>
     </ContextMenuProvider>,
     { store }
@@ -114,5 +114,25 @@ describe('TierFocusView - a long tier is virtualized', () => {
     const lines = screen.getAllByTestId('drop-indicator');
     expect(lines).toHaveLength(1);
     expect(lines[0].dataset.index).toBe('6');
+  });
+});
+
+describe('TierFocusView - loading rows are track rows', () => {
+  it('skeleton rows have the real row height and column grid', () => {
+    renderPage(5);
+    const real = renderedRows()[0];
+    const { height, gridTemplateColumns } = real.style;
+    cleanup();
+
+    renderPage(0, { loading: true });
+    const rows = screen.getAllByTestId('track-row-skeleton');
+    expect(rows.length).toBeGreaterThan(0);
+    rows.forEach((r) => {
+      expect(r.style.height).toBe(height);
+      expect(r.style.gridTemplateColumns).toBe(gridTemplateColumns);
+    });
+    expect(height).toBe(`${TRACK_ROW_HEIGHT}px`);
+    // One chip placeholder per tier, like the real row's tier chips.
+    expect(rows[0].children[3].children).toHaveLength(2);
   });
 });

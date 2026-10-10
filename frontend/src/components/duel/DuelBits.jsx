@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Box, Group, Image, Paper, Stack, Text, ThemeIcon } from '@mantine/core';
+import { Box, Group, Image, Paper, Skeleton, Stack, Text, ThemeIcon } from '@mantine/core';
 import { Music } from 'lucide-react';
 import { TIER_COLORS, TIER_ORDER } from '../../tiers';
 import { useTierName } from '../../tierLabels';
@@ -158,7 +158,9 @@ export function ScoreTrend({ trend, border, height = 80 }) {
   );
 }
 
-export function StatCard({ label, value, aside, children, highlight, onClick }) {
+// `loading`: the same card with the number (and its aside, when there is one)
+// as Skeleton blocks of the same size, so the hub doesn't jump when data lands.
+export function StatCard({ label, value, aside, children, highlight, onClick, loading }) {
   return (
     <Paper withBorder radius="md" p="lg" onClick={onClick}
       className={onClick ? 'duel-card' : undefined}
@@ -166,8 +168,8 @@ export function StatCard({ label, value, aside, children, highlight, onClick }) 
       <Stack gap={6}>
         <Text fz={13} fw={700} c={highlight ? 'accent' : 'dimmed'} tt="uppercase" style={{ letterSpacing: '0.08em' }}>{label}</Text>
         <Group gap={10} align="baseline">
-          <Text ff="var(--font-display)" fw={900} fz={44} lh={1}>{value}</Text>
-          {aside && <Text fz={14} c="dimmed">{aside}</Text>}
+          {loading ? <Skeleton h={44} w={96} radius="sm" /> : <Text ff="var(--font-display)" fw={900} fz={44} lh={1}>{value}</Text>}
+          {loading ? aside != null && <Skeleton h={14} w={120} /> : aside && <Text fz={14} c="dimmed">{aside}</Text>}
         </Group>
         {children}
       </Stack>

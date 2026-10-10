@@ -9,6 +9,78 @@ import { SectionLabel } from './DuelBits';
 
 const minSec = (s) => `${Math.floor(s / 60)} min ${s % 60} s`;
 
+// Where to go next - static, so the loading state shows it too.
+function WrapActions({ base }) {
+  return (
+    <Group justify="center" gap={12}>
+      <Button size="lg" component={Link} to={`${base}/duel/moves`}>Review moves</Button>
+      <Button size="lg" variant="light" color="gray" component={Link} to={`${base}/duel`}>Another session</Button>
+      <Button size="lg" variant="default" component={Link} to={base}>Back to board</Button>
+    </Group>
+  );
+}
+
+// The summary's own layout - header, certainty card, moves, the two
+// result cards, the button row - with Skeleton blocks where the session's
+// numbers go, so nothing moves when the summary arrives.
+function WrapSkeleton({ base }) {
+  return (
+    <Container className="duel-view" size={980} py={64} data-testid="wrap-skeleton">
+      <Stack gap={32}>
+        <Stack gap={10} align="center">
+          <Skeleton h={16} w={300} my={2} />
+          <Skeleton h={50} w="70%" my={3} radius="md" />
+        </Stack>
+
+        <Paper withBorder radius={18} p={28}>
+          <SimpleGrid cols={{ base: 1, sm: 2 }} spacing={28} style={{ alignItems: 'center' }}>
+            <Stack gap={6}>
+              <SectionLabel>Board certainty</SectionLabel>
+              <Skeleton h={56} w={220} radius="sm" my={14} />
+            </Stack>
+            <Stack gap={10}>
+              <Skeleton h={14} radius={7} />
+              <Group gap={18}>
+                {[110, 120, 140].map((w) => <Skeleton key={w} h={14} w={w} my={4} />)}
+              </Group>
+            </Stack>
+          </SimpleGrid>
+        </Paper>
+
+        <Stack gap={14}>
+          <Group justify="space-between" align="baseline">
+            <Skeleton h={24} w={300} />
+            <Skeleton h={14} w={140} />
+          </Group>
+          <Paper withBorder radius="md">
+            {[0, 1].map((i) => (
+              <Group key={i} px={20} py={14} gap={14} style={{ borderBottom: '1px solid var(--border)' }} wrap="wrap">
+                <Skeleton h={14} style={{ flex: '1 1 200px' }} my={6} />
+                <Group gap={8}><Skeleton w={20} h={20} radius={4} /><Text c="dimmed">→</Text><Skeleton w={20} h={20} radius={4} /></Group>
+                <Skeleton h={12} w={50} />
+              </Group>
+            ))}
+          </Paper>
+        </Stack>
+
+        <SimpleGrid cols={{ base: 1, sm: 2 }} spacing={14}>
+          {['Biggest upset', 'Still undecided'].map((label) => (
+            <Paper key={label} withBorder radius="md" p={20}>
+              <Stack gap={8}>
+                <SectionLabel>{label}</SectionLabel>
+                <Skeleton h={14} w="90%" my={5} />
+                <Skeleton h={12} w="70%" my={5} />
+              </Stack>
+            </Paper>
+          ))}
+        </SimpleGrid>
+
+        <WrapActions base={base} />
+      </Stack>
+    </Container>
+  );
+}
+
 export default function DuelWrap({ category, sessionId, boardLoading, base }) {
   const board = useDuelBoard(category);
   const summary = useDuelSummaryQuery(category, sessionId, board.duelLayout, !boardLoading);
@@ -24,7 +96,7 @@ export default function DuelWrap({ category, sessionId, boardLoading, base }) {
       </Container>
     );
   }
-  if (!s) return <Container className="duel-view" size={980} py={64}><Skeleton h={420} radius="lg" /></Container>;
+  if (!s) return <WrapSkeleton base={base} />;
 
   return (
     <Container className="duel-view" size={980} py={64}>
@@ -119,11 +191,7 @@ export default function DuelWrap({ category, sessionId, boardLoading, base }) {
           </Paper>
         </SimpleGrid>
 
-        <Group justify="center" gap={12}>
-          <Button size="lg" component={Link} to={`${base}/duel/moves`}>Review moves</Button>
-          <Button size="lg" variant="light" color="gray" component={Link} to={`${base}/duel`}>Another session</Button>
-          <Button size="lg" variant="default" component={Link} to={base}>Back to board</Button>
-        </Group>
+        <WrapActions base={base} />
       </Stack>
     </Container>
   );

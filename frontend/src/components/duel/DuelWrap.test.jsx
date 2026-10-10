@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { screen } from '@testing-library/react';
+import { cleanup, screen } from '@testing-library/react';
 import DuelWrap from './DuelWrap';
 import { IDS, renderDuel, suggestion } from '../../test/duelFixtures';
 
@@ -43,6 +43,21 @@ describe('DuelWrap', () => {
     expect(screen.getByText('Rock: every duel counts.')).toBeInTheDocument();
     expect(screen.getByText(/No surprises/)).toBeInTheDocument();
     expect(screen.getByText(/No pair came out/)).toBeInTheDocument();
+  });
+
+  it('loading draws the summary layout: same section labels, cards and buttons', () => {
+    const structure = () => ({
+      labels: ['Board certainty', 'Biggest upset', 'Still undecided'].map((l) => !!screen.queryByText(l)),
+      buttons: screen.getAllByRole('link').filter((a) => a.className.includes('Button')).map((a) => a.textContent),
+      cards: document.querySelectorAll('.mantine-Paper-root').length,
+    });
+    page();
+    const after = structure();
+    cleanup();
+    h.summary = undefined;
+    page();
+    expect(screen.getByTestId('wrap-skeleton')).toBeInTheDocument();
+    expect(structure()).toEqual(after);
   });
 
   it('a failed load says why', () => {
