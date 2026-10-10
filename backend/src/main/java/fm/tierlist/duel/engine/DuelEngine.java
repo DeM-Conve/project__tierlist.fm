@@ -9,7 +9,6 @@ import fm.tierlist.duel.engine.policy.SuggestionPolicy;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -40,6 +39,7 @@ public final class DuelEngine {
     private final TierModel tiers;
     private final SuggestionPolicy suggestions;
     private final PairingStrategies pairing;
+    private final TierOrderPolicy tierOrder;
 
     private DuelEngine(Builder b) {
         this.config = b.config;
@@ -49,6 +49,7 @@ public final class DuelEngine {
         this.tiers = b.tiers;
         this.suggestions = b.suggestions;
         this.pairing = b.pairing;
+        this.tierOrder = b.tierOrder;
     }
 
     public static DuelEngine standard() {
@@ -192,17 +193,14 @@ public final class DuelEngine {
         return out;
     }
 
-    // Order within a tier is just sorting by score - offered where it differs
-    // from the board and the tier has seen at least one duel.
-    private static Map<String, List<String>> tierOrders(BoardLayout layout, Map<String, SongState> songs) {
+    // Order within a tier: offered where the TierOrderPolicy disagrees with the board.
+    private Map<String, List<String>> tierOrders(BoardLayout layout, Map<String, SongState> songs) {
         Map<String, List<String>> out = new LinkedHashMap<>();
         for (String tier : layout.rankedTiers()) {
             List<String> ids = layout.songsIn(tier).stream().distinct().toList();
-            if (ids.size() < 2 || ids.stream().allMatch(id -> songs.get(id).duels().isEmpty())) continue;
-            List<String> sorted = ids.stream()
-                .sorted(Comparator.comparingDouble((String id) -> songs.get(id).rating().mu()).reversed())
-                .toList();
-            if (!sorted.equals(ids)) out.put(tier, sorted);
+            if (ids.size() < 2) continue;
+            List<String> ordered = tierOrder.order(ids, songs);
+            if (!ordered.equals(ids)) out.put(tier, ordered);
         }
         return out;
     }
@@ -229,6 +227,7 @@ public final class DuelEngine {
         private TierModel tiers;
         private SuggestionPolicy suggestions;
         private PairingStrategies pairing;
+        private TierOrderPolicy tierOrder;
 
         public Builder config(EngineConfig v) { this.config = Objects.requireNonNull(v); return this; }
         public Builder ratingModel(RatingModel v) { this.ratings = v; return this; }
@@ -237,6 +236,7 @@ public final class DuelEngine {
         public Builder tierModel(TierModel v) { this.tiers = v; return this; }
         public Builder suggestionPolicy(SuggestionPolicy v) { this.suggestions = v; return this; }
         public Builder pairing(PairingStrategies v) { this.pairing = v; return this; }
+        public Builder tierOrderPolicy(TierOrderPolicy v) { this.tierOrder = v; return this; }
 
         public DuelEngine build() {
             if (ratings == null) ratings = new WengLinBradleyTerry(config.driftPerWeek());
@@ -245,6 +245,7 @@ public final class DuelEngine {
             if (tiers == null) tiers = new OrdinalProbitTierModel();
             if (suggestions == null) suggestions = SuggestionPolicy.standard(config);
             if (pairing == null) pairing = PairingStrategies.standard();
+            if (tierOrder == null) tierOrder = new ConfidentSwapOrder(config.moveThreshold());
             return new DuelEngine(this);
         }
     }

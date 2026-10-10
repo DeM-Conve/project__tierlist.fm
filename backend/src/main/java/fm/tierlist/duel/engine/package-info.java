@@ -18,6 +18,7 @@
  *       is suggested: a composite of
  *       {@link fm.tierlist.duel.engine.policy.SuggestionRule}s.</li>
  * </ol>
+ * Plus a {@link TierOrderPolicy} ({@link ConfidentSwapOrder}) for order within a tier.
  * The duel log is the source of truth (event sourcing): every score is rebuilt
  * from the starting scores ({@link PriorPolicy}) plus the log.
  */

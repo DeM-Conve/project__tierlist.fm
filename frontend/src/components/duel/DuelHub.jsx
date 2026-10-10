@@ -23,7 +23,7 @@ const LENGTHS = [
 function focusCards(data, minutes) {
   return [
     { focus: 'SMART_MIX', title: 'Smart mix', recommended: true, body: 'We choose whichever duel would settle the most among your ranked songs - borderlines, shaky rankings. To-do songs stay out.', meta: `~${minutes * 6} duels` },
-    { focus: 'PLACE_TODO', title: 'Place TODO songs', body: 'No tier guess needed. Each new song meets anchors from across the board and lands where it wins.', meta: `${data.unplaced} waiting · ~5 duels each`, disabled: !data.unplaced },
+    { focus: 'PLACE_TODO', title: 'Place TODO songs', body: 'No tier guess needed. Each new song meets anchors from across the board and lands where it wins.', meta: `${data.unplaced} waiting · 5–10 duels each`, disabled: !data.unplaced },
     { focus: 'BORDERLINES', title: 'Borderlines only', body: `Just the ${data.onFence} ringed dots. The fastest way to clean up songs filed a tier off.`, meta: `${data.onFence} songs · ~3 duels each`, disabled: !data.onFence },
     { focus: 'ONE_SONG', title: 'One song', body: 'Pin a track and find its true spot - tier and rank - in a handful of duels.' },
   ];

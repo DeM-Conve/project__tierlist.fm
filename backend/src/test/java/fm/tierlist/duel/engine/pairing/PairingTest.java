@@ -91,7 +91,7 @@ class PairingTest {
     @Test
     void placeTodoMovesOnAfterTheCap() {
         List<Duel> mine = new ArrayList<>();
-        for (int i = 0; i < 8; i++) mine.add(Boards.duel(i, id("TD", 0), id("B", i % 6), Verdict.TOO_CLOSE));
+        for (int i = 0; i < 12; i++) mine.add(Boards.duel(i, id("TD", 0), id("B", i % 6), Verdict.TOO_CLOSE));
         BoardAnalysis a = analyze(mine, Set.of());
         assertThat(engine.next(a, session(Focus.PLACE_TODO, null, mine, Set.of())).orElseThrow().a()).isEqualTo(id("TD", 1));
     }
@@ -109,7 +109,7 @@ class PairingTest {
         BoardAnalysis a = analyze(List.of(), Set.of());
         assertThat(engine.next(a, session(Focus.ONE_SONG, song, List.of(), Set.of())).orElseThrow().a()).isEqualTo(song);
         List<Duel> mine = new ArrayList<>();
-        for (int i = 0; i < 10; i++) mine.add(Boards.duel(i, song, id("B", i % 6), Verdict.B));
+        for (int i = 0; i < 12; i++) mine.add(Boards.duel(i, song, id("B", i % 6), Verdict.B));
         assertThat(engine.next(analyze(mine, Set.of()), session(Focus.ONE_SONG, song, mine, Set.of()))).isEmpty();
         assertThat(engine.next(a, session(Focus.ONE_SONG, "nonexistent", List.of(), Set.of()))).isEmpty();
     }

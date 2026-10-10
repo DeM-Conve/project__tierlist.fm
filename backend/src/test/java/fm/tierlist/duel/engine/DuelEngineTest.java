@@ -103,10 +103,19 @@ class DuelEngineTest {
     }
 
     @Test
-    void tierOrderIsSortingByScore() {
-        BoardAnalysis a = analyze(List.of(duel(1, id("C", 5), id("C", 0), Verdict.A_CLEARLY), duel(2, id("C", 5), id("C", 1), Verdict.A_CLEARLY)));
+    void aTierIsReorderedOnlyOnStrongEvidence() {
+        List<Duel> strong = new ArrayList<>();
+        for (int i = 0; i < 4; i++) strong.add(duel(i + 1, id("C", 5), id("C", 4), Verdict.A_CLEARLY));
+        BoardAnalysis a = analyze(strong);
         assertThat(a.tierOrders()).containsKey("C");
         assertThat(a.tierOrders().get("C").indexOf(id("C", 5))).isLessThan(5);
+    }
+
+    @Test
+    void aFewDrawsNeverReshuffleATier() {
+        BoardAnalysis a = analyze(List.of(duel(1, id("B", 5), id("B", 0), Verdict.TOO_CLOSE), duel(2, id("B", 4), id("B", 1), Verdict.TOO_CLOSE),
+            duel(3, id("B", 3), id("B", 0), Verdict.A)));
+        assertThat(a.tierOrders()).doesNotContainKey("B");
     }
 
     @Test
