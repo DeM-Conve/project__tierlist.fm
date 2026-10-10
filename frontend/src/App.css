@@ -24,7 +24,10 @@
      board panel floats beside it as a rounded card (Sidebar.jsx). */
   background: var(--bg);
 }
-.sidebar-panel { width: calc(var(--sidebar-w) - 24px); }
+/* The panel's resize edge (Sidebar.jsx ResizeEdge): an accent line on
+   hover - a :hover state Mantine has no prop for. */
+.sidebar-resizer { cursor: col-resize; z-index: 2; border-radius: 4px; transition: background 0.12s ease 0.1s; }
+.sidebar-resizer:hover, .sidebar-resizer:active { background: color-mix(in srgb, var(--accent) 55%, transparent); }
 .sidebar-scrim { display: none; }
 
 /* Tier board lanes - layout/visuals are Mantine props; only what Mantine

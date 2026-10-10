@@ -72,19 +72,62 @@ function PlaylistLink({ category, tier, playlist, active }) {
       component={Link}
       to={tierPath(category, tier)}
       variant="light"
-      py={4}
+      py={3}
+      pl={10}
       active={active}
-      leftSection={<TierChip tier={tier} size={20} />}
+      // Fixed chip column so every title starts at the same x (TODO's chip
+      // is wider than T1's).
+      leftSection={
+        <Box w={44} style={{ display: 'flex' }}>
+          <TierChip tier={tier} size={20} />
+        </Box>
+      }
       label={
-        <Group justify="space-between" wrap="nowrap" gap={6}>
+        <Group justify="space-between" wrap="nowrap" gap={8}>
           <Text size="sm" truncate="end" title={playlist.title}>
             {playlist.title}
           </Text>
-          <Text size="xs" c="dimmed">
+          <Text size="xs" c="dimmed" style={{ fontVariantNumeric: 'tabular-nums' }}>
             {playlist.itemCount ?? 0}
           </Text>
         </Group>
       }
+    />
+  );
+}
+
+// The panel's right edge: drag to resize it, double-click to reset - like
+// VS Code's sidebar sash. Plain pointer events: Mantine has no resizable
+// panel, and a library for one edge would be more code than this.
+function ResizeEdge({ width, onResize }) {
+  function start(e) {
+    e.preventDefault();
+    const x0 = e.clientX;
+    const w0 = width;
+    const move = (ev) => onResize(w0 + ev.clientX - x0);
+    const stop = () => {
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', stop);
+      document.body.style.cursor = '';
+    };
+    document.body.style.cursor = 'col-resize';
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', stop);
+  }
+  return (
+    <Box
+      className="sidebar-resizer"
+      role="separator"
+      aria-orientation="vertical"
+      aria-label="Resize the panel (double-click to reset)"
+      aria-valuenow={width}
+      pos="absolute"
+      top={12}
+      bottom={12}
+      right={-6}
+      w={8}
+      onPointerDown={start}
+      onDoubleClick={() => onResize(null)}
     />
   );
 }
@@ -170,6 +213,8 @@ export default function Sidebar({
   collapsed,
   view = 'boards',
   onShowView,
+  panelWidth = 280,
+  onResizePanel,
 }) {
   const naming = useSelector(selectNaming);
   const location = useLocation();
@@ -177,12 +222,19 @@ export default function Sidebar({
   const filteredCategories = tierCategories.filter((c) => c.toLowerCase().includes(q));
   const isPlaylists = view === 'playlists';
   // Every tier playlist (template-matching only - see selectTierPlaylists),
-  // board by board, best tier first.
-  const playlists = isPlaylists
-    ? tierCategories.flatMap((c) =>
-        BOARD_TIERS.filter((t) => tierGroups[c]?.[t]).map((t) => ({ category: c, tier: t, playlist: tierGroups[c][t] }))
-      ).filter((p) => p.playlist.title.toLowerCase().includes(q))
+  // grouped under its board like a file tree, best tier first. The filter
+  // matches a playlist's title or its board.
+  const playlistGroups = isPlaylists
+    ? tierCategories
+        .map((c) => [
+          c,
+          BOARD_TIERS.filter((t) => tierGroups[c]?.[t])
+            .map((t) => ({ tier: t, playlist: tierGroups[c][t] }))
+            .filter((p) => c.toLowerCase().includes(q) || p.playlist.title.toLowerCase().includes(q)),
+        ])
+        .filter(([, rows]) => rows.length)
     : [];
+  const playlists = playlistGroups.flatMap(([, rows]) => rows);
 
   return (
     <>
@@ -199,15 +251,17 @@ export default function Sidebar({
         />
         {!collapsed && (
           <Stack
-            className="sidebar-panel"
+            pos="relative"
+            w={panelWidth}
             gap={0}
             px={SIDEBAR_X}
             py={SHELL_Y}
             my={8}
             mr={8}
             bg="var(--surface)"
-            style={{ borderRadius: 14, border: '1px solid var(--border-soft)' }}
+            style={{ borderRadius: 14, border: '1px solid var(--border-soft)', flexShrink: 0 }}
           >
+            {onResizePanel && <ResizeEdge width={panelWidth} onResize={onResizePanel} />}
             <Group justify="space-between" px={8} mb={8} mt={6} wrap="nowrap">
               <Text size="xs" fw={700} c="dimmed" tt="uppercase" style={{ letterSpacing: 1 }}>
                 {isPlaylists ? 'Playlists' : 'Tier lists'}
@@ -233,14 +287,21 @@ export default function Sidebar({
             <ScrollArea style={{ flex: 1 }} type="hover" offsetScrollbars>
               <Stack gap={0}>
                 {isPlaylists &&
-                  playlists.map(({ category, tier, playlist }) => (
-                    <PlaylistLink
-                      key={playlist.id}
-                      category={category}
-                      tier={tier}
-                      playlist={playlist}
-                      active={location.pathname === tierPath(category, tier)}
-                    />
+                  playlistGroups.map(([category, rows]) => (
+                    <Box key={category} mb={6}>
+                      <Text size="xs" fw={700} c="dimmed" px={10} pt={6} pb={2} truncate="end">
+                        {category}
+                      </Text>
+                      {rows.map(({ tier, playlist }) => (
+                        <PlaylistLink
+                          key={playlist.id}
+                          category={category}
+                          tier={tier}
+                          playlist={playlist}
+                          active={location.pathname === tierPath(category, tier)}
+                        />
+                      ))}
+                    </Box>
                   ))}
                 {isPlaylists && !loading && tierCategories.length > 0 && playlists.length === 0 && (
                   <Text size="sm" c="dimmed" px={8}>

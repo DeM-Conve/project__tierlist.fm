@@ -74,6 +74,22 @@ describe('Sidebar', () => {
     expect(screen.getByRole('link', { name: /Rap S/ })).toHaveAttribute('href', '/tier/Rap/t/S');
     expect(screen.getByRole('link', { name: /Rap A/ })).toHaveAttribute('data-active', 'true');
     expect(screen.queryByText('Rock S')).not.toBeInTheDocument();
+    // Grouped under its board, like a file tree.
+    expect(screen.getByText('Rap', { selector: 'p' })).toBeInTheDocument();
+  });
+
+  it('dragging the panel edge resizes it; double-click resets', () => {
+    const onResizePanel = vi.fn();
+    draw(props({ panelWidth: 280, onResizePanel }));
+    const edge = screen.getByRole('separator', { name: /Resize the panel/ });
+    fireEvent.pointerDown(edge, { clientX: 300 });
+    fireEvent.pointerMove(window, { clientX: 360 });
+    expect(onResizePanel).toHaveBeenLastCalledWith(340);
+    fireEvent.pointerUp(window);
+    fireEvent.pointerMove(window, { clientX: 500 });
+    expect(onResizePanel).toHaveBeenCalledTimes(1);
+    fireEvent.doubleClick(edge);
+    expect(onResizePanel).toHaveBeenLastCalledWith(null);
   });
 
   it('activity bar order: Home, Jump to, Tier lists, Playlists, Add songs, then shortcuts, settings, log out', () => {

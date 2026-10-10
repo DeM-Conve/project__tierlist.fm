@@ -52,7 +52,7 @@ import { setLoggedIn, setPlaylists } from './store/authSlice';
 import { detectedNaming } from './store/namingSlice';
 import { useSettingsSync } from './api/useSettingsSync';
 import { detectNaming } from './naming';
-import { setCurrentCategory, setHomeQuery, setSidebarQuery, setMobileSidebarOpen, toggleSidebarCollapsed, showSidebarView } from './store/viewSlice';
+import { setCurrentCategory, setHomeQuery, setSidebarQuery, setMobileSidebarOpen, toggleSidebarCollapsed, showSidebarView, setSidebarWidth } from './store/viewSlice';
 import {
   setTierItems,
   applySyncedMoves,
@@ -214,6 +214,7 @@ function Layout() {
   const mobileSidebarOpen = useSelector((s) => s.view.mobileSidebarOpen);
   const sidebarCollapsed = useSelector((s) => s.view.sidebarCollapsed);
   const sidebarView = useSelector((s) => s.view.sidebarView);
+  const sidebarWidth = useSelector((s) => s.view.sidebarWidth);
   // Below Mantine's md breakpoint the sidebar is a drawer (App.css).
   const narrow = useMediaQuery('(max-width: 61.99em)');
   const tierPlaylists = useSelector(selectTierPlaylists);
@@ -601,6 +602,8 @@ function Layout() {
           collapsed={sidebarCollapsed && !narrow}
           view={sidebarView}
           onShowView={(v) => dispatch(showSidebarView(v))}
+          panelWidth={narrow ? undefined : sidebarWidth}
+          onResizePanel={narrow ? undefined : (w) => dispatch(setSidebarWidth(w))}
         />
 
         {/* The canvas is the page's scroll container (see layout/canvas.js).
