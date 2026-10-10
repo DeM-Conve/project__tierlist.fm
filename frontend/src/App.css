@@ -18,15 +18,15 @@
    the player dock begins. Stays CSS for the mobile drawer's @media
    positioning/transition, which Mantine has no prop for. */
 .sidebar {
-  width: var(--sidebar-w);
   flex-shrink: 0;
   display: flex;
-  flex-direction: column;
   /* padding: the shell spacing standard, as Mantine props (layout/spacing.js). */
   background: var(--surface);
   border-right: 1px solid var(--border-soft);
 }
-.sidebar-collapsed { width: auto; }
+/* VS Code-style: a permanent icon strip, then the panel it opens/closes. */
+.activity-bar { border-right: 1px solid var(--border-soft); }
+.sidebar-panel { width: calc(var(--sidebar-w) - 24px); }
 .sidebar-scrim { display: none; }
 
 /* Tier board lanes - layout/visuals are Mantine props; only what Mantine

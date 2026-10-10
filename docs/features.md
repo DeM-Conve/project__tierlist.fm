@@ -32,8 +32,9 @@
 - Errors say what YouTube actually said (daily quota used up, login expired, video not found) instead of a generic failure.
 
 ## Sidebar
-- Brand, "Jump to… ⌘K" (command palette), Home, Add songs (with a count of songs waiting for a tier), and every board with its video total (from playlist item counts - no per-board fetch). Filter box, empty-state hint explaining the playlist naming convention.
-- Footer: Settings, Keyboard shortcuts (`?`), Log out. On narrow screens the sidebar is a drawer opened from a burger button. `Ctrl+B` (`⌘B`) folds the sidebar to an icon strip (Jump to, Home, Add songs, Settings, Shortcuts, Log out), like VS Code's activity bar, and unfolds it again (also the fold/unfold button by the logo); on a phone it opens/closes the drawer.
+- **VS Code-style**: a permanent **activity bar** (icon strip) with the brand, **Tier lists** (opens / closes the board panel - `Ctrl+B` / `⌘B`; an accent bar marks it open), Jump to (`o` / `⌘K`, command palette), Home (`g h`), Add songs (`a`, with a badge counting songs waiting for a tier); at the bottom Keyboard shortcuts (`?`), Settings (`g s`), Log out. Each icon names itself and its key on hover; the page you're on is marked.
+- The **board panel** beside it: every board with its video total (from playlist item counts - no per-board fetch), a filter box, and an empty-state hint explaining the playlist naming convention. Hold a dragged song over a board to open it.
+- On narrow screens the whole sidebar is a drawer opened from a burger button (`Ctrl+B` opens / closes it there).
 
 ## Tier boards (the tier list)
 - Playlists named by your naming (default `<Category> S` … `<Category> D`) are auto-grouped into a per-category tier board (plus an optional `<Category> TODO` list - see below).
