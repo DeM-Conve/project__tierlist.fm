@@ -80,9 +80,6 @@ import {
   selectStagedChanges,
   selectTransfers,
   selectPlayingVideoIdOnBoard,
-  selectDuelPool,
-  selectDuelRuns,
-  selectDuelTierSizes,
   selectFocusSequence,
   selectVideoLookup,
   selectFocusedVideoData,
@@ -868,27 +865,25 @@ function DuelPage() {
   const category = useCategoryParam();
   const dispatch = useDispatch();
   const navigate = useNavigate();
-  const duelPool = useSelector(selectDuelPool);
-  const duelRuns = useSelector(selectDuelRuns);
-  const duelTierSizes = useSelector(selectDuelTierSizes);
+  const tierItems = useSelector((s) => s.tiers.tierItems);
 
   // Supports deep-linking straight to a duel: fetches (and caches) the
   // board's data the same way the tier list does. Coming from "Rank → Duel"
   // on an already-open board serves straight from the query cache.
-  useBoardPage(category);
+  const { isLoading } = useBoardPage(category);
+  const board = `/tier/${encodeURIComponent(category)}`;
 
   function applyDuelResult(result) {
     dispatch(applyOrderWithFeedback(result));
-    navigate(`/tier/${encodeURIComponent(category)}`);
+    navigate(board);
   }
 
   return (
     <DuelView
-      videos={duelPool}
-      runs={duelRuns}
-      tierSizes={duelTierSizes}
-      onComplete={applyDuelResult}
-      onCancel={() => navigate(`/tier/${encodeURIComponent(category)}`)}
+      tierItems={tierItems}
+      isLoading={isLoading}
+      onApply={applyDuelResult}
+      onExit={() => navigate(board)}
     />
   );
 }

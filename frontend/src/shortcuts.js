@@ -111,7 +111,9 @@ export const SHORTCUTS = [
 
   { id: 'duel-left', keys: ['←'], description: 'Pick the left video', category: 'Duel' },
   { id: 'duel-right', keys: ['→'], description: 'Pick the right video', category: 'Duel' },
-  { id: 'duel-skip', keys: ['Space'], description: "Skip - too close to call", category: 'Duel' },
+  { id: 'duel-skip', keys: ['↓'], description: "Can't decide - too close to call", category: 'Duel' },
+  { id: 'duel-listen', keys: ['Tab'], description: 'Switch which song is playing', category: 'Duel' },
+  { id: 'duel-tier', keys: ['1-5'], description: 'Place: pick the to-do song\'s tier', category: 'Duel' },
   { id: 'duel-undo', keys: ['u'], description: 'Undo the last pick', category: 'Duel' },
 ];
 

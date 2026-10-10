@@ -63,12 +63,7 @@
 .board-card, .playlist-card { transition: border-color 0.15s ease, transform 0.15s ease; }
 .board-card:hover, .playlist-card:hover { border-color: var(--text-faint); transform: translateY(-2px); }
 
-/* Duel view - everything (layout, card width, card media positioning, the
-   VS badge, thumbnail, responsive width) is Mantine components/props or
-   inline style now (Container/Group/Stack/Progress/Card/Image/ThemeIcon/
-   Kbd + useMediaQuery for the one responsive width swap). The only thing
-   left with no Mantine prop equivalent is the hover lift - Mantine has no
-   ":hover" styling prop, so that alone stays a plain CSS rule. */
+/* Duel mode cards: hover lift - Mantine has no ":hover" styling prop. */
 .duel-card { transition: border-color 0.15s ease, transform 0.15s ease; }
 .duel-card:hover { border-color: var(--accent); transform: translateY(-2px); }
 

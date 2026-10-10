@@ -115,17 +115,15 @@
 - It also opens every page and Settings tab (**Go to**: Home, Add songs, Settings, Settings → Appearance / Playlist naming / Duels / Keyboard shortcuts, Show keyboard shortcuts) and Log out. Each carries search keywords, so `sett`, `theme`, `dark mode`, `todo`, `rename`, `elo` or `inbox` find the right one.
 
 ## Duels (pairwise ranking)
-- Duel on a tier board (or a Home card) launches a side-by-side comparison flow: two videos at a time, pick the one that deserves the higher tier.
-- Each duel card can toggle a live embedded player preview (only one plays at a time) so you can actually watch/listen before choosing, plus a tier badge showing the video's current tier.
-- Keyboard: `←` left wins, `→` right wins, `space` skip (strategy-dependent), `u` undo.
-- Progress bar + "X of Y duels · Z% settled" status.
-- Finishing a duel run re-applies the resulting order back onto the board's existing tier sizes (each tier keeps its current video count, just refilled from the new ranking) - as one undoable step.
-
-### Duel strategies (Strategy pattern)
-Swappable at runtime via a dropdown on the duel screen (and persisted as a default via Settings):
-- **Tier-aware merge (default)** — treats each existing tier as an already-sorted run and k-way merges them, exploiting current tier placement to ask far fewer questions than a full sort (~n·log₂(tiers) comparisons instead of n·log₂(n)).
-- **Full re-sort** — a complete interactive merge sort that ignores current tier placement entirely.
-- **Elo** — rates videos via random pairwise duels using an Elo rating system; supports skip.
+- Duel on a tier board (or a Home card) opens a **mode picker** - duels by goal, no algorithm menu (`frontend/src/duel/sessions.js`):
+  - **Place to-do songs** (Beli-style): pick each TODO song's tier (`1`-`5` or the chips), then a few duels binary-search its exact spot in that tier (~log2(n)+1). Landing on the top of a tier asks once more against the bottom of the tier above (and the bottom against the top of the tier below), so a song can climb or drop a tier.
+  - **Tune the borders**: the bottom of each tier against the top of the one below, 3 deep; the lower song winning swaps the two.
+  - **Order a tier**: a merge sort of one tier (robust: one wrong pick can't misplace everything after it).
+- Two song cards side by side, each a real embedded player: the song you're listening to plays from ~35% in (near the hook), the other waits; `Tab` / "Listen" switches and each resumes where it was. In Place the new song keeps playing through all its duels.
+- **The board, live** (right panel): one bar per tier, a sliver per song - the two contenders marked, and in Place the range the new song can still land in lit up. Under it, **Changes** lists every song that moved (new tier / new place among its tier-mates).
+- Keyboard: `←` / `→` pick, `↓` can't decide (placed right next to that song), `Tab` switch song, `u` undo (any number of steps - a session is a replay of its answers).
+- **Apply N changes** any time (stopping early keeps what's done) writes the live board as one undoable edit; it's staged like any move until you push. Exit discards.
+- The Settings "default duel strategy" isn't used by the new modes yet (proof of concept).
 
 ## Settings
 - **Appearance** tab (default): pick a **theme** (Tokyo Night, Dracula, Warm charcoal - dark; Paper, Sand, Solarized Light - light; picking one also applies its signature accent), an **accent** (Blue, Violet, Teal, Green, Pink, Red, Orange, Amber - works with any theme; Warm charcoal + Amber is the original look) and a **tier palette** (Vivid, TierMaker classic, Heat). Each option shows a live mini preview, changes apply instantly across the whole app and are saved to your account. All colors come from one file, `frontend/src/themes.js`.
@@ -147,7 +145,7 @@ Source of truth is `frontend/src/shortcuts.js` (rendered by the `?` modal and Se
 - Tier board: `/` search, `n` / `N` next/previous match, `Enter` play match (or step), `Esc` close search, `Shift+P` push to YouTube (any board page).
 - Tier page: `/` filter, `Esc` clear the filter.
 - Player: `h` / `l` prev/next track, `←`/`→` seek 10s (expanded), `Space` play/pause, `m` mute, `f` fullscreen video (expanded; elsewhere `f` is link hints), `0`-`9` jump to that 10%, `j` minimize (expanded → mini → floating), `k` expand, `Esc` minimize from expanded, `Shift+1`-`9` rate the playing video (any mode, on its board), `Del` remove it from its playlist (staged until push).
-- Duel: `←` / `→` pick left/right, `Space` skip, `u` undo.
+- Duel: `←` / `→` pick, `↓` can't decide, `Tab` switch song, `1`-`5` tier (Place), `u` undo.
 
 ## Architecture
 - React (Vite) frontend + Spring Boot (Java 21, Maven) backend, fully separated.

@@ -164,7 +164,9 @@ export function createSession(mode, startLadder, opts = {}, answers = []) {
   };
 }
 
-// Every song whose tier or position differs from the start, best first.
+// Every song that really moved, best first: a new tier, or a new place among
+// the songs it shared its tier with before (a song inserted above it alone
+// doesn't count - that just shifts its number).
 export function ladderChanges(start, now) {
   const where = (ladder) => {
     const map = new Map();
@@ -173,11 +175,19 @@ export function ladderChanges(start, now) {
   };
   const before = where(start);
   const after = where(now);
+  const keptRank = new Map(); // id -> [rank before, rank after] among tier-mates that stayed
+  for (const tier of Object.keys(now)) {
+    const stayed = (ids) => ids.filter((id) => before.get(id)?.tier === tier && after.get(id)?.tier === tier);
+    const was = stayed(start[tier] || []);
+    const is = stayed(now[tier]);
+    is.forEach((id, i) => keptRank.set(id, [was.indexOf(id), i]));
+  }
   const order = [...TIER_ORDER, TODO_TIER];
   const changes = [];
   for (const [id, to] of after) {
     const from = before.get(id);
-    if (!from || from.tier !== to.tier || from.index !== to.index) changes.push({ id, from, to });
+    const ranks = keptRank.get(id);
+    if (!from || from.tier !== to.tier || (ranks && ranks[0] !== ranks[1])) changes.push({ id, from, to });
   }
   return changes.sort((x, y) => order.indexOf(x.to.tier) - order.indexOf(y.to.tier) || x.to.index - y.to.index);
 }

@@ -91,6 +91,12 @@ describe('order mode', () => {
 });
 
 describe('ladderChanges', () => {
+  it("doesn't count songs that only shifted down because one was inserted above", () => {
+    const changes = ladderChanges({ A: ['a1', 'a2'], TODO: ['n'] }, { A: ['n', 'a1', 'a2'], TODO: [] });
+    expect(changes.map((c) => c.id)).toEqual(['n']);
+  });
+
+
   it('lists moved songs with where they came from', () => {
     const changes = ladderChanges({ S: ['x'], A: ['y'] }, { S: ['y'], A: ['x'] });
     expect(changes).toEqual([

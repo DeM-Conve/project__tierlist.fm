@@ -1,298 +1,486 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { tierName } from '../tierLabels';
 import {
   Badge,
+  Box,
   Button,
   Card,
   Container,
   Group,
   Image,
   Kbd,
+  Paper,
   Progress,
-  Select,
+  ScrollArea,
+  SimpleGrid,
+  Skeleton,
   Stack,
   Text,
   ThemeIcon,
   Title,
+  Tooltip,
+  UnstyledButton,
 } from '@mantine/core';
-import { useMediaQuery } from '@mantine/hooks';
-import { Play, Square } from 'lucide-react';
-import { useDispatch, useSelector } from 'react-redux';
-import { DUEL_STRATEGIES, DUEL_STRATEGY_LABELS } from '../duel';
-import { setDuelStrategy } from '../store/prefsSlice';
+import { ArrowDown, ArrowUp, Inbox, ListOrdered, Swords, Undo2, Volume2 } from 'lucide-react';
+import { useSelector } from 'react-redux';
+import { createSession, estimateDuels, ladderChanges } from '../duel/sessions';
 import { selectPlayerCoversPage } from '../store/selectors';
-import { TIER_COLORS } from '../tiers';
-import { TIER_INK } from '../tierUtils';
+import { TIER_COLORS, TIER_ORDER, TODO_TIER } from '../tiers';
+import { songLabel } from '../tierUtils';
+import { useTierName } from '../tierLabels';
+import { TierChip } from './TierBits';
 import EmbeddedPlayer from './EmbeddedPlayer';
 
-function DuelCard({ video, tier, arrowKey, isPreviewing, onTogglePreview, onChoose, width }) {
+// Duels, by goal (see duel/sessions.js for the three modes). A session is an
+// immutable value - every answer returns a new one - so undo is free and the
+// ladder on the right is always exactly what Apply would write.
+
+const HOOK = 0.35; // songs start about a third in - near the hook, not the intro
+
+function ladderFrom(tierItems) {
+  const ladder = {};
+  for (const t of [...TIER_ORDER, TODO_TIER]) {
+    if (tierItems[t]) ladder[t] = tierItems[t].map((v) => v.videoId);
+  }
+  return ladder;
+}
+
+// ---------------------------------------------------------------- song card
+
+function SongCard({ video, tier, side, keyHint, active, onListen, onPick, pickLabel }) {
+  const { song, artist } = songLabel(video);
+  const playerRef = useRef(null);
+  const seeked = useRef(false);
+
+  // Only the side you're listening to plays; the other waits where it was.
+  useEffect(() => {
+    const p = playerRef.current;
+    if (!p) return;
+    if (active) p.playVideo?.();
+    else p.pauseVideo?.();
+  }, [active]);
+
   return (
-    <Card
-      className="duel-card"
-      padding={0}
-      radius="md"
-      withBorder
-      onClick={onChoose}
-      style={{ width }}
-    >
-      <Card.Section style={{ position: 'relative', aspectRatio: '16/9', overflow: 'hidden', background: 'var(--media-bg)' }}>
-        {tier && (
-          <Badge
-            style={{
-              position: 'absolute',
-              top: 8,
-              left: 8,
-              zIndex: 2,
-              background: TIER_COLORS[tier],
-              color: TIER_INK,
-            }}
-          >
-            {tierName(tier)}
-          </Badge>
-        )}
-        <Kbd style={{ position: 'absolute', top: 8, right: 8, zIndex: 2 }}>{arrowKey}</Kbd>
-        {isPreviewing ? (
-          <EmbeddedPlayer videoId={video.videoId} autoplay />
-        ) : (
-          <Image src={video.thumbnail || ''} alt={video.title} fit="cover" h="100%" w="100%" />
-        )}
-        <Button
-          style={{ position: 'absolute', bottom: 8, right: 8, zIndex: 2 }}
-          size="xs"
-          variant="filled"
-          color="dark"
-          leftSection={isPreviewing ? <Square size={12} fill="currentColor" /> : <Play size={12} fill="currentColor" />}
-          onClick={(e) => {
-            e.stopPropagation();
-            onTogglePreview();
+    <Card withBorder radius="md" padding={0} style={{ borderColor: active ? 'var(--accent)' : undefined }}>
+      <Card.Section style={{ position: 'relative', aspectRatio: '16/9', background: 'var(--media-bg)' }}>
+        <EmbeddedPlayer
+          key={video.videoId}
+          videoId={video.videoId}
+          autoplay={active}
+          onPlayerReady={(p) => {
+            playerRef.current = p;
+            seeked.current = false;
           }}
-        >
-          {isPreviewing ? 'Stop' : 'Preview'}
-        </Button>
+          onPlayingChange={(playing) => {
+            const p = playerRef.current;
+            if (!playing || !p || seeked.current) return;
+            seeked.current = true;
+            const d = p.getDuration?.() ?? 0;
+            if (d > 60) p.seekTo(d * HOOK, true);
+            if (!active) p.pauseVideo();
+          }}
+        />
+        {tier && (
+          <Box style={{ position: 'absolute', top: 8, left: 8, zIndex: 2, pointerEvents: 'none' }}>
+            <TierChip tier={tier} size={26} />
+          </Box>
+        )}
       </Card.Section>
-      <Text fw={600} size="sm" lineClamp={2} mx={16} mt={12} mb={4}>
-        {video.title}
-      </Text>
-      <Text c="dimmed" size="sm" mx={16} mb={16}>
-        {video.channelTitle}
-      </Text>
+      <Stack gap={10} p="md">
+        <Group justify="space-between" wrap="nowrap" align="flex-start">
+          <Box miw={0}>
+            <Text fw={700} truncate="end">{song}</Text>
+            <Text c="dimmed" size="sm" truncate="end">{artist}</Text>
+          </Box>
+          <Tooltip label="Listen to this one (Tab switches)" withArrow>
+            <Button
+              size="compact-sm"
+              variant={active ? 'light' : 'subtle'}
+              color={active ? 'accent' : 'gray'}
+              leftSection={<Volume2 size={14} />}
+              onClick={onListen}
+            >
+              {active ? 'Listening' : `Listen ${side.toUpperCase()}`}
+            </Button>
+          </Tooltip>
+        </Group>
+        {onPick && (
+          <Button fullWidth size="md" onClick={onPick} rightSection={<Kbd size="xs">{keyHint}</Kbd>}>
+            {pickLabel}
+          </Button>
+        )}
+      </Stack>
     </Card>
   );
 }
 
-export default function DuelView({ videos, runs, tierSizes, onComplete, onCancel }) {
-  const dispatch = useDispatch();
-  const defaultStrategy = useSelector((s) => s.prefs.duelStrategy);
+// ------------------------------------------------------------------ ladder
+
+// One bar per tier, a sliver per song: the two contenders are marked, and in
+// Place the range the new song can still land in is lit up - you watch the
+// binary search close in.
+function Ladder({ ladder, request, showTodo, videoOf }) {
+  const tierName = useTierName();
+  const tiers = [...TIER_ORDER, ...(showTodo ? [TODO_TIER] : [])].filter((t) => ladder[t]);
+  const marked = new Set(request?.kind === 'duel' ? [request.a, request.b] : request ? [request.id] : []);
+  return (
+    <Stack gap={10}>
+      {tiers.map((t) => {
+        const ids = ladder[t];
+        const inRange = (i) =>
+          request?.kind === 'duel' && request.tier === t && request.lo != null && i >= request.lo && i < Math.max(request.hi, request.lo + 1);
+        return (
+          <Group key={t} gap={10} wrap="nowrap">
+            <TierChip tier={t} size={24} />
+            <Box style={{ flex: 1, minWidth: 0 }}>
+              <Group gap={0} wrap="nowrap" h={16} style={{ borderRadius: 4, overflow: 'hidden', background: 'var(--surface-2)' }}>
+                {ids.map((id, i) => (
+                  // A native title, not a Tooltip each: a to-do list can be 1000 songs.
+                  <Box
+                      key={`${id}-${i}`}
+                      title={videoOf(id) ? songLabel(videoOf(id)).song : id}
+                      h="100%"
+                      style={{
+                        flex: 1,
+                        minWidth: marked.has(id) ? 6 : 0,
+                        background: marked.has(id)
+                          ? 'var(--accent)'
+                          : `color-mix(in srgb, ${TIER_COLORS[t]} ${inRange(i) ? 85 : 30}%, transparent)`,
+                        borderRight: ids.length < 120 ? '1px solid var(--surface)' : undefined,
+                      }}
+                    />
+                ))}
+              </Group>
+            </Box>
+            <Text size="xs" c="dimmed" w={34} ta="right">{ids.length}</Text>
+          </Group>
+        );
+      })}
+      <Text size="xs" c="dimmed">
+        Accent = the two songs in this duel{request?.lo != null ? '; bright = where the new song can still land' : ''}. Hover a sliver for its song. ({tierName(TIER_ORDER[0])} first)
+      </Text>
+    </Stack>
+  );
+}
+
+function ChangeList({ changes, videoOf }) {
+  const order = [...TIER_ORDER, TODO_TIER];
+  if (!changes.length) return <Text size="sm" c="dimmed">No changes yet.</Text>;
+  return (
+    <Stack gap={6}>
+      {changes.map(({ id, from, to }) => {
+        const v = videoOf(id);
+        const up = from && order.indexOf(to.tier) < order.indexOf(from.tier);
+        const down = from && order.indexOf(to.tier) > order.indexOf(from.tier);
+        return (
+          <Group key={id} gap={8} wrap="nowrap">
+            <Image src={v?.thumbnail} w={36} h={36} radius="sm" fit="cover" />
+            <Box miw={0} style={{ flex: 1 }}>
+              <Text size="sm" truncate="end">{v ? songLabel(v).song : id}</Text>
+              <Group gap={4}>
+                {from && from.tier !== to.tier && <TierChip tier={from.tier} size={16} />}
+                {from && from.tier !== to.tier && <Text size="xs" c="dimmed">→</Text>}
+                <TierChip tier={to.tier} size={16} />
+                <Text size="xs" c="dimmed">#{to.index + 1}</Text>
+              </Group>
+            </Box>
+            {up && <ArrowUp size={16} color="currentColor" style={{ color: 'var(--accent)' }} />}
+            {down && <ArrowDown size={16} color="currentColor" style={{ color: 'var(--text-dim)' }} />}
+          </Group>
+        );
+      })}
+    </Stack>
+  );
+}
+
+// ------------------------------------------------------------- mode picker
+
+function ModeCard({ icon, title, body, meta, onClick, disabled, children }) {
+  return (
+    <Card
+      withBorder
+      radius="md"
+      padding="lg"
+      className={disabled ? undefined : 'duel-card'}
+      onClick={disabled ? undefined : onClick}
+      style={{ cursor: disabled ? 'default' : 'pointer', opacity: disabled ? 0.5 : 1 }}
+    >
+      <Stack gap="sm" ta="left">
+        <ThemeIcon size={40} radius="md" variant="light" color="accent">{icon}</ThemeIcon>
+        <Title order={3} fz={20}>{title}</Title>
+        <Text size="sm" c="dimmed">{body}</Text>
+        <Badge variant="light" color="gray" w="fit-content">{meta}</Badge>
+        {children}
+      </Stack>
+    </Card>
+  );
+}
+
+function ModePicker({ ladder, onStart }) {
+  const tierName = useTierName();
+  const todo = ladder[TODO_TIER]?.length ?? 0;
+  const tiers = TIER_ORDER.filter((t) => ladder[t]);
+  return (
+    <Stack gap="xl">
+      <Box ta="left">
+        <Title order={1} fz={30}>Duel</Title>
+        <Text c="dimmed">Pick a job. Every duel moves the board on the right as you go; nothing reaches YouTube until you apply and push.</Text>
+      </Box>
+      <SimpleGrid cols={{ base: 1, md: 3 }}>
+        <ModeCard
+          icon={<Inbox size={22} />}
+          title="Place to-do songs"
+          body={`Give each song from ${tierName(TODO_TIER)} a tier, then a few duels find its exact spot. Beat the top of its tier and it gets a shot at the tier above.`}
+          meta={todo ? `${todo} to place · ~${estimateDuels('place', ladder)} duels each` : 'Nothing to place'}
+          disabled={!todo}
+          onClick={() => onStart('place')}
+        />
+        <ModeCard
+          icon={<Swords size={22} />}
+          title="Tune the borders"
+          body="The bottom of each tier against the top of the one below. Lose to a lower song and you swap. Quick - fixes songs filed a tier off."
+          meta={`~${estimateDuels('tune', ladder)} duels`}
+          onClick={() => onStart('tune')}
+        />
+        <ModeCard
+          icon={<ListOrdered size={22} />}
+          title="Order a tier"
+          body="Properly sort one tier - positions are ranks. Merge sort, so one wrong pick can't wreck the rest."
+          meta="Pick a tier"
+        >
+          <Group gap={6} onClick={(e) => e.stopPropagation()}>
+            {tiers.map((t) => (
+              <Tooltip key={t} label={`${ladder[t].length} songs · ~${estimateDuels('order', ladder, { tier: t })} duels`} withArrow>
+                <UnstyledButton disabled={ladder[t].length < 2} onClick={() => onStart('order', { tier: t })}>
+                  <TierChip tier={t} size={30} active={ladder[t].length >= 2} />
+                </UnstyledButton>
+              </Tooltip>
+            ))}
+          </Group>
+        </ModeCard>
+      </SimpleGrid>
+    </Stack>
+  );
+}
+
+// ----------------------------------------------------------------- the view
+
+export default function DuelView({ tierItems, isLoading, onApply, onExit }) {
+  const tierName = useTierName();
   const playerCoversPage = useSelector(selectPlayerCoversPage);
-  const [strategyKey, setStrategyKeyState] = useState(defaultStrategy);
-  const [currentPair, setCurrentPair] = useState(null);
-  const [progress, setProgress] = useState({ completed: 0, total: 0 });
-  const [spine, setSpine] = useState(null);
-  const [previewing, setPreviewing] = useState(null);
+  const [session, setSession] = useState(null);
+  const [listening, setListening] = useState('a');
 
-  const strategyRef = useRef(null);
-  const videoMapRef = useRef(new Map());
-  videoMapRef.current = new Map(videos.map((v) => [v.videoId, v]));
-
-  const tierOfId = useMemo(() => {
-    const map = {};
-    tierSizes.forEach((entry, i) => {
-      (runs[i] || []).forEach((id) => {
-        map[id] = entry.tier;
-      });
-    });
+  const videoMap = useMemo(() => {
+    const map = new Map();
+    Object.values(tierItems).forEach((list) => list?.forEach((v) => map.set(v.videoId, v)));
     return map;
-  }, [runs, tierSizes]);
+  }, [tierItems]);
+  const videoOf = (id) => videoMap.get(id);
+  const boardLadder = useMemo(() => ladderFrom(tierItems), [tierItems]);
 
-  // Picking a strategy here also updates the persisted default, so Settings
-  // and the in-session dropdown always agree on "what happens next time."
-  function setStrategyKey(key) {
-    setStrategyKeyState(key);
-    dispatch(setDuelStrategy(key));
+  const request = session?.request ?? null;
+  const tiers = TIER_ORDER.filter((t) => boardLadder[t]);
+  const changes = useMemo(() => (session ? ladderChanges(session.startLadder, session.ladder) : []), [session]);
+
+  // The new song keeps playing across its duels; a new song starts on A again.
+  const subject = request?.kind === 'tier' ? request.id : request?.a;
+  useEffect(() => setListening('a'), [subject]);
+
+  function start(mode, opts) {
+    setSession(createSession(mode, boardLadder, opts));
   }
+  const answer = (value) => setSession((s) => s.answer(value));
+  const undo = () => setSession((s) => (s.answers.length ? s.undo() : s));
 
-  function advance(strategy) {
-    const pair = strategy.nextPair();
-    setProgress(strategy.getProgress());
-    setPreviewing(null);
-    if (!pair) {
-      setCurrentPair(null);
-      setSpine(strategy.getSpine());
-    } else {
-      setCurrentPair(pair);
-    }
-  }
-
-  useEffect(() => {
-    const ids = videos.map((v) => v.videoId);
-    const strategy = DUEL_STRATEGIES[strategyKey]({ ids, runs });
-    strategyRef.current = strategy;
-    setSpine(null);
-    advance(strategy);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [strategyKey]);
-
-  function chooseWinner(winnerId) {
-    const strategy = strategyRef.current;
-    strategy.reportResult(winnerId);
-    advance(strategy);
-  }
-
-  function skip() {
-    const strategy = strategyRef.current;
-    if (!strategy?.supportsSkip) return;
-    strategy.skip();
-    advance(strategy);
-  }
-
-  function undo() {
-    const strategy = strategyRef.current;
-    if (!strategy?.undoLast) return;
-    strategy.undoLast();
-    setSpine(null);
-    advance(strategy);
+  function apply() {
+    const result = {};
+    for (const [t, ids] of Object.entries(session.ladder)) result[t] = ids.map(videoOf).filter(Boolean);
+    onApply(result);
   }
 
   useEffect(() => {
     function onKeyDown(e) {
-      if (spine || !currentPair || playerCoversPage) return;
-      if (e.key === 'ArrowLeft') {
-        e.preventDefault();
-        chooseWinner(currentPair.a);
-      } else if (e.key === 'ArrowRight') {
-        e.preventDefault();
-        chooseWinner(currentPair.b);
-      } else if (e.key === ' ') {
-        e.preventDefault();
-        skip();
-      } else if (e.key.toLowerCase() === 'u') {
+      if (!request || playerCoversPage || e.ctrlKey || e.metaKey || e.altKey) return;
+      const el = document.activeElement;
+      if (el?.tagName === 'INPUT' || el?.tagName === 'TEXTAREA') return;
+      if (e.key === 'u') {
         e.preventDefault();
         undo();
+      } else if (request.kind === 'tier' && e.code.startsWith('Digit')) {
+        const t = tiers[Number(e.code.slice(5)) - 1];
+        if (t) {
+          e.preventDefault();
+          answer(t);
+        }
+      } else if (request.kind === 'duel') {
+        if (e.key === 'ArrowLeft') answer(request.a);
+        else if (e.key === 'ArrowRight') answer(request.b);
+        else if (e.key === 'ArrowDown') answer(null);
+        else if (e.key === 'Tab') setListening((l) => (l === 'a' ? 'b' : 'a'));
+        else return;
+        e.preventDefault();
       }
     }
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentPair, spine, playerCoversPage]);
+  }, [request, playerCoversPage, tiers.join()]);
 
-  function finish() {
-    if (!spine) return;
-    const result = {};
-    let cursor = 0;
-    for (const { tier, count } of tierSizes) {
-      result[tier] = spine.slice(cursor, cursor + count).map((id) => videoMapRef.current.get(id));
-      cursor += count;
-    }
-    onComplete(result);
+  if (isLoading) {
+    return (
+      <Container className="duel-view" size={1200} pt={24}>
+        <SimpleGrid cols={{ base: 1, md: 3 }}>
+          {[0, 1, 2].map((i) => <Skeleton key={i} h={260} radius="md" />)}
+        </SimpleGrid>
+      </Container>
+    );
   }
 
-  const strategy = strategyRef.current;
-  const pct = progress.total > 0 ? Math.round((progress.completed / progress.total) * 100) : 0;
-  const a = currentPair ? videoMapRef.current.get(currentPair.a) : null;
-  const b = currentPair ? videoMapRef.current.get(currentPair.b) : null;
-  // Mantine has no responsive-numeric-prop story for "fluid up to a cap, then
-  // full-width below a breakpoint" - useMediaQuery covers that in JS instead
-  // of a hand-written @media rule.
-  const isNarrow = useMediaQuery('(max-width: 720px)');
-  const cardWidth = isNarrow ? '100%' : 'min(440px, 42vw)';
+  if (!session) {
+    return (
+      <Container className="duel-view" size={1200} pt={24}>
+        <Group mb="lg">
+          <Button variant="default" onClick={onExit}>&larr; Back to board</Button>
+        </Group>
+        <ModePicker ladder={boardLadder} onStart={start} />
+      </Container>
+    );
+  }
+
+  const placeTotal = session.mode === 'place' ? session.startLadder[TODO_TIER].length : 0;
+  const placed = placeTotal - (session.ladder[TODO_TIER]?.length ?? 0);
+  const estimate =
+    session.mode === 'place' ? placeTotal : estimateDuels(session.mode, session.startLadder, session.opts);
+  const done = session.mode === 'place' ? placed : session.duels;
+  const pct = request ? Math.min(99, Math.round((done / Math.max(1, estimate)) * 100)) : 100;
+  const a = request?.kind === 'duel' ? videoOf(request.a) : null;
+  const b = request?.kind === 'duel' ? videoOf(request.b) : null;
+  const tierOf = (id) => Object.keys(session.ladder).find((t) => session.ladder[t].includes(id));
+  const question =
+    request?.kind === 'tier'
+      ? 'Which tier is this song?'
+      : request?.step === 'climb'
+        ? `Top of its tier - does it beat this ${tierName(request.tier)} song too?`
+        : request?.step === 'drop'
+          ? `Bottom of its tier - is it still better than this ${tierName(request.tier)} song?`
+          : request?.step === 'border'
+            ? `${tierName(request.border[0])} / ${tierName(request.border[1])} border - which is better?`
+            : 'Which is better?';
 
   return (
-    <Container className="duel-view" size={1100} pt={24} ta="center">
-      <Group justify="space-between" wrap="wrap" mb={36} ta="left">
-        <Button variant="default" onClick={onCancel}>
-          &larr; Cancel
-        </Button>
-
-        <Stack gap={6} style={{ flex: 1, maxWidth: 320 }}>
-          <Group justify="space-between" gap={8}>
+    <Container className="duel-view" size={1400} pt={16} pb={40}>
+      <Group justify="space-between" mb="lg" wrap="wrap">
+        <Group gap="sm">
+          <Button variant="default" onClick={() => setSession(null)}>&larr; Modes</Button>
+          <Button variant="subtle" color="gray" leftSection={<Undo2 size={16} />} disabled={!session.answers.length} onClick={undo}>
+            Undo <Kbd size="xs" ml={6}>U</Kbd>
+          </Button>
+        </Group>
+        <Stack gap={4} style={{ flex: 1, maxWidth: 360 }}>
+          <Group justify="space-between">
             <Text size="xs" c="dimmed" fw={600}>
-              {spine
-                ? 'All duels settled'
-                : `${progress.completed} of ${progress.total} duels`}
+              {session.mode === 'place'
+                ? `${placed} of ${placeTotal} placed · ${session.duels} duels`
+                : `${session.duels} of ~${estimate} duels`}
             </Text>
-            <Text size="xs" c="dimmed" fw={600}>
-              {pct}%
-            </Text>
+            <Text size="xs" c="dimmed" fw={600}>{pct}%</Text>
           </Group>
           <Progress value={pct} size="sm" radius="xl" />
         </Stack>
-
-        <Select
-          value={strategyKey}
-          onChange={(value) => value && setStrategyKey(value)}
-          allowDeselect={false}
-          data={Object.keys(DUEL_STRATEGIES).map((key) => ({
-            value: key,
-            label: DUEL_STRATEGY_LABELS[key],
-          }))}
-        />
+        <Group gap="sm">
+          <Button variant="default" onClick={onExit}>{changes.length ? 'Discard & exit' : 'Exit'}</Button>
+          <Button disabled={!changes.length} onClick={apply}>
+            Apply {changes.length || ''} change{changes.length === 1 ? '' : 's'}
+          </Button>
+        </Group>
       </Group>
 
-      {!spine && a && b && (
-        <>
-          <Title order={1} fz={28} fw={800} mb={40}>
-            Which one deserves the higher tier?
-          </Title>
-          <Group justify="center" wrap="wrap" align="center" gap={28}>
-            <DuelCard
-              video={a}
-              tier={tierOfId[a.videoId]}
-              arrowKey="←"
-              width={cardWidth}
-              isPreviewing={previewing === a.videoId}
-              onTogglePreview={() => setPreviewing((p) => (p === a.videoId ? null : a.videoId))}
-              onChoose={() => chooseWinner(a.videoId)}
-            />
-            <ThemeIcon size={52} radius={100} variant="outline" color="accent" fw={800} fz={14}>
-              VS
-            </ThemeIcon>
-            <DuelCard
-              video={b}
-              tier={tierOfId[b.videoId]}
-              arrowKey="→"
-              width={cardWidth}
-              isPreviewing={previewing === b.videoId}
-              onTogglePreview={() => setPreviewing((p) => (p === b.videoId ? null : b.videoId))}
-              onChoose={() => chooseWinner(b.videoId)}
-            />
-          </Group>
-          <Group justify="center" gap={20} mt={32}>
-            <Group gap={6}>
-              <Kbd>←</Kbd>
-              <Text size="sm" c="dimmed">left wins</Text>
-            </Group>
-            <Group gap={6}>
-              <Kbd>→</Kbd>
-              <Text size="sm" c="dimmed">right wins</Text>
-            </Group>
-            {strategy?.supportsSkip && (
-              <Group gap={6}>
-                <Kbd>Space</Kbd>
-                <Text size="sm" c="dimmed">too close to call</Text>
+      <Group align="flex-start" gap="xl" wrap="nowrap">
+        <Stack style={{ flex: 1, minWidth: 0 }} gap="lg">
+          {request ? (
+            <>
+              <Title order={2} fz={24} ta="center">{question}</Title>
+              {/* Same first child for the tier pick and the duels after it,
+                  so the new song's player carries on instead of restarting. */}
+              <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="lg">
+                {request.kind === 'tier' ? (
+                  <SongCard video={videoOf(request.id)} side="a" active onListen={() => {}} />
+                ) : (
+                  <SongCard
+                    video={a}
+                    tier={session.mode === 'place' ? null : tierOf(a.videoId)}
+                    side="a"
+                    keyHint="←"
+                    active={listening === 'a'}
+                    onListen={() => setListening('a')}
+                    onPick={() => answer(request.a)}
+                    pickLabel={session.mode === 'place' ? 'The new song' : 'This one'}
+                  />
+                )}
+                {request.kind === 'tier' ? (
+                  <Paper withBorder radius="md" p="xl">
+                    <Stack justify="center" h="100%" gap="lg">
+                      <Group justify="center" gap="sm">
+                        {tiers.map((t, i) => (
+                          <TierChip key={t} tier={t} size={52} kbd={i + 1} title={`${tierName(t)} (${i + 1})`} onClick={() => answer(t)} />
+                        ))}
+                      </Group>
+                      <Text size="sm" c="dimmed" ta="center">
+                        Rough is fine - the duels that follow find the exact spot, and can move it a tier.
+                      </Text>
+                    </Stack>
+                  </Paper>
+                ) : (
+                  <SongCard
+                    video={b}
+                    tier={tierOf(b.videoId)}
+                    side="b"
+                    keyHint="→"
+                    active={listening === 'b'}
+                    onListen={() => setListening('b')}
+                    onPick={() => answer(request.b)}
+                    pickLabel="This one"
+                  />
+                )}
+              </SimpleGrid>
+              {a && b && (
+                <Group justify="center" gap="lg">
+                  <Group gap={6}><Kbd>←</Kbd><Kbd>→</Kbd><Text size="sm" c="dimmed">pick</Text></Group>
+                  <UnstyledButton onClick={() => answer(null)}>
+                    <Group gap={6}><Kbd>↓</Kbd><Text size="sm" c="dimmed">can&apos;t decide</Text></Group>
+                  </UnstyledButton>
+                  <Group gap={6}><Kbd>Tab</Kbd><Text size="sm" c="dimmed">switch song</Text></Group>
+                  <Group gap={6}><Kbd>U</Kbd><Text size="sm" c="dimmed">undo</Text></Group>
+                </Group>
+              )}
+            </>
+          ) : (
+            <Stack align="center" py={48} gap="sm">
+              <Title order={2}>All done.</Title>
+              <Text c="dimmed" maw={460} ta="center">
+                {changes.length
+                  ? `${changes.length} song${changes.length === 1 ? '' : 's'} moved. Apply them to the board - they're staged like any edit, so you can still review, undo or discard before pushing to YouTube.`
+                  : 'Everything was already where it belongs.'}
+              </Text>
+              <Group mt="sm">
+                <Button variant="default" onClick={() => setSession(null)}>Another duel</Button>
+                {changes.length > 0 && <Button onClick={apply}>Apply {changes.length} changes</Button>}
               </Group>
-            )}
-            <Group gap={6}>
-              <Kbd>U</Kbd>
-              <Text size="sm" c="dimmed">undo</Text>
-            </Group>
-          </Group>
-        </>
-      )}
-
-      {spine && (
-        <Stack align="center" gap="sm" py={64}>
-          <Title order={2} fz={24}>
-            All set.
-          </Title>
-          <Text c="dimmed" size="sm" maw={440}>
-            Apply this order to your tiers — each tier keeps its current number of videos, just
-            re-filled from the new ranking.
-          </Text>
-          <Button onClick={finish} size="md" mt={8}>
-            Apply to tiers
-          </Button>
+            </Stack>
+          )}
         </Stack>
-      )}
+
+        <Paper withBorder radius="md" p="md" w={360} visibleFrom="md" style={{ flexShrink: 0 }}>
+          <Stack gap="md">
+            <Text size="xs" fw={700} c="dimmed" tt="uppercase">The board, live</Text>
+            <Ladder ladder={session.ladder} request={request} showTodo={session.mode === 'place'} videoOf={videoOf} />
+            <Text size="xs" fw={700} c="dimmed" tt="uppercase" mt="sm">Changes ({changes.length})</Text>
+            <ScrollArea.Autosize mah={320}>
+              <ChangeList changes={changes} videoOf={videoOf} />
+            </ScrollArea.Autosize>
+          </Stack>
+        </Paper>
+      </Group>
     </Container>
   );
 }
