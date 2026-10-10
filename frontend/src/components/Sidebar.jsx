@@ -162,10 +162,9 @@ function ActivityIcon({ label, keys, marked, children, ...props }) {
 // "Playlists" open / close their view in the panel beside it (Ctrl+B
 // toggles the panel); the rest go places.
 function ActivityBar({ openView, onShowView, onOpenPalette, waitingCount, onSelectSettings, onOpenShortcuts, onLogout }) {
-  const { pathname } = useLocation();
   return (
     <Stack component="nav" aria-label="Activity bar" gap={6} align="center" px={6} py={SHELL_Y}>
-      <ActivityIcon label="Home" keys="g h" component={Link} to="/" marked={pathname === '/'}>
+      <ActivityIcon label="Home" keys="g h" component={Link} to="/">
         <Home size={22} />
       </ActivityIcon>
       <ActivityIcon label="Jump to…" keys="o / ⌘K" onClick={onOpenPalette}>
@@ -178,7 +177,7 @@ function ActivityBar({ openView, onShowView, onOpenPalette, waitingCount, onSele
         <ListMusic size={22} />
       </ActivityIcon>
       <Indicator label={waitingCount} size={16} disabled={!waitingCount} offset={8}>
-        <ActivityIcon label="Add songs" keys="a" component={Link} to="/add" state={{ focusInput: true }} marked={pathname === '/add'}>
+        <ActivityIcon label="Add songs" keys="a" component={Link} to="/add" state={{ focusInput: true }}>
           <ListPlus size={22} />
         </ActivityIcon>
       </Indicator>
@@ -186,7 +185,7 @@ function ActivityBar({ openView, onShowView, onOpenPalette, waitingCount, onSele
       <ActivityIcon label="Keyboard shortcuts" keys="?" onClick={onOpenShortcuts}>
         <Keyboard size={22} />
       </ActivityIcon>
-      <ActivityIcon label="Settings" keys="g s" onClick={onSelectSettings} marked={pathname === '/settings'}>
+      <ActivityIcon label="Settings" keys="g s" onClick={onSelectSettings}>
         <Settings size={22} />
       </ActivityIcon>
       <ActivityIcon label="Log out" onClick={onLogout}>

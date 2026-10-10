@@ -60,11 +60,10 @@ describe('Sidebar', () => {
     expect(p.onLogout).toHaveBeenCalled();
   });
 
-  it('marks the page you are on and the open panel', () => {
-    draw(props(), '/add');
-    expect(screen.getByRole('link', { name: 'Add songs' })).toHaveAttribute('data-active', 'true');
-    expect(screen.getByRole('link', { name: 'Home' })).not.toHaveAttribute('data-active');
+  it('highlights only the open view, never a second icon for the page you are on', () => {
+    const { container } = draw(props(), '/add');
     expect(screen.getByRole('button', { name: 'Tier lists' })).toHaveAttribute('data-active', 'true');
+    expect(container.querySelectorAll('[data-active]')).toHaveLength(1);
   });
 
   it('the Playlists view lists every tier playlist, each opening its tier page', () => {
