@@ -56,6 +56,12 @@ describe('DuelMatch', () => {
     expect(mutations.verdict.mock.calls[0][0]).toMatchObject({ a: 'aaaaaaaaaaa', b: 'sssssssssss', verdict: 'A_CLEARLY' });
   });
 
+  it('shows the Tab hint only on the paused side (Tab switches to it)', () => {
+    setup(<DuelMatch category="Rock" sessionId="s1" boardLoading={false} base="/tier/Rock" />);
+    expect(screen.getByRole('button', { name: 'Replay clip' })).not.toHaveTextContent('Tab');
+    expect(screen.getByRole('button', { name: /Hear B/ })).toHaveTextContent('Tab');
+  });
+
   it('"Don\'t know one of them" skips the opponent', () => {
     setup(<DuelMatch category="Rock" sessionId="s1" boardLoading={false} base="/tier/Rock" />);
     fireEvent.keyDown(window, { key: 's' });

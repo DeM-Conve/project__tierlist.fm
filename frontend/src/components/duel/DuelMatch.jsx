@@ -99,7 +99,8 @@ function ClipCard({ side, video, song, name, artist, active, onListen, onClipEnd
             <Text ff="monospace" fz={12} c="dimmed">from 0:30</Text>
           </Group>
         </Stack>
-        <Button variant="default" onClick={onListen} rightSection={<Kbd size="xs">Tab</Kbd>}>
+        {/* Tab switches to the other song, so only the paused side shows it. */}
+        <Button variant="default" onClick={onListen} rightSection={active ? null : <Kbd size="xs">Tab</Kbd>}>
           {active ? 'Replay clip' : `Hear ${side}`}
         </Button>
       </Stack>
