@@ -40,15 +40,14 @@ body {
 :root {
   --bg: #16161e;
   --editor: #1a1b26;
-  --side: #1f212d;
-  --activity: #272836;
-  --chrome: #15151d;
-  --chrome-border: #2d2f3e;
-  --chrome-fg-muted: #878ead;
-  --chrome-hover: #262835;
-  --chrome-selected: #2d2f3e;
-  --chrome-input: #272a37;
-  --chrome-input-border: #323545;
+  --side: #21232f;
+  --chrome: #2e3040;
+  --chrome-border: #2f3140;
+  --chrome-fg-muted: #9198bb;
+  --chrome-hover: #282a37;
+  --chrome-selected: #2f3140;
+  --chrome-input: #292c39;
+  --chrome-input-border: #343747;
   --surface: #1a1b26;
   --surface-2: #24283b;
   --surface-3: #292e42;

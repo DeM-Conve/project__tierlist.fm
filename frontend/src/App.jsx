@@ -639,8 +639,7 @@ function Layout() {
             >
               {/* The side panel is a card on the frame (VS Code's side bar). */}
               <Box h="100%" py={PART_GAP}>
-                {/* The rest of the activity bar's card: joined on the left. */}
-                <Box h="100%" bg="var(--side)" style={{ borderRadius: '0 10px 10px 0', overflow: 'hidden' }}>
+                <Box h="100%" bg="var(--side)" style={{ borderRadius: 8, overflow: 'hidden' }}>
               <SidebarPanel
                 query={query}
                 onQueryChange={(q) => dispatch(setSidebarQuery(q))}

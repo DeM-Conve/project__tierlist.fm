@@ -144,7 +144,7 @@ function ActivityIcon({ label, keys, marked, children, ...props }) {
 // toggles the panel); the rest go places.
 export function ActivityBar({ openView, onShowView, onOpenPalette, waitingCount, onSelectSettings, onOpenShortcuts, onLogout }) {
   return (
-    <Stack component="nav" aria-label="Activity bar" gap={6} align="center" px={8} py={PART_GAP}>
+    <Stack component="nav" aria-label="Activity bar" gap={6} align="center" px={8} py={6}>
       <ActivityIcon label="Home" keys="g h" component={Link} to="/">
         <Home {...ICON} />
       </ActivityIcon>
@@ -202,7 +202,7 @@ export function SidebarPanel({ query, onQueryChange, tierCategories, tierGroups,
 
   return (
     <Stack h="100%" gap={0} px={SIDEBAR_X} py={SHELL_Y} miw={0}>
-      <Group justify="space-between" px={8} mb={8} mt={6} wrap="nowrap">
+      <Group justify="space-between" px={8} mb={10} wrap="nowrap">
         {/* VS Code's side bar title: small caps-style, the secondary ink. */}
         <Text fz={14} fw={700} c="var(--text)">
           {isPlaylists ? 'Playlists' : 'Tier lists'}
@@ -309,7 +309,7 @@ export default function Sidebar({
   return (
     <>
       {mobileOpen && <div className="sidebar-scrim" onClick={onCloseMobile} />}
-      <Box component="aside" className={`sidebar${mobileOpen ? ' sidebar-open' : ''}${collapsed ? ' sidebar-alone' : ''}`}>
+      <Box component="aside" className={`sidebar${mobileOpen ? ' sidebar-open' : ''}`}>
         <ActivityBar
           openView={collapsed ? null : view}
           onShowView={onShowView}

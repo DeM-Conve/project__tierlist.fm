@@ -1,8 +1,9 @@
 import { DEFAULT_THEME, createTheme, defaultVariantColorsResolver, isLightColor } from '@mantine/core';
 import { colord, extend } from 'colord';
 import mixPlugin from 'colord/plugins/mix';
+import labPlugin from 'colord/plugins/lab';
 
-extend([mixPlugin]);
+extend([mixPlugin, labPlugin]);
 
 // THE single source of truth for every color in the app.
 //
@@ -148,6 +149,20 @@ export const DEFAULT_APPEARANCE = { theme: 'tokyo', accent: 'blue', tierPalette:
 // isLightColor) rather than hand-rolled hex arithmetic.
 const mix = (a, b, t) => colord(a).mix(b, t).toHex();
 
+// `base` moved toward `target` until it looks `delta` different (colord's
+// CIEDE2000 delta, 0..1) - a perceptual step, so the same `delta` reads the
+// same in every theme, dark or light, with no per-theme numbers.
+function step(base, target, delta) {
+  let lo = 0;
+  let hi = 1;
+  for (let i = 0; i < 24; i++) {
+    const t = (lo + hi) / 2;
+    if (colord(base).delta(mix(base, target, t)) < delta) lo = t;
+    else hi = t;
+  }
+  return mix(base, target, hi);
+}
+
 // Neutral 10-shade scale (0 = lightest) in the order Mantine expects for
 // both its `dark` (dark scheme) and `gray` (light scheme) palettes.
 function neutralScale(t) {
@@ -174,18 +189,15 @@ export function buildAppearance(choice) {
   const fill = a.scale[dark ? a.onDark : a.onLight];
   const accentText = a.scale[dark ? a.textDark : a.textLight];
   const editor = t.surface;
-  // The shell, measured off the user's own VS Code (their screenshots):
-  // the editor is the base (#1E1E1E), the side bar a rounded card one step
-  // toward the ink (#252525, ~4%), and the window frame around both - the
-  // activity bar and the gaps between the cards - furthest from it (#333,
-  // ~12%). So cards are islands on the frame, and the same rule (mix the
-  // editor toward the text) works for dark and light themes alike.
-  const side = mix(editor, t.text, 0.04);
-  // The activity bar: the left part of the side card, a step lighter.
-  const activity = mix(editor, t.text, 0.09);
-  // The frame the cards sit on: a step darker than the page in dark themes,
-  // a step greyer in light ones - so every card reads as its own object.
-  const chrome = dark ? mix(editor, '#000000', 0.3) : mix(editor, t.text, 0.1);
+  // The shell, VS Code-style, computed at run time from the theme's own
+  // page and ink colors by one rule - each layer a fixed perceptual step
+  // further from the page (step()): the side panel card, then the frame
+  // every card sits on (the activity bar is part of the frame). The same
+  // steps give the same visible difference in any theme.
+  // Like a VS Code theme, a theme may name any of these itself (THEMES
+  // entry `side` / `chrome`); only what it leaves out is derived.
+  const side = t.side ?? step(editor, t.text, 0.025);
+  const chrome = t.chrome ?? step(editor, t.text, 0.07);
 
   const cssVars = {
     '--bg': t.bg,
@@ -197,7 +209,6 @@ export function buildAppearance(choice) {
     // mixed toward the text, VS Code-style.
     '--editor': editor,
     '--side': side,
-    '--activity': activity,
     '--chrome': chrome,
     '--chrome-border': mix(side, t.text, 0.1),
     '--chrome-fg-muted': mix(chrome, t.text, 0.7),

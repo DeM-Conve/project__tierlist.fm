@@ -24,7 +24,6 @@ const REQUIRED_VARS = [
   '--editor',
   '--chrome',
   '--side',
-  '--activity',
   '--chrome-border',
   '--chrome-fg-muted',
   '--chrome-hover',
@@ -133,15 +132,25 @@ describe('resolveAppearance', () => {
 });
 
 describe('buildAppearance', () => {
+  it('a theme can name its shell colors itself, like a VS Code theme; the rest are derived', () => {
+    THEMES.tokyo.side = '#123456';
+    try {
+      const { cssVars } = buildAppearance({ theme: 'tokyo' });
+      expect(cssVars['--side']).toBe('#123456');
+      expect(cssVars['--chrome']).not.toBe('#123456');
+    } finally {
+      delete THEMES.tokyo.side;
+    }
+  });
+
   // The shell: the activity bar + side panel are one card (strip a step
   // lighter than the panel), the page another, all on a frame that differs
   // from every card so each reads as one object.
-  it.each(Object.keys(THEMES))('%s: frame, page card, side card and activity strip are all distinct', (theme) => {
+  it.each(Object.keys(THEMES))('%s: frame (with the activity bar), page card and side card are all distinct', (theme) => {
     const { cssVars } = buildAppearance({ theme });
     expect(cssVars['--editor']).toBe(THEMES[theme].surface);
     const d = (a, b) => colord(cssVars[a]).delta(cssVars[b]);
     expect(d('--editor', '--side')).toBeGreaterThan(0.005);
-    expect(d('--side', '--activity')).toBeGreaterThan(0.005);
     expect(d('--chrome', '--editor')).toBeGreaterThan(0.01);
     expect(d('--chrome', '--side')).toBeGreaterThan(0.01);
   });
@@ -152,7 +161,7 @@ describe('buildAppearance', () => {
     expect(dist('--chrome-hover')).toBeGreaterThan(0);
     expect(dist('--chrome-selected')).toBeGreaterThan(dist('--chrome-hover'));
     expect(dist('--chrome-fg-muted')).toBeGreaterThan(dist('--chrome-selected'));
-    expect(colord(cssVars['--chrome-fg-muted']).contrast(cssVars['--activity'])).toBeGreaterThanOrEqual(3);
+    expect(colord(cssVars['--chrome-fg-muted']).contrast(cssVars['--chrome'])).toBeGreaterThanOrEqual(3);
     expect(colord(cssVars['--chrome-fg-muted']).contrast(cssVars['--side'])).toBeGreaterThanOrEqual(3);
   });
 

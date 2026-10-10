@@ -20,16 +20,12 @@
 .sidebar {
   flex-shrink: 0;
   display: flex;
-  /* VS Code-style: the icon strip and the side panel are ONE card - the
-     strip is its slightly lighter left part, the panel (App.jsx) joins it
-     with no gap, and only the outside corners are rounded; with the panel
-     shut the strip is the whole card. Margin/radius are a CSS class
-     because the phone drawer resets them below - no Mantine prop. */
-  background: var(--activity);
-  margin: 8px 0 8px 8px;
-  border-radius: 10px 0 0 10px;
+  /* VS Code-style: the icon strip sits straight on the window frame (one
+     color); the side panel and the page are the rounded cards. With the
+     panel open its card sits flush against the strip, so the two read as
+     one block; shut, the strip is just the frame's edge. */
+  background: var(--chrome);
 }
-.sidebar-alone { border-radius: 10px; }
 /* The page as a rounded card on the window chrome (App.jsx), like VS
    Code's editor part: --editor on --chrome, a 1px chrome-toned border - a
    CSS class because it goes flat on phones, an @media rule Mantine has no
@@ -64,18 +60,13 @@
   transition: background 0.1s ease;
 }
 .sash-grip {
-  /* On a chrome-colored pill, so the accent line runs behind it, not
-     through it. */
+  /* Just the dots, on the frame inside the gap - no box behind them, so
+     nothing spills onto the cards (VS Code's sash grip). */
   position: relative;
-  background: var(--chrome);
-  border-radius: 4px;
-  padding: 3px 0;
-  /* Never squeezed by the 8px hit area, and readable at rest. */
   flex-shrink: 0;
   overflow: visible;
-  color: var(--text-dim);
-  opacity: 1;
-  transition: opacity 0.1s ease, color 0.1s ease;
+  color: var(--chrome-fg-muted);
+  transition: color 0.1s ease;
 }
 .sash[data-separator='hover']::before,
 .sash[data-separator='active']::before,
@@ -156,8 +147,6 @@
     z-index: 40;
     transition: left 0.2s ease;
     box-shadow: 0 0 32px var(--shadow);
-    margin: 0;
-    border-radius: 0;
   }
   .sidebar-open { left: 0; }
   .canvas-card { border-radius: 0; border: 0; }
