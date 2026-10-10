@@ -9,6 +9,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.JdbcTemplate;
 
+import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -39,7 +40,7 @@ class SettingsServiceIT extends PostgresIT {
     }
 
     private UserSettings save(WritePrecondition p, Appearance look, Map<String, String> links) {
-        return service.save("alice", p, look, NAMING, links);
+        return service.save("alice", p, look, NAMING, links, null);
     }
 
     @Test
@@ -102,9 +103,39 @@ class SettingsServiceIT extends PostgresIT {
     }
 
     @Test
+    void anActivityOrderChangeAloneIsANewVersion() {
+        List<ActivityItem> mine = List.of(ActivityItem.PLAYLISTS, ActivityItem.HOME, ActivityItem.JUMP,
+            ActivityItem.BOARDS, ActivityItem.ADD_SONGS);
+        UserSettings first = service.save("alice", new MustNotExist(), LOOK, NAMING, Map.of(), null);
+        assertThat(first.getVersion()).isZero();
+        assertThat(service.find("alice").orElseThrow().getActivityOrder()).isEqualTo(ActivityItem.DEFAULT_ORDER);
+
+        UserSettings reordered = service.save("alice", new MustMatch(0), LOOK, NAMING, Map.of(), mine);
+        assertThat(reordered.getVersion()).isEqualTo(1).isEqualTo(dbVersion());
+        assertThat(service.find("alice").orElseThrow().getActivityOrder()).isEqualTo(mine);
+
+        // The same order, or a partial list completing to it, is no change.
+        assertThat(service.save("alice", new MustMatch(1), LOOK, NAMING, Map.of(), List.of(ActivityItem.PLAYLISTS)).getVersion())
+            .isEqualTo(1);
+        assertThat(dbVersion()).isEqualTo(1);
+
+        UserSettings back = service.save("alice", new MustMatch(1), LOOK, NAMING, Map.of(), null);
+        assertThat(back.getVersion()).isEqualTo(2).isEqualTo(dbVersion());
+        assertThat(service.find("alice").orElseThrow().getActivityOrder()).isEqualTo(ActivityItem.DEFAULT_ORDER);
+    }
+
+    @Test
+    void aRowSavedWithoutActivityRowsReadsAsTheDefaultOrder() {
+        service.save("alice", new MustNotExist(), LOOK, NAMING, Map.of(), null);
+        jdbc.update("DELETE FROM activity_bar_item");
+
+        assertThat(service.find("alice").orElseThrow().getActivityOrder()).isEqualTo(ActivityItem.DEFAULT_ORDER);
+    }
+
+    @Test
     void settingsNeedARecordedUser() {
         // The FK to app_user; the controller records the user first (AppUserService.current).
-        assertThatThrownBy(() -> service.save("stranger", new MustNotExist(), LOOK, NAMING, Map.of()))
+        assertThatThrownBy(() -> service.save("stranger", new MustNotExist(), LOOK, NAMING, Map.of(), null))
             .isInstanceOf(DataIntegrityViolationException.class);
     }
 }

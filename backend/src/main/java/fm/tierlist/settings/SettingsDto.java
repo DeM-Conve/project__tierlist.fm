@@ -26,7 +26,18 @@ public record SettingsDto(
     @Valid @NotNull NamingDto naming
 ) {
 
-    public record AppearanceDto(@NotNull Theme theme, @NotNull Accent accent, @NotNull TierPalette tierPalette) {
+    // activityOrder: the activity bar's top group, as frontend ids. Optional
+    // on input - missing/null means the default order, and a partial list is
+    // completed with the items it leaves out, in default order (so an older
+    // tab that doesn't know a newer item still saves). Unknown ids (Jackson)
+    // and duplicates are a 400. Always complete on output.
+    public record AppearanceDto(@NotNull Theme theme, @NotNull Accent accent, @NotNull TierPalette tierPalette,
+                                List<@NotNull ActivityItem> activityOrder) {
+
+        @AssertTrue(message = "activityOrder must list each item at most once")
+        boolean isActivityOrderDistinct() {
+            return activityOrder == null || activityOrder.stream().distinct().count() == activityOrder.size();
+        }
     }
 
     // tierLabels: what each tier is called, keyed by the frontend's tier ids.
@@ -106,7 +117,7 @@ public record SettingsDto(
         Appearance a = row.getAppearance();
         Naming n = row.getNaming();
         return new SettingsDto(
-            new AppearanceDto(a.theme(), a.accent(), a.tierPalette()),
+            new AppearanceDto(a.theme(), a.accent(), a.tierPalette(), row.getActivityOrder()),
             new NamingDto(n.template(), TierLabelsDto.from(n.tierLabels()), TierDisplayNamesDto.from(n.tierDisplayNames()),
                 n.migratingFrom(),
                 TierLabelsDto.from(n.migratingFromTierLabels()), row.getTodoLinks())
@@ -122,6 +133,11 @@ public record SettingsDto(
             naming.tierDisplayNames() == null ? TierDisplayNames.NONE : naming.tierDisplayNames().toTierDisplayNames(),
             naming.migratingFrom(),
             naming.migratingFromTierLabels() == null ? null : naming.migratingFromTierLabels().toTierLabels());
+    }
+
+    // Complete: see AppearanceDto.
+    public List<ActivityItem> toActivityOrder() {
+        return ActivityItem.completeOrder(appearance.activityOrder());
     }
 
     public Map<String, String> toTodoLinks() {

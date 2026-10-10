@@ -2,11 +2,11 @@
 // the Redux slices that own them. One schema drives mapping, comparison and
 // merging, so a new setting is one entry here (+ its column/enum backend-side).
 const SCHEMA = {
-  appearance: ['theme', 'accent', 'tierPalette'],
+  appearance: ['theme', 'accent', 'tierPalette', 'activityOrder'],
   naming: ['template', 'tierLabels', 'tierDisplayNames', 'migratingFrom', 'migratingFromTierLabels', 'todoLinks'],
 };
 
-// Fields are primitives except tierLabels / tierDisplayNames ({ slot: name }) and todoLinks
+// Fields are primitives except activityOrder ([id]), tierLabels / tierDisplayNames ({ slot: name }) and todoLinks
 // ({ playlistId: category }), so
 // compare by value: a copy that came back from the server is still "same".
 function sameValue(a, b) {

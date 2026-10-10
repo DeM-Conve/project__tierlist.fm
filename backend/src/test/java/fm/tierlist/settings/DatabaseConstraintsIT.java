@@ -74,7 +74,7 @@ class DatabaseConstraintsIT extends PostgresIT {
     void enumLabelsAreExactlyTheJavaConstantNames() {
         Map<String, Enum<?>[]> types = Map.of(
             "theme_option", Theme.values(), "accent_option", Accent.values(),
-            "tier_palette_option", TierPalette.values());
+            "tier_palette_option", TierPalette.values(), "activity_item", ActivityItem.values());
         types.forEach((type, values) -> assertThat(
                 jdbc.queryForList("SELECT unnest(enum_range(NULL::" + type + "))::text", String.class))
             .as(type)
@@ -167,6 +167,33 @@ class DatabaseConstraintsIT extends PostgresIT {
 
         assertThat(jdbc.queryForObject("SELECT count(*) FROM user_settings", Integer.class)).isZero();
         assertThat(jdbc.queryForObject("SELECT count(*) FROM todo_list_link", Integer.class)).isZero();
+    }
+
+    private void item(int position, String item) {
+        jdbc.update("INSERT INTO activity_bar_item (user_id, position, item) VALUES ('alice', ?, ?::activity_item)", position, item);
+    }
+
+    @Test
+    void activityBarItemsBelongToASettingsRowAndGoWithIt() {
+        assertThatThrownBy(() -> item(0, "HOME")).isInstanceOf(DataIntegrityViolationException.class);
+        insert(row());
+        item(0, "HOME");
+        item(1, "ADD_SONGS");
+        jdbc.update("DELETE FROM user_settings");
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM activity_bar_item", Integer.class)).isZero();
+    }
+
+    @Test
+    void eachActivityItemAndPositionOnceAndOnlyKnownItems() {
+        insert(row());
+        item(0, "HOME");
+        assertThatThrownBy(() -> item(0, "JUMP")).isInstanceOf(DataIntegrityViolationException.class);
+        assertThatThrownBy(() -> item(1, "HOME"))
+            .isInstanceOf(DataIntegrityViolationException.class).hasMessageContaining("activity_item_once");
+        assertThatThrownBy(() -> item(-1, "JUMP")).isInstanceOf(DataIntegrityViolationException.class);
+        assertThatThrownBy(() -> item(1, "home")).isInstanceOf(DataAccessException.class).hasMessageContaining("invalid input value for enum");
+        assertThatThrownBy(() -> item(1, "SETTINGS")).isInstanceOf(DataAccessException.class).hasMessageContaining("invalid input value for enum");
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM activity_bar_item", Integer.class)).isEqualTo(1);
     }
 
     @Test

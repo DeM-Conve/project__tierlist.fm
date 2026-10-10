@@ -57,6 +57,11 @@ class SettingsApiIT extends PostgresIT {
         return body("\"tokyo\"", "\"blue\"", "\"vivid\"", LABELS, "null", "null", links);
     }
 
+    // A body whose appearance group carries `"activityOrder": <order>` (raw JSON).
+    private static String withOrder(String order) {
+        return body("{}").replace("\"tierPalette\": \"vivid\"}", "\"tierPalette\": \"vivid\", \"activityOrder\": " + order + "}");
+    }
+
     private MockHttpServletRequestBuilder save(RequestPostProcessor who, String json) {
         return put("/api/settings").with(who).contentType(MediaType.APPLICATION_JSON).content(json);
     }
@@ -142,6 +147,72 @@ class SettingsApiIT extends PostgresIT {
         assertThat(etag).isEqualTo("\"" + storedVersion("alice") + "\"").isNotEqualTo("\"0\"");
         // ...and it's immediately usable for the next write.
         mvc.perform(save(alice, body("{}")).header(HttpHeaders.IF_MATCH, etag)).andExpect(status().isOk());
+    }
+
+    // ---- activity bar order -------------------------------------------------
+
+    @Test
+    void aCustomActivityOrderRoundTripsAndChangingOnlyItIsANewETag() throws Exception {
+        String mine = "[\"addSongs\", \"boards\", \"home\", \"playlists\", \"jump\"]";
+        mvc.perform(save(alice, withOrder(mine)).header(HttpHeaders.IF_NONE_MATCH, "*"))
+            .andExpect(status().isOk())
+            .andExpect(header().string(HttpHeaders.ETAG, "\"0\""))
+            .andExpect(jsonPath("$.appearance.activityOrder[0]").value("addSongs"));
+        assertThat(jdbc.queryForList("SELECT item::text FROM activity_bar_item WHERE user_id = 'alice' ORDER BY position",
+            String.class)).containsExactly("ADD_SONGS", "BOARDS", "HOME", "PLAYLISTS", "JUMP");
+
+        // Swap the top two only (rows rewritten in place - the deferred UNIQUE lets it through).
+        String swapped = "[\"boards\", \"addSongs\", \"home\", \"playlists\", \"jump\"]";
+        String etag = mvc.perform(save(alice, withOrder(swapped)).header(HttpHeaders.IF_MATCH, "\"0\""))
+            .andExpect(status().isOk())
+            .andReturn().getResponse().getHeader(HttpHeaders.ETAG);
+        assertThat(etag).isEqualTo("\"" + storedVersion("alice") + "\"").isNotEqualTo("\"0\"");
+
+        mvc.perform(get("/api/settings").with(alice))
+            .andExpect(header().string(HttpHeaders.ETAG, etag))
+            .andExpect(jsonPath("$.appearance.activityOrder.length()").value(5))
+            .andExpect(jsonPath("$.appearance.activityOrder[0]").value("boards"))
+            .andExpect(jsonPath("$.appearance.activityOrder[1]").value("addSongs"))
+            .andExpect(jsonPath("$.appearance.activityOrder[4]").value("jump"));
+
+        // The same order again is not a change.
+        mvc.perform(save(alice, withOrder(swapped)).header(HttpHeaders.IF_MATCH, etag))
+            .andExpect(header().string(HttpHeaders.ETAG, etag));
+        // A stale order write is a 412 like any other.
+        mvc.perform(save(alice, withOrder(mine)).header(HttpHeaders.IF_MATCH, "\"0\""))
+            .andExpect(status().isPreconditionFailed());
+    }
+
+    @Test
+    void noActivityOrderMeansTheDefaultAndAPartialOneIsCompleted() throws Exception {
+        mvc.perform(save(alice, body("{}")).header(HttpHeaders.IF_NONE_MATCH, "*"))
+            .andExpect(jsonPath("$.appearance.activityOrder[0]").value("home"))
+            .andExpect(jsonPath("$.appearance.activityOrder[4]").value("addSongs"));
+        mvc.perform(save(alice, withOrder("null")).header(HttpHeaders.IF_MATCH, "\"0\""))
+            .andExpect(header().string(HttpHeaders.ETAG, "\"0\"")); // still the default: no change
+
+        mvc.perform(save(alice, withOrder("[\"playlists\"]")).header(HttpHeaders.IF_MATCH, "\"0\""))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.appearance.activityOrder[0]").value("playlists"))
+            .andExpect(jsonPath("$.appearance.activityOrder[1]").value("home"))
+            .andExpect(jsonPath("$.appearance.activityOrder[4]").value("addSongs"));
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM activity_bar_item", Integer.class)).isEqualTo(5);
+    }
+
+    @Test
+    void aBadActivityOrderIs400() throws Exception {
+        for (String bad : new String[] {
+            "[\"home\", \"home\"]",          // duplicate
+            "[\"home\", \"settings\"]",      // not a reorderable item
+            "[\"HOME\"]",                    // DB label, not the key
+            "[\"home\", null]",
+            "\"home\"",                      // not a list
+        }) {
+            mvc.perform(save(alice, withOrder(bad)).header(HttpHeaders.IF_NONE_MATCH, "*"))
+                .andExpect(status().isBadRequest())
+                .andExpect(problemJson());
+        }
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM user_settings", Integer.class)).isZero();
     }
 
     // ---- per account --------------------------------------------------------

@@ -5,6 +5,7 @@ import jakarta.persistence.LockModeType;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
@@ -30,19 +31,22 @@ public class SettingsService {
     // loser at flush - see SettingsExceptionHandler.
     @Transactional
     public UserSettings save(String userId, WritePrecondition precondition,
-                             Appearance appearance, Naming naming, Map<String, String> todoLinks) {
+                             Appearance appearance, Naming naming, Map<String, String> todoLinks,
+                             List<ActivityItem> activityOrder) {
         Optional<UserSettings> existing = settings.findById(userId);
         if (!precondition.isSatisfiedBy(existing.map(UserSettings::getVersion))) {
             throw new SettingsConflictException();
         }
-        UserSettings row = existing.orElseGet(() -> new UserSettings(userId, appearance, naming, todoLinks));
-        // The links table is excluded from Hibernate's automatic versioning
-        // (it bumped the version on every insert), so a links change bumps it
-        // here - immediately, so the ETag returned below is already the new one.
-        if (existing.isPresent() && !row.getTodoLinks().equals(todoLinks)) {
+        UserSettings row = existing.orElseGet(() -> new UserSettings(userId, appearance, naming, todoLinks, activityOrder));
+        // The links and activity-bar tables are excluded from Hibernate's
+        // automatic versioning (it bumped the version on every insert), so a
+        // change to either bumps it here - immediately, so the ETag returned
+        // below is already the new one.
+        if (existing.isPresent() && (!row.getTodoLinks().equals(todoLinks)
+            || !row.getActivityOrder().equals(ActivityItem.completeOrder(activityOrder)))) {
             entityManager.lock(row, LockModeType.PESSIMISTIC_FORCE_INCREMENT);
         }
-        row.replace(appearance, naming, todoLinks);
+        row.replace(appearance, naming, todoLinks, activityOrder);
         return settings.saveAndFlush(row); // flush now so the new version is the ETag we return
     }
 }

@@ -16,7 +16,8 @@ vi.mock('@mantine/notifications', () => ({ notifications: { show: vi.fn(), hide:
 import { notifications } from '@mantine/notifications';
 import { useSettingsSync } from './useSettingsSync';
 import { toServer } from './settingsMapping';
-import appearanceReducer, { setTheme } from '../store/appearanceSlice';
+import appearanceReducer, { setActivityOrder, setTheme } from '../store/appearanceSlice';
+import { DEFAULT_ACTIVITY_ORDER } from '../activityOrder';
 import namingReducer from '../store/namingSlice';
 
 const makeStore = () => configureStore({ reducer: { appearance: appearanceReducer, naming: namingReducer } });
@@ -49,11 +50,12 @@ describe('useSettingsSync', () => {
 
   it('adopts the account’s row and does not re-save an identical copy', async () => {
     const store = makeStore();
-    const row = { ...toServer(store.getState()), appearance: { theme: 'dracula', accent: 'violet', tierPalette: 'heat' } };
+    const mine = ['addSongs', 'home', 'jump', 'boards', 'playlists'];
+    const row = { ...toServer(store.getState()), appearance: { theme: 'dracula', accent: 'violet', tierPalette: 'heat', activityOrder: mine } };
     Object.assign(query, { data: { settings: row, etag: '"3"' }, isSuccess: true });
     mount(store);
     await settle();
-    expect(store.getState().appearance).toEqual({ theme: 'dracula', accent: 'violet', tierPalette: 'heat' });
+    expect(store.getState().appearance).toEqual({ theme: 'dracula', accent: 'violet', tierPalette: 'heat', activityOrder: mine });
     expect(mutateAsync).not.toHaveBeenCalled();
   });
 
@@ -105,6 +107,31 @@ describe('useSettingsSync', () => {
     expect(mutateAsync.mock.calls[1][0].etag).toBe('"2"');
     expect(mutateAsync.mock.calls[1][0].settings.appearance.theme).toBe('sand');
     expect(mutateAsync.mock.calls[1][0].settings.appearance.tierPalette).toBe('heat');
+  });
+
+  it('a reordered activity bar is saved, and survives a 412 rebase next to the other device’s change', async () => {
+    const store = makeStore();
+    const base = toServer(store.getState());
+    expect(base.appearance.activityOrder).toEqual(DEFAULT_ACTIVITY_ORDER);
+    Object.assign(query, { data: { settings: base, etag: '"1"' }, isSuccess: true });
+    const newer = { ...base, appearance: { ...base.appearance, theme: 'sand' } };
+    query.refetch.mockResolvedValue({ data: { settings: newer, etag: '"2"' } });
+    mutateAsync
+      .mockRejectedValueOnce({ response: { status: 412 } })
+      .mockImplementation(async ({ settings }) => ({ settings, etag: '"3"' }));
+    mount(store);
+    await settle();
+    const mine = ['playlists', 'boards', 'home', 'jump', 'addSongs'];
+    act(() => {
+      store.dispatch(setActivityOrder(mine));
+    });
+    await settle();
+    await settle();
+    expect(mutateAsync.mock.calls[0][0].settings.appearance.activityOrder).toEqual(mine);
+    expect(store.getState().appearance.activityOrder).toEqual(mine);
+    expect(store.getState().appearance.theme).toBe('sand');
+    expect(mutateAsync).toHaveBeenCalledTimes(2);
+    expect(mutateAsync.mock.calls[1][0].settings.appearance).toMatchObject({ theme: 'sand', activityOrder: mine });
   });
 
   it('a non-412 failure shows a notice and keeps settings locally', async () => {

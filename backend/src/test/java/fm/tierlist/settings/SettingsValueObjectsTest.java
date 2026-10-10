@@ -46,7 +46,7 @@ class SettingsValueObjectsTest {
     void aSettingsRowReplacesEverythingAndHandsOutACopyOfItsLinks() {
         Naming naming = new Naming("{category} {tier}", LABELS, null, null, null);
         UserSettings row = new UserSettings("alice", new Appearance(Theme.TOKYO, Accent.BLUE, TierPalette.VIVID), naming,
-            Map.of("PL1", "Rap"));
+            Map.of("PL1", "Rap"), null);
 
         assertThat(row.getUserId()).isEqualTo("alice");
         assertThat(row.getVersion()).isZero(); // never saved: no version yet
@@ -54,7 +54,7 @@ class SettingsValueObjectsTest {
 
         Map<String, String> newLinks = new HashMap<>(Map.of("PL2", "Jazz"));
         Naming newNaming = new Naming("[{tag}] {category} {tier}", LABELS, null, null, null);
-        row.replace(new Appearance(Theme.PAPER, Accent.RED, TierPalette.HEAT), newNaming, newLinks);
+        row.replace(new Appearance(Theme.PAPER, Accent.RED, TierPalette.HEAT), newNaming, newLinks, null);
 
         assertThat(row.getAppearance()).isEqualTo(new Appearance(Theme.PAPER, Accent.RED, TierPalette.HEAT));
         assertThat(row.getNaming()).isEqualTo(newNaming);

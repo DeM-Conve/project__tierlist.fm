@@ -17,6 +17,8 @@ CREATE TABLE app_user (
 CREATE TYPE theme_option         AS ENUM ('TOKYO', 'DRACULA', 'CHARCOAL', 'PAPER', 'SAND', 'SOLARIZED');
 CREATE TYPE accent_option        AS ENUM ('BLUE', 'VIOLET', 'TEAL', 'GREEN', 'PINK', 'RED', 'ORANGE', 'AMBER');
 CREATE TYPE tier_palette_option  AS ENUM ('VIVID', 'CLASSIC', 'HEAT');
+-- The activity bar's reorderable icons (ActivityItem), in default order.
+CREATE TYPE activity_item        AS ENUM ('HOME', 'JUMP', 'BOARDS', 'PLAYLISTS', 'ADD_SONGS');
 
 -- A tier's name as the user wrote it ("S", "T1", "(**TODO**)"). Mirrors
 -- @TierLabel / naming.js validateTierLabels: no surrounding spaces, a
@@ -114,6 +116,20 @@ CREATE TABLE todo_list_link (
     PRIMARY KEY (user_id, playlist_id),
     CONSTRAINT playlist_id_format CHECK (playlist_id ~ '^[A-Za-z0-9_-]{1,64}$'),
     CONSTRAINT category_not_blank CHECK (btrim(category) <> '')
+);
+
+-- Settings -> Appearance: the user's order of the activity bar's top group
+-- (the left icon strip), one row per item, `position` 0 = top. The app always
+-- stores every item once (no rows = never saved = the default order). Part
+-- of the settings row: shares its version/ETag and goes when the row does.
+-- The item constraint is deferred so a reorder (rows updated in place, one
+-- by one) may pass through a moment where an item is listed twice.
+CREATE TABLE activity_bar_item (
+    user_id   TEXT          NOT NULL REFERENCES user_settings (user_id) ON DELETE CASCADE,
+    position  SMALLINT      NOT NULL CHECK (position >= 0),
+    item      activity_item NOT NULL,
+    PRIMARY KEY (user_id, position),
+    CONSTRAINT activity_item_once UNIQUE (user_id, item) DEFERRABLE INITIALLY DEFERRED
 );
 
 -- ---------------------------------------------------------------- Duels

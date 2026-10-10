@@ -1,11 +1,13 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import appearance, { setAccent, setTheme, setTierPalette } from './appearanceSlice';
+import appearance, { selectActivityOrder, setAccent, setActivityOrder, setTheme, setTierPalette } from './appearanceSlice';
+import { ACTIVITY_ITEMS, DEFAULT_ACTIVITY_ORDER, completeActivityOrder } from '../activityOrder';
 import view, { setCurrentCategory, setHomeQuery, setMobileSidebarOpen, setSidebarQuery, toggleSidebarCollapsed, showSidebarView, setSidebarCollapsed } from './viewSlice';
 import auth, { setLoggedIn, setPlaylists } from './authSlice';
 import { settingsLoaded } from './settingsActions';
 import { SETTINGS } from '../settings';
 
 const init = (r) => r(undefined, { type: '@@init' });
+const ORDER = { activityOrder: DEFAULT_ACTIVITY_ORDER };
 
 describe('settingsActions', () => {
   it('settingsLoaded is a plain action creator', () => {
@@ -17,29 +19,58 @@ describe('settingsActions', () => {
 
 describe('appearanceSlice', () => {
   it('defaults to Tokyo Night + Blue + Vivid', () => {
-    expect(init(appearance)).toEqual({ theme: 'tokyo', accent: 'blue', tierPalette: 'vivid' });
+    expect(init(appearance)).toEqual({ theme: 'tokyo', accent: 'blue', tierPalette: 'vivid', ...ORDER });
   });
 
   it('setters', () => {
     let s = appearance(init(appearance), setTheme('paper'));
     s = appearance(s, setAccent('amber'));
     s = appearance(s, setTierPalette('heat'));
-    expect(s).toEqual({ theme: 'paper', accent: 'amber', tierPalette: 'heat' });
+    expect(s).toEqual({ theme: 'paper', accent: 'amber', tierPalette: 'heat', ...ORDER });
   });
 
   it('settingsLoaded adopts the account’s appearance', () => {
     const s = appearance(init(appearance), settingsLoaded({ appearance: { theme: 'dracula', accent: 'violet', tierPalette: 'classic' } }));
-    expect(s).toEqual({ theme: 'dracula', accent: 'violet', tierPalette: 'classic' });
+    expect(s).toEqual({ theme: 'dracula', accent: 'violet', tierPalette: 'classic', ...ORDER });
   });
 
   it('settingsLoaded resolves unknown options to defaults', () => {
     const s = appearance(init(appearance), settingsLoaded({ appearance: { theme: 'nope', accent: 'teal', tierPalette: null } }));
-    expect(s).toEqual({ theme: 'tokyo', accent: 'teal', tierPalette: 'vivid' });
+    expect(s).toEqual({ theme: 'tokyo', accent: 'teal', tierPalette: 'vivid', ...ORDER });
+  });
+
+  it('setActivityOrder stores a complete order, selectActivityOrder reads it', () => {
+    const mine = ['addSongs', 'boards', 'home', 'playlists', 'jump'];
+    const s = appearance(init(appearance), setActivityOrder(mine));
+    expect(s.activityOrder).toEqual(mine);
+    expect(selectActivityOrder({ appearance: s })).toEqual(mine);
+    // Partial / junk input is completed, never stored as-is.
+    expect(appearance(s, setActivityOrder(['playlists'])).activityOrder).toEqual(['playlists', 'home', 'jump', 'boards', 'addSongs']);
+    expect(appearance(s, setActivityOrder(null)).activityOrder).toEqual(DEFAULT_ACTIVITY_ORDER);
+  });
+
+  it('settingsLoaded adopts the account’s activity order, completing a partial one', () => {
+    const s = appearance(init(appearance), settingsLoaded({ appearance: { theme: 'tokyo', accent: 'blue', tierPalette: 'vivid', activityOrder: ['jump', 'settings'] } }));
+    expect(s.activityOrder).toEqual(['jump', 'home', 'boards', 'playlists', 'addSongs']);
   });
 
   it('settingsLoaded without appearance keeps state', () => {
     const before = appearance(init(appearance), setTheme('sand'));
     expect(appearance(before, settingsLoaded({}))).toBe(before);
+  });
+});
+
+describe('completeActivityOrder', () => {
+  it('default order is the five items, top to bottom', () => {
+    expect(DEFAULT_ACTIVITY_ORDER).toEqual(['home', 'jump', 'boards', 'playlists', 'addSongs']);
+    expect(ACTIVITY_ITEMS).toBe(DEFAULT_ACTIVITY_ORDER);
+  });
+
+  it('keeps the given order, drops unknown ids and repeats, appends what is missing', () => {
+    expect(completeActivityOrder(['boards', 'nope', 'boards', 'home'])).toEqual(['boards', 'home', 'jump', 'playlists', 'addSongs']);
+    expect(completeActivityOrder([])).toEqual(DEFAULT_ACTIVITY_ORDER);
+    expect(completeActivityOrder(undefined)).toEqual(DEFAULT_ACTIVITY_ORDER);
+    expect(completeActivityOrder('home')).toEqual(DEFAULT_ACTIVITY_ORDER);
   });
 });
 
@@ -49,11 +80,18 @@ describe('boot cache for appearance', () => {
     vi.resetModules();
   });
 
+  it('appearance reads the cached activity order', async () => {
+    localStorage.setItem(SETTINGS.appearance, JSON.stringify({ theme: 'tokyo', activityOrder: ['addSongs', 'home'] }));
+    vi.resetModules();
+    const { default: fresh } = await import('./appearanceSlice');
+    expect(init(fresh).activityOrder).toEqual(['addSongs', 'home', 'jump', 'boards', 'playlists']);
+  });
+
   it('appearance reads the cached choice', async () => {
     localStorage.setItem(SETTINGS.appearance, JSON.stringify({ theme: 'solarized', accent: 'green', tierPalette: 'heat' }));
     vi.resetModules();
     const { default: fresh } = await import('./appearanceSlice');
-    expect(init(fresh)).toEqual({ theme: 'solarized', accent: 'green', tierPalette: 'heat' });
+    expect(init(fresh)).toEqual({ theme: 'solarized', accent: 'green', tierPalette: 'heat', ...ORDER });
   });
 });
 

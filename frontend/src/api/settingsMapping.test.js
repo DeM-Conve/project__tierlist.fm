@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { configureStore } from '@reduxjs/toolkit';
 import { rebase, sameSettings, toServer } from './settingsMapping';
-import appearanceReducer, { setAccent, setTheme, setTierPalette } from '../store/appearanceSlice';
+import appearanceReducer, { setAccent, setActivityOrder, setTheme, setTierPalette } from '../store/appearanceSlice';
+import { DEFAULT_ACTIVITY_ORDER } from '../activityOrder';
 import namingReducer, { linkTodoList } from '../store/namingSlice';
 import { settingsLoaded } from '../store/settingsActions';
 import { DEFAULT_TIER_LABELS } from '../tiers';
@@ -10,7 +11,7 @@ import { NO_DISPLAY_NAMES } from '../naming';
 const CUSTOM = { S: 'T1', A: 'T2', B: 'T3', C: 'T4', D: 'TZ', TODO: '(**TODO**)' };
 
 const dto = (over = {}) => ({
-  appearance: { theme: 'tokyo', accent: 'blue', tierPalette: 'vivid', ...over.appearance },
+  appearance: { theme: 'tokyo', accent: 'blue', tierPalette: 'vivid', activityOrder: DEFAULT_ACTIVITY_ORDER, ...over.appearance },
   naming: {
     template: '{category} {tier}',
     tierLabels: DEFAULT_TIER_LABELS,
@@ -37,7 +38,7 @@ describe('toServer', () => {
 
   it('undefined / missing fields become null', () => {
     const body = toServer({ appearance: {}, naming: {} });
-    expect(body.appearance).toEqual({ theme: null, accent: null, tierPalette: null });
+    expect(body.appearance).toEqual({ theme: null, accent: null, tierPalette: null, activityOrder: null });
     expect(Object.values(body.naming).every((x) => x === null)).toBe(true);
   });
 
@@ -52,9 +53,15 @@ describe('toServer', () => {
     expect(body.naming.todoLinks).toEqual({ p: 'Rap' });
   });
 
+  it('sends the activity bar order', () => {
+    const s = makeStore();
+    s.dispatch(setActivityOrder(['playlists', 'home', 'jump', 'boards', 'addSongs']));
+    expect(toServer(s.getState()).appearance.activityOrder).toEqual(['playlists', 'home', 'jump', 'boards', 'addSongs']);
+  });
+
   it('round-trips: DTO -> settingsLoaded -> toServer gives the same DTO', () => {
     const account = dto({
-      appearance: { theme: 'solarized', accent: 'amber', tierPalette: 'heat' },
+      appearance: { theme: 'solarized', accent: 'amber', tierPalette: 'heat', activityOrder: ['addSongs', 'jump', 'home', 'boards', 'playlists'] },
       naming: {
         template: '[{my_label}] {category} - {tier}',
         tierLabels: CUSTOM,
@@ -98,6 +105,11 @@ describe('sameSettings', () => {
     expect(sameSettings(dto(), dto({ appearance: { accent: 'red' } }))).toBe(false);
     expect(sameSettings(dto(), dto({ appearance: { tierPalette: 'heat' } }))).toBe(false);
     expect(sameSettings(dto(), dto({ naming: { template: '{tier} | {category}' } }))).toBe(false);
+  });
+
+  it('compares the activity order by value, order mattering', () => {
+    expect(sameSettings(dto({ appearance: { activityOrder: [...DEFAULT_ACTIVITY_ORDER] } }), dto())).toBe(true);
+    expect(sameSettings(dto({ appearance: { activityOrder: ['jump', 'home', 'boards', 'playlists', 'addSongs'] } }), dto())).toBe(false);
   });
 
   it('null vs an object is different; null vs null is the same', () => {
@@ -177,6 +189,14 @@ describe('rebase (three-way merge after a 412)', () => {
     expect(merged.naming.migratingFrom).toBeNull();
     expect(merged.naming.migratingFromTierLabels).toBeNull();
     expect(merged.appearance.tierPalette).toBe('heat');
+  });
+
+  it('a reordered activity bar is kept over the newer row, other fields merged', () => {
+    const mine = ['addSongs', 'home', 'jump', 'boards', 'playlists'];
+    const merged = rebase(dto({ appearance: { activityOrder: mine } }), dto(), dto({ appearance: { theme: 'sand' } }));
+    expect(merged.appearance).toEqual({ theme: 'sand', accent: 'blue', tierPalette: 'vivid', activityOrder: mine });
+    // ...and another device's reorder is taken when this one didn't touch it.
+    expect(rebase(dto({ appearance: { theme: 'paper' } }), dto(), dto({ appearance: { activityOrder: mine } })).appearance.activityOrder).toEqual(mine);
   });
 
   it('only schema fields appear in the result', () => {

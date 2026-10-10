@@ -15,6 +15,7 @@ import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -50,7 +51,7 @@ class SettingsDtoTest {
     }
 
     private static SettingsDto dto(NamingDto naming) {
-        return new SettingsDto(new AppearanceDto(Theme.DRACULA, Accent.TEAL, TierPalette.CLASSIC), naming);
+        return new SettingsDto(new AppearanceDto(Theme.DRACULA, Accent.TEAL, TierPalette.CLASSIC, null), naming);
     }
 
     private static Set<String> violations(Object o) {
@@ -67,11 +68,11 @@ class SettingsDtoTest {
             new TierDisplayNames("S", null, null, null, null, "TODO"),
             "{category} {tier}", new TierLabels("S", "A", "B", "C", "D", "TODO"));
         UserSettings row = new UserSettings("alice", new Appearance(Theme.SAND, Accent.AMBER, TierPalette.HEAT), naming,
-            Map.of("PLabc", "Rap"));
+            Map.of("PLabc", "Rap"), null);
 
         SettingsDto dto = SettingsDto.from(row);
 
-        assertThat(dto.appearance()).isEqualTo(new AppearanceDto(Theme.SAND, Accent.AMBER, TierPalette.HEAT));
+        assertThat(dto.appearance()).isEqualTo(new AppearanceDto(Theme.SAND, Accent.AMBER, TierPalette.HEAT, ActivityItem.DEFAULT_ORDER));
         assertThat(dto.naming().template()).isEqualTo("[{tag}] {category} {tier}");
         assertThat(dto.naming().tierLabels()).isEqualTo(MINE);
         assertThat(dto.naming().tierDisplayNames()).isEqualTo(new TierDisplayNamesDto("S", null, null, null, null, "TODO"));
@@ -93,11 +94,12 @@ class SettingsDtoTest {
         assertThat(naming.migratingFromTierLabels()).isNull();
         assertThat(naming.tierDisplayNames()).isEqualTo(TierDisplayNames.NONE);
 
-        UserSettings row = new UserSettings("bob", dto.toAppearance(), naming, dto.toTodoLinks());
+        UserSettings row = new UserSettings("bob", dto.toAppearance(), naming, dto.toTodoLinks(), dto.toActivityOrder());
         SettingsDto back = SettingsDto.from(row);
         assertThat(back.naming().migratingFromTierLabels()).isNull();
         assertThat(back.naming().tierDisplayNames()).isEqualTo(new TierDisplayNamesDto(null, null, null, null, null, null));
-        assertThat(back).isEqualTo(new SettingsDto(dto.appearance(),
+        assertThat(back).isEqualTo(new SettingsDto(
+            new AppearanceDto(Theme.DRACULA, Accent.TEAL, TierPalette.CLASSIC, ActivityItem.DEFAULT_ORDER),
             new NamingDto("{category} {tier}", DEFAULT, new TierDisplayNamesDto(null, null, null, null, null, null), null, null, Map.of())));
     }
 
@@ -116,7 +118,7 @@ class SettingsDtoTest {
     @Test
     void jsonUsesFrontendKeysAndTierIds() throws Exception {
         ObjectMapper json = new ObjectMapper();
-        SettingsDto dto = new SettingsDto(new AppearanceDto(Theme.TOKYO, Accent.BLUE, TierPalette.VIVID),
+        SettingsDto dto = new SettingsDto(new AppearanceDto(Theme.TOKYO, Accent.BLUE, TierPalette.VIVID, List.of(ActivityItem.ADD_SONGS)),
             new NamingDto("{category} {tier}", MINE, new TierDisplayNamesDto(null, null, null, null, null, "TODO"), null, null,
                 Map.of("PL1", "Rap")));
 
@@ -125,6 +127,8 @@ class SettingsDtoTest {
         assertThat(tree.at("/appearance/theme").asText()).isEqualTo("tokyo");
         assertThat(tree.at("/appearance/accent").asText()).isEqualTo("blue");
         assertThat(tree.at("/appearance/tierPalette").asText()).isEqualTo("vivid");
+        assertThat(tree.at("/appearance/activityOrder/0").asText()).isEqualTo("addSongs");
+        assertThat(tree.at("/appearance").has("activityOrderDistinct")).isFalse();
         assertThat(tree.at("/naming/tierLabels").fieldNames()).toIterable().containsExactly("S", "A", "B", "C", "D", "TODO");
         assertThat(tree.at("/naming/tierLabels/TODO").asText()).isEqualTo("(**TODO**)");
         assertThat(tree.at("/naming/tierDisplayNames/TODO").asText()).isEqualTo("TODO");
@@ -136,7 +140,37 @@ class SettingsDtoTest {
         assertThat(json.readValue(json.writeValueAsString(dto), SettingsDto.class)).isEqualTo(dto);
     }
 
+    @Test
+    void anActivityOrderRoundTripsAndAPartialOrMissingOneIsCompleted() {
+        List<ActivityItem> mine = List.of(ActivityItem.ADD_SONGS, ActivityItem.HOME, ActivityItem.PLAYLISTS,
+            ActivityItem.JUMP, ActivityItem.BOARDS);
+        SettingsDto custom = new SettingsDto(new AppearanceDto(Theme.TOKYO, Accent.BLUE, TierPalette.VIVID, mine),
+            naming("{category} {tier}", DEFAULT, null, null, Map.of()));
+        assertThat(custom.toActivityOrder()).isEqualTo(mine);
+        UserSettings row = new UserSettings("alice", custom.toAppearance(), custom.toNaming(), Map.of(), custom.toActivityOrder());
+        assertThat(SettingsDto.from(row).appearance().activityOrder()).isEqualTo(mine);
+
+        SettingsDto partial = new SettingsDto(new AppearanceDto(Theme.TOKYO, Accent.BLUE, TierPalette.VIVID,
+            List.of(ActivityItem.PLAYLISTS, ActivityItem.JUMP)), naming("{category} {tier}", DEFAULT, null, null, Map.of()));
+        assertThat(partial.toActivityOrder()).containsExactly(ActivityItem.PLAYLISTS, ActivityItem.JUMP,
+            ActivityItem.HOME, ActivityItem.BOARDS, ActivityItem.ADD_SONGS);
+
+        assertThat(dto(naming("{category} {tier}", DEFAULT, null, null, Map.of())).toActivityOrder())
+            .isEqualTo(ActivityItem.DEFAULT_ORDER);
+    }
+
     // ---- validation ---------------------------------------------------------
+
+    @Test
+    void anActivityOrderListsEachItemOnceAndNoNulls() {
+        assertThat(violations(new AppearanceDto(Theme.TOKYO, Accent.BLUE, TierPalette.VIVID,
+            List.of(ActivityItem.HOME, ActivityItem.JUMP, ActivityItem.HOME))))
+            .containsExactly("activityOrderDistinct: activityOrder must list each item at most once");
+        assertThat(violations(new AppearanceDto(Theme.TOKYO, Accent.BLUE, TierPalette.VIVID,
+            java.util.Arrays.asList(ActivityItem.HOME, null)))).hasSize(1);
+        assertThat(violations(new AppearanceDto(Theme.TOKYO, Accent.BLUE, TierPalette.VIVID, List.of()))).isEmpty();
+        assertThat(violations(new AppearanceDto(Theme.TOKYO, Accent.BLUE, TierPalette.VIVID, null))).isEmpty();
+    }
 
     @Test
     void aCompleteSettingsBodyIsValid() {
@@ -148,7 +182,7 @@ class SettingsDtoTest {
     void everyGroupIsRequired() {
         assertThat(violations(new SettingsDto(null, null)))
             .containsExactlyInAnyOrder("appearance: must not be null", "naming: must not be null");
-        assertThat(violations(new AppearanceDto(null, null, null))).hasSize(3);
+        assertThat(violations(new AppearanceDto(null, null, null, null))).hasSize(3);
     }
 
     @Test
@@ -159,7 +193,7 @@ class SettingsDtoTest {
 
     @Test
     void validationCascadesIntoEveryNestedGroup() {
-        SettingsDto bad = new SettingsDto(new AppearanceDto(null, Accent.BLUE, TierPalette.VIVID),
+        SettingsDto bad = new SettingsDto(new AppearanceDto(null, Accent.BLUE, TierPalette.VIVID, null),
             new NamingDto("{category}", new TierLabelsDto("S", "A", "B", "C", "D", null),
                 new TierDisplayNamesDto(" x", null, null, null, null, null), null, null, Map.of()));
 

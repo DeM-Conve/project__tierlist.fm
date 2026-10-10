@@ -67,6 +67,19 @@ category.
     edges are `layout/Sash.jsx` (react-resizable-panels `Separator` + grip). Sidebar, canvas and rail pass these to Mantine `p*` props;
     layout maths reads them via `spacingPx()`. Don't hand-pick a padding number
     for a shell column - change the token.
+  - **Spacing and type are scales, never raw px** (the user's call: "variable the
+    thing", VS Code density). Every margin/padding/gap is a key of `themes.js`
+    `SPACING` (`5xs` 2 · `4xs` 4 · `3xs` 6 · `2xs` 8 · `xs` 10 · `sm` 12 · `md` 16
+    · `lg` 20 · `xl` 32 · `2xl` 40 · `3xl` 48 · `4xl` 64 · `5xl` 80) and every font
+    size a key of `FONT_SIZES` (`2xs` 10 · `xs` 11 · `sm` 12 · `md` 13 body · `lg`
+    14 · `xl` 16 · `2xl` 20 · `3xl` 26 · `4xl` 32); both are in the Mantine theme,
+    so props take the key (`gap="2xs"`, `fz="sm"`) and CSS reads
+    `var(--mantine-spacing-*)` / `var(--mantine-font-size-*)`. `<Title>` takes its
+    size from `HEADING_SIZES` (h1 page title 26, h2 section 16) - no `fz` on it.
+    Default Button/Input height is 30px (`CONTROL`); don't use `size="lg"` for
+    ordinary page actions. A new value means a new key, not a literal. Exempt:
+    intrinsic sizes (icon `size`, tile/thumbnail `w`/`h`), sizes derived from the
+    tile size, and geometry (centering offsets, hairlines).
   - **Right-click menus are `mantine-contextmenu`** (`ContextMenuProvider` in
     `AppearanceRoot`, `useContextMenu()`), chosen over react-contexify / Radix
     because it's built on Mantine and follows the theme. The song menu's items
@@ -104,7 +117,14 @@ category.
   functions) and a `version`), `todo_list_link`
   (playlist id -> board, part of the settings row: an `@ElementCollection` excluded
   from Hibernate's auto-versioning - it bumped the version on insert - so
-  `SettingsService` force-increments when links change). Backend package
+  `SettingsService` force-increments when links change), and `activity_bar_item`
+  (the activity bar's icon order: `position` SMALLINT -> `item`, the `activity_item`
+  enum, `UNIQUE (user_id, item)` deferred so in-place reorders pass; also part of the
+  settings row, an `@ElementCollection` `List<ActivityItem>` + `@OrderColumn`, versioned
+  the same way as `todo_list_link`; on the wire `appearance.activityOrder`, frontend
+  ids, missing/partial -> completed in default order, duplicates/unknown -> 400;
+  frontend `activityOrder.js` + `appearanceSlice` `setActivityOrder` /
+  `selectActivityOrder`). Backend package
   `fm.tierlist.settings`, layered and SOLID:
   - enums `Theme`/`Accent`/`TierPalette`: constant name = Postgres
     enum label (Hibernate `@JdbcTypeCode(SqlTypes.NAMED_ENUM)` + `columnDefinition`
