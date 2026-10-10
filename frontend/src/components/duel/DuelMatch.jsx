@@ -257,9 +257,45 @@ export default function DuelMatch({ category, sessionId, boardLoading, base }) {
   }
   if (!s) {
     return (
-      <Container className="duel-view" size={1320} py={32}>
-        <Skeleton h={44} mb={28} radius="md" />
-        <SimpleGrid cols={{ base: 1, md: 2 }}>{[0, 1].map((i) => <Skeleton key={i} h={480} radius="lg" />)}</SimpleGrid>
+      // Same containers, columns and block sizes as the loaded page below,
+      // so nothing jumps when the session arrives.
+      <Container className="duel-view" size={1320} py={32} data-testid="duel-match-loading">
+        <Stack gap={28}>
+          <Group justify="space-between" wrap="wrap" gap={16}>
+            <Button variant="default" component={Link} to={`${base}/duel`}>← {category} · Duel</Button>
+            <Stack gap={8} style={{ flex: '1 1 360px', maxWidth: 560 }}>
+              <Skeleton h={14} w={180} />
+              <Skeleton h={10} radius="xl" />
+            </Stack>
+            <Group gap={8}>
+              <Skeleton h={36} w={96} radius="sm" />
+              <Skeleton h={36} w={150} radius="sm" />
+            </Group>
+          </Group>
+          <Grid gutter={28}>
+            <Grid.Col span={{ base: 12, lg: 8 }}>
+              <Stack gap={22}>
+                <Stack gap={6} align="center" ta="center">
+                  <Title order={1} fz={34} ff="var(--font-display)" fw={900}>Which one hits harder?</Title>
+                  <Text fz={15} c="dimmed">Both clips start at 0:30. Trust your gut - you can be unsure.</Text>
+                </Stack>
+                <SimpleGrid cols={{ base: 1, sm: 2 }} spacing={18}>
+                  {[0, 1].map((i) => <Skeleton key={i} h={540} radius="lg" />)}
+                </SimpleGrid>
+                <SimpleGrid cols={{ base: 2, sm: 5 }} spacing={8}>
+                  {[0, 1, 2, 3, 4].map((i) => <Skeleton key={i} h={108} radius="md" />)}
+                </SimpleGrid>
+              </Stack>
+            </Grid.Col>
+            <Grid.Col span={{ base: 12, lg: 4 }}>
+              <Stack gap={16}>
+                <Skeleton h={198} radius="md" />
+                <Skeleton h={250} radius="md" />
+                <Skeleton h={110} radius="md" />
+              </Stack>
+            </Grid.Col>
+          </Grid>
+        </Stack>
       </Container>
     );
   }

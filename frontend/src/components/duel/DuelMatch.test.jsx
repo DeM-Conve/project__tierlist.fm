@@ -157,6 +157,15 @@ describe('DuelMatch', () => {
     expect(h.spies.end).toHaveBeenCalledTimes(2);
   });
 
+  it('while loading, the skeleton mirrors the page: top bar, heading, two cards, five verdicts, side column', () => {
+    h.session = null;
+    page();
+    const loading = screen.getByTestId('duel-match-loading');
+    expect(screen.getByRole('link', { name: /Rock · Duel/ })).toBeInTheDocument();
+    expect(screen.getByText('Which one hits harder?')).toBeInTheDocument();
+    expect(loading.querySelectorAll('.mantine-Skeleton-root')).toHaveLength(2 + 2 + 2 + 5 + 3);
+  });
+
   it('long song names truncate instead of resizing the layout', () => {
     h.session.duels = [{ id: 1, a: IDS.mid, b: IDS.top, verdict: 'A' }];
     page();
