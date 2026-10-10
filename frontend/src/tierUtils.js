@@ -19,17 +19,16 @@ export function indexForPointInFlow(container, clientX, clientY) {
   return tiles.length;
 }
 
-// Vertical list: first row whose vertical midpoint is below the pointer.
-export function indexForPointInList(container, clientY) {
-  if (!container) return 0;
-  const rows = Array.from(container.querySelectorAll('[data-video-id]'));
-  for (let i = 0; i < rows.length; i++) {
-    const r = rows[i].getBoundingClientRect();
-    if (clientY < r.top + r.height / 2) return i;
-  }
-  return rows.length;
+// Vertical virtualized list: the slot a drop at `offset` (in the
+// virtualizer's coordinates, scrollMargin included) lands in - before the
+// row under the pointer if it's in that row's top half, else after it.
+// Reads the virtualizer's own row offsets, so no row's DOM rect is queried
+// (and rows outside the rendered window count too).
+export function dropIndexAtOffset(virtualizer, offset) {
+  const row = virtualizer.getVirtualItemForOffset(offset);
+  if (!row) return 0;
+  return offset < row.start + row.size / 2 ? row.index : row.index + 1;
 }
-
 
 // Bracketed noise YouTube titles carry: "(Official Music Video)", "[Lyrics]",
 // "(Audio)", "(prod. X)", "| Album name" ...

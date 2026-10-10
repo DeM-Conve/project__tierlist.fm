@@ -1,18 +1,26 @@
-import { useEffect, useRef } from 'react';
-import { ActionIcon, Box, Group, Image, ScrollArea, Stack, Text, Tooltip, UnstyledButton } from '@mantine/core';
+import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef } from 'react';
+import { ActionIcon, Box, Group, Image, ScrollArea, Text, Tooltip, UnstyledButton } from '@mantine/core';
+import { useMergedRef } from '@mantine/hooks';
 import { DragDropContext, Draggable, Droppable } from '@hello-pangea/dnd';
+import { useVirtualizer } from '@tanstack/react-virtual';
 import { Play, Shuffle, X } from 'lucide-react';
 import { EqualizerMark, TierChip } from './TierBits';
+import { queueMove, queueSlot } from '../queueTimeline';
 
-// How many played / upcoming entries the panel renders around "now".
-const HISTORY_SHOWN = 50;
-const UPCOMING_SHOWN = 200;
+// A queue row is 6px + a 40px cover + 6px, plus a 2px gap below it. Exact,
+// so only the playing song's row (which carries the "Up next" header) is
+// measured.
+export const QUEUE_ROW_SIZE = 54;
+const CURRENT_ESTIMATE = QUEUE_ROW_SIZE + 40;
+const OVERSCAN = 6;
 
 // One queue row. The whole row is the drag handle; the cover is the play
 // button (▶ on hover), and double-clicking the row plays it too - so a
 // plain click-and-drag never starts a song by accident.
-function Row({ entry, dimmed, isCurrent, onPlay, onRemove, dragging }) {
+// Memoized: the queue can hold hundreds of songs.
+const Row = memo(function Row({ entry, section, index, dimmed, isCurrent, onPlay, onRemove, dragging }) {
   const mine = entry.source === 'user' && !isCurrent;
+  const play = isCurrent || !onPlay ? undefined : () => onPlay(section, index);
   return (
     <Group
       className="queue-row"
@@ -30,7 +38,7 @@ function Row({ entry, dimmed, isCurrent, onPlay, onRemove, dragging }) {
       }
       opacity={dimmed && !dragging ? 0.55 : 1}
       aria-current={isCurrent ? 'true' : undefined}
-      onDoubleClick={isCurrent ? undefined : onPlay}
+      onDoubleClick={play}
       style={{
         borderRadius: 8,
         cursor: isCurrent ? 'default' : dragging ? 'grabbing' : 'grab',
@@ -42,7 +50,7 @@ function Row({ entry, dimmed, isCurrent, onPlay, onRemove, dragging }) {
       {mine && <Box pos="absolute" left={0} top={10} bottom={10} w={3} bg="accent" style={{ borderRadius: 2 }} />}
       <UnstyledButton
         className="queue-thumb"
-        onClick={isCurrent ? undefined : onPlay}
+        onClick={play}
         aria-label={isCurrent ? 'Playing now' : `Play ${entry.video.title}`}
         pos="relative"
         style={{ flexShrink: 0, borderRadius: 6, cursor: isCurrent ? 'default' : 'pointer' }}
@@ -75,7 +83,7 @@ function Row({ entry, dimmed, isCurrent, onPlay, onRemove, dragging }) {
           color="gray"
           radius="xl"
           size={26}
-          onClick={onRemove}
+          onClick={() => onRemove(entry.key)}
           aria-label="Remove from queue"
           title="Remove from queue"
         >
@@ -86,52 +94,7 @@ function Row({ entry, dimmed, isCurrent, onPlay, onRemove, dragging }) {
       )}
     </Group>
   );
-}
-
-// A droppable run of rows: the played list or Up next. `offset` maps the
-// rendered index back to the real one (the played list only renders its
-// tail).
-function DragList({ id, entries, offset = 0, dimmed, onPlay, onRemove, empty, more }) {
-  return (
-    <Droppable
-      droppableId={id}
-      // The clone is rendered in <body> so the dragged row follows the
-      // pointer exactly, whatever the dock's own positioning.
-      renderClone={(provided, snapshot, rubric) => (
-        <div ref={provided.innerRef} {...provided.draggableProps} {...provided.dragHandleProps}>
-          <Row entry={entries[rubric.source.index]} dragging />
-        </div>
-      )}
-    >
-      {(provided, snapshot) => (
-        <Box
-          ref={provided.innerRef}
-          {...provided.droppableProps}
-          mih={entries.length === 0 ? 44 : undefined}
-          style={{ borderRadius: 8, outline: snapshot.isDraggingOver ? '1px dashed var(--accent)' : undefined }}
-        >
-          {entries.length === 0 && !snapshot.isDraggingOver && empty}
-          {entries.map((entry, i) => (
-            <Draggable key={entry.key} draggableId={entry.key} index={i}>
-              {(drag) => (
-                <div ref={drag.innerRef} {...drag.draggableProps} {...drag.dragHandleProps}>
-                  <Row
-                    entry={entry}
-                    dimmed={dimmed}
-                    onPlay={() => onPlay(id, offset + i)}
-                    onRemove={() => onRemove(entry.key)}
-                  />
-                </div>
-              )}
-            </Draggable>
-          ))}
-          {provided.placeholder}
-          {more}
-        </Box>
-      )}
-    </Droppable>
-  );
-}
+});
 
 // YouTube-Music-style queue: one timeline. What's been played (dimmed)
 // above the playing song, then Up next - one list: songs you queued (Play
@@ -139,33 +102,51 @@ function DragList({ id, entries, offset = 0, dimmed, onPlay, onRemove, empty, mo
 // followed by the rest of what you started. Drag any row anywhere,
 // including a played song back down to hear it again; click a cover (or
 // double-click a row) to play it. State lives in focusSlice.
+//
+// The whole timeline is ONE virtualized list (@tanstack/react-virtual) and
+// one @hello-pangea/dnd Droppable in virtual mode: [...history, now,
+// ...upcoming], so every song is in it (no "+N more") but only the rows on
+// screen are rendered. The playing song is a drag-disabled row, so a drop
+// above it lands in history and below it in Up next (queueTimeline.js).
 export default function QueuePanel({ queue, current, onJump, onRemove, onMove, onShuffle }) {
   const { history, upcoming, contextLabel } = queue;
   const viewportRef = useRef(null);
-  const currentRef = useRef(null);
-  const historyStart = Math.max(0, history.length - HISTORY_SHOWN);
-  const shownHistory = history.slice(historyStart);
-  const shownUpcoming = upcoming.slice(0, UPCOMING_SHOWN);
+  const H = history.length;
+  const rows = useMemo(() => [...history, current, ...upcoming], [history, current, upcoming]);
+
+  // Stable handlers for the memoized rows (the parent passes fresh ones).
+  const latest = useRef(null);
+  useLayoutEffect(() => {
+    latest.current = { onJump, onRemove, historyLength: H };
+  });
+  const play = useCallback((section, index) => latest.current.onJump(section, index), []);
+  const remove = useCallback((key) => latest.current.onRemove(key), []);
+
+  // (No React Compiler in this app, so its "incompatible library" note on
+  // useVirtualizer doesn't apply.)
+  // oxlint-disable-next-line react/incompatible-library
+  const virtualizer = useVirtualizer({
+    count: rows.length,
+    getScrollElement: () => viewportRef.current,
+    estimateSize: (i) => (i === H ? CURRENT_ESTIMATE : QUEUE_ROW_SIZE),
+    overscan: OVERSCAN,
+    getItemKey: (i) => (i === H ? 'now' : rows[i].key),
+  });
 
   // Keep the playing song pinned near the top as the queue advances, with
   // a sliver of the last played song showing above it.
   useEffect(() => {
     const viewport = viewportRef.current;
-    const row = currentRef.current;
-    if (!viewport || !row) return;
-    const top = row.getBoundingClientRect().top - viewport.getBoundingClientRect().top + viewport.scrollTop;
-    viewport.scrollTo({ top: Math.max(0, top - 28), behavior: 'smooth' });
+    if (!viewport) return;
+    // Only when the playing song changes (not when a played row is removed),
+    // so the history length is read through the ref.
+    viewport.scrollTo({ top: Math.max(0, latest.current.historyLength * QUEUE_ROW_SIZE - 28), behavior: 'smooth' });
   }, [current.key, current.video.videoId]);
-
-  const realIndex = (section, index) => (section === 'history' ? historyStart + index : index);
 
   function onDragEnd({ source, destination }) {
     if (!destination) return;
-    if (source.droppableId === destination.droppableId && source.index === destination.index) return;
-    onMove(
-      { section: source.droppableId, index: realIndex(source.droppableId, source.index) },
-      { section: destination.droppableId, index: realIndex(destination.droppableId, destination.index) }
-    );
+    const move = queueMove(H, source.index, destination.index);
+    if (move) onMove(move.from, move.to);
   }
 
   return (
@@ -188,44 +169,112 @@ export default function QueuePanel({ queue, current, onJump, onRemove, onMove, o
         )}
       </Group>
 
-      <ScrollArea viewportRef={viewportRef} mt={8} style={{ flex: 1, minHeight: 0 }} type="hover" scrollbarSize={6} offsetScrollbars>
-        <DragDropContext onDragEnd={onDragEnd}>
-          <Stack gap={2}>
-            {historyStart > 0 && (
-              <Text fz="xs" c="dimmed" ta="center" py={6}>
-                {historyStart} earlier
-              </Text>
-            )}
-            <DragList id="history" entries={shownHistory} offset={historyStart} dimmed onPlay={onJump} onRemove={onRemove} />
-
-            <div ref={currentRef}>
-              <Row entry={current} isCurrent />
+      <DragDropContext onDragEnd={onDragEnd}>
+        <Droppable
+          droppableId="queue"
+          mode="virtual"
+          // Rows scrolled out of view aren't rendered, so the dragged row is
+          // drawn as a clone in <body> - it also follows the pointer exactly,
+          // whatever the dock's own positioning.
+          renderClone={(provided, snapshot, rubric) => (
+            <div ref={provided.innerRef} {...provided.draggableProps} {...provided.dragHandleProps}>
+              <Row entry={rows[rubric.source.index]} dimmed={rubric.source.index < H} dragging />
             </div>
+          )}
+        >
+          {(provided) => (
+            <QueueViewport droppableRef={provided.innerRef} viewportRef={viewportRef} droppableProps={provided.droppableProps}>
+              <div style={{ height: virtualizer.getTotalSize(), position: 'relative' }}>
+                {virtualizer.getVirtualItems().map((item) => {
+                  const isCurrent = item.index === H;
+                  const entry = rows[item.index];
+                  const slot = queueSlot(H, item.index);
+                  return (
+                    <Draggable
+                      key={item.key}
+                      draggableId={isCurrent ? `now:${entry.key}` : entry.key}
+                      index={item.index}
+                      isDragDisabled={isCurrent}
+                    >
+                      {(drag) => (
+                        <div
+                          ref={(el) => {
+                            drag.innerRef(el);
+                            if (el && isCurrent) virtualizer.measureElement(el);
+                          }}
+                          {...drag.draggableProps}
+                          {...drag.dragHandleProps}
+                          data-index={item.index}
+                          style={{
+                            ...drag.draggableProps.style,
+                            position: 'absolute',
+                            top: item.start,
+                            left: 0,
+                            width: '100%',
+                            paddingBottom: 2,
+                          }}
+                        >
+                          {isCurrent ? (
+                            <NowAndUpNext current={entry} upcomingCount={upcoming.length} />
+                          ) : (
+                            <Row
+                              entry={entry}
+                              section={slot.section}
+                              index={slot.index}
+                              dimmed={slot.section === 'history'}
+                              onPlay={play}
+                              onRemove={remove}
+                            />
+                          )}
+                        </div>
+                      )}
+                    </Draggable>
+                  );
+                })}
+              </div>
+            </QueueViewport>
+          )}
+        </Droppable>
+      </DragDropContext>
+    </>
+  );
+}
 
-            <Text fz={11} fw={800} tt="uppercase" c="dimmed" mt="md" mb={4} px={6} style={{ letterSpacing: 1 }}>
-              Up next{upcoming.length > 0 ? ` · ${upcoming.length}` : ''}
-            </Text>
-            <DragList
-              id="upcoming"
-              entries={shownUpcoming}
-              onPlay={onJump}
-              onRemove={onRemove}
-              empty={
-                <Text fz="xs" c="dimmed" px={6} py={10}>
-                  End of the queue. Use Play next / Add to queue in any song's ⋯ menu, or drag a played song back down here.
-                </Text>
-              }
-              more={
-                upcoming.length > UPCOMING_SHOWN && (
-                  <Text fz="xs" c="dimmed" ta="center" py={8}>
-                    + {upcoming.length - UPCOMING_SHOWN} more
-                  </Text>
-                )
-              }
-            />
-          </Stack>
-        </DragDropContext>
-      </ScrollArea>
+// The ScrollArea's viewport is both the virtualizer's scroll element and
+// the Droppable (dnd's virtual lists want the scroll container as the
+// droppable).
+function QueueViewport({ droppableRef, viewportRef, droppableProps, children }) {
+  const ref = useMergedRef(droppableRef, viewportRef);
+  return (
+    <ScrollArea
+      viewportRef={ref}
+      viewportProps={droppableProps}
+      mt={8}
+      style={{ flex: 1, minHeight: 0 }}
+      type="hover"
+      scrollbars="y"
+      scrollbarSize={6}
+      offsetScrollbars
+    >
+      {children}
+    </ScrollArea>
+  );
+}
+
+// The playing song, with the "Up next" heading (and the end-of-queue hint)
+// under it - one row of the list, so it moves with the rest while dragging.
+function NowAndUpNext({ current, upcomingCount }) {
+  return (
+    <>
+      <Row entry={current} isCurrent />
+      <Text fz={11} fw={800} tt="uppercase" c="dimmed" mt="md" mb={4} px={6} style={{ letterSpacing: 1 }}>
+        Up next{upcomingCount > 0 ? ` · ${upcomingCount}` : ''}
+      </Text>
+      {upcomingCount === 0 && (
+        <Text fz="xs" c="dimmed" px={6} py={10}>
+          End of the queue. Use Play next / Add to queue in any song's ⋯ menu, or drag a played song back down here.
+        </Text>
+      )}
     </>
   );
 }

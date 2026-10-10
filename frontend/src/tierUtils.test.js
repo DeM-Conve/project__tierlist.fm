@@ -3,7 +3,7 @@ import {
   TIER_INK,
   artistKey,
   indexForPointInFlow,
-  indexForPointInList,
+  dropIndexAtOffset,
   playlistThumbnail,
   songLabel,
   videoMatches,
@@ -217,27 +217,27 @@ describe('indexForPointInFlow', () => {
   });
 });
 
-describe('indexForPointInList', () => {
-  const list = () =>
-    container([
-      { left: 0, top: 0, width: 300, height: 40 },
-      { left: 0, top: 40, width: 300, height: 40 },
-      { left: 0, top: 80, width: 300, height: 40 },
-    ]);
-
-  it('no container / empty -> 0', () => {
-    expect(indexForPointInList(null, 10)).toBe(0);
-    expect(indexForPointInList(container([]), 10)).toBe(0);
+describe('dropIndexAtOffset', () => {
+  // Three 40px rows starting 100px down (the list's scrollMargin), with the
+  // virtualizer's nearest-start lookup.
+  const rows = [0, 1, 2].map((index) => ({ index, start: 100 + index * 40, size: 40 }));
+  const virtualizer = (items) => ({
+    getVirtualItemForOffset: (offset) => (items.length ? [...items].reverse().find((r) => r.start <= offset) ?? items[0] : undefined),
   });
 
-  it('above a row’s midpoint -> before it', () => {
-    expect(indexForPointInList(list(), 5)).toBe(0);
-    expect(indexForPointInList(list(), 25)).toBe(1);
-    expect(indexForPointInList(list(), 59)).toBe(1);
-    expect(indexForPointInList(list(), 61)).toBe(2);
+  it('an empty list -> 0', () => {
+    expect(dropIndexAtOffset(virtualizer([]), 10)).toBe(0);
+  });
+
+  it('above a row’s midpoint -> before it, below -> after it', () => {
+    expect(dropIndexAtOffset(virtualizer(rows), 50)).toBe(0);
+    expect(dropIndexAtOffset(virtualizer(rows), 105)).toBe(0);
+    expect(dropIndexAtOffset(virtualizer(rows), 125)).toBe(1);
+    expect(dropIndexAtOffset(virtualizer(rows), 159)).toBe(1);
+    expect(dropIndexAtOffset(virtualizer(rows), 161)).toBe(2);
   });
 
   it('below the last midpoint -> length', () => {
-    expect(indexForPointInList(list(), 110)).toBe(3);
+    expect(dropIndexAtOffset(virtualizer(rows), 999)).toBe(3);
   });
 });
