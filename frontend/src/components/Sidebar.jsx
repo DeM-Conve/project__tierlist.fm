@@ -67,19 +67,24 @@ function BoardLink({ category, tiers, active }) {
 // you're on.
 function ActivityIcon({ label, keys, marked, children, ...props }) {
   return (
-    <Tooltip label={keys ? `${label} (${keys})` : label} position="right" withArrow>
-      <ActionIcon
-        variant="subtle"
-        color={marked ? undefined : 'gray'}
-        size={42}
-        aria-label={label}
-        pos="relative"
-        {...props}
-      >
-        {marked && <Box pos="absolute" left={-6} top={8} bottom={8} w={3} bg="accent" style={{ borderRadius: 2 }} />}
-        {children}
-      </ActionIcon>
-    </Tooltip>
+    // The bar sits outside the button (which clips its overflow), on the
+    // strip's left edge.
+    <Box pos="relative">
+      {marked && <Box pos="absolute" left={-6} top={6} bottom={6} w={3} bg="accent" style={{ borderRadius: 2 }} />}
+      <Tooltip label={keys ? `${label} (${keys})` : label} position="right" withArrow>
+        <ActionIcon
+          variant={marked ? 'light' : 'subtle'}
+          color={marked ? undefined : 'gray'}
+          size={42}
+          radius="md"
+          aria-label={label}
+          data-active={marked || undefined}
+          {...props}
+        >
+          {children}
+        </ActionIcon>
+      </Tooltip>
+    </Box>
   );
 }
 
@@ -88,7 +93,7 @@ function ActivityIcon({ label, keys, marked, children, ...props }) {
 function ActivityBar({ panelOpen, onTogglePanel, onOpenPalette, waitingCount, onSelectSettings, onOpenShortcuts, onLogout }) {
   const { pathname } = useLocation();
   return (
-    <Stack component="nav" aria-label="Activity bar" gap={6} align="center" px={6} py={SHELL_Y} className="activity-bar">
+    <Stack component="nav" aria-label="Activity bar" gap={6} align="center" px={6} py={SHELL_Y}>
       <ThemeIcon size={34} radius="sm" variant="filled" mb={8} aria-label="Tierlist.fm">
         <ListOrdered size={20} />
       </ThemeIcon>
@@ -156,7 +161,16 @@ export default function Sidebar({
           onLogout={onLogout}
         />
         {!collapsed && (
-          <Stack className="sidebar-panel" gap={0} px={SIDEBAR_X} py={SHELL_Y}>
+          <Stack
+            className="sidebar-panel"
+            gap={0}
+            px={SIDEBAR_X}
+            py={SHELL_Y}
+            my={8}
+            mr={8}
+            bg="var(--surface)"
+            style={{ borderRadius: 14, border: '1px solid var(--border-soft)' }}
+          >
             <Group justify="space-between" px={8} mb={8} mt={6} wrap="nowrap">
               <Text size="xs" fw={700} c="dimmed" tt="uppercase" style={{ letterSpacing: 1 }}>
                 Tier lists

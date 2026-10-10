@@ -20,12 +20,10 @@
 .sidebar {
   flex-shrink: 0;
   display: flex;
-  /* padding: the shell spacing standard, as Mantine props (layout/spacing.js). */
-  background: var(--surface);
-  border-right: 1px solid var(--border-soft);
+  /* VS Code-style: the icon strip sits on the app background and the
+     board panel floats beside it as a rounded card (Sidebar.jsx). */
+  background: var(--bg);
 }
-/* VS Code-style: a permanent icon strip, then the panel it opens/closes. */
-.activity-bar { border-right: 1px solid var(--border-soft); }
 .sidebar-panel { width: calc(var(--sidebar-w) - 24px); }
 .sidebar-scrim { display: none; }
 

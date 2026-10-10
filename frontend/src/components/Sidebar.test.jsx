@@ -54,6 +54,13 @@ describe('Sidebar', () => {
     expect(p.onLogout).toHaveBeenCalled();
   });
 
+  it('marks the page you are on and the open panel', () => {
+    draw(props(), '/add');
+    expect(screen.getByRole('link', { name: 'Add songs' })).toHaveAttribute('data-active', 'true');
+    expect(screen.getByRole('link', { name: 'Home' })).not.toHaveAttribute('data-active');
+    expect(screen.getByRole('button', { name: 'Tier lists' })).toHaveAttribute('data-active', 'true');
+  });
+
   it('filters the boards', () => {
     draw(props({ query: 'ro' }));
     expect(screen.queryByText('Rap')).not.toBeInTheDocument();
