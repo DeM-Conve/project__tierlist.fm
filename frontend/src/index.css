@@ -40,10 +40,11 @@ body {
 :root {
   --bg: #16161e;
   --editor: #1a1b26;
+  --activity: #2a2c3a;
   --side: #21232f;
-  --chrome: #2e3040;
+  --chrome: #313443;
   --chrome-border: #2f3140;
-  --chrome-fg-muted: #9198bb;
+  --chrome-fg-muted: #929abc;
   --chrome-hover: #282a37;
   --chrome-selected: #2f3140;
   --chrome-input: #292c39;

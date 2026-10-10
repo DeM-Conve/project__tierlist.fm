@@ -309,7 +309,7 @@ export default function Sidebar({
   return (
     <>
       {mobileOpen && <div className="sidebar-scrim" onClick={onCloseMobile} />}
-      <Box component="aside" className={`sidebar${mobileOpen ? ' sidebar-open' : ''}`}>
+      <Box component="aside" className={`sidebar${mobileOpen ? ' sidebar-open' : ''}${collapsed ? ' sidebar-alone' : ''}`}>
         <ActivityBar
           openView={collapsed ? null : view}
           onShowView={onShowView}

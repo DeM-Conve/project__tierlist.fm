@@ -191,13 +191,16 @@ export function buildAppearance(choice) {
   const editor = t.surface;
   // The shell, VS Code-style, computed at run time from the theme's own
   // page and ink colors by one rule - each layer a fixed perceptual step
-  // further from the page (step()): the side panel card, then the frame
-  // every card sits on (the activity bar is part of the frame). The same
-  // steps give the same visible difference in any theme.
+  // further from the page (step()) - measured off the user's VS Code
+  // (editor #1E1E1E, side panel #252525, activity strip #333, frame
+  // #3C3C3C): the side panel, then the activity strip (the left part of the
+  // side panel's card), then the frame every card sits on. The same steps
+  // give the same visible difference in any theme.
   // Like a VS Code theme, a theme may name any of these itself (THEMES
-  // entry `side` / `chrome`); only what it leaves out is derived.
+  // entry `side` / `activity` / `chrome`); only what it leaves out is derived.
   const side = t.side ?? step(editor, t.text, 0.025);
-  const chrome = t.chrome ?? step(editor, t.text, 0.07);
+  const activity = t.activity ?? step(editor, t.text, 0.055);
+  const chrome = t.chrome ?? step(editor, t.text, 0.08);
 
   const cssVars = {
     '--bg': t.bg,
@@ -209,6 +212,7 @@ export function buildAppearance(choice) {
     // mixed toward the text, VS Code-style.
     '--editor': editor,
     '--side': side,
+    '--activity': activity,
     '--chrome': chrome,
     '--chrome-border': mix(side, t.text, 0.1),
     '--chrome-fg-muted': mix(chrome, t.text, 0.7),

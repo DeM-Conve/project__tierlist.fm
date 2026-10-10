@@ -24,6 +24,7 @@ const REQUIRED_VARS = [
   '--editor',
   '--chrome',
   '--side',
+  '--activity',
   '--chrome-border',
   '--chrome-fg-muted',
   '--chrome-hover',
@@ -146,13 +147,17 @@ describe('buildAppearance', () => {
   // The shell: the activity bar + side panel are one card (strip a step
   // lighter than the panel), the page another, all on a frame that differs
   // from every card so each reads as one object.
-  it.each(Object.keys(THEMES))('%s: frame (with the activity bar), page card and side card are all distinct', (theme) => {
+  it.each(Object.keys(THEMES))('%s: frame, activity strip, side panel and page card are all distinct', (theme) => {
     const { cssVars } = buildAppearance({ theme });
     expect(cssVars['--editor']).toBe(THEMES[theme].surface);
     const d = (a, b) => colord(cssVars[a]).delta(cssVars[b]);
     expect(d('--editor', '--side')).toBeGreaterThan(0.005);
     expect(d('--chrome', '--editor')).toBeGreaterThan(0.01);
     expect(d('--chrome', '--side')).toBeGreaterThan(0.01);
+    // The strip is its own step inside the left card, and the frame is
+    // apart from it too (in light themes as well).
+    expect(d('--side', '--activity')).toBeGreaterThan(0.01);
+    expect(d('--chrome', '--activity')).toBeGreaterThan(0.01);
   });
 
   it.each(Object.keys(THEMES))('%s: on the side card, hover < selection < muted text; icons readable on the frame', (theme) => {
@@ -161,7 +166,7 @@ describe('buildAppearance', () => {
     expect(dist('--chrome-hover')).toBeGreaterThan(0);
     expect(dist('--chrome-selected')).toBeGreaterThan(dist('--chrome-hover'));
     expect(dist('--chrome-fg-muted')).toBeGreaterThan(dist('--chrome-selected'));
-    expect(colord(cssVars['--chrome-fg-muted']).contrast(cssVars['--chrome'])).toBeGreaterThanOrEqual(3);
+    expect(colord(cssVars['--chrome-fg-muted']).contrast(cssVars['--activity'])).toBeGreaterThanOrEqual(3);
     expect(colord(cssVars['--chrome-fg-muted']).contrast(cssVars['--side'])).toBeGreaterThanOrEqual(3);
   });
 

@@ -20,12 +20,17 @@
 .sidebar {
   flex-shrink: 0;
   display: flex;
-  /* VS Code-style: the icon strip sits straight on the window frame (one
-     color); the side panel and the page are the rounded cards. With the
-     panel open its card sits flush against the strip, so the two read as
-     one block; shut, the strip is just the frame's edge. */
-  background: var(--chrome);
+  /* VS Code-style (measured off the user's screenshot): the icon strip is
+     the left part of ONE rounded card with the side panel (App.jsx) -
+     strip a step lighter, panel joined with no gap, outside corners
+     rounded, the card a gap in from the window frame. Panel shut: the
+     strip alone is the card. Margin/radius are a CSS class because the
+     phone drawer resets them below - no Mantine prop for that. */
+  background: var(--activity);
+  margin: var(--mantine-spacing-xs) 0 var(--mantine-spacing-xs) var(--mantine-spacing-xs);
+  border-radius: var(--mantine-radius-md) 0 0 var(--mantine-radius-md);
 }
+.sidebar-alone { border-radius: var(--mantine-radius-md); }
 /* The page as a rounded card on the window chrome (App.jsx), like VS
    Code's editor part: --editor on --chrome, a 1px chrome-toned border - a
    CSS class because it goes flat on phones, an @media rule Mantine has no
@@ -148,6 +153,8 @@
     z-index: 40;
     transition: left 0.2s ease;
     box-shadow: 0 0 32px var(--shadow);
+    margin: 0;
+    border-radius: 0;
   }
   .sidebar-open { left: 0; }
   .canvas-card { border-radius: 0; border: 0; }

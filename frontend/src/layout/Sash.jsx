@@ -12,7 +12,7 @@ export default function Sash(props) {
   return (
     <Separator className="sash" {...props}>
       {/* Always visible at rest (the user: "clearly visible that it is adjustable"). */}
-      <EllipsisVertical className="sash-grip" size={20} strokeWidth={3} aria-hidden />
+      <EllipsisVertical className="sash-grip" size={16} strokeWidth={2.5} aria-hidden />
     </Separator>
   );
 }
