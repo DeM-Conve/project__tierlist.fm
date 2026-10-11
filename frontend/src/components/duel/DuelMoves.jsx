@@ -480,7 +480,7 @@ export default function DuelMoves({ category, boardLoading, base }) {
       <Text c="dimmed" fz="md">Order within a tier is the songs sorted by score - positions are ranks on YouTube. Check the new order before you sort.</Text>
       <Paper withBorder radius="lg" style={{ overflow: 'hidden' }}>
         {/* The first tier starts open: the change is there to see before Sort. */}
-        <Accordion multiple chevronPosition="left" variant="default" defaultValue={Object.keys(data.tierOrders).slice(0, 1)}>
+        <Accordion multiple chevronPosition="left" variant="default">
           {Object.entries(data.tierOrders).map(([tier, ids]) => (
             <TierOrderItem key={tier} tier={tier} ids={ids} board={board} />
           ))}

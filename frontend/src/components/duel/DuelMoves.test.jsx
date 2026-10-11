@@ -115,7 +115,11 @@ describe('DuelMoves', () => {
     expect(screen.getByText('No moves to review')).toBeInTheDocument();
     expect(screen.getByText('Duel more and the strongest cases show up here.')).toBeInTheDocument();
     expect(screen.getByText('2 of 2 songs change places')).toBeInTheDocument();
-    // The (first) tier starts open on the new order before anything changes: each song at its new place, where it was.
+    // Every tier starts closed, so the page leads with the suggested moves; opening one shows the new order
+    // before anything changes: each song at its new place, where it was.
+    const control = screen.getByRole('button', { name: 'Show the new A order' });
+    expect(control).toHaveAttribute('aria-expanded', 'false');
+    fireEvent.click(control);
     const rows = within(await screen.findByRole('table', { name: 'New A order' })).getAllByRole('row');
     expect(rows.map((r) => r.textContent)).toEqual([
       expect.stringMatching(/^1Other Song.*was 2/),
