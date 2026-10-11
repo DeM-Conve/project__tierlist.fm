@@ -8,6 +8,7 @@ import fm.tierlist.duel.engine.SongState;
 import fm.tierlist.duel.engine.Verdict;
 import fm.tierlist.duel.engine.pairing.Focus;
 import fm.tierlist.duel.engine.pairing.Matchup;
+import fm.tierlist.duel.engine.policy.Shortfall;
 import fm.tierlist.duel.engine.policy.Suggestion;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
@@ -82,20 +83,26 @@ public final class DuelDtos {
 
     public record KeyResultDto(String opponent, String opponentTier, int result) {}
 
+    // What a move still lacks: CONFIDENCE (have/need are probabilities), DUELS,
+    // BORDER_OPPONENTS, FRESH_DUELS (counts) or LOCKED.
+    public record ShortfallDto(Shortfall.Kind kind, double have, double need) {}
+
+    // `unmet` is empty for a suggested move; a leaning one lists what it lacks.
     public record SuggestionDto(String song, String from, String to, double confidence, int wins, int losses, int draws,
-                                List<KeyResultDto> keyResults, List<Double> trend) {
+                                List<KeyResultDto> keyResults, List<Double> trend, List<ShortfallDto> unmet) {
         static SuggestionDto from(Suggestion s) {
             return new SuggestionDto(s.song(), s.from() == null ? TierSlot.TODO.name() : s.from(), s.to(), s.confidence(),
                 s.wins(), s.losses(), s.draws(),
                 s.keyResults().stream().map(k -> new KeyResultDto(k.opponent(), k.opponentTier(), k.result())).toList(),
-                s.trend());
+                s.trend(), s.unmet().stream().map(u -> new ShortfallDto(u.kind(), u.have(), u.need())).toList());
         }
     }
 
     public record BorderDto(String upper, String lower, double score) {}
 
     public record AnalysisDto(double certainty, List<BorderDto> borders, List<SongDto> songs, int onFence, int unplaced,
-                              List<SuggestionDto> suggestions, Map<String, List<String>> tierOrders, UUID activeSession,
+                              List<SuggestionDto> suggestions, List<SuggestionDto> leaning,
+                              Map<String, List<String>> tierOrders, UUID activeSession,
                               long duelsTotal) {
         static AnalysisDto from(BoardAnalysis a, UUID activeSession, long duelsTotal) {
             List<String> tiers = a.layout().rankedTiers();
@@ -104,7 +111,8 @@ public final class DuelDtos {
             for (int k = 0; k < cuts.length; k++) borders.add(new BorderDto(tiers.get(k), tiers.get(k + 1), cuts[k]));
             int unplaced = (int) a.songs().values().stream().filter(s -> s.tier() == null).count();
             return new AnalysisDto(a.certainty(), borders, a.songs().values().stream().map(s -> SongDto.from(s, a)).toList(),
-                a.onFence().size(), unplaced, a.suggestions().stream().map(SuggestionDto::from).toList(), a.tierOrders(),
+                a.onFence().size(), unplaced, a.suggestions().stream().map(SuggestionDto::from).toList(),
+                a.leaning().stream().map(SuggestionDto::from).toList(), a.tierOrders(),
                 activeSession, duelsTotal);
         }
     }

@@ -52,6 +52,20 @@ class DuelEngineTest {
         assertThat(s.trend()).hasSize(7); // the prior + one point per duel
     }
 
+    // The bug behind "I have never seen a suggested move": a move into a middle
+    // tier was gated on P(exactly that tier), which a ~6-point-wide tier caps
+    // near 80% - this song beat six B songs clearly and was never suggested.
+    @Test
+    void aMiddleTierSongThatKeepsBeatingTheTierAboveIsSuggestedAMoveUp() {
+        String song = id("C", 3);
+        BoardAnalysis a = analyze(beats(song, "B", 6));
+        Suggestion s = a.suggestions().stream().filter(x -> x.song().equals(song)).findFirst().orElseThrow();
+        assertThat(s.from()).isEqualTo("C");
+        assertThat(s.to()).isEqualTo("B");
+        assertThat(s.confidence()).isGreaterThanOrEqualTo(0.85);
+        assertThat(s.unmet()).isEmpty();
+    }
+
     @Test
     void oneUpsetMovesScoresNeverTiers() {
         BoardAnalysis a = analyze(List.of(duel(1, id("D", 0), id("S", 0), Verdict.A_CLEARLY)));

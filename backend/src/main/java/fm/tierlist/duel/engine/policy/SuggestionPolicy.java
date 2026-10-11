@@ -10,18 +10,38 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 
-// Composite of SuggestionRules: a move is suggested only when every rule
-// allows it - the confidence gate with hysteresis from the design brief.
+/**
+ * Composite of SuggestionRules: a move is suggested only when every rule
+ * allows it - the confidence gate with hysteresis from the design brief.
+ *
+ * <p>Which move, and how sure: a ranked song whose most likely tier isn't its
+ * own moves towards it, to the farthest tier `t` on that side it belongs in
+ * "`t` or beyond" with at least `targetConfidence` - P(score past the border
+ * of `t`), summed over the ordinal model's tiers - else just one tier, at
+ * whatever that chance is. Asking "the exact tier" instead capped every move
+ * into a middle tier below the gate: a tier is only ~6 points wide, so even a
+ * song settled dead in its centre (sigma ~1.8 after 8 duels, plus the user's
+ * own placement noise) tops out near 80%, while moves into the top or bottom
+ * tier (no far border) were unbounded. A to-do song has no side: it goes to
+ * its most likely tier, at that tier's probability.
+ *
+ * <p>Moves that fail a rule the user hasn't answered (not a lock, not a Keep)
+ * and that have at least one duel behind them come back as "leaning", with
+ * what they lack, so the page can say why nothing is suggested yet.
+ */
 public final class SuggestionPolicy {
 
     private static final int KEY_RESULTS = 4;
 
     private final List<SuggestionRule> rules;
+    private final double targetConfidence;
 
-    public SuggestionPolicy(List<SuggestionRule> rules) {
+    public SuggestionPolicy(List<SuggestionRule> rules, double targetConfidence) {
         this.rules = List.copyOf(rules);
+        this.targetConfidence = targetConfidence;
     }
 
     public static SuggestionPolicy standard(EngineConfig config) {
@@ -31,24 +51,57 @@ public final class SuggestionPolicy {
             new MinimumDuelsRule(config.minDuels()),
             new BorderOpponentsRule(config.minBorderOpponents()),
             new KeepHysteresisRule(config.keepFreshDuels())
-        ));
+        ), config.moveThreshold());
     }
 
-    public List<Suggestion> suggest(Iterable<SongState> songs, BoardLayout layout, Map<String, String> tierOf,
-                                    Map<String, Decision> decisions, Set<String> locks) {
-        List<Suggestion> out = new ArrayList<>();
+    // `ready`: every rule met, the suggested moves. `leaning`: where the duels
+    // point but the evidence isn't there yet. Both most confident first.
+    public record Result(List<Suggestion> ready, List<Suggestion> leaning) {
+        public Result {
+            ready = List.copyOf(ready);
+            leaning = List.copyOf(leaning);
+        }
+    }
+
+    public Result suggest(Iterable<SongState> songs, BoardLayout layout, Map<String, String> tierOf,
+                          Map<String, Decision> decisions, Set<String> locks) {
+        List<Suggestion> ready = new ArrayList<>();
+        List<Suggestion> leaning = new ArrayList<>();
         for (SongState s : songs) {
             if (s.probabilities().length == 0) continue;
-            String to = layout.rankedTiers().get(s.bestRank());
-            if (to.equals(s.tier())) continue;
-            Candidate c = new Candidate(s, s.tier(), to, s.bestProbability(), layout, tierOf, decisions.get(s.id()), locks.contains(s.id()));
-            if (rules.stream().allMatch(r -> r.allows(c))) out.add(toSuggestion(c, tierOf));
+            Optional<Integer> from = layout.rankOf(s.tier());
+            if (from.isPresent() && from.get() == s.bestRank()) continue;
+            int[] to = new int[1];
+            double confidence = from.isEmpty() ? s.bestProbability() : target(s.probabilities(), from.get(), s.bestRank(), to);
+            if (from.isEmpty()) to[0] = s.bestRank();
+            Candidate c = new Candidate(s, s.tier(), layout.rankedTiers().get(to[0]), confidence, layout, tierOf,
+                decisions.get(s.id()), locks.contains(s.id()));
+            List<Shortfall> unmet = rules.stream().map(r -> r.shortfall(c)).flatMap(Optional::stream).toList();
+            if (unmet.isEmpty()) ready.add(toSuggestion(c, tierOf, unmet));
+            else if (!s.duels().isEmpty() && unmet.stream().noneMatch(Shortfall::userDecided)) leaning.add(toSuggestion(c, tierOf, unmet));
         }
-        out.sort(Comparator.comparingDouble(Suggestion::confidence).reversed());
-        return out;
+        Comparator<Suggestion> surest = Comparator.comparingDouble(Suggestion::confidence).reversed();
+        ready.sort(surest);
+        leaning.sort(surest);
+        return new Result(ready, leaning);
     }
 
-    private static Suggestion toSuggestion(Candidate c, Map<String, String> tierOf) {
+    // The farthest tier towards `best` the song belongs in "or beyond" with at
+    // least targetConfidence (else the next tier over); returns that chance.
+    private double target(double[] p, int from, int best, int[] to) {
+        int step = best < from ? -1 : 1;
+        double beyond = 0;
+        // Walk from the far end towards `from`: P(t or beyond) grows as t nears it.
+        int far = step < 0 ? 0 : p.length - 1;
+        for (int t = far; t != from; t -= step) {
+            beyond += p[t];
+            to[0] = t;
+            if (beyond >= targetConfidence) return beyond;
+        }
+        return beyond;
+    }
+
+    private static Suggestion toSuggestion(Candidate c, Map<String, String> tierOf, List<Shortfall> unmet) {
         SongState s = c.song();
         List<Duel> duels = s.duels();
         List<Suggestion.KeyResult> key = new ArrayList<>();
@@ -57,6 +110,6 @@ public final class SuggestionPolicy {
             String opp = d.opponentOf(s.id());
             key.add(new Suggestion.KeyResult(opp, tierOf.get(opp), d.resultFor(s.id())));
         }
-        return new Suggestion(s.id(), c.from(), c.to(), c.confidence(), s.wins(), s.losses(), s.draws(), key, s.trend());
+        return new Suggestion(s.id(), c.from(), c.to(), c.confidence(), s.wins(), s.losses(), s.draws(), key, s.trend(), unmet);
     }
 }

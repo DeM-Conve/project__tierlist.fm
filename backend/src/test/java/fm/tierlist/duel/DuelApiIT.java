@@ -236,6 +236,22 @@ class DuelApiIT extends PostgresIT {
     }
 
     @Test
+    void aMoveShortOfTheBarComesBackAsLeaningWithWhatItLacks() throws Exception {
+        String sid = start("SMART_MIX", null).get("id").asText();
+        String song = id("A", 2);
+        for (int i = 0; i < 3; i++) verdict(sid, song, id("S", i), "A_CLEARLY");
+        JsonNode a = ok(call(post(BOARD + "/analysis"), layoutBody(), alice));
+        assertThat(a.get("suggestions").toString()).doesNotContain(song);
+        JsonNode lean = a.get("leaning").get(0);
+        assertThat(lean.get("song").asText()).isEqualTo(song);
+        assertThat(lean.get("to").asText()).isEqualTo("S");
+        assertThat(lean.get("unmet").toString()).contains("\"kind\":\"DUELS\"", "\"have\":3.0", "\"need\":4.0");
+
+        call(put(BOARD + "/locks/" + song), "", alice).andExpect(status().isNoContent());
+        assertThat(ok(call(post(BOARD + "/analysis"), layoutBody(), alice)).get("leaning").toString()).doesNotContain(song);
+    }
+
+    @Test
     void renamingABoardTakesItsDuelHistoryAlong() throws Exception {
         String sid = start("SMART_MIX", null).get("id").asText();
         verdict(sid, id("A", 0), id("B", 0), "A");

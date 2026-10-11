@@ -3,7 +3,6 @@ package fm.tierlist.duel.engine;
 import fm.tierlist.duel.engine.pairing.Matchup;
 import fm.tierlist.duel.engine.pairing.PairingStrategies;
 import fm.tierlist.duel.engine.pairing.SessionContext;
-import fm.tierlist.duel.engine.policy.Suggestion;
 import fm.tierlist.duel.engine.policy.SuggestionPolicy;
 
 import java.time.Duration;
@@ -124,8 +123,8 @@ public final class DuelEngine {
             if (Math.max(up, down) >= config.fenceNeighbourProbability()) onFence.add(s.id());
         }
 
-        List<Suggestion> moves = suggestions.suggest(songs.values(), layout, tierOf, history.decisions(), history.locks());
-        return new BoardAnalysis(layout, songs, fit.cutpoints(), ranked == 0 ? 0 : certainty / ranked, onFence, moves,
+        SuggestionPolicy.Result moves = suggestions.suggest(songs.values(), layout, tierOf, history.decisions(), history.locks());
+        return new BoardAnalysis(layout, songs, fit.cutpoints(), ranked == 0 ? 0 : certainty / ranked, onFence, moves.ready(), moves.leaning(),
             equalsPairs(history.duels()), tierOrders(layout, songs), replay.winnerOdds, history.locks());
     }
 

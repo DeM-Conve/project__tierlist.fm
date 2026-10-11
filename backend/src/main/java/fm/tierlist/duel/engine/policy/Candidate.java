@@ -8,6 +8,8 @@ import java.util.Map;
 
 // A possible move the rules vote on: `song` from its tier (null = to-do) to
 // `to`, at `confidence`; `decision` is the user's earlier answer for it, if any.
+// For a ranked song `confidence` is the chance it belongs in `to` *or beyond*
+// (P(score past the border of `to`)), for a to-do song the chance of `to` itself.
 public record Candidate(
     SongState song,
     String from,

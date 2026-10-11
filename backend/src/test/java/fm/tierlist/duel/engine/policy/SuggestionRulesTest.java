@@ -12,6 +12,8 @@ import org.junit.jupiter.api.Test;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
 
 import static fm.tierlist.duel.engine.Boards.id;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -65,12 +67,62 @@ class SuggestionRulesTest {
 
     @Test
     void policySortsByConfidenceAndSkipsTheCurrentTier() {
-        SuggestionPolicy p = new SuggestionPolicy(List.of(c -> true));
+        SuggestionPolicy p = new SuggestionPolicy(List.of(c -> Optional.empty()), 0.85);
         SongState stay = new SongState(id("C", 0), "C", new Rating(20, 1), new double[] {0, 0, 0.1, 0.9, 0}, 0.2, 3, List.of(), List.of());
         SongState up = state(wins("A", 2));
         SongState none = new SongState(id("D", 0), "D", new Rating(20, 1), new double[0], 0, 0, List.of(), List.of());
-        List<Suggestion> out = p.suggest(List.of(stay, up, none), board, tierOf, Map.of(), java.util.Set.of());
+        List<Suggestion> out = p.suggest(List.of(stay, up, none), board, tierOf, Map.of(), Set.of()).ready();
         assertThat(out).extracting(Suggestion::song).containsExactly(song);
         assertThat(out.get(0).keyResults()).hasSize(2);
+    }
+
+    @Test
+    void rulesSayWhatIsMissing() {
+        assertThat(new ConfidenceRule(0.85).shortfall(candidate(List.of(), 0.8, null, false)))
+            .contains(new Shortfall(Shortfall.Kind.CONFIDENCE, 0.8, 0.85));
+        assertThat(new MinimumDuelsRule(4).shortfall(candidate(wins("A", 3), 0.9, null, false)))
+            .contains(new Shortfall(Shortfall.Kind.DUELS, 3, 4));
+        assertThat(new BorderOpponentsRule(2).shortfall(candidate(wins("D", 4), 0.9, null, false)))
+            .contains(new Shortfall(Shortfall.Kind.BORDER_OPPONENTS, 0, 2));
+        assertThat(new NotLockedRule().shortfall(candidate(List.of(), 0.9, null, true)).orElseThrow().userDecided()).isTrue();
+        Decision kept = new Decision(Decision.Kind.KEPT, "B", "A", 4);
+        assertThat(new KeepHysteresisRule(5).shortfall(candidate(wins("A", 6), 0.9, kept, false)))
+            .contains(new Shortfall(Shortfall.Kind.FRESH_DUELS, 2, 5));
+    }
+
+    private SongState inC(double[] p, int best, int duels) {
+        return new SongState(id("C", 0), "C", new Rating(20, 1), p, 0.5, best, wins("B", duels), List.of());
+    }
+
+    @Test
+    void aMoveGoesAsFarAsTheEvidenceSurelyReaches() {
+        SuggestionPolicy p = new SuggestionPolicy(List.of(new ConfidenceRule(0.85)), 0.85);
+        // Surely above C (99%), but S/A/B split: B is as far as 85% reaches.
+        Suggestion up = p.suggest(List.of(inC(new double[] {0, 0.49, 0.49, 0.01, 0.01}, 1, 4)), board, tierOf, Map.of(), Set.of()).ready().get(0);
+        assertThat(up.to()).isEqualTo("B");
+        assertThat(up.confidence()).isCloseTo(0.98, org.assertj.core.data.Offset.offset(1e-9));
+        // 89% "A or better": straight to A.
+        Suggestion far = p.suggest(List.of(inC(new double[] {0.14, 0.75, 0.11, 0, 0}, 1, 4)), board, tierOf, Map.of(), Set.of()).ready().get(0);
+        assertThat(far.to()).isEqualTo("A");
+        assertThat(far.confidence()).isCloseTo(0.89, org.assertj.core.data.Offset.offset(1e-9));
+        // Downwards the same way.
+        Suggestion down = p.suggest(List.of(inC(new double[] {0, 0, 0.05, 0.05, 0.9}, 4, 4)), board, tierOf, Map.of(), Set.of()).ready().get(0);
+        assertThat(down.to()).isEqualTo("D");
+        assertThat(down.confidence()).isCloseTo(0.9, org.assertj.core.data.Offset.offset(1e-9));
+    }
+
+    @Test
+    void aMoveShortOfTheBarIsLeaningWithWhatItLacks() {
+        SuggestionPolicy p = new SuggestionPolicy(List.of(new NotLockedRule(), new ConfidenceRule(0.85), new MinimumDuelsRule(4)), 0.85);
+        SongState unsure = inC(new double[] {0, 0.03, 0.8, 0.17, 0}, 2, 3);
+        SuggestionPolicy.Result r = p.suggest(List.of(unsure), board, tierOf, Map.of(), Set.of());
+        assertThat(r.ready()).isEmpty();
+        Suggestion lean = r.leaning().get(0);
+        assertThat(lean.to()).isEqualTo("B");
+        assertThat(lean.confidence()).isCloseTo(0.83, org.assertj.core.data.Offset.offset(1e-9));
+        assertThat(lean.unmet()).extracting(Shortfall::kind).containsExactly(Shortfall.Kind.CONFIDENCE, Shortfall.Kind.DUELS);
+        // A lock is the user's answer: not leaning either. Nor is a song with no duels at all.
+        assertThat(p.suggest(List.of(unsure), board, tierOf, Map.of(), Set.of(unsure.id())).leaning()).isEmpty();
+        assertThat(p.suggest(List.of(inC(unsure.probabilities(), 2, 0)), board, tierOf, Map.of(), Set.of()).leaning()).isEmpty();
     }
 }

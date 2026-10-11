@@ -1,13 +1,14 @@
 package fm.tierlist.duel.engine.policy;
 
 import java.util.Objects;
+import java.util.Optional;
 
 // Not one lucky matchup: at least `minimum` distinct opponents from near the
 // border being crossed - the tiers from `from` to `to` (for a to-do song, the
 // target tier and its neighbours).
 public record BorderOpponentsRule(int minimum) implements SuggestionRule {
     @Override
-    public boolean allows(Candidate c) {
+    public Optional<Shortfall> shortfall(Candidate c) {
         int to = c.layout().rankOf(c.to()).orElseThrow();
         int lo;
         int hi;
@@ -25,6 +26,6 @@ public record BorderOpponentsRule(int minimum) implements SuggestionRule {
             .map(c.layout()::rankOf)
             .filter(r -> r.isPresent() && r.get() >= lo && r.get() <= hi)
             .count();
-        return near >= minimum;
+        return near >= minimum ? Optional.empty() : Optional.of(new Shortfall(Shortfall.Kind.BORDER_OPPONENTS, near, minimum));
     }
 }
