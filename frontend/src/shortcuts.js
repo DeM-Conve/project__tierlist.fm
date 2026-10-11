@@ -20,6 +20,7 @@ export const SHORTCUTS = [
   { id: 'sidebar', keys: ['Ctrl', 'B'], description: 'Open / close the board panel next to the activity bar, like VS Code (on a phone: the menu)', category: 'Global' },
   { id: 'view-boards', keys: ['Ctrl', 'Shift', 'E'], description: 'Show the Tier lists view in the panel (like VS Code’s Explorer)', category: 'Global' },
   { id: 'view-playlists', keys: ['Ctrl', 'Shift', 'F'], description: 'Show the Playlists view in the panel (like VS Code’s Search)', category: 'Global' },
+  { id: 'view-duels', keys: ['Ctrl', 'Shift', 'D'], description: 'Show the Duels view in the panel (like VS Code’s Run and Debug)', category: 'Global' },
   { id: 'settings', keys: ['Ctrl', ','], description: 'Open Settings, like VS Code', category: 'Global', commandId: 'page-settings' },
   { id: 'undo', keys: ['Ctrl', 'Z'], description: 'Undo the last tier edit (drag, move, rating, bulk, duel result)', category: 'Global' },
   { id: 'redo', keys: ['Ctrl', 'Shift', 'Z'], description: 'Redo the last undone tier edit (Ctrl+Y too)', category: 'Global' },
