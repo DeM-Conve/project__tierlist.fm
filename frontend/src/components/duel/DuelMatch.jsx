@@ -235,12 +235,12 @@ export default function DuelMatch({ category, sessionId, boardLoading, base }) {
     dispatch(requestPlayerPause());
   }, [dispatch]);
 
-  // A new song to settle starts on A; the same one again starts on its new opponent.
-  const lastA = useRef(null);
+  // Every new pair (after a verdict or a skip) starts clean: on A, both clips
+  // from 0:30 part 1 - the cards are keyed by the pair, so nothing carries over
+  // (the user's call: a song staying on after a skip restarts too).
   useEffect(() => {
     if (!m || answered) return;
-    setListening(m.a === lastA.current ? 'B' : 'A');
-    lastA.current = m.a;
+    setListening('A');
   }, [m?.a, m?.b, answered]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // 409: the session moved on (another tab, a double press - nothing was
@@ -437,6 +437,7 @@ export default function DuelMatch({ category, sessionId, boardLoading, base }) {
   const gain = s.certainty - s.certaintyStart;
   const elapsed = Math.max(1, s.minutes * 60 - secondsLeft);
   const shown = answered ?? m;
+  const pairKey = `${shown?.a}|${shown?.b}`;
   const prev = s.previous;
   const showResult = answered && prev && !verdict.isPending;
   const v = (id) => board.videoOf(id) ?? { videoId: id };
@@ -504,12 +505,12 @@ export default function DuelMatch({ category, sessionId, boardLoading, base }) {
         {heading}
         {cardsBox(
           <>
-            <ClipCard side="A" video={v(shown.a)} song={shown.songA} name={board.nameOf(shown.a)} artist={board.artistOf(shown.a)}
+            <ClipCard key={`A|${pairKey}`} side="A" video={v(shown.a)} song={shown.songA} name={board.nameOf(shown.a)} artist={board.artistOf(shown.a)}
               active={listening === 'A'} paused={paused} fit={fit} onListen={() => setListening('A')}
               onStartedByUser={() => setListening('A')}
               onClipEnd={() => !blocked[shown.b] && setListening('B')}
               onBlocked={() => setBlocked((x) => ({ ...x, [shown.a]: true }))} />
-            <ClipCard side="B" video={v(shown.b)} song={shown.songB} name={board.nameOf(shown.b)} artist={board.artistOf(shown.b)}
+            <ClipCard key={`B|${pairKey}`} side="B" video={v(shown.b)} song={shown.songB} name={board.nameOf(shown.b)} artist={board.artistOf(shown.b)}
               active={listening === 'B'} paused={paused} fit={fit} onListen={() => setListening('B')}
               onStartedByUser={() => setListening('B')}
               onClipEnd={() => !blocked[shown.a] && setListening('A')}

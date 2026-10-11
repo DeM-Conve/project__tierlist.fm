@@ -194,6 +194,17 @@ describe('DuelMatch', () => {
     expect(screen.getByRole('button', { name: /Hear A/ })).toHaveTextContent('Tab');
   });
 
+  it('a new pair after a skip starts clean on A, even when A stays the same song', () => {
+    page();
+    fireEvent.keyDown(window, { key: 'Tab' });
+    expect(screen.getByRole('button', { name: /Hear A/ })).toBeInTheDocument();
+    // The skip lands: same A, a new opponent. Any re-render shows it.
+    h.session = { ...h.session, matchup: matchup(IDS.mid, IDS.mid2) };
+    fireEvent.keyDown(window, { key: ' ' });
+    expect(screen.getByRole('button', { name: /Hear B/ })).toBeInTheDocument();
+    expect(screen.getAllByText('0:30 – 1:00')).toHaveLength(2);
+  });
+
   it("s skips the opponent; u undoes; the list shows this session's verdicts", () => {
     h.session.duels = [
       { id: 1, a: IDS.mid, b: IDS.top, verdict: 'TOO_CLOSE' },
