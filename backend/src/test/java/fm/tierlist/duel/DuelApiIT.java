@@ -78,8 +78,8 @@ class DuelApiIT extends PostgresIT {
         return json.readTree(r.andReturn().getResponse().getContentAsString());
     }
 
-    private JsonNode start(String focus, String song) throws Exception {
-        String body = "{\"layout\": %s, \"focus\": \"%s\", \"songId\": %s, \"minutes\": 5}".formatted(layout(), focus, song == null ? "null" : "\"" + song + "\"");
+    private JsonNode start(String focus) throws Exception {
+        String body = "{\"layout\": %s, \"focus\": \"%s\", \"minutes\": 5}".formatted(layout(), focus);
         return ok(call(post(BOARD + "/sessions"), body, alice).andExpect(status().isCreated()));
     }
 
@@ -102,7 +102,7 @@ class DuelApiIT extends PostgresIT {
 
     @Test
     void placeTodoSessionRoundTrip() throws Exception {
-        JsonNode s = start("PLACE_TODO", null);
+        JsonNode s = start("PLACE_TODO");
         String sid = s.get("id").asText();
         assertThat(s.get("matchup").get("a").asText()).isEqualTo(id("TD", 0));
         assertThat(s.get("matchup").get("reason").get("kind").asText()).isEqualTo("PLACE");
@@ -150,7 +150,7 @@ class DuelApiIT extends PostgresIT {
 
     @Test
     void endingASessionSummarisesItAndClosesIt() throws Exception {
-        JsonNode s = start("SMART_MIX", null);
+        JsonNode s = start("SMART_MIX");
         String sid = s.get("id").asText();
         verdict(sid, id("D", 0), id("S", 0), "A_CLEARLY");
         verdict(sid, id("B", 0), id("B", 1), "TOO_CLOSE");
@@ -169,7 +169,7 @@ class DuelApiIT extends PostgresIT {
 
     @Test
     void aRepeatedOrStaleWriteIsRefusedNotRecordedTwice() throws Exception {
-        String sid = start("SMART_MIX", null).get("id").asText();
+        String sid = start("SMART_MIX").get("id").asText();
         String body = "{\"layout\": %s, \"a\": \"%s\", \"b\": \"%s\", \"verdict\": \"A\", \"seenDuels\": 0}".formatted(layout(), id("A", 0), id("B", 0));
         call(post(BOARD + "/sessions/" + sid + "/verdicts"), body, alice).andExpect(status().isOk());
         call(post(BOARD + "/sessions/" + sid + "/verdicts"), body, alice)
@@ -182,7 +182,7 @@ class DuelApiIT extends PostgresIT {
 
     @Test
     void timeIsUpAfterTheSessionLength() throws Exception {
-        String sid = start("SMART_MIX", null).get("id").asText();
+        String sid = start("SMART_MIX").get("id").asText();
         now = now.plus(Duration.ofMinutes(6));
         JsonNode s = ok(call(post(BOARD + "/sessions/" + sid), layoutBody(), alice).andExpect(status().isOk()));
         assertThat(s.get("done").asBoolean()).isTrue();
@@ -193,26 +193,22 @@ class DuelApiIT extends PostgresIT {
 
     @Test
     void aNewSessionEndsTheOpenOne() throws Exception {
-        String first = start("SMART_MIX", null).get("id").asText();
-        start("BORDERLINES", null);
+        String first = start("SMART_MIX").get("id").asText();
+        start("BORDERLINES");
         assertThat(jdbc.queryForObject("SELECT ended_at IS NOT NULL FROM duel_session WHERE id = ?::uuid", Boolean.class, first)).isTrue();
     }
 
     @Test
-    void oneSongSessionPinsTheSong() throws Exception {
-        JsonNode s = start("ONE_SONG", id("C", 2));
-        assertThat(s.get("matchup").get("a").asText()).isEqualTo(id("C", 2));
-        String body = "{\"layout\": %s, \"focus\": \"ONE_SONG\", \"songId\": \"%s\", \"minutes\": 5}".formatted(layout(), "zzzzzzzzzzz");
+    void oneSongIsNoLongerAFocus() throws Exception {
+        // The One song mode was removed: its focus is refused like any unknown value.
+        String body = "{\"layout\": %s, \"focus\": \"ONE_SONG\", \"songId\": \"%s\", \"minutes\": 5}".formatted(layout(), id("C", 2));
         call(post(BOARD + "/sessions"), body, alice).andExpect(status().isBadRequest());
-        call(post(BOARD + "/sessions"), "{\"layout\": %s, \"focus\": \"ONE_SONG\", \"songId\": null, \"minutes\": 5}".formatted(layout()), alice)
-            .andExpect(status().isBadRequest());
-        String todo = "{\"layout\": %s, \"focus\": \"ONE_SONG\", \"songId\": \"%s\", \"minutes\": 5}".formatted(layout(), id("TD", 0));
-        call(post(BOARD + "/sessions"), todo, alice).andExpect(status().isBadRequest());
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM duel_session", Integer.class)).isZero();
     }
 
     @Test
     void suggestionsDecisionsAndLocks() throws Exception {
-        String sid = start("SMART_MIX", null).get("id").asText();
+        String sid = start("SMART_MIX").get("id").asText();
         String song = id("A", 2);
         for (int i = 0; i < 5; i++) verdict(sid, song, id("S", i), "A_CLEARLY");
         JsonNode a = ok(call(post(BOARD + "/analysis"), layoutBody(), alice));
@@ -237,7 +233,7 @@ class DuelApiIT extends PostgresIT {
 
     @Test
     void aMoveShortOfTheBarComesBackAsLeaningWithWhatItLacks() throws Exception {
-        String sid = start("SMART_MIX", null).get("id").asText();
+        String sid = start("SMART_MIX").get("id").asText();
         String song = id("A", 2);
         for (int i = 0; i < 3; i++) verdict(sid, song, id("S", i), "A_CLEARLY");
         JsonNode a = ok(call(post(BOARD + "/analysis"), layoutBody(), alice));
@@ -253,7 +249,7 @@ class DuelApiIT extends PostgresIT {
 
     @Test
     void renamingABoardTakesItsDuelHistoryAlong() throws Exception {
-        String sid = start("SMART_MIX", null).get("id").asText();
+        String sid = start("SMART_MIX").get("id").asText();
         verdict(sid, id("A", 0), id("B", 0), "A");
         call(put(BOARD + "/locks/" + id("A", 0)), "", alice).andExpect(status().isNoContent());
         call(put(BOARD + "/decisions/" + id("B", 0)), "{\"from\": \"B\", \"to\": \"A\", \"confidence\": 0.9, \"decision\": \"KEPT\"}", alice)
@@ -292,7 +288,7 @@ class DuelApiIT extends PostgresIT {
 
     @Test
     void sessionsBelongToTheirUserAndBoard() throws Exception {
-        String sid = start("SMART_MIX", null).get("id").asText();
+        String sid = start("SMART_MIX").get("id").asText();
         call(post(BOARD + "/sessions/" + sid), layoutBody(), bob).andExpect(status().isNotFound());
         call(post("/api/duels/Other/sessions/" + sid), layoutBody(), alice).andExpect(status().isNotFound());
     }
@@ -300,7 +296,7 @@ class DuelApiIT extends PostgresIT {
     @Test
     void rejectsWhatTheFrontendNeverSends() throws Exception {
         call(post(BOARD + "/analysis"), "{\"layout\": {\"tiers\": {\"S\": [\"bad id\"]}}}", alice).andExpect(status().isBadRequest());
-        String sid = start("SMART_MIX", null).get("id").asText();
+        String sid = start("SMART_MIX").get("id").asText();
         String same = "{\"layout\": %s, \"a\": \"%s\", \"b\": \"%s\", \"verdict\": \"A\", \"seenDuels\": 0}".formatted(layout(), id("A", 0), id("A", 0));
         call(post(BOARD + "/sessions/" + sid + "/verdicts"), same, alice).andExpect(status().isBadRequest());
         String offBoard = "{\"layout\": %s, \"a\": \"%s\", \"b\": \"zzzzzzzzzzz\", \"verdict\": \"A\", \"seenDuels\": 0}".formatted(layout(), id("A", 0));
@@ -316,10 +312,6 @@ class DuelApiIT extends PostgresIT {
             + "VALUES ('00000000-0000-0000-0000-0000000000aa', 'carol', 'B', 'SMART_MIX', 5, now(), 0.5)");
         org.assertj.core.api.Assertions.assertThatThrownBy(() -> jdbc.update(
             "INSERT INTO duel (session_id, video_a, video_b, verdict, created_at) VALUES ('00000000-0000-0000-0000-0000000000aa', 'aaaaaaaaaaa', 'aaaaaaaaaaa', 'A', now())"))
-            .isInstanceOf(org.springframework.dao.DataIntegrityViolationException.class);
-        org.assertj.core.api.Assertions.assertThatThrownBy(() -> jdbc.update(
-            "INSERT INTO duel_session (id, user_id, board, focus, minutes, started_at, certainty_start) "
-                + "VALUES ('00000000-0000-0000-0000-0000000000ab', 'carol', 'B', 'ONE_SONG', 5, now(), 0.5)"))
             .isInstanceOf(org.springframework.dao.DataIntegrityViolationException.class);
     }
 }

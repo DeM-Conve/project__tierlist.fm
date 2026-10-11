@@ -24,7 +24,6 @@ public final class PairingStrategies {
         m.put(Focus.SMART_MIX, new BorderPairing((s, a) -> s.tier() != null));
         m.put(Focus.PLACE_TODO, new PlaceTodoPairing());
         m.put(Focus.BORDERLINES, new BorderPairing(PairingStrategies::onFence));
-        m.put(Focus.ONE_SONG, new OneSongPairing());
         return new PairingStrategies(m);
     }
 

@@ -15,7 +15,6 @@ import fm.tierlist.duel.engine.Duel;
 import fm.tierlist.duel.engine.DuelEngine;
 import fm.tierlist.duel.engine.DuelHistory;
 import fm.tierlist.duel.engine.Rating;
-import fm.tierlist.duel.engine.pairing.Focus;
 import fm.tierlist.duel.engine.pairing.Matchup;
 import fm.tierlist.duel.engine.pairing.SessionContext;
 import org.springframework.stereotype.Service;
@@ -146,16 +145,11 @@ public class DuelService {
     @Transactional
     public SessionDto start(String userId, String board, DuelDtos.StartRequest req) {
         BoardLayout layout = req.layout().toLayout();
-        String song = req.focus() == Focus.ONE_SONG ? requireVideoId(req.songId()) : null;
-        if (song != null && !layout.isRanked(layout.tierOf().get(song))) {
-            // To-do songs aren't done yet: only a Place TODO session duels them.
-            throw new IllegalArgumentException("Pick a song from a ranked tier - to-do songs are placed with Place TODO songs");
-        }
         Instant now = clock.instant();
         openSession(userId, board).ifPresent(s -> s.end(now));
         DuelHistory history = history(userId, board, layout);
         double certainty = engine.analyze(layout, history, now).certainty();
-        DuelSession s = sessions.save(new DuelSession(userId, board, req.focus(), song, req.minutes(), now, certainty));
+        DuelSession s = sessions.save(new DuelSession(userId, board, req.focus(), req.minutes(), now, certainty));
         return view(s, layout, history, null);
     }
 
@@ -301,14 +295,14 @@ public class DuelService {
                 next = Optional.of(Matchup.of(a, rematch.a(), rematch.b()));
             } else {
                 long seed = s.getId().getMostSignificantBits() ^ (31L * mine.size() + skipped.size());
-                SessionContext ctx = new SessionContext(s.getFocus(), s.getSongId(), mine, Set.copyOf(skipped),
+                SessionContext ctx = new SessionContext(s.getFocus(), mine, Set.copyOf(skipped),
                     history.duels(), new Random(seed));
                 next = engine.next(a, ctx);
             }
         }
         MatchupDto matchup = next.map(m -> MatchupDto.from(m, a)).orElse(null);
         DuelDtos.PreviousDto previous = mine.isEmpty() ? null : previous(mine.get(mine.size() - 1), a);
-        return new SessionDto(s.getId(), s.getBoard(), s.getFocus(), s.getSongId(), s.getMinutes(), s.getStartedAt(),
+        return new SessionDto(s.getId(), s.getBoard(), s.getFocus(), s.getMinutes(), s.getStartedAt(),
             s.endsAt(), s.getCertaintyStart(), a.certainty(), mine.stream().map(DuelDto::from).toList(), skipped,
             previous, matchup, matchup == null);
     }

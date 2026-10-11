@@ -4,6 +4,5 @@ package fm.tierlist.duel.engine.pairing;
 public enum Focus {
     SMART_MIX,
     PLACE_TODO,
-    BORDERLINES,
-    ONE_SONG
+    BORDERLINES
 }

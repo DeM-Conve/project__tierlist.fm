@@ -32,9 +32,6 @@ public class DuelSession {
     @Column(nullable = false, columnDefinition = "duel_focus")
     private Focus focus;
 
-    @Column(name = "song_id")
-    private String songId;
-
     @Column(nullable = false)
     private short minutes;
 
@@ -50,12 +47,11 @@ public class DuelSession {
     protected DuelSession() {
     }
 
-    DuelSession(String userId, String board, Focus focus, String songId, int minutes, Instant startedAt, double certaintyStart) {
+    DuelSession(String userId, String board, Focus focus, int minutes, Instant startedAt, double certaintyStart) {
         this.id = UUID.randomUUID();
         this.userId = userId;
         this.board = board;
         this.focus = focus;
-        this.songId = songId;
         this.minutes = (short) minutes;
         this.startedAt = startedAt;
         this.certaintyStart = (float) certaintyStart;
@@ -65,7 +61,6 @@ public class DuelSession {
     public String getUserId() { return userId; }
     public String getBoard() { return board; }
     public Focus getFocus() { return focus; }
-    public String getSongId() { return songId; }
     public int getMinutes() { return minutes; }
     public Instant getStartedAt() { return startedAt; }
     public Instant getEndedAt() { return endedAt; }

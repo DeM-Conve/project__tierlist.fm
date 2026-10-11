@@ -57,7 +57,7 @@ class SimulatedListenerTest {
         BoardAnalysis a = null;
         for (int n = 0; n < duels; n++) {
             a = engine.analyze(board, new DuelHistory(priors, log, Map.of(), Set.of()), Boards.T0.plusSeconds(n + 1000));
-            Optional<Matchup> m = engine.next(a, new SessionContext(focus, null, log, Set.of(), log, random));
+            Optional<Matchup> m = engine.next(a, new SessionContext(focus, log, Set.of(), log, random));
             if (m.isEmpty()) break;
             log.add(Boards.duel(n + 1, m.get().a(), m.get().b(), answer(truth.get(m.get().a()), truth.get(m.get().b()))));
         }

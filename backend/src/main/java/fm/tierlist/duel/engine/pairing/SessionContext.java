@@ -9,7 +9,6 @@ import java.util.random.RandomGenerator;
 /**
  * What pairing needs to know about the session in progress.
  *
- * @param songId       the pinned song (ONE_SONG only)
  * @param sessionDuels this session's duels, oldest first
  * @param skipped      songs the user said they don't know - never offered again this session
  * @param recentDuels  the board's latest duels (any session), oldest first, for the repeat penalty
@@ -17,7 +16,6 @@ import java.util.random.RandomGenerator;
  */
 public record SessionContext(
     Focus focus,
-    String songId,
     List<Duel> sessionDuels,
     Set<String> skipped,
     List<Duel> recentDuels,

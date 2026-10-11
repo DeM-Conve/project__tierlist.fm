@@ -50,7 +50,7 @@ public final class DuelDtos {
 
     public record LayoutRequest(@NotNull @Valid LayoutDto layout) {}
 
-    public record StartRequest(@NotNull @Valid LayoutDto layout, @NotNull Focus focus, String songId,
+    public record StartRequest(@NotNull @Valid LayoutDto layout, @NotNull Focus focus,
                                @Min(1) @Max(60) int minutes) {}
 
     // `seenDuels`: how many duels the session had when the browser asked - a
@@ -136,7 +136,7 @@ public final class DuelDtos {
     // Both songs of the last verdict as they stand after it (for "Nayaab is now 81% T1").
     public record PreviousDto(DuelDto duel, SongDto a, SongDto b) {}
 
-    public record SessionDto(UUID id, String board, Focus focus, String songId, int minutes, Instant startedAt, Instant endsAt,
+    public record SessionDto(UUID id, String board, Focus focus, int minutes, Instant startedAt, Instant endsAt,
                              double certaintyStart, double certainty, List<DuelDto> duels, List<String> skipped,
                              PreviousDto previous, MatchupDto matchup, boolean done) {}
 

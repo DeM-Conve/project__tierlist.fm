@@ -7,7 +7,7 @@ import fm.tierlist.duel.engine.SongState;
  * The next duel: `a` is the song being settled, `b` its opponent.
  *
  * @param reason why this pairing - BORDER (a sits near the upper/lower border, b anchors it),
- *               PLACE (binary search for a to-do or pinned song)
+ *               PLACE (binary search for a to-do song)
  */
 public record Matchup(String a, String b, Reason reason) {
 
