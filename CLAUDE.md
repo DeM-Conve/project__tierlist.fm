@@ -218,8 +218,8 @@ category.
   whole log on every analysis), `PriorPolicy` (`TierPriorPolicy`: a song starts from
   the tier it's in), `TierModel` (`OrdinalProbitTierModel`, Commons Math),
   `pairing.PairingStrategy` per `Focus` (registry `PairingStrategies`; the focuses
-  are `SMART_MIX`, `PLACE_TODO`, `BORDERLINES` - the "One song" mode was removed,
-  the user's call), and
+  are `SMART_MIX`, `BORDERLINES` - the "One song" and "Place TODO" modes were
+  removed, the user's calls), and
   `policy.SuggestionPolicy`, a composite of `SuggestionRule`s (the 85% / 4 duels /
   2 border opponents gate, Keep hysteresis, locks). Tunables: `EngineConfig`. The duel
   log is the source of truth (event sourcing): scores are always rebuilt from priors +
@@ -230,10 +230,17 @@ category.
   staged edits included). The frontend's duel screens (`components/duel/`) only show
   what the API returns - add ranking logic to the engine, never to the frontend.
   Every duel/user datum lives in Postgres (the user's call), not localStorage.
-  **To-do songs only come up in a Place TODO session** (the user's call: they "aren't
-  done yet") - Smart mix, Borderlines and every opponent are ranked songs.
+  **To-do songs are never part of duels; the user places them** (the user's call:
+  "for the entire duel concept the todo song will not be there"). `DuelEngine.analyze`
+  leaves `BoardLayout.toDo()` out entirely - no prior, score, pairing, opponent,
+  certainty/fence count, suggestion, leaning or tier order - and drops old duels
+  involving a song now in to-do; `SuggestionPolicy.userPlacesIt` states the same
+  rule. The frontend still sends the to-do list in the layout so the backend knows
+  what to leave out. Verdicts with a to-do song and decisions from TODO are 400.
   **Retired schema bits, drop at the next schema reset:** V1 still has the
-  `ONE_SONG` label in the `duel_focus` enum, the nullable `duel_session.song_id`
+  `ONE_SONG` and `PLACE_TODO` labels in the `duel_focus` enum (`Focus.PLACE_TODO`
+  is kept as a `@Deprecated` constant so old sessions still load; an open one plays
+  as Smart mix, a new one is refused with 400), the nullable `duel_session.song_id`
   column and its `session_song_for_one_song` CHECK. They're harmless (nothing
   writes them; `DuelSession` no longer maps `song_id`), and V1 is applied on the
   live DB, so they're left in place rather than editing the migration.
