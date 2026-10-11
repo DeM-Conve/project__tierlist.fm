@@ -73,6 +73,13 @@ public class PlaylistController {
         return result;
     }
 
+    // YouTube's partial response: only what toVideo() reads. A big to-do list
+    // is many pages fetched one after another (each needs the last one's
+    // token), so a smaller page - no descriptions, one thumbnail size - is
+    // the main lever on how long a board takes to load. Same quota cost.
+    static final String ITEM_FIELDS =
+        "nextPageToken,items(id,snippet(title,videoOwnerChannelTitle,resourceId/videoId,thumbnails(medium/url,default/url)),contentDetails/videoId)";
+
     @GetMapping("/api/playlists/{id}/items")
     public List<Map<String, Object>> playlistItems(
             @PathVariable String id,
@@ -80,7 +87,7 @@ public class PlaylistController {
     ) {
         List<Map<String, Object>> allItems = fetchAllPages(
             client,
-            apiBase + "/playlistItems?part=snippet,contentDetails&playlistId=" + id + "&maxResults=50"
+            apiBase + "/playlistItems?part=snippet,contentDetails&playlistId=" + id + "&maxResults=50&fields=" + ITEM_FIELDS
         );
 
         return toVideos(allItems);

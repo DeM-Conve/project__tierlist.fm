@@ -61,6 +61,11 @@
       <artifactId>flyway-database-postgresql</artifactId>
     </dependency>
     <!-- Duel engine maths: the normal CDF and a 1-D optimiser (Apache-2.0). -->
+    <!-- Pooled keep-alive + gzip for the YouTube client (YoutubeConfig). Apache-2.0; version from Boot. -->
+    <dependency>
+      <groupId>org.apache.httpcomponents.client5</groupId>
+      <artifactId>httpclient5</artifactId>
+    </dependency>
     <dependency>
       <groupId>org.apache.commons</groupId>
       <artifactId>commons-math3</artifactId>

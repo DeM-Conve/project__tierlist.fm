@@ -178,9 +178,15 @@ class PlaylistControllerIT extends PostgresIT {
 
     // ---- GET /api/playlists/{id}/items --------------------------------------
 
+    // Asks YouTube for only the fields the app maps (partial response).
+    private static String itemsUrl(String playlistId) {
+        return YT + "/playlistItems?part=snippet,contentDetails&playlistId=" + playlistId
+            + "&maxResults=50&fields=" + PlaylistController.ITEM_FIELDS;
+    }
+
     @Test
     void itemsFollowEveryPageMapFieldsAndSkipDeletedAndPrivateVideos() throws Exception {
-        String url = YT + "/playlistItems?part=snippet,contentDetails&playlistId=PLrap&maxResults=50";
+        String url = itemsUrl("PLrap");
         expectGet(url, """
             {"nextPageToken": "N2", "items": [
               {"id": "ITEM1", "snippet": {"title": "Song One", "videoOwnerChannelTitle": "Artist One",
@@ -214,7 +220,7 @@ class PlaylistControllerIT extends PostgresIT {
 
     @Test
     void theSameVideoTwiceInAPlaylistComesBackTwice() throws Exception {
-        expectGet(YT + "/playlistItems?part=snippet,contentDetails&playlistId=PLrap&maxResults=50", """
+        expectGet(itemsUrl("PLrap"), """
             {"items": [
               {"id": "ITEM1", "snippet": {"title": "Song", "resourceId": {"videoId": "vid1"}}, "contentDetails": {"videoId": "vid1"}},
               {"id": "ITEM2", "snippet": {"title": "Song", "resourceId": {"videoId": "vid1"}}, "contentDetails": {"videoId": "vid1"}}
@@ -229,7 +235,7 @@ class PlaylistControllerIT extends PostgresIT {
 
     @Test
     void itemsOfAMissingPlaylistAre404() throws Exception {
-        youtube.expect(requestTo(YT + "/playlistItems?part=snippet,contentDetails&playlistId=PLgone&maxResults=50"))
+        youtube.expect(requestTo(itemsUrl("PLgone")))
             .andRespond(withStatus(HttpStatus.NOT_FOUND).contentType(MediaType.APPLICATION_JSON)
                 .body(youtubeError(404, "playlistNotFound", "The playlist identified with the request's playlistId parameter cannot be found.")));
 
