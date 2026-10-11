@@ -3,7 +3,7 @@ import { tierName } from '../tierLabels';
 import { useDispatch, useSelector } from 'react-redux';
 import { useOutletContext } from 'react-router-dom';
 import { ActionIcon, Badge, Box, Button, Group, Image, Kbd, Modal, Paper, ScrollArea, Stack, Text, Tooltip } from '@mantine/core';
-import { useMediaQuery } from '@mantine/hooks';
+import { useHotkeys, useMediaQuery } from '@mantine/hooks';
 import { ArrowRight, Trash2, Undo2 } from 'lucide-react';
 import { selectStagedChanges } from '../store/selectors';
 import { cancelTransfer, moveWithFeedback } from '../tierActions';
@@ -151,20 +151,20 @@ export default function PendingChanges() {
   const compact = useMediaQuery('(max-width: 62em)');
   const count = moves.length;
 
-  useEffect(() => {
-    function onKeyDown(e) {
-      const a = document.activeElement;
-      const isTyping = a?.tagName === 'INPUT' || a?.tagName === 'TEXTAREA' || a?.isContentEditable;
-      // Shift required (e.key is the uppercase 'P') - a bare "p" was too
-      // easy to hit by accident while browsing a board.
-      if (e.key === 'P' && !isTyping && count > 0 && category) {
+  // Shift+P pushes (Mantine useHotkeys: exact modifiers, and it ignores
+  // keys typed into inputs). Shift is required - a bare "p" was too easy to
+  // hit by accident while browsing a board.
+  useHotkeys([
+    [
+      'shift+P',
+      (e) => {
+        if (count === 0 || !category) return;
         e.preventDefault();
         syncChanges(category);
-      }
-    }
-    window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
-  }, [count, category, syncChanges]);
+      },
+      { preventDefault: false },
+    ],
+  ]);
 
   const showBar = count > 0 || syncStatus === 'done' || syncStatus === 'partial' || syncStatus === 'error';
 

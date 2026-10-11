@@ -64,7 +64,23 @@ describe('PendingChanges with a song moved to another board', () => {
 
   it('Shift+P pushes too', () => {
     const { syncChanges } = setup();
-    fireEvent.keyDown(window, { key: 'P' });
+    fireEvent.keyDown(document.body, { key: 'P', code: 'KeyP', shiftKey: true });
     expect(syncChanges).toHaveBeenCalledWith('Pop');
+  });
+
+  it('Shift+P typed into a text box does not push', () => {
+    const { syncChanges } = setup();
+    const input = document.createElement('input');
+    document.body.appendChild(input);
+    fireEvent.keyDown(input, { key: 'P', code: 'KeyP', shiftKey: true });
+    input.remove();
+    expect(syncChanges).not.toHaveBeenCalled();
+  });
+
+  it('a bare p, or Shift+P with Ctrl held, does not push', () => {
+    const { syncChanges } = setup();
+    fireEvent.keyDown(document.body, { key: 'p', code: 'KeyP' });
+    fireEvent.keyDown(document.body, { key: 'P', code: 'KeyP', shiftKey: true, ctrlKey: true });
+    expect(syncChanges).not.toHaveBeenCalled();
   });
 });
