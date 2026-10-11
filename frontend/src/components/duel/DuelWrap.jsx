@@ -65,11 +65,10 @@ export default function DuelWrap({ category, sessionId, boardLoading, base }) {
     <Container className="duel-view" fluid px={0} py={0} data-testid={s ? undefined : 'wrap-skeleton'}>
       <Stack gap={SECTION_GAP}>
         <PageHeader
-          eyebrow={s && `Session done · ${s.duels} duels · ${minSec(s.seconds)}`}
-          crumb={s ? undefined : <Skeleton h={12} w={260} />}
           title={s
             ? (s.certainty > s.certaintyStart ? `Your ${category} board got sharper.` : `${category}: every duel counts.`)
             : <Skeleton h={30} w={420} radius="sm" />}
+          meta={s ? `Session done · ${s.duels} duels · ${minSec(s.seconds)}` : <Skeleton component="span" display="inline-block" h={12} w={260} />}
           actions={<WrapActions base={base} />}
         />
 

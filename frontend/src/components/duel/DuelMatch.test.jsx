@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, screen } from '@testing-library/react';
+import { fireEvent, screen, within } from '@testing-library/react';
 import DuelMatch from './DuelMatch';
 import { CanvasContext } from '../../layout/canvas';
 import { IDS, renderDuel, song } from '../../test/duelFixtures';
@@ -32,7 +32,7 @@ const matchup = (a = IDS.mid, b = IDS.top) => ({
   songA: song(a, 'A', { mu: 25 }), songB: song(b, 'S', { mu: 30, onFence: false }),
 });
 
-const page = () => renderDuel(<DuelMatch category="Rock" sessionId="s1" boardLoading={false} base="/tier/Rock" />);
+const page = () => renderDuel(<DuelMatch category="Rock" sessionId="s1" boardLoading={false} base="/tier/Rock" />, '/tier/Rock/duel/play/s1');
 
 beforeEach(() => {
   h.error = null;
@@ -44,6 +44,33 @@ beforeEach(() => {
 });
 
 describe('DuelMatch', () => {
+
+  it('shows the "← parent  g u" crumb to /tier/Rock/duel', () => {
+    page();
+    const up = screen.getByRole('link', { name: /Rock · Duel/ });
+    expect(up).toHaveAttribute('href', '/tier/Rock/duel');
+    expect(up).toHaveAttribute('aria-keyshortcuts', 'g u');
+    expect(within(up).getByText('g u', { selector: 'kbd' })).toBeInTheDocument();
+  });
+
+  it('Alt+arrows are the browser’s Back / Forward, never a verdict', () => {
+    page();
+    fireEvent.keyDown(window, { key: 'ArrowLeft', altKey: true });
+    fireEvent.keyDown(window, { key: 'ArrowRight', altKey: true });
+    expect(h.spies.verdict).not.toHaveBeenCalled();
+    fireEvent.keyDown(window, { key: 'ArrowLeft' });
+    expect(h.spies.verdict).toHaveBeenCalledTimes(1);
+  });
+
+  it('g u goes up, it doesn’t undo a verdict', () => {
+    h.session = { ...h.session, duels: [{ id: 1, a: IDS.mid, b: IDS.top, verdict: 'A' }] };
+    page();
+    fireEvent.keyDown(window, { key: 'g' });
+    fireEvent.keyDown(window, { key: 'u' });
+    expect(h.spies.undo).not.toHaveBeenCalled();
+    fireEvent.keyDown(window, { key: 'u' });
+    expect(h.spies.undo).toHaveBeenCalledTimes(1);
+  });
   it('both sides play a 30-second part from 0:30, so their parts line up', () => {
     page();
     expect(screen.getAllByText('0:30 – 1:00')).toHaveLength(2);

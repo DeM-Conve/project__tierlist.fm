@@ -1034,7 +1034,6 @@ function TierFocusPage() {
         onPlay={openFocus}
         onPlayFrom={playFrom}
         onShuffle={startShufflePlay}
-        onBack={() => navigate(base)}
         onSwitchTier={(t) => navigate(`${base}/t/${t}`, { replace: true })}
       />
     </BoardShell>

@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, screen } from '@testing-library/react';
+import { cleanup, screen, within } from '@testing-library/react';
 import DuelWrap from './DuelWrap';
 import { IDS, renderDuel, suggestion } from '../../test/duelFixtures';
 
@@ -11,7 +11,7 @@ vi.mock('../../api/queries', () => ({
   useDuelLockMutation: () => ({ mutate: vi.fn() }),
 }));
 
-const page = () => renderDuel(<DuelWrap category="Rock" sessionId="s1" boardLoading={false} base="/tier/Rock" />);
+const page = () => renderDuel(<DuelWrap category="Rock" sessionId="s1" boardLoading={false} base="/tier/Rock" />, '/tier/Rock/duel/done/s1');
 
 beforeEach(() => {
   h.error = null;
@@ -24,6 +24,14 @@ beforeEach(() => {
 });
 
 describe('DuelWrap', () => {
+
+  it('shows the "← parent  g u" crumb to /tier/Rock/duel', () => {
+    page();
+    const up = screen.getByRole('link', { name: /Rock · Duel/ });
+    expect(up).toHaveAttribute('href', '/tier/Rock/duel');
+    expect(up).toHaveAttribute('aria-keyshortcuts', 'g u');
+    expect(within(up).getByText('g u', { selector: 'kbd' })).toBeInTheDocument();
+  });
   it('sums the session up', () => {
     page();
     expect(screen.getByText('Session done · 14 duels · 4 min 12 s')).toBeInTheDocument();
@@ -64,7 +72,7 @@ describe('DuelWrap', () => {
 
   it('uses the app’s button system: secondaries (default variant) first, the one primary (filled) last', () => {
     page();
-    const buttons = screen.getAllByRole('link').filter((a) => a.className.includes('Button'));
+    const buttons = screen.getAllByRole('link').filter((a) => a.classList.contains('mantine-Button-root'));
     // Mantine leaves data-variant off for its default variant, filled.
     expect(buttons.map((b) => [b.textContent, b.getAttribute('data-variant') ?? 'filled'])).toEqual([
       ['Back to board', 'default'],

@@ -36,7 +36,6 @@ function Page({ loading = false }) {
       onPlay={noop}
       onPlayFrom={noop}
       onShuffle={noop}
-      onBack={noop}
       onSwitchTier={noop}
     />
   );

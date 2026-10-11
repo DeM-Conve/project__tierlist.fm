@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
-import { act, fireEvent } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { act, fireEvent, screen } from '@testing-library/react';
+import { MemoryRouter, useLocation } from 'react-router-dom';
 import { useVimKeys } from './useVimKeys';
 import { makeStore, renderWithApp } from '../test/render';
 import { minimizePlayer, openFocus } from '../store/focusSlice';
@@ -9,7 +9,11 @@ vi.mock('@mantine/notifications', () => ({ notifications: { show: vi.fn(), hide:
 
 const entries = [{ tier: 'S', video: { videoId: 'a', title: 'Song' } }];
 
-function setup({ canvas = null } = {}) {
+function Where() {
+  return <span data-testid="where">{useLocation().pathname}</span>;
+}
+
+function setup({ canvas = null, path = '/' } = {}) {
   const hintsRef = { current: { open: vi.fn() } };
   const canvasRef = { current: canvas };
   function Keys() {
@@ -18,8 +22,9 @@ function setup({ canvas = null } = {}) {
   }
   const store = makeStore();
   renderWithApp(
-    <MemoryRouter>
+    <MemoryRouter initialEntries={[path]}>
       <Keys />
+      <Where />
     </MemoryRouter>,
     { store }
   );
@@ -93,5 +98,32 @@ describe('useVimKeys g i', () => {
     fireEvent.keyDown(document, { key: 'g', code: 'KeyG' });
     fireEvent.keyDown(document, { key: 'i', code: 'KeyI' });
     expect(document.activeElement).toBe(canvas.querySelector('input[type=text]'));
+  });
+});
+
+describe('useVimKeys g u', () => {
+  const goUp = () => {
+    fireEvent.keyDown(document, { key: 'g', code: 'KeyG' });
+    fireEvent.keyDown(document, { key: 'u', code: 'KeyU' });
+  };
+  it.each([
+    ['/tier/Rock/duel', '/tier/Rock'],
+    ['/tier/Rock/duel/moves', '/tier/Rock/duel'],
+    ['/tier/Rock/duel/done/s1', '/tier/Rock/duel'],
+    ['/tier/Rock/duel/play/s1', '/tier/Rock/duel'],
+    ['/tier/Rock/t/S', '/tier/Rock'],
+    ['/tier/Rock', '/'],
+    ['/settings', '/'],
+    ['/add', '/'],
+  ])('from %s goes up to %s', (from, to) => {
+    setup({ path: from });
+    goUp();
+    expect(screen.getByTestId('where')).toHaveTextContent(new RegExp(`^${to}$`));
+  });
+
+  it('does nothing on Home', () => {
+    setup({ path: '/' });
+    goUp();
+    expect(screen.getByTestId('where')).toHaveTextContent(/^\/$/);
   });
 });

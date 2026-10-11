@@ -24,6 +24,8 @@ export const SHORTCUTS = [
   { id: 'settings', keys: ['Ctrl', ','], description: 'Open Settings, like VS Code', category: 'Global', commandId: 'page-settings' },
   { id: 'undo', keys: ['Ctrl', 'Z'], description: 'Undo the last tier edit (drag, move, rating, bulk, duel result)', category: 'Global' },
   { id: 'redo', keys: ['Ctrl', 'Shift', 'Z'], description: 'Redo the last undone tier edit (Ctrl+Y too)', category: 'Global' },
+  { id: 'back', keys: ['Alt', '←'], description: 'Go back, like VS Code’s Go Back (the browser’s own key)', category: 'Global' },
+  { id: 'forward', keys: ['Alt', '→'], description: 'Go forward, like VS Code’s Go Forward (the browser’s own key)', category: 'Global' },
 
   { id: 'hints', keys: ['f'], description: 'Link hints: label everything clickable, type a label to click it', category: 'Navigation (Vim)' },
   { id: 'omnibar', keys: ['o'], description: 'Open the command palette (like Ctrl+K)', category: 'Navigation (Vim)' },
@@ -31,7 +33,7 @@ export const SHORTCUTS = [
   { id: 'add-songs', keys: ['a'], description: 'Add a song (paste its YouTube link)', category: 'Navigation (Vim)' },
   { id: 'go-settings', keys: ['gs'], description: 'Go to Settings', category: 'Navigation (Vim)' },
   { id: 'go-playing', keys: ['gp'], description: 'Go to the playing song’s board', category: 'Navigation (Vim)' },
-  { id: 'go-up', keys: ['gu'], description: 'Up one level: tier page → its board → Home', category: 'Navigation (Vim)' },
+  { id: 'go-up', keys: ['gu'], description: 'Up one level (every page: tier page → board → Home, duel pages → hub → board)', category: 'Navigation (Vim)' },
   { id: 'go-board', keys: ['gb'], description: 'Back to this board (from a tier page)', category: 'Navigation (Vim)' },
   { id: 'go-todo', keys: ['gt'], description: 'This board’s TODO list', category: 'Navigation (Vim)' },
   { id: 'go-duel', keys: ['gd'], description: 'Duel on this board', category: 'Navigation (Vim)' },

@@ -23,6 +23,8 @@ import { CLIP_START, firstStart, nextStart, seeked } from '../../duel/clipWindow
 import { SECTION_GAP } from '../../layout/spacing';
 import { useCanvas } from '../../layout/canvas';
 import { matchFitHeight } from '../../duel/matchFit';
+import { isSequenceKey } from '../../keyboard/sequence';
+import UpCrumb from '../UpCrumb';
 
 // Clips: from the 0:30 mark (no "most replayed" data without an outside
 // service), the same length on both sides so their parts line up.
@@ -278,7 +280,10 @@ export default function DuelMatch({ category, sessionId, boardLoading, base }) {
   useEffect(() => {
     function onKey(e) {
       const el = document.activeElement;
+      // Alt+arrows are the browser's Back / Forward, never a verdict; the
+      // key after `g` belongs to the sequence (`g u` is up, not Undo).
       if (el?.tagName === 'INPUT' || el?.tagName === 'TEXTAREA' || e.ctrlKey || e.metaKey || e.altKey) return;
+      if (isSequenceKey(e)) return;
       // A held key repeats: one press, one verdict.
       if (e.repeat) return;
       if (e.key === 'e') {
@@ -358,7 +363,7 @@ export default function DuelMatch({ category, sessionId, boardLoading, base }) {
     <>
       <Grid.Col span={{ base: 12, lg: 8 }}>
         <Group wrap="nowrap" gap="md" align="center">
-          <Button variant="default" component={Link} to={`${base}/duel`} style={{ flexShrink: 0 }}>← {category} · Duel</Button>
+          <Box style={{ flexShrink: 0 }}><UpCrumb /></Box>
           <Stack gap="2xs" style={{ flex: 1, minWidth: 0 }}>{left}</Stack>
         </Group>
       </Grid.Col>

@@ -20,7 +20,7 @@ export default function SettingsView() {
   return (
     <Box component="section">
       <Box mb={SECTION_GAP}>
-        <PageHeader eyebrow="Account" title="Settings" meta="Look, playlist naming and shortcuts - saved to your account." />
+        <PageHeader title="Settings" meta="Look, playlist naming and shortcuts - saved to your account." />
       </Box>
 
       <Tabs value={tab} onChange={(v) => v && setSearchParams({ tab: v }, { replace: true })} orientation="vertical">

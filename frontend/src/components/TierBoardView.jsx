@@ -527,7 +527,6 @@ export default function TierBoardView({
     <Box component="section" pb={pendingPad}>
       <Stack ref={headerRef} gap={SECTION_GAP} mb={SECTION_GAP}>
       <PageHeader
-        eyebrow="Tier list"
         title={<BoardNameEditor key={category} category={category} onRenamed={onRenameBoard} />}
         meta={anyLoading ? 'Loading videos…' : `${total} videos · ${tiers.length} tiers${hasTodo ? ` · ${todoCount} to do` : ''}`}
         actions={<>

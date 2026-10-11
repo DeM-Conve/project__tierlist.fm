@@ -1,11 +1,12 @@
 import { useHotkeys } from 'react-hotkeys-hook';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import { spotlight } from '@mantine/spotlight';
 import { notifications } from '@mantine/notifications';
 import { TODO_TIER } from '../tiers';
 import { youtubeUrl } from '../tierUtils';
 import { selectPlayerCoversPage } from '../store/selectors';
+import { parentOf } from '../upLevel';
 import './sequence';
 
 const board = (category, rest = '') => `/tier/${encodeURIComponent(category)}${rest}`;
@@ -44,17 +45,18 @@ export function useVimKeys({ hintsRef, canvasRef, categories, currentCategory, p
   useHotkeys('g>s', go('/settings'));
   useHotkeys('g>p', (e) => playingCategory && go(board(playingCategory))(e), deps);
   useHotkeys('g>b', (e) => currentCategory && go(board(currentCategory))(e), deps);
-  // Vimium's "go up": one level up the address - a tier page or duel to its
-  // board, a board / playlist / Add songs / Settings page to Home.
+  // Vimium's "go up": one level up (upLevel.js - the same target as every
+  // page's "← parent" crumb). Home has no parent.
+  const { pathname } = useLocation();
   useHotkeys(
     'g>u',
     (e) => {
-      const parts = window.location.pathname.split('/').filter(Boolean);
-      if (!parts.length) return;
+      const up = parentOf(pathname);
+      if (!up) return;
       e.preventDefault();
-      navigate(parts[0] === 'tier' && parts.length > 2 ? `/tier/${parts[1]}` : '/');
+      navigate(up.to);
     },
-    deps
+    [pathname]
   );
   useHotkeys('g>d', (e) => currentCategory && go(board(currentCategory, '/duel'))(e), deps);
   useHotkeys('g>t', (e) => currentCategory && hasTodo && go(board(currentCategory, `/t/${TODO_TIER}`))(e), deps);

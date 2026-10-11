@@ -19,9 +19,8 @@ import {
   Text,
   TextInput,
   Title,
-  UnstyledButton,
 } from '@mantine/core';
-import { ArrowLeft, ListTodo, MoreHorizontal, Play, Search, Shuffle } from 'lucide-react';
+import { ListTodo, MoreHorizontal, Play, Search, Shuffle } from 'lucide-react';
 import { TIER_COLORS, TODO_TIER } from '../tiers';
 import { moveWithFeedback, useTierDnd } from '../tierActions';
 import { selectStagedChanges, selectPlayerCoversPage } from '../store/selectors';
@@ -178,7 +177,6 @@ export default function TierFocusView({
   onPlay,
   onPlayFrom,
   onShuffle,
-  onBack,
   onSwitchTier,
 }) {
   const dispatch = useDispatch();
@@ -296,15 +294,6 @@ export default function TierFocusView({
     <Box component="section" pb={hasPendingBar ? '5xl' : 0}>
       <Box mb={SECTION_GAP}>
       <PageHeader
-        crumb={
-          <UnstyledButton onClick={onBack} className="crumb">
-            <Group gap="3xs" c="dimmed">
-              <ArrowLeft size={14} />
-              <Text fz="xs">{category} · tier list</Text>
-              <Kbd size="xs">g u</Kbd>
-            </Group>
-          </UnstyledButton>
-        }
         badge={
           <Box w={44} h={44} bg={color} style={{ borderRadius: 'var(--mantine-radius-md)', display: 'grid', placeItems: 'center', flexShrink: 0 }}>
             <Text ff="var(--font-display)" fw={900} fz={isTodo ? 'sm' : '2xl'} c={TIER_INK}>

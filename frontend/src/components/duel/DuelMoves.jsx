@@ -536,11 +536,6 @@ export default function DuelMoves({ category, boardLoading, base }) {
     <Container className="duel-view" fluid px={0} py={0}>
       <Stack gap={SECTION_GAP}>
         <PageHeader
-          crumb={
-            <Anchor component={Link} to={`${base}/duel`} fz="xs" c="dimmed">
-              ← {category} · Duel
-            </Anchor>
-          }
           title="Suggested moves"
           meta="Your duels built the case. Nothing moves until you say so - then push to YouTube as usual."
           actions={rows.length > 0 && (

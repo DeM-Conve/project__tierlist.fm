@@ -74,7 +74,6 @@ export default function DuelHub({ category, boardLoading, base }) {
     <Container className="duel-view" fluid px={0} py={0}>
       <Stack gap={SECTION_GAP}>
         <PageHeader
-          eyebrow={`${category} · Duel`}
           title="Settle the board."
           meta="Every duel nudges a hidden score. A song changes tier only when the evidence is overwhelming - and only after you approve the move."
           actions={

@@ -230,7 +230,6 @@ export default function AddSongsView({ addSongs, actions, onAddLinks }) {
   return (
     <Stack gap={SECTION_GAP} maw={1100}>
       <PageHeader
-        eyebrow="Add songs"
         title="Add a song"
         meta={
           <>
