@@ -510,7 +510,7 @@ export default function TierBoardView({
         actions={<>
           {todoCount > 0 && (
             <Tooltip label="Play the TODO list and give each song a tier - rating one moves on to the next" withArrow multiline maw={260}>
-              <Button variant="light" leftSection={<ListTodo size={15} />} onClick={() => onPlayFrom(TODO_TIER)}>
+              <Button variant="default" leftSection={<ListTodo size={15} />} onClick={() => onPlayFrom(TODO_TIER)}>
                 Triage {todoCount}
               </Button>
             </Tooltip>

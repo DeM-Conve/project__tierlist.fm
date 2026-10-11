@@ -325,15 +325,15 @@ export default function PlaylistNamingSettings() {
           above - sticky via Mantine's style props. */}
       <Paper pos="sticky" bottom={0} withBorder radius="md" p="sm" bg="var(--surface)" shadow="md" style={{ zIndex: 5 }}>
         <Group gap="sm">
-          <Button leftSection={<Check size={15} />} onClick={save} disabled={invalid || Object.keys(shownErrors).length > 0 || !dirty}>
-            Save
-          </Button>
+          <Text fz="xs" c="dimmed" mr="auto">
+            {dirty ? 'Unsaved changes' : 'Saved'}
+          </Text>
           <Button variant="subtle" color="gray" onClick={() => setDraftRaw(active)} disabled={!dirty}>
             Reset
           </Button>
-          <Text fz="xs" c="dimmed" ml="auto">
-            {dirty ? 'Unsaved changes' : 'Saved'}
-          </Text>
+          <Button leftSection={<Check size={15} />} onClick={save} disabled={invalid || Object.keys(shownErrors).length > 0 || !dirty}>
+            Save
+          </Button>
         </Group>
       </Paper>
     </Stack>

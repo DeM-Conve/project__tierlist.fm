@@ -284,7 +284,7 @@ export default function AddSongsView({ addSongs, actions, onAddLinks }) {
                       </Text>
                     </Group>
                     <Group gap="xs">
-                      <Button variant="light" onClick={() => navigate(`/tier/${encodeURIComponent(where.category)}/t/${where.tier}`)}>
+                      <Button variant="default" onClick={() => navigate(`/tier/${encodeURIComponent(where.category)}/t/${where.tier}`)}>
                         Open it
                       </Button>
                       <Button variant="default" rightSection={<Kbd size="xs">x</Kbd>} onClick={() => actions.remove(current)}>

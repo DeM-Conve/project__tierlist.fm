@@ -63,8 +63,8 @@ export function MoveRow({ s, board, selected, decided, onSelect, onMove, onKeep,
         </Group>
       ) : (
         <Group gap="3xs" miw={150}>
-          <Button onClick={onMove}>Move</Button>
           <Button variant="default" onClick={onKeep}>Keep</Button>
+          <Button onClick={onMove}>Move</Button>
         </Group>
       )}
     </Group>
@@ -238,7 +238,7 @@ export default function DuelMoves({ category, boardLoading, base }) {
       <Container className="duel-view" fluid px={0} py={0}>
         <Alert color="red" title="Couldn’t load the suggested moves">
           {errorMessage(analysis.error, 'The app couldn’t reach the server.')}
-          <Group mt="sm"><Button size="xs" onClick={() => analysis.refetch()}>Retry</Button></Group>
+          <Group mt="sm"><Button size="compact-sm" onClick={() => analysis.refetch()}>Retry</Button></Group>
         </Alert>
       </Container>
     );
@@ -357,8 +357,8 @@ export default function DuelMoves({ category, boardLoading, base }) {
                   <Stack gap="xs">
                     {!decided[current.song] && (
                       <Group gap="2xs" grow>
-                        <Button onClick={() => move(current)}>Move to {tierName(current.to)}</Button>
                         <Button variant="default" onClick={() => keep(current)}>Keep in {tierName(current.from)}</Button>
+                        <Button onClick={() => move(current)}>Move to {tierName(current.to)}</Button>
                       </Group>
                     )}
                     <Checkbox

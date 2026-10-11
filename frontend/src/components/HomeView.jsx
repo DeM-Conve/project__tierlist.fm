@@ -83,11 +83,11 @@ function BoardCard({ category, tiers, onOpen, onDuel }) {
         </Stack>
       </UnstyledButton>
       <Group gap="3xs" mt="auto" pt="sm">
-        <Button size="compact-sm" variant="light" onClick={onOpen}>
-          Open
-        </Button>
         <Button size="compact-sm" variant="subtle" color="gray" leftSection={<Swords size={13} />} onClick={onDuel}>
           Duel
+        </Button>
+        <Button size="compact-sm" variant="default" onClick={onOpen}>
+          Open
         </Button>
       </Group>
     </Paper>
@@ -223,7 +223,7 @@ export default function HomeView({
                 </Text>
               </Box>
             </Group>
-            <Button variant="light" onClick={() => onOpenBoard(nowPlaying.category)}>
+            <Button variant="default" onClick={() => onOpenBoard(nowPlaying.category)}>
               Rate it on the board
             </Button>
           </Group>
@@ -236,11 +236,11 @@ export default function HomeView({
             <Stack gap="sm" align="flex-start">
               <Text fz="sm">{loadError}</Text>
               <Group gap="sm">
-                <Button size="compact-sm" onClick={onRelogin}>
-                  Log in again
-                </Button>
                 <Button size="compact-sm" variant="default" loading={retrying} onClick={onRetry}>
                   Retry
+                </Button>
+                <Button size="compact-sm" onClick={onRelogin}>
+                  Log in again
                 </Button>
               </Group>
             </Stack>
