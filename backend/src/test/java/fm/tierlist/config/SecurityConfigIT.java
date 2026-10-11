@@ -6,6 +6,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
@@ -27,7 +28,9 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.options;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrlPattern;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -82,6 +85,23 @@ class SecurityConfigIT extends PostgresIT {
         mvc.perform(get("/api/settings")).andExpect(status().isUnauthorized());
         mvc.perform(get("/api/anything")).andExpect(status().isUnauthorized());
         mvc.perform(post("/api/tier-sync")).andExpect(status().isUnauthorized());
+    }
+
+    // A signed-out POST (the duel analysis) is a 401 ProblemDetail like a GET -
+    // not a login redirect, a 405 or an empty body.
+    @Test
+    void signedOutApiCallsGetA401ProblemDetailForEveryMethod() throws Exception {
+        mvc.perform(post("/api/duels/Rap/analysis").contentType(MediaType.APPLICATION_JSON).content("{}"))
+            .andExpect(status().isUnauthorized())
+            .andExpect(header().doesNotExist(HttpHeaders.LOCATION))
+            .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+            .andExpect(jsonPath("$.status").value(401))
+            .andExpect(jsonPath("$.detail").value(org.hamcrest.Matchers.containsString("log in again")))
+            .andExpect(jsonPath("$.instance").value("/api/duels/Rap/analysis"));
+        mvc.perform(get("/api/playlists"))
+            .andExpect(status().isUnauthorized())
+            .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+            .andExpect(jsonPath("$.status").value(401));
     }
 
     @Test

@@ -6,13 +6,21 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.web.SecurityFilterChain;
-import org.springframework.security.web.authentication.HttpStatusEntryPoint;
+import org.springframework.http.MediaType;
+import org.springframework.http.ProblemDetail;
+import org.springframework.http.converter.json.ProblemDetailJacksonMixin;
+import org.springframework.security.core.AuthenticationException;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.security.web.authentication.SimpleUrlAuthenticationSuccessHandler;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
+import java.io.IOException;
+import java.net.URI;
 import java.util.List;
 
 @Configuration
@@ -37,7 +45,7 @@ public class SecurityConfig {
             )
             .exceptionHandling(ex -> ex
                 .defaultAuthenticationEntryPointFor(
-                    new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED),
+                    SecurityConfig::notLoggedIn,
                     request -> request.getRequestURI().startsWith("/api/")
                 )
             )
@@ -53,6 +61,19 @@ public class SecurityConfig {
             );
 
         return http.build();
+    }
+
+    private static final ObjectMapper JSON = new ObjectMapper().addMixIn(ProblemDetail.class, ProblemDetailJacksonMixin.class);
+
+    // A signed-out API call: 401 with an RFC 9457 ProblemDetail (like every
+    // other API error), never a redirect to Google's login page - for every
+    // method, so a POST can't end up following the redirect as a GET.
+    static void notLoggedIn(HttpServletRequest request, HttpServletResponse response, AuthenticationException e) throws IOException {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.UNAUTHORIZED, "You're not logged in (or your login expired) - log in again.");
+        problem.setInstance(URI.create(request.getRequestURI()));
+        response.setStatus(HttpStatus.UNAUTHORIZED.value());
+        response.setContentType(MediaType.APPLICATION_PROBLEM_JSON_VALUE);
+        JSON.writeValue(response.getOutputStream(), problem);
     }
 
     @Bean

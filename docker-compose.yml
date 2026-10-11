@@ -37,6 +37,8 @@ services:
       context: ./frontend
       args:
         VITE_API_BASE: ${VITE_API_BASE:-http://localhost:48123}
+    environment:
+      BACKEND_ORIGIN: http://backend:${SERVER_PORT:-48123}
     ports:
       - "${FRONTEND_PORT:-80}:80"
     depends_on:
