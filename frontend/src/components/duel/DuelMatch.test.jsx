@@ -4,9 +4,15 @@ import DuelMatch from './DuelMatch';
 import { IDS, renderDuel, song } from '../../test/duelFixtures';
 
 vi.mock('@mantine/notifications', () => ({ notifications: { show: vi.fn(), hide: vi.fn() } }));
-// A stand-in player: a button that reports its video as unplayable here.
+// A stand-in player: buttons that report its video as unplayable here, or
+// as started from the player's own controls.
 vi.mock('../EmbeddedPlayer', () => ({
-  default: ({ videoId, onBlocked }) => <button type="button" onClick={onBlocked}>{`block ${videoId}`}</button>,
+  default: ({ videoId, onBlocked, onPlayingChange }) => (
+    <>
+      <button type="button" onClick={onBlocked}>{`block ${videoId}`}</button>
+      <button type="button" onClick={() => onPlayingChange?.(true)}>{`play ${videoId}`}</button>
+    </>
+  ),
 }));
 
 const h = vi.hoisted(() => ({ session: null, error: null, spies: {} }));
@@ -190,6 +196,32 @@ describe('DuelMatch', () => {
     fireEvent.keyDown(window, { key: 'ArrowLeft' });
     fireEvent.keyDown(window, { key: 'ArrowLeft', repeat: true });
     expect(h.spies.verdict).toHaveBeenCalledTimes(1);
+  });
+
+  it('play pressed in the other side\'s own player makes that side the one being heard', () => {
+    page();
+    expect(screen.getByRole('button', { name: /Hear B/ })).toBeInTheDocument();
+    fireEvent.click(screen.getByText(`play ${IDS.top}`)); // B, not the side playing
+    expect(screen.getByRole('button', { name: /Hear A/ })).toBeInTheDocument();
+    expect(screen.getAllByText('▶ Playing')).toHaveLength(1);
+    // Paused with Space, then play in the heard side's player: it plays again.
+    fireEvent.keyDown(window, { key: ' ' });
+    expect(screen.queryByText('▶ Playing')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByText(`play ${IDS.top}`));
+    expect(screen.getAllByText('▶ Playing')).toHaveLength(1);
+  });
+
+  it('"This session" sits in the side column, next to the duel, with every verdict', () => {
+    h.session.duels = Array.from({ length: 9 }, (_, i) => ({ id: i + 1, a: IDS.mid, b: IDS.top, verdict: 'A' }));
+    page();
+    const sessionCard = screen.getByTestId('duel-session');
+    expect(screen.getByTestId('duel-side')).toContainElement(sessionCard);
+    expect(screen.getByTestId('duel-main')).not.toContainElement(sessionCard);
+    expect(screen.getByTestId('duel-main')).toContainElement(screen.getByRole('group', { name: 'Your verdict' }));
+    expect(sessionCard).toHaveTextContent('This session');
+    // It scrolls instead of cutting the list short.
+    expect(sessionCard.querySelector('.mantine-ScrollArea-root')).not.toBeNull();
+    expect(screen.getAllByText((_, el) => el?.tagName === 'P' && el.textContent === 'Middle Song over Top Song')).toHaveLength(9);
   });
 
   it('Undo is off before the first verdict', () => {
