@@ -114,13 +114,14 @@ export default function TierRail({ category, activeTier }) {
             </Text>
           )}
           {isPlayingTier && playingVideo && (
-            // The playing song's art, centred across its tier's width (the
-            // user's call) and near the bottom, under the label and count.
+            // The playing song's art on its tier's left edge, vertically
+            // centred, its own centre exactly on that edge (the user's call -
+            // the old fixed offset sat it off-centre to the left).
             <Box
               pos="absolute"
-              left="50%"
-              bottom={8}
-              style={{ transform: 'translateX(-50%)', borderRadius: 5, boxShadow: '0 4px 12px var(--shadow)' }}
+              left={0}
+              top="50%"
+              style={{ transform: 'translate(-50%, -50%)', borderRadius: 5, boxShadow: '0 4px 12px var(--shadow)' }}
             >
               <Image src={playingVideo.thumbnail} w={24} h={24} radius={5} fit="cover" alt="" />
               <Box pos="absolute" bottom={2} left={2} bg="accent" px="5xs" py={1} style={{ borderRadius: 2 }}>
