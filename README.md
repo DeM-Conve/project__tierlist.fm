@@ -36,9 +36,9 @@ your device, so even one with hundreds of songs opens instantly while the fresh 
 from YouTube in the background.
 
 **Duels** - Hear two songs' hooks back to back and say which hits harder (clearly, a bit, or
-too close). Every verdict feeds a hidden score; the app picks the duels that settle the most,
-places your to-do songs, and suggests a tier move only once the evidence is overwhelming - you
-approve each one, then push to YouTube as usual.
+too close). Every verdict feeds a hidden score; the app picks the duels that settle the most
+among your ranked songs and suggests a tier move only once the evidence is overwhelming - you
+approve each one, then push to YouTube as usual. To-do songs stay out of duels: you place those.
 
 **A player that never stops** - A YouTube-Music-style player with a real queue (play next,
 add to queue, shuffle, repeat). Minimize it to a mini bar or a floating corner; it keeps
