@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, screen } from '@testing-library/react';
 import { useLocation } from 'react-router-dom';
 import DuelHub from './DuelHub';
@@ -46,7 +46,7 @@ describe('DuelHub', () => {
     fireEvent.click(screen.getByRole('button', { name: /Start duelling/ }));
     expect(h.start.mock.calls[0][0]).toEqual({
       layout: { tiers: { S: [IDS.top], A: [IDS.mid, IDS.mid2], TODO: [IDS.todo] } },
-      focus: 'SMART_MIX', songId: null, minutes: 15,
+      focus: 'SMART_MIX', minutes: 15,
     });
     expect(screen.getByTestId('where')).toHaveTextContent('/tier/Rock/duel/play/new-session');
   });
@@ -68,21 +68,11 @@ describe('DuelHub', () => {
     expect(h.start.mock.calls[0][0]).toMatchObject({ focus: 'BORDERLINES', minutes: 5 });
   });
 
-  it('One song opens a picker of ranked songs; the picked song starts the session', async () => {
-    // jsdom has no layout: give the picker's virtualized list a height.
-    const height = vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get')
-      .mockImplementation(function () { return this.hasAttribute('data-scrollarea-viewport') ? 360 : 0; });
-    onTestFinished(() => height.mockRestore());
+  it('offers exactly three focuses - there is no One song mode', () => {
     page();
-    fireEvent.click(screen.getByText('One song'));
-    expect(screen.getByRole('button', { name: /Start duelling/ })).toBeDisabled();
-    // Choosing the card opens the picker (a modal, not an inline dropdown).
-    expect(await screen.findByPlaceholderText('Search Rock…')).toBeInTheDocument();
-    expect(screen.queryByRole('option', { name: /New Song/ })).not.toBeInTheDocument();
-    fireEvent.click(await screen.findByRole('option', { name: /Middle Song/ }));
-    expect(screen.getByRole('button', { name: /Change the pinned song \(Middle Song\)/ })).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: /Start duelling/ }));
-    expect(h.start.mock.calls[0][0]).toMatchObject({ focus: 'ONE_SONG', songId: IDS.mid });
+    for (const l of ['Smart mix', 'Place TODO songs', 'Borderlines only']) expect(screen.getByText(l)).toBeInTheDocument();
+    expect(screen.queryByText('One song')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Choose a song/ })).not.toBeInTheDocument();
   });
 
   it('Place TODO is off when nothing is waiting', () => {
@@ -115,7 +105,7 @@ describe('DuelHub', () => {
     const structure = () => ({
       headings: screen.getAllByRole('heading').map((x) => x.textContent).filter((t) => t !== 'Ready to move'),
       stats: ['Board certainty', 'Moves waiting', 'On the fence'].map((l) => !!screen.queryByText(l)),
-      focus: ['Smart mix', 'Place TODO songs', 'Borderlines only', 'One song'].map((l) => !!screen.queryByText(l)),
+      focus: ['Smart mix', 'Place TODO songs', 'Borderlines only'].map((l) => !!screen.queryByText(l)),
     });
     page();
     const after = structure();

@@ -12,7 +12,6 @@ import { useDuelBoard } from '../../duel/useDuelBoard';
 import { pct } from '../../duel/duelText';
 import { ScoreMap, StatCard } from './DuelBits';
 import { MoveRow } from './DuelMoves';
-import { SongPickerButton } from './SongPicker';
 import PageHeader from '../PageHeader';
 import { SECTION_GAP } from '../../layout/spacing';
 import { useDevicePref } from '../../settings';
@@ -33,7 +32,6 @@ function focusCards(data, minutes) {
     { focus: 'SMART_MIX', title: 'Smart mix', recommended: true, body: 'We choose whichever duel would settle the most among your ranked songs - borderlines, shaky rankings. To-do songs stay out.', meta: `~${minutes * 6} duels` },
     { focus: 'PLACE_TODO', title: 'Place TODO songs', body: 'No tier guess needed. Each new song meets anchors from across the board and lands where it wins.', meta: `${data.unplaced} waiting · 5–10 duels each`, disabled: data.loading || !data.unplaced },
     { focus: 'BORDERLINES', title: 'Borderlines only', body: `Just the ${data.onFence} ringed dots. The fastest way to clean up songs filed a tier off.`, meta: `${data.onFence} songs · ~3 duels each`, disabled: data.loading || !data.onFence },
-    { focus: 'ONE_SONG', title: 'One song', body: 'Pin a track and find its true spot - tier and rank - in a handful of duels.', disabled: data.loading },
   ];
 }
 
@@ -47,18 +45,17 @@ export default function DuelHub({ category, boardLoading, base }) {
   // the focus starts on Smart mix each time - the others depend on the board.
   const [minutes, setMinutes] = useDevicePref('duelMinutes');
   const [focus, setFocus] = useState('SMART_MIX');
-  const [songId, setSongId] = useState(null);
   const data = analysis.data;
 
-  const canStart = data && !start.isPending && (focus !== 'ONE_SONG' || songId);
+  const canStart = data && !start.isPending;
   function begin() {
     if (!canStart) return;
     start.mutate(
-      { layout: board.duelLayout.layout, focus, songId: focus === 'ONE_SONG' ? songId : null, minutes: Number(minutes) },
+      { layout: board.duelLayout.layout, focus, minutes: Number(minutes) },
       { onSuccess: (s) => navigate(`${base}/duel/play/${s.id}`) }
     );
   }
-  useHotkeys('enter', begin, { preventDefault: true }, [canStart, focus, songId, minutes]);
+  useHotkeys('enter', begin, { preventDefault: true }, [canStart, focus, minutes]);
 
   if (analysis.isError) {
     return (
@@ -72,9 +69,6 @@ export default function DuelHub({ category, boardLoading, base }) {
   }
 
   const muOf = (id) => data?.songs.find((x) => x.id === id)?.mu;
-  const songOptions = data
-    ? data.songs.filter((s) => s.tier).map((s) => ({ id: s.id, tier: s.tier, video: board.videoOf(s.id) }))
-    : [];
 
   return (
     <Container className="duel-view" fluid px={0} py={0}>
@@ -131,7 +125,7 @@ export default function DuelHub({ category, boardLoading, base }) {
 
         <Stack gap="md">
           <Title order={2}>What should this session sharpen?</Title>
-          <SimpleGrid cols={{ base: 1, sm: 2, lg: 4 }} spacing="md">
+          <SimpleGrid cols={{ base: 1, sm: 3 }} spacing="md">
             {focusCards(data, Number(minutes)).map((c) => (
               <UnstyledButton key={c.focus} disabled={c.disabled} onClick={() => setFocus(c.focus)}
                 style={{ opacity: c.disabled && data ? 0.5 : 1 }}>
@@ -154,10 +148,6 @@ export default function DuelHub({ category, boardLoading, base }) {
                     {c.meta && (data
                       ? <Text fz="md" fw={700} c={focus === c.focus ? 'accent' : 'dimmed'}>{c.meta}</Text>
                       : <Skeleton h={12} w="45%" my="4xs" />)}
-                    {c.focus === 'ONE_SONG' && (
-                      <SongPickerButton category={category} songs={songOptions} value={songId} disabled={!data}
-                        active={focus === 'ONE_SONG'} onChange={(v) => { setSongId(v); setFocus('ONE_SONG'); }} />
-                    )}
                   </Stack>
                 </Paper>
               </UnstyledButton>

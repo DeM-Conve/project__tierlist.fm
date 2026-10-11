@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useHover } from '@mantine/hooks';
 import {
@@ -11,7 +11,7 @@ import { useTierName } from '../../tierLabels';
 import { TIER_ORDER } from '../../tiers';
 import { TierChip } from '../TierBits';
 import EmbeddedPlayer from '../EmbeddedPlayer';
-import { useDuelAnalysisQuery, useStartDuelMutation } from '../../api/queries';
+import { useDuelAnalysisQuery } from '../../api/queries';
 import { errorMessage } from '../../api/client';
 import { useDuelBoard } from '../../duel/useDuelBoard';
 import { leaningConfidence, leaningText, moveKind, orderChanges, pct, record, shortfallText } from '../../duel/duelText';
@@ -83,8 +83,8 @@ export function MoveRow({ s, board, selected, decided, onSelect, onMove, onKeep,
 
 // A move the engine leans towards but isn't sure of. Deliberately not a
 // MoveRow: dimmed, no selection bar, a neutral bar instead of the accent and
-// only quiet actions - duel it more (the useful one) or move it anyway.
-function LeaningRow({ s, board, decided, onDuel, onMove, onUndo, starting }) {
+// one quiet action - move it anyway.
+function LeaningRow({ s, board, decided, onMove, onUndo }) {
   const tierName = useTierName();
   const others = (s.unmet ?? []).filter((u) => u.kind !== 'CONFIDENCE').map(shortfallText);
   return (
@@ -115,9 +115,6 @@ function LeaningRow({ s, board, decided, onDuel, onMove, onUndo, starting }) {
       ) : (
         <Group gap="4xs" miw={190} wrap="nowrap">
           <Button variant="subtle" color="gray" size="compact-sm" onClick={onMove}>Move anyway</Button>
-          <Button variant="subtle" color="gray" size="compact-sm" leftSection={<Swords size={14} />} onClick={onDuel} disabled={starting}>
-            {s.from === 'TODO' ? 'Duel to-do songs' : 'Duel this song'}
-          </Button>
         </Group>
       )}
     </Group>
@@ -249,10 +246,8 @@ const FILTERS = [
 // "Suggested moves": the duels built the case; nothing moves until you say so.
 export default function DuelMoves({ category, boardLoading, base }) {
   const tierName = useTierName();
-  const navigate = useNavigate();
   const board = useDuelBoard(category);
   const analysis = useDuelAnalysisQuery(category, board.duelLayout, !boardLoading);
-  const start = useStartDuelMutation(category);
   const [filter, setFilter] = useState('all');
   const [decided, setDecided] = useState({}); // song -> { s, kind, lean }
   const [selected, setSelected] = useState(null);
@@ -283,11 +278,6 @@ export default function DuelMoves({ category, boardLoading, base }) {
   // leaning moves are never selected, so nothing about them reads as a suggestion.
   const browsable = shown;
   const current = browsable.find((s) => s.song === selected) ?? browsable[0];
-  // "Duel this song": a One song session pinned on it (to-do songs only duel in Place TODO).
-  const duelSong = (s) => start.mutate(
-    { layout: board.duelLayout.layout, focus: s.from === 'TODO' ? 'PLACE_TODO' : 'ONE_SONG', songId: s.from === 'TODO' ? null : s.song, minutes: 5 },
-    { onSuccess: (session) => navigate(`${base}/duel/play/${session.id}`) }
-  );
   const sure = rows.filter((s) => !decided[s.song] && s.confidence >= 0.9);
 
   // The preview belongs to one song: selecting another stops it.
@@ -485,8 +475,6 @@ export default function DuelMoves({ category, boardLoading, base }) {
                       s={s}
                       board={board}
                       decided={decided[s.song]?.kind}
-                      starting={start.isPending}
-                      onDuel={() => duelSong(s)}
                       onMove={() => move(s)}
                       onUndo={() => undo(s)}
                     />
@@ -496,7 +484,6 @@ export default function DuelMoves({ category, boardLoading, base }) {
             </Accordion>
           </Paper>
         )}
-        {start.isError && <Alert color="red">{errorMessage(start.error, 'Couldn’t start the session.')}</Alert>}
 
         {data && Object.keys(data.tierOrders).length > 0 && (
           <Stack gap="sm">

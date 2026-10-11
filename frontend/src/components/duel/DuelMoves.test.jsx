@@ -6,12 +6,11 @@ import { IDS, analysis, renderDuel, suggestion } from '../../test/duelFixtures';
 vi.mock('@mantine/notifications', () => ({ notifications: { show: vi.fn(), hide: vi.fn() } }));
 vi.mock('../EmbeddedPlayer', () => ({ default: ({ videoId }) => <div data-testid="player">{videoId}</div> }));
 
-const h = vi.hoisted(() => ({ analysis: null, error: null, decision: null, lock: null, start: null }));
+const h = vi.hoisted(() => ({ analysis: null, error: null, decision: null, lock: null }));
 vi.mock('../../api/queries', () => ({
   useDuelAnalysisQuery: () => ({ data: h.analysis, isError: !!h.error, error: h.error, refetch: vi.fn() }),
   useDuelDecisionMutation: () => ({ mutate: h.decision }),
   useDuelLockMutation: () => ({ mutate: h.lock }),
-  useStartDuelMutation: () => ({ mutate: h.start, isPending: false, isError: false }),
 }));
 
 const page = () => renderDuel(<DuelMoves category="Rock" boardLoading={false} base="/tier/Rock" />, '/tier/Rock/duel/moves');
@@ -24,7 +23,6 @@ beforeEach(() => {
   h.error = null;
   h.decision = vi.fn();
   h.lock = vi.fn();
-  h.start = vi.fn();
   h.analysis = analysis({ suggestions: [suggestion(), up] });
 });
 
@@ -152,19 +150,18 @@ describe('DuelMoves', () => {
     expect(control).toHaveAttribute('aria-expanded', 'false');
   });
 
-  it('leaning rows only offer quiet actions: Duel this song starts a One song session, Move anyway stages it', async () => {
+  it('leaning rows offer one quiet action: Move anyway stages it (no Duel this song)', async () => {
     h.analysis = analysis({ suggestions: [], leaning: [lean] });
     const store = page();
     fireEvent.click(screen.getByRole('button', { name: 'Leaning · 1 not sure yet' }));
     const row = await screen.findByTestId('leaning-row');
-    await waitFor(() => expect(within(row).getByRole('button', { name: 'Duel this song' })).toBeInTheDocument());
+    await waitFor(() => expect(within(row).getByRole('button', { name: 'Move anyway' })).toBeInTheDocument());
+    expect(within(row).queryByRole('button', { name: /Duel/ })).not.toBeInTheDocument();
     expect(within(row).getByText('83% · needs 85%')).toBeInTheDocument();
     expect(within(row).getByText(/3 of 4 duels$/)).toBeInTheDocument();
     // The page's single primary is "Duel more" - nothing in the leaning row is filled.
     expect(filled().map((b) => b.textContent)).toEqual(['Duel more']);
     within(row).getAllByRole('button').forEach((b) => expect(b).toHaveAttribute('data-variant', 'subtle'));
-    fireEvent.click(within(row).getByRole('button', { name: 'Duel this song' }));
-    expect(h.start.mock.calls[0][0]).toMatchObject({ focus: 'ONE_SONG', songId: IDS.mid2 });
     fireEvent.click(within(row).getByRole('button', { name: 'Move anyway' }));
     expect(tierOf(store, IDS.mid2)).toBe('S');
     expect(h.decision.mock.calls[0][0]).toMatchObject({ videoId: IDS.mid2, decision: 'ACCEPTED', from: 'A', to: 'S' });

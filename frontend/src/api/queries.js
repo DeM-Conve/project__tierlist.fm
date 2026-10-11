@@ -234,8 +234,8 @@ function useSessionMutation(board, request) {
 }
 
 export function useStartDuelMutation(board) {
-  return useSessionMutation(board, async ({ layout, focus, songId, minutes }) =>
-    (await api.post(`${duelPath(board)}/sessions`, { layout, focus, songId, minutes })).data);
+  return useSessionMutation(board, async ({ layout, focus, minutes }) =>
+    (await api.post(`${duelPath(board)}/sessions`, { layout, focus, minutes })).data);
 }
 
 export function useDuelVerdictMutation(board, id) {

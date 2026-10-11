@@ -29,8 +29,8 @@ describe('duel API hooks', () => {
   it('a session read resumes it; start / verdict replace the cached session', async () => {
     api.post.mockResolvedValueOnce({ data: { id: 's1', duels: [] } });
     const start = renderHook(() => useStartDuelMutation('Rock'), { wrapper });
-    await act(() => start.result.current.mutateAsync({ layout, focus: 'SMART_MIX', songId: null, minutes: 5 }));
-    expect(api.post).toHaveBeenLastCalledWith('/api/duels/Rock/sessions', { layout, focus: 'SMART_MIX', songId: null, minutes: 5 });
+    await act(() => start.result.current.mutateAsync({ layout, focus: 'SMART_MIX', minutes: 5 }));
+    expect(api.post).toHaveBeenLastCalledWith('/api/duels/Rock/sessions', { layout, focus: 'SMART_MIX', minutes: 5 });
     expect(client.getQueryData(duelKeys.session('Rock', 's1'))).toEqual({ id: 's1', duels: [] });
 
     api.post.mockResolvedValueOnce({ data: { id: 's1', duels: [{ id: 1 }] } });
