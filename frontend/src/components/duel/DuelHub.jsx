@@ -15,7 +15,9 @@ import { MoveRow } from './DuelMoves';
 import { SongPickerButton } from './SongPicker';
 import PageHeader from '../PageHeader';
 import { SECTION_GAP } from '../../layout/spacing';
+import { useDevicePref } from '../../settings';
 
+// Values are settings.js DEVICE_UI.duelMinutes' - keep in step.
 const LENGTHS = [
   { value: '2', label: 'Quick · 2 min' },
   { value: '5', label: 'Session · 5 min' },
@@ -41,7 +43,9 @@ export default function DuelHub({ category, boardLoading, base }) {
   const board = useDuelBoard(category);
   const analysis = useDuelAnalysisQuery(category, board.duelLayout, !boardLoading);
   const start = useStartDuelMutation(category);
-  const [minutes, setMinutes] = useState('5');
+  // The session length is remembered on this device (settings.js DEVICE_UI);
+  // the focus starts on Smart mix each time - the others depend on the board.
+  const [minutes, setMinutes] = useDevicePref('duelMinutes');
   const [focus, setFocus] = useState('SMART_MIX');
   const [songId, setSongId] = useState(null);
   const data = analysis.data;

@@ -1,11 +1,13 @@
 import { createSlice } from '@reduxjs/toolkit';
+import { readDevicePref } from '../settings';
 
 // "Add songs" session state: songs picked from a pasted link or a search,
 // waiting to be put in a tier. Where songs already are (every tier
 // playlist's items) is server state - see addSongs/useAddSongs.js.
 const addSongsSlice = createSlice({
   name: 'addSongs',
-  initialState: {
+  // A function, so each fresh store (a reload) reads this device's prefs.
+  initialState: () => ({
     // Picked songs, in the order they were added.
     queue: [],
     // Skipped video ids, oldest first: skipping sends a song to the back.
@@ -17,11 +19,12 @@ const addSongsSlice = createSlice({
     // Board picked by hand for a song, overriding the guess: { [videoId]: category }.
     boardFor: {},
     // Board the last song was filed into - the fallback guess.
-    lastBoard: null,
+    // Kept across reloads on this device (settings.js DEVICE_UI, saved by store.js).
+    lastBoard: readDevicePref('addSongsLastBoard'),
     // What happened this session, newest last (the "Added" list + Undo):
     // { kind: 'file', video, category, tier, playlistId } | { kind: 'skip' | 'remove', video }
     history: [],
-  },
+  }),
   reducers: {
     // New songs join the queue; the first of them becomes the card.
     addVideos: (state, action) => {

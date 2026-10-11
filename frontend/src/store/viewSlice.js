@@ -1,5 +1,5 @@
 import { createSlice } from '@reduxjs/toolkit';
-import { loadSidebarState } from '../settings';
+import { readDevicePref } from '../settings';
 
 // "What page" is now owned by React Router (the URL), not this slice.
 // currentCategory is the one piece of routing context still needed outside
@@ -9,7 +9,7 @@ import { loadSidebarState } from '../settings';
 // A function, so RTK reads the saved layout lazily (each fresh store - a
 // reload - starts from what this device last had).
 function initialState() {
-  const { collapsed, view } = loadSidebarState();
+  const { collapsed, view } = readDevicePref('sidebar');
   return {
     currentCategory: null,
     // Two independent filters: the sidebar's board list and Home's page.

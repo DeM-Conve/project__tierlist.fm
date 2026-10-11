@@ -20,6 +20,7 @@ function Where() {
 const page = () => renderDuel(<><DuelHub category="Rock" boardLoading={false} base="/tier/Rock" /><Where /></>);
 
 beforeEach(() => {
+  localStorage.clear(); // the session length is remembered per device
   h.error = null;
   h.analysis = analysis();
   h.start = vi.fn((_, { onSuccess }) => onSuccess({ id: 'new-session' }));
@@ -48,6 +49,16 @@ describe('DuelHub', () => {
       focus: 'SMART_MIX', songId: null, minutes: 15,
     });
     expect(screen.getByTestId('where')).toHaveTextContent('/tier/Rock/duel/play/new-session');
+  });
+
+  it('remembers the session length on this device, but the focus starts on Smart mix again', () => {
+    page();
+    fireEvent.click(screen.getByText('Quick · 2 min'));
+    fireEvent.click(screen.getByText('Borderlines only'));
+    cleanup();
+    page(); // a reload / coming back to the hub
+    fireEvent.click(screen.getByRole('button', { name: /Start duelling/ }));
+    expect(h.start.mock.calls[0][0]).toMatchObject({ focus: 'SMART_MIX', minutes: 2 });
   });
 
   it('Enter starts too, with the chosen focus', () => {

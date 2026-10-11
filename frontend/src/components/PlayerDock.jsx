@@ -25,6 +25,7 @@ import QueuePanel from './QueuePanel';
 import EmbeddedPlayer from './EmbeddedPlayer';
 import { usePlayerTime } from './usePlayerTime';
 import { isSequenceKey } from '../keyboard/sequence';
+import { useDevicePref } from '../settings';
 
 // Renders in 'expanded' (full-screen modal), 'mini' (YouTube-Music-style
 // bottom bar) or 'floating' (small bottom-right corner box) modes.
@@ -123,12 +124,17 @@ export default function PlayerDock({
   }, [pauseRequest]);
   const [isPlaying, setIsPlaying] = useState(true);
   // Playback position, polled (see below) for the edge progress line.
-  const [isMuted, setIsMuted] = useState(false);
-  const [volume, setVolume] = useState(100);
+  // The volume and mute survive a reload (per device, settings.js
+  // DEVICE_UI): saved on every change, applied to each new player instance.
+  const [savedVolume, setSavedVolume] = useDevicePref('playerVolume');
+  const [isMuted, setIsMuted] = useState(savedVolume.muted);
+  const [volume, setVolume] = useState(savedVolume.muted ? 0 : savedVolume.volume);
   // Remembers the level to restore when unmuting via the button/shortcut,
   // the way a hardware volume knob would - dragging the slider itself to 0
   // is just another way of reaching muted, not a separate state.
-  const lastVolumeRef = useRef(100);
+  const lastVolumeRef = useRef(savedVolume.volume || 100);
+  const savedVolumeRef = useRef(savedVolume);
+  savedVolumeRef.current = savedVolume;
   // Repeat lives in focusSlice (off -> all -> one, YouTube Music's cycle):
   // repeat-all has to wrap the queue itself, which is App's state.
   const repeatOne = repeatMode === 'one';
@@ -299,11 +305,13 @@ export default function PlayerDock({
       player.setVolume?.(restored);
       setVolume(restored);
       setIsMuted(false);
+      setSavedVolume({ volume: restored, muted: false });
     } else {
       lastVolumeRef.current = volume || 100;
       player.mute?.();
       setVolume(0);
       setIsMuted(true);
+      setSavedVolume({ volume: lastVolumeRef.current, muted: true });
     }
   }
 
@@ -313,11 +321,13 @@ export default function PlayerDock({
     if (next === 0) {
       player?.mute?.();
       setIsMuted(true);
+      setSavedVolume({ volume: lastVolumeRef.current || 100, muted: true });
     } else {
       lastVolumeRef.current = next;
       player?.unMute?.();
       player?.setVolume?.(next);
       setIsMuted(false);
+      setSavedVolume({ volume: next, muted: false });
     }
   }
 
@@ -438,14 +448,17 @@ export default function PlayerDock({
                   onPlayerReady={(p) => {
                     playerRef.current = p;
                     // A new EmbeddedPlayer instance mounts per video (its own
-                    // effect keys off videoId) - re-sync the slider/mute state
-                    // to whatever that fresh player actually reports instead
-                    // of assuming it kept the previous instance's volume.
+                    // effect keys off videoId) - give it the saved volume and
+                    // mute, then sync the slider to what it reports (the
+                    // browser may still have started it muted).
                     if (p) {
-                      const v = p.getVolume?.() ?? 100;
-                      setVolume(v);
+                      const { volume: v, muted } = savedVolumeRef.current;
+                      p.setVolume?.(v);
+                      if (muted) p.mute?.();
+                      const isOff = muted || (p.isMuted?.() ?? false);
+                      setVolume(isOff ? 0 : v);
                       lastVolumeRef.current = v || lastVolumeRef.current;
-                      setIsMuted(p.isMuted?.() ?? false);
+                      setIsMuted(isOff);
                     }
                   }}
                   onPlayingChange={setIsPlaying}

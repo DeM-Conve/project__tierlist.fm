@@ -1,4 +1,5 @@
 import { createSlice, nanoid } from '@reduxjs/toolkit';
+import { readDevicePref } from '../settings';
 
 // The player's queue, modelled on YouTube Music's: one timeline.
 //
@@ -69,7 +70,8 @@ function startContext(state, { tier, videoId, queue, entries, category, label })
 
 const focusSlice = createSlice({
   name: 'focus',
-  initialState: {
+  // A function, so each fresh store (a reload) reads this device's prefs.
+  initialState: () => ({
     // { tier, videoId } of `current`, or null - see sync().
     focusedVideo: null,
     history: [],
@@ -86,7 +88,8 @@ const focusSlice = createSlice({
     isShuffling: false,
     // YouTube Music's repeat button: 'off' -> 'all' (loop the whole queue)
     // -> 'one' (loop the playing song). Kept across queues.
-    repeatMode: 'off',
+    // A per-device preference (settings.js DEVICE_UI, saved by store.js).
+    repeatMode: readDevicePref('repeatMode'),
     // Working through a board's TODO list: the queue is just the to-do
     // songs, and rating the playing one moves straight on to the next.
     isTriage: false,
@@ -96,7 +99,7 @@ const focusSlice = createSlice({
     // Bumped to ask the dock to pause (another player - a duel clip - is
     // about to play). A counter, so asking twice pauses twice.
     pauseRequest: 0,
-  },
+  }),
   reducers: {
     requestPlayerPause: (state) => {
       state.pauseRequest += 1;

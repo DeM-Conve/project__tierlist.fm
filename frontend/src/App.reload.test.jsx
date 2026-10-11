@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { DEVICE_UI } from './settings';
 
-const SIDEBAR_STATE_KEY = DEVICE_UI.sidebar;
+const SIDEBAR_STATE_KEY = DEVICE_UI.sidebar.key;
 
 vi.mock('./api/queries', async (importOriginal) => ({
   ...(await importOriginal()),

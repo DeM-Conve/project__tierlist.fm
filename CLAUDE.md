@@ -173,6 +173,20 @@ category.
   in flight) and on 412 refetches and `rebase()`s (three-way merge: this browser's
   edits on top of the newer row). localStorage (`settings.js`) is only a boot cache
   so the theme applies before first paint - the account's row wins.
+- **Per-device UI prefs vs account prefs.** Account prefs (theme/accent/tier
+  palette, naming, to-do links, activity order) live in Postgres (`user_settings`);
+  `settings.js` `SETTINGS` is only their boot cache - never duplicate one as a
+  device pref. Per-device UI state (side panel shut/view, player volume/mute and
+  repeat, duel session length, Add songs' last board) lives only in this browser's
+  localStorage, declared once in `settings.js` `DEVICE_UI` (`{ key, fallback,
+  parse }`; synchronous, guarded, invalid -> default); the side panel's width is
+  react-resizable-panels' `useDefaultLayout` through `layoutStorage`. Adding one:
+  a `DEVICE_UI` entry, then `useDevicePref(name)` for component state, or for Redux
+  state `readDevicePref(name)` in the slice's (function) initial state + one
+  `DEVICE_PREF_SOURCES` line in `store/store.js`. Never call `localStorage` or
+  Mantine's `useLocalStorage` directly elsewhere. Don't persist search text,
+  selections, modals, the queue or server data. Boot runs `cleanStorage()`: a key
+  a feature stops reading goes on `RETIRED_KEYS`.
 - **Duels: the algorithm lives only in the backend, in `fm.tierlist.duel.engine`**
   (the user's call: "the algorithm logic should be in our backend", its own package).
   Plain Java - no Spring/JPA/HTTP imports there - built from swappable parts (Strategy
