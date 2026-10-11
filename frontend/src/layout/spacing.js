@@ -26,3 +26,8 @@ export const CANVAS_TOP = { base: 72, md: SHELL_Y };
 
 // The same values in px, for layout maths (e.g. the tier board's fit).
 export const spacingPx = (key) => px(SPACING[key]);
+
+// Every page's vertical rhythm (PageHeader.jsx): the gap from the page
+// header to its first content and between a page's sections - one key, so
+// pages line up with each other.
+export const SECTION_GAP = 'md';

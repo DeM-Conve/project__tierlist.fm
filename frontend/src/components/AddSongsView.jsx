@@ -27,6 +27,8 @@ import { chooseBoard, setCurrent } from '../store/addSongsSlice';
 import { isSequenceKey } from '../keyboard/sequence';
 import { songLabel, TIER_INK, youtubeUrl } from '../tierUtils';
 import { EqualizerMark, TierChip } from './TierBits';
+import PageHeader from './PageHeader';
+import { SECTION_GAP } from '../layout/spacing';
 
 function isTyping() {
   const el = document.activeElement;
@@ -226,18 +228,16 @@ export default function AddSongsView({ addSongs, actions, onAddLinks }) {
   const upNext = current ? list.filter((v) => v.videoId !== current.videoId) : [];
 
   return (
-    <Stack gap="lg" maw={1100}>
-      <Stack gap="4xs">
-        <Text fz="xs" fw={800} tt="uppercase" c="accent" style={{ letterSpacing: 1.5 }}>
-          Add songs
-        </Text>
-        <Title order={1} lh={1}>
-          Add a song
-        </Title>
-        <Text c="dimmed" fz="sm">
-          Paste its YouTube link, then press <Kbd size="xs">Shift</Kbd> + <Kbd size="xs">1</Kbd>–<Kbd size="xs">5</Kbd> to put it in a tier. <Kbd size="xs">Ctrl</Kbd> <Kbd size="xs">V</Kbd> with a link works on any page.
-        </Text>
-      </Stack>
+    <Stack gap={SECTION_GAP} maw={1100}>
+      <PageHeader
+        eyebrow="Add songs"
+        title="Add a song"
+        meta={
+          <>
+            Paste its YouTube link, then press <Kbd size="xs">Shift</Kbd> + <Kbd size="xs">1</Kbd>–<Kbd size="xs">5</Kbd> to put it in a tier. <Kbd size="xs">Ctrl</Kbd> <Kbd size="xs">V</Kbd> with a link works on any page.
+          </>
+        }
+      />
 
       <SongInput inputRef={inputRef} onAddLinks={onAddLinks} />
 

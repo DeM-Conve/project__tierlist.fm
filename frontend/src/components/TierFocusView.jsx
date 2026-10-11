@@ -27,6 +27,8 @@ import { EqualizerMark, MoveMenu, TierChip } from './TierBits';
 import { useSongContextMenu } from '../songMenu';
 import { TIER_INK, dropIndexAtOffset, songLabel, videoMatches } from '../tierUtils';
 import { useCanvas } from '../layout/canvas';
+import PageHeader from './PageHeader';
+import { SECTION_GAP } from '../layout/spacing';
 
 const NO_ITEMS = [];
 // Every row is the same height (6px padding + a 44px cover + 6px), so the
@@ -304,33 +306,31 @@ export default function TierFocusView({
 
   return (
     <Box component="section" pb={hasPendingBar ? '5xl' : 0}>
-      <UnstyledButton onClick={onBack} mb="xs" className="crumb">
-        <Group gap="3xs" c="dimmed">
-          <ArrowLeft size={14} />
-          <Text fz="sm">{category} · tier list</Text>
-          <Kbd size="xs">g u</Kbd>
-        </Group>
-      </UnstyledButton>
-
-      <Group justify="space-between" align="flex-end" wrap="wrap" gap="md" mb="sm">
-        <Group gap="sm" wrap="nowrap">
-          <Box w={48} h={48} bg={color} style={{ borderRadius: 8, display: 'grid', placeItems: 'center', flexShrink: 0 }}>
+      <Box mb={SECTION_GAP}>
+      <PageHeader
+        crumb={
+          <UnstyledButton onClick={onBack} className="crumb">
+            <Group gap="3xs" c="dimmed">
+              <ArrowLeft size={14} />
+              <Text fz="xs">{category} · tier list</Text>
+              <Kbd size="xs">g u</Kbd>
+            </Group>
+          </UnstyledButton>
+        }
+        badge={
+          <Box w={44} h={44} bg={color} style={{ borderRadius: 'var(--mantine-radius-md)', display: 'grid', placeItems: 'center', flexShrink: 0 }}>
             <Text ff="var(--font-display)" fw={900} fz={isTodo ? 'sm' : '2xl'} c={TIER_INK}>
               {tierName(tier)}
             </Text>
           </Box>
-          <Stack gap="5xs">
-            <Title order={1}>
-              {tierName(tier)} <Text span inherit c="dimmed" fw={700}>in {category}</Text>
-            </Title>
-            <Text c="dimmed" fz="sm">
-              {loading
-                ? 'Loading…'
-                : `${items.length} video${items.length === 1 ? '' : 's'} · ${isTodo ? 'waiting for a tier' : 'ranked top to bottom'}`}
-            </Text>
-          </Stack>
-        </Group>
-        <Group gap="xs">
+        }
+        title={
+          <Title order={1} lh={1.15}>
+            {tierName(tier)} <Text span inherit c="dimmed" fw={700}>in {category}</Text>
+          </Title>
+        }
+        meta={loading ? 'Loading…' : `${items.length} video${items.length === 1 ? '' : 's'} · ${isTodo ? 'waiting for a tier' : 'ranked top to bottom'}`}
+        actions={<>
           <Button variant="default" leftSection={<Shuffle size={15} />} onClick={() => onShuffle(tier)} disabled={!items.length}>
             Shuffle
           </Button>
@@ -342,8 +342,9 @@ export default function TierFocusView({
           >
             {isTodo ? 'Triage' : `Play ${tierName(tier)}`}
           </Button>
-        </Group>
-      </Group>
+        </>}
+      />
+      </Box>
 
       <Tabs value={tier} onChange={(t) => t && onSwitchTier(t)} mb="sm">
         <Tabs.List>

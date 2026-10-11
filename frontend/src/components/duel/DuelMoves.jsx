@@ -14,6 +14,8 @@ import { errorMessage } from '../../api/client';
 import { useDuelBoard } from '../../duel/useDuelBoard';
 import { moveKind, pct, record } from '../../duel/duelText';
 import { ProbabilityBars, ScoreTrend, SectionLabel, SongArt } from './DuelBits';
+import PageHeader from '../PageHeader';
+import { SECTION_GAP } from '../../layout/spacing';
 
 // One suggested move: song, from -> to, confidence, Move / Keep (or what was decided, with Undo).
 export function MoveRow({ s, board, selected, decided, onSelect, onMove, onKeep, onUndo, detail }) {
@@ -233,7 +235,7 @@ export default function DuelMoves({ category, boardLoading, base }) {
 
   if (analysis.isError) {
     return (
-      <Container className="duel-view" size={1320} py="xs">
+      <Container className="duel-view" fluid px={0} py={0}>
         <Alert color="red" title="Couldn’t load the suggested moves">
           {errorMessage(analysis.error, 'The app couldn’t reach the server.')}
           <Group mt="sm"><Button size="xs" onClick={() => analysis.refetch()}>Retry</Button></Group>
@@ -247,20 +249,22 @@ export default function DuelMoves({ category, boardLoading, base }) {
   const border = currentSong && data.borders.reduce((best, b) => (!best || Math.abs(b.score - currentSong.mu) < Math.abs(best.score - currentSong.mu) ? b : best), null);
 
   return (
-    <Container className="duel-view" size={1320} py="xs">
-      <Stack gap="lg">
-        <Group justify="space-between" align="flex-end" wrap="wrap">
-          <Stack gap="2xs">
-            <Anchor component={Link} to={`${base}/duel`} fz="md" fw={700} tt="uppercase" style={{ letterSpacing: '0.14em' }}>
+    <Container className="duel-view" fluid px={0} py={0}>
+      <Stack gap={SECTION_GAP}>
+        <PageHeader
+          crumb={
+            <Anchor component={Link} to={`${base}/duel`} fz="xs" c="dimmed">
               ← {category} · Duel
             </Anchor>
-            <Title order={1}>Suggested moves</Title>
-            <Text c="dimmed">Your duels built the case. Nothing moves until you say so - then push to YouTube as usual.</Text>
-          </Stack>
-          <Button disabled={!sure.length} onClick={() => sure.forEach(move)}>
-            Move all {sure.length} at ≥90%
-          </Button>
-        </Group>
+          }
+          title="Suggested moves"
+          meta="Your duels built the case. Nothing moves until you say so - then push to YouTube as usual."
+          actions={
+            <Button disabled={!sure.length} onClick={() => sure.forEach(move)}>
+              Move all {sure.length} at ≥90%
+            </Button>
+          }
+        />
 
         <Chip.Group value={filter} onChange={setFilter}>
           <Group gap="2xs">

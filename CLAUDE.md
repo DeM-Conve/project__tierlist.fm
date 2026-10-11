@@ -80,6 +80,12 @@ category.
     ordinary page actions. A new value means a new key, not a literal. Exempt:
     intrinsic sizes (icon `size`, tile/thumbnail `w`/`h`), sizes derived from the
     tile size, and geometry (centering offsets, hairlines).
+  - **Every page header is `components/PageHeader.jsx`** (the user's call: spacing
+    "coherent across pages"): eyebrow-or-crumb slot, optional badge, the h1 title,
+    meta line, actions top-aligned with the title - so titles and first content line
+    up page to page. Under it and between a page's sections: `SECTION_GAP`
+    (`layout/spacing.js`). Pages are full width (duel pages too: `Container fluid`),
+    never their own centred max-width column.
   - **Right-click menus are `mantine-contextmenu`** (`ContextMenuProvider` in
     `AppearanceRoot`, `useContextMenu()`), chosen over react-contexify / Radix
     because it's built on Mantine and follows the theme. The song menu's items

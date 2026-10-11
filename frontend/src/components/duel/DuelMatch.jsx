@@ -259,7 +259,7 @@ export default function DuelMatch({ category, sessionId, boardLoading, base }) {
     return (
       // Same containers, columns and block sizes as the loaded page below,
       // so nothing jumps when the session arrives.
-      <Container className="duel-view" size={1320} py="xs" data-testid="duel-match-loading">
+      <Container className="duel-view" fluid px={0} py={0} data-testid="duel-match-loading">
         <Stack gap="lg">
           <Group justify="space-between" wrap="wrap" gap="md">
             <Button variant="default" component={Link} to={`${base}/duel`}>← {category} · Duel</Button>
@@ -308,7 +308,7 @@ export default function DuelMatch({ category, sessionId, boardLoading, base }) {
   const v = (id) => board.videoOf(id) ?? { videoId: id };
 
   return (
-    <Container className="duel-view" size={1320} py="xs">
+    <Container className="duel-view" fluid px={0} py={0}>
       <Stack gap="lg">
         <Group justify="space-between" wrap="wrap" gap="md">
           <Button variant="default" component={Link} to={`${base}/duel`}>← {category} · Duel</Button>

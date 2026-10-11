@@ -467,8 +467,11 @@
   font: inherit;
   letter-spacing: inherit;
   padding: var(--mantine-spacing-5xs) var(--mantine-spacing-2xs);
-  /* the padding + the 1px border */
+  /* the padding + the 1px border: pulled back left (translate keeps the
+     width) and up/down (block margins) so the name sits exactly where a
+     plain page title would (PageHeader) */
   translate: calc(-1 * var(--mantine-spacing-2xs) - 1px) 0;
+  margin-block: calc(-1 * var(--mantine-spacing-5xs) - 1px);
   border: 1px solid transparent;
   border-radius: 6px;
   color: inherit;

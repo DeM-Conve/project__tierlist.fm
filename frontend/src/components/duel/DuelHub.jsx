@@ -12,6 +12,8 @@ import { useDuelBoard } from '../../duel/useDuelBoard';
 import { pct } from '../../duel/duelText';
 import { ScoreMap, StatCard } from './DuelBits';
 import { MoveRow } from './DuelMoves';
+import PageHeader from '../PageHeader';
+import { SECTION_GAP } from '../../layout/spacing';
 
 const LENGTHS = [
   { value: '2', label: 'Quick · 2 min' },
@@ -55,7 +57,7 @@ export default function DuelHub({ category, boardLoading, base }) {
 
   if (analysis.isError) {
     return (
-      <Container className="duel-view" size={1280} py="xs">
+      <Container className="duel-view" fluid px={0} py={0}>
         <Alert color="red" title="Couldn’t load this board’s duels">
           {errorMessage(analysis.error, 'The app couldn’t reach the server.')}
           <Group mt="sm"><Button size="xs" onClick={() => analysis.refetch()}>Retry</Button></Group>
@@ -70,17 +72,14 @@ export default function DuelHub({ category, boardLoading, base }) {
     : [];
 
   return (
-    <Container className="duel-view" size={1280} py="xs">
-      <Stack gap="lg">
-        <Group justify="space-between" align="flex-end" wrap="wrap" gap="lg">
-          <Stack gap="xs" maw={720}>
-            <Text fz="md" fw={700} c="accent" tt="uppercase" style={{ letterSpacing: '0.14em' }}>{category} · Duel</Text>
-            <Title order={1} lh={1}>Settle the board.</Title>
-            <Text fz="xl" c="dimmed">
-              Every duel nudges a hidden score. A song changes tier only when the evidence is overwhelming - and only after you approve the move.
-            </Text>
-          </Stack>
-          <Stack align="flex-end" gap="sm">
+    <Container className="duel-view" fluid px={0} py={0}>
+      <Stack gap={SECTION_GAP}>
+        <PageHeader
+          eyebrow={`${category} · Duel`}
+          title="Settle the board."
+          meta="Every duel nudges a hidden score. A song changes tier only when the evidence is overwhelming - and only after you approve the move."
+          actions={
+          <Stack align="flex-end" gap="2xs">
             <SegmentedControl value={minutes} onChange={setMinutes} data={LENGTHS} aria-label="Session length" />
             <Button leftSection={<Swords size={18} />} rightSection={<Kbd size="xs">Enter</Kbd>} onClick={begin}
               loading={start.isPending} disabled={!canStart}>
@@ -92,7 +91,8 @@ export default function DuelHub({ category, boardLoading, base }) {
               </Anchor>
             )}
           </Stack>
-        </Group>
+          }
+        />
         {start.isError && <Alert color="red">{errorMessage(start.error, 'Couldn’t start the session.')}</Alert>}
 
         {/* Loading draws the same sections (headings, cards, map) with

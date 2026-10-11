@@ -1,8 +1,10 @@
-import { Box, Tabs, Title } from '@mantine/core';
+import { Box, Tabs } from '@mantine/core';
 import { ShortcutsList } from './ShortcutsModal';
 import AppearanceSettings from './AppearanceSettings';
 import PlaylistNamingSettings from './PlaylistNamingSettings';
 import { useSearchParams } from 'react-router-dom';
+import PageHeader from './PageHeader';
+import { SECTION_GAP } from '../layout/spacing';
 
 const CATEGORIES = [
   { key: 'appearance', label: 'Appearance' },
@@ -17,9 +19,9 @@ export default function SettingsView() {
 
   return (
     <Box component="section">
-      <Title order={1} mb="md">
-        Settings
-      </Title>
+      <Box mb={SECTION_GAP}>
+        <PageHeader eyebrow="Account" title="Settings" meta="Look, playlist naming and shortcuts - saved to your account." />
+      </Box>
 
       <Tabs value={tab} onChange={(v) => v && setSearchParams({ tab: v }, { replace: true })} orientation="vertical">
         {/* Only as tall as its tabs (not the open section), and it stays put while a long section scrolls. */}

@@ -26,8 +26,9 @@ import BoardNameEditor from './BoardNameEditor';
 import { TIER_INK, indexForPointInFlow, videoMatches } from '../tierUtils';
 import { isSequenceKey } from '../keyboard/sequence';
 import { useCanvas } from '../layout/canvas';
-import { SHELL_Y, spacingPx } from '../layout/spacing';
+import { SECTION_GAP, SHELL_Y, spacingPx } from '../layout/spacing';
 import { EMPTY_ROW, GAP_KEY, INSET_KEY, TODO_GAP_KEY, allocateLines, fitBoard, tilesPerLine } from '../layout/boardFit';
+import PageHeader from './PageHeader';
 
 function DropIndicator({ size }) {
   return <Box w={3} h={size} bg="accent" style={{ borderRadius: 2, flexShrink: 0 }} />;
@@ -501,21 +502,12 @@ export default function TierBoardView({
 
   return (
     <Box component="section" pb={pendingPad}>
-      <Box ref={headerRef}>
-      <Group justify="space-between" align="flex-end" wrap="wrap" gap="md" mb="sm">
-        <Stack gap="5xs" align="flex-start">
-          <Text fz="xs" fw={800} tt="uppercase" c="accent" style={{ letterSpacing: 1.5 }}>
-            Tier list
-          </Text>
-          <BoardNameEditor key={category} category={category} onRenamed={onRenameBoard} />
-          <Text c="dimmed" fz="sm">
-            {anyLoading
-              ? 'Loading videos…'
-              : `${total} videos · ${tiers.length} tiers${hasTodo ? ` · ${todoCount} to do` : ''}`}
-          </Text>
-        </Stack>
-
-        <Group gap="xs" wrap="wrap">
+      <Stack ref={headerRef} gap={SECTION_GAP} mb={SECTION_GAP}>
+      <PageHeader
+        eyebrow="Tier list"
+        title={<BoardNameEditor key={category} category={category} onRenamed={onRenameBoard} />}
+        meta={anyLoading ? 'Loading videos…' : `${total} videos · ${tiers.length} tiers${hasTodo ? ` · ${todoCount} to do` : ''}`}
+        actions={<>
           {todoCount > 0 && (
             <Tooltip label="Play the TODO list and give each song a tier - rating one moves on to the next" withArrow multiline maw={260}>
               <Button variant="light" leftSection={<ListTodo size={15} />} onClick={() => onPlayFrom(TODO_TIER)}>
@@ -549,16 +541,14 @@ export default function TierBoardView({
               </Button>
             </Tooltip>
           </Button.Group>
-        </Group>
-      </Group>
+        </>}
+      />
 
       {/* Shown (empty) while loading too, so the rows below don't drop when it fills. */}
       {(hasVideos || anyLoading) && (
-        <Box mb="sm">
-          <TierMixBar tiers={tiers} counts={counts} size={18} labels onSegmentClick={onOpenTier} />
-        </Box>
+        <TierMixBar tiers={tiers} counts={counts} size={18} labels onSegmentClick={onOpenTier} />
       )}
-      </Box>
+      </Stack>
 
       <Box ref={rowsRef}>
 

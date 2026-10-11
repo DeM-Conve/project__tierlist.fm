@@ -29,6 +29,8 @@ import { selectNaming } from '../store/selectors';
 import { useTierName } from '../tierLabels';
 import { EqualizerMark, TierChip } from './TierBits';
 import { TIER_INK } from '../tierUtils';
+import PageHeader from './PageHeader';
+import { SECTION_GAP } from '../layout/spacing';
 
 // A board drawn as a tiny tier list: one line per tier, sized by how many
 // videos it holds - recognisably "a tier list" at a glance, built only from
@@ -166,24 +168,18 @@ export default function HomeView({
   const shownPlaylists = (playlists || []).filter((p) => p.title.toLowerCase().includes(q));
 
   return (
-    <Stack gap="lg" component="section">
-      <Group justify="space-between" align="flex-end" wrap="wrap" gap="md">
-        <Stack gap="4xs">
-          <Text fz="xs" fw={800} tt="uppercase" c="accent" style={{ letterSpacing: 1.5 }}>
-            Home
-          </Text>
-          <Title order={1} lh={1}>
-            Your tier lists
-          </Title>
-          <Text c="dimmed" fz="sm">
-            {loadError
-              ? 'Couldn’t load your playlists'
-              : playlists === null
-              ? 'Loading your playlists…'
-              : `${tierCategories.length} boards built from ${playlists.length} playlists`}
-          </Text>
-        </Stack>
-        <Group gap="sm" wrap="wrap">
+    <Stack gap={SECTION_GAP} component="section">
+      <PageHeader
+        eyebrow="Home"
+        title="Your tier lists"
+        meta={
+          loadError
+            ? 'Couldn’t load your playlists'
+            : playlists === null
+            ? 'Loading your playlists…'
+            : `${tierCategories.length} boards built from ${playlists.length} playlists`
+        }
+        actions={<>
         <Button variant="default" leftSection={<ListPlus size={15} />} rightSection={<Kbd size="xs">a</Kbd>} onClick={onAddSongs}>
           Add songs
         </Button>
@@ -200,8 +196,8 @@ export default function HomeView({
           rightSection={query ? <CloseButton size="sm" onClick={() => onQueryChange('')} aria-label="Clear" /> : <Kbd size="xs">/</Kbd>}
           w={300}
         />
-        </Group>
-      </Group>
+        </>}
+      />
 
       {creating && (
         <CreateTierPlaylistsModal opened onClose={() => setCreating(false)} onCreated={onOpenBoard} />

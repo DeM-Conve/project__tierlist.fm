@@ -6,6 +6,8 @@ import { errorMessage } from '../../api/client';
 import { useDuelBoard } from '../../duel/useDuelBoard';
 import { pct } from '../../duel/duelText';
 import { SectionLabel } from './DuelBits';
+import PageHeader from '../PageHeader';
+import { SECTION_GAP } from '../../layout/spacing';
 
 const minSec = (s) => `${Math.floor(s / 60)} min ${s % 60} s`;
 
@@ -25,7 +27,7 @@ function WrapActions({ base }) {
 // numbers go, so nothing moves when the summary arrives.
 function WrapSkeleton({ base }) {
   return (
-    <Container className="duel-view" size={980} py="xs" data-testid="wrap-skeleton">
+    <Container className="duel-view" fluid px={0} py={0} data-testid="wrap-skeleton">
       <Stack gap="lg">
         <Stack gap="xs" align="center">
           <Skeleton h={16} w={300} my="5xs" />
@@ -88,7 +90,7 @@ export default function DuelWrap({ category, sessionId, boardLoading, base }) {
 
   if (summary.isError) {
     return (
-      <Container className="duel-view" size={980} py="xs">
+      <Container className="duel-view" fluid px={0} py={0}>
         <Alert color="red" title="Couldn’t load the session summary">
           {errorMessage(summary.error, 'The app couldn’t reach the server.')}
           <Group mt="sm"><Button size="xs" component={Link} to={`${base}/duel`}>Back to the duel hub</Button></Group>
@@ -99,16 +101,12 @@ export default function DuelWrap({ category, sessionId, boardLoading, base }) {
   if (!s) return <WrapSkeleton base={base} />;
 
   return (
-    <Container className="duel-view" size={980} py="xs">
-      <Stack gap="lg">
-        <Stack gap="xs" align="center" ta="center">
-          <Text fz="md" fw={700} c="accent" tt="uppercase" style={{ letterSpacing: '0.14em' }}>
-            Session done · {s.duels} duels · {minSec(s.seconds)}
-          </Text>
-          <Title order={1} lh={1.05}>
-            {s.certainty > s.certaintyStart ? `Your ${category} board got sharper.` : `${category}: every duel counts.`}
-          </Title>
-        </Stack>
+    <Container className="duel-view" fluid px={0} py={0}>
+      <Stack gap={SECTION_GAP}>
+        <PageHeader
+          eyebrow={`Session done · ${s.duels} duels · ${minSec(s.seconds)}`}
+          title={s.certainty > s.certaintyStart ? `Your ${category} board got sharper.` : `${category}: every duel counts.`}
+        />
 
         <Paper withBorder radius="lg" p="md">
           <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="lg" style={{ alignItems: 'center' }}>
