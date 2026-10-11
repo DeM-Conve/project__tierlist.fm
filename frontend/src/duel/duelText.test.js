@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  dropIndexByScore, likelyTiers, moveKind, outcomeText, pct, reasonText, record, scoreDelta, verdictForKey, verdictHeadline,
+  confidenceText, dropIndexByScore, leaningText, likelyTiers, moveKind, orderChanges, shortfallText, outcomeText, pct, reasonText, record, scoreDelta, verdictForKey, verdictHeadline,
 } from './duelText';
 
 const name = (id) => ({ n1: 'Nayaab', m1: 'Melancholy' })[id] ?? id;
@@ -60,5 +60,26 @@ describe('duelText', () => {
     expect(dropIndexByScore(['x', 'y', 'z'], 26, (id) => mu[id])).toBe(1);
     expect(dropIndexByScore(['x', 'y', 'z'], 10, (id) => mu[id])).toBe(3);
     expect(dropIndexByScore(['x', 'q'], 26, (id) => mu[id])).toBe(1);
+  });
+});
+
+describe('leaning moves and tier orders', () => {
+  const name = (t) => `T${'SABCD'.indexOf(t) + 1}`;
+  it('says how sure a move is, by direction', () => {
+    expect(confidenceText({ from: 'C', to: 'B', confidence: 0.834 }, name)).toBe('83% T3 or higher');
+    expect(confidenceText({ from: 'B', to: 'C', confidence: 0.72 }, name)).toBe('72% T4 or lower');
+    expect(confidenceText({ from: 'TODO', to: 'A', confidence: 0.6 }, name)).toBe('60% T2');
+  });
+  it('lists what a leaning move lacks', () => {
+    const s = { from: 'C', to: 'B', confidence: 0.83, unmet: [{ kind: 'CONFIDENCE', have: 0.83, need: 0.85 }, { kind: 'DUELS', have: 3, need: 4 }] };
+    expect(leaningText(s, name)).toBe('83% T3 or higher · needs 85% · 3 of 4 duels');
+    expect(shortfallText({ kind: 'BORDER_OPPONENTS', have: 1, need: 2 })).toBe('1 of 2 opponents near the border');
+  });
+  it('maps a proposed order onto the board order', () => {
+    expect(orderChanges(['a', 'b', 'c', 'a'], ['b', 'a', 'c'])).toEqual([
+      { id: 'b', from: 2, to: 1, delta: 1 },
+      { id: 'a', from: 1, to: 2, delta: -1 },
+      { id: 'c', from: 3, to: 3, delta: 0 },
+    ]);
   });
 });

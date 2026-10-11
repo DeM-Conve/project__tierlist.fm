@@ -2,9 +2,10 @@ import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useHotkeys } from 'react-hotkeys-hook';
 import {
-  Alert, Anchor, Box, Button, Checkbox, Chip, Container, Group, Kbd, Paper, Skeleton, Stack, Text, Title, UnstyledButton,
+  Accordion, Alert, Anchor, Badge, Box, Button, Checkbox, Chip, Container, Group, Kbd, Paper, Skeleton, Stack, Table, Text, Title,
+  UnstyledButton,
 } from '@mantine/core';
-import { Play, Square } from 'lucide-react';
+import { ArrowDown, ArrowUp, Play, Square } from 'lucide-react';
 import { useTierName } from '../../tierLabels';
 import { TIER_ORDER } from '../../tiers';
 import { TierChip } from '../TierBits';
@@ -12,13 +13,14 @@ import EmbeddedPlayer from '../EmbeddedPlayer';
 import { useDuelAnalysisQuery } from '../../api/queries';
 import { errorMessage } from '../../api/client';
 import { useDuelBoard } from '../../duel/useDuelBoard';
-import { moveKind, pct, record } from '../../duel/duelText';
+import { leaningText, moveKind, orderChanges, pct, record, shortfallText } from '../../duel/duelText';
 import { ProbabilityBars, ScoreTrend, SectionLabel, SongArt } from './DuelBits';
 import PageHeader from '../PageHeader';
 import { SECTION_GAP } from '../../layout/spacing';
 
 // One suggested move: song, from -> to, confidence, Move / Keep (or what was decided, with Undo).
-export function MoveRow({ s, board, selected, decided, onSelect, onMove, onKeep, onUndo, detail }) {
+// `leaning`: short of the bar - the confidence bar is drawn faint.
+export function MoveRow({ s, board, selected, decided, onSelect, onMove, onKeep, onUndo, detail, leaning = false }) {
   const tierName = useTierName();
   return (
     <Group
@@ -50,7 +52,7 @@ export function MoveRow({ s, board, selected, decided, onSelect, onMove, onKeep,
       </Group>
       <Group gap="2xs" w={130} wrap="nowrap">
         <Box h={6} style={{ flex: 1, background: 'var(--surface-3)', borderRadius: 3, overflow: 'hidden' }}>
-          <Box h="100%" w={pct(s.confidence)} style={{ background: 'var(--accent)' }} />
+          <Box h="100%" w={pct(s.confidence)} style={{ background: leaning ? 'var(--text-faint)' : 'var(--accent)' }} />
         </Box>
         <Text ff="monospace" fz="md">{pct(s.confidence)}</Text>
       </Group>
@@ -178,24 +180,31 @@ export default function DuelMoves({ category, boardLoading, base }) {
   const board = useDuelBoard(category);
   const analysis = useDuelAnalysisQuery(category, board.duelLayout, !boardLoading);
   const [filter, setFilter] = useState('all');
-  const [decided, setDecided] = useState({}); // song -> { s, kind }
+  const [decided, setDecided] = useState({}); // song -> { s, kind, lean }
   const [selected, setSelected] = useState(null);
   const [previewSong, setPreviewSong] = useState(null);
 
   const data = analysis.data;
   const muOf = (id) => data?.songs.find((x) => x.id === id)?.mu;
 
-  // Decided rows stay listed (with Undo) after the analysis drops them.
-  const rows = useMemo(() => {
-    if (!data) return [];
-    const live = data.suggestions.filter((s) => !decided[s.song]);
-    const done = Object.values(decided).map((d) => d.s);
-    return [...live, ...done].sort((a, b) => b.confidence - a.confidence);
+  // Decided rows stay listed (with Undo), in the list they came from, after the analysis drops them.
+  const [rows, leaningRows] = useMemo(() => {
+    if (!data) return [[], []];
+    const list = (live, lean) => [
+      ...live.filter((s) => !decided[s.song]),
+      ...Object.values(decided).filter((d) => !!d.lean === lean).map((d) => d.s),
+    ].sort((a, b) => b.confidence - a.confidence);
+    return [list(data.suggestions, false), list(data.leaning ?? [], true)];
   }, [data, decided]);
   const counts = { all: rows.length, up: 0, down: 0, new: 0 };
   rows.forEach((s) => (counts[moveKind(s.from, s.to)] += 1));
-  const shown = filter === 'all' ? rows : rows.filter((s) => moveKind(s.from, s.to) === filter);
-  const current = shown.find((s) => s.song === selected) ?? shown[0];
+  const byFilter = (list) => (filter === 'all' ? list : list.filter((s) => moveKind(s.from, s.to) === filter));
+  const shown = byFilter(rows);
+  const shownLeaning = byFilter(leaningRows);
+  const isLeaning = (s) => leaningRows.includes(s);
+  // Browsing (keys, the evidence panel) walks the suggested moves, then the leaning ones.
+  const browsable = [...shown, ...shownLeaning];
+  const current = browsable.find((s) => s.song === selected) ?? browsable[0];
   const sure = rows.filter((s) => !decided[s.song] && s.confidence >= 0.9);
 
   // The preview belongs to one song: selecting another stops it.
@@ -204,11 +213,11 @@ export default function DuelMoves({ category, boardLoading, base }) {
 
   const move = (s) => {
     board.accept(s, muOf);
-    setDecided((d) => ({ ...d, [s.song]: { s, kind: 'move' } }));
+    setDecided((d) => ({ ...d, [s.song]: { s, kind: 'move', lean: isLeaning(s) } }));
   };
   const keep = (s) => {
     board.keep(s);
-    setDecided((d) => ({ ...d, [s.song]: { s, kind: 'keep' } }));
+    setDecided((d) => ({ ...d, [s.song]: { s, kind: 'keep', lean: isLeaning(s) } }));
   };
   const undo = (s) => {
     board.undo(s, decided[s.song]?.kind === 'move');
@@ -222,12 +231,12 @@ export default function DuelMoves({ category, boardLoading, base }) {
   };
 
   const browse = (step) => {
-    const i = shown.findIndex((s) => s.song === current?.song);
-    const next = shown[Math.max(0, Math.min(shown.length - 1, i + step))];
+    const i = browsable.findIndex((s) => s.song === current?.song);
+    const next = browsable[Math.max(0, Math.min(browsable.length - 1, i + step))];
     if (next) setSelected(next.song);
   };
-  useHotkeys('down', () => browse(1), { preventDefault: true }, [shown, current]);
-  useHotkeys('up', () => browse(-1), { preventDefault: true }, [shown, current]);
+  useHotkeys('down', () => browse(1), { preventDefault: true }, [browsable, current]);
+  useHotkeys('up', () => browse(-1), { preventDefault: true }, [browsable, current]);
   useHotkeys('m', () => current && !decided[current.song] && move(current), [current, decided]);
   useHotkeys('x', () => current && !decided[current.song] && keep(current), [current, decided]);
   useHotkeys('l', () => current && toggleLock(current.song), [current, locked]);
@@ -291,7 +300,9 @@ export default function DuelMoves({ category, boardLoading, base }) {
             <Paper withBorder radius="lg" style={{ flex: '999 1 560px', minWidth: 0, overflow: 'hidden' }}>
               {shown.length === 0 && (
                 <Text c="dimmed" p="xl" ta="center">
-                  No moves to review. Duel more and the strongest cases show up here.
+                  {shownLeaning.length
+                    ? `Nothing is sure enough to suggest yet. Closest: ${board.nameOf(shownLeaning[0].song)} - ${leaningText(shownLeaning[0], tierName)}.`
+                    : 'No moves to review. Duel more and the strongest cases show up here.'}
                 </Text>
               )}
               {shown.map((s) => (
@@ -307,6 +318,31 @@ export default function DuelMoves({ category, boardLoading, base }) {
                   onUndo={() => undo(s)}
                 />
               ))}
+              {shownLeaning.length > 0 && (
+                <>
+                  <Stack gap="5xs" px="lg" pt="md" pb="2xs" style={{ borderBottom: '1px solid var(--border)' }}>
+                    <SectionLabel>Leaning · not sure yet</SectionLabel>
+                    <Text fz="md" c="dimmed">
+                      Where your duels point, short of the bar for a suggestion. Move or keep one yourself, or duel more.
+                    </Text>
+                  </Stack>
+                  {shownLeaning.map((s) => (
+                    <MoveRow
+                      key={s.song}
+                      s={s}
+                      board={board}
+                      leaning
+                      detail={s.unmet.map(shortfallText).join(' · ')}
+                      selected={current?.song === s.song}
+                      decided={decided[s.song]?.kind}
+                      onSelect={() => setSelected(s.song)}
+                      onMove={() => move(s)}
+                      onKeep={() => keep(s)}
+                      onUndo={() => undo(s)}
+                    />
+                  ))}
+                </>
+              )}
               <KeyHints />
             </Paper>
 
@@ -379,25 +415,82 @@ export default function DuelMoves({ category, boardLoading, base }) {
         {data && Object.keys(data.tierOrders).length > 0 && (
           <Stack gap="sm">
             <Title order={2}>Tighten tier order</Title>
-            <Text c="dimmed" fz="md">Order within a tier is the songs sorted by score - positions are ranks on YouTube.</Text>
-            <Paper withBorder radius="lg">
-              {Object.entries(data.tierOrders).map(([tier, ids]) => {
-                const now = (board.tierItems[tier] || []).map((v) => v.videoId);
-                const changed = ids.filter((id, i) => now[i] !== id).length;
-                return (
-                  <Group key={tier} justify="space-between" px="lg" py="sm" style={{ borderBottom: '1px solid var(--border)' }}>
-                    <Group gap="xs">
-                      <TierChip tier={tier} size={22} />
-                      <Text>{changed} of {ids.length} songs change places</Text>
-                    </Group>
-                    <Button variant="default" onClick={() => board.applyTierOrder(tier, ids)}>Sort {tierName(tier)} by score</Button>
-                  </Group>
-                );
-              })}
+            <Text c="dimmed" fz="md">Order within a tier is the songs sorted by score - positions are ranks on YouTube. Check the new order before you sort.</Text>
+            <Paper withBorder radius="lg" style={{ overflow: 'hidden' }}>
+              {/* The first tier starts open: the change is there to see before Sort. */}
+              <Accordion multiple chevronPosition="left" variant="default" defaultValue={Object.keys(data.tierOrders).slice(0, 1)}>
+                {Object.entries(data.tierOrders).map(([tier, ids]) => (
+                  <TierOrderItem key={tier} tier={tier} ids={ids} board={board} />
+                ))}
+              </Accordion>
             </Paper>
           </Stack>
         )}
       </Stack>
     </Container>
+  );
+}
+
+// One tier's proposed order: a header (how many change, Sort) that opens to
+// the songs at their new places - where each was, arrows for how far it
+// moved; songs that stay put are dimmed.
+function TierOrderItem({ tier, ids, board }) {
+  const tierName = useTierName();
+  const changes = orderChanges((board.tierItems[tier] || []).map((v) => v.videoId), ids);
+  const changed = changes.filter((c) => c.delta !== 0).length;
+  return (
+    <Accordion.Item value={tier}>
+      <Group gap="xs" wrap="nowrap" pr="lg">
+        <Accordion.Control aria-label={`Show the new ${tierName(tier)} order`}>
+          <Group gap="xs" wrap="nowrap">
+            <TierChip tier={tier} size={22} />
+            <Text>{changed} of {ids.length} songs change places</Text>
+          </Group>
+        </Accordion.Control>
+        <Button variant="default" style={{ flexShrink: 0 }} onClick={() => board.applyTierOrder(tier, ids)}>
+          Sort {tierName(tier)} by score
+        </Button>
+      </Group>
+      <Accordion.Panel>
+        <Table verticalSpacing="4xs" horizontalSpacing="sm" withRowBorders={false} aria-label={`New ${tierName(tier)} order`}>
+          <Table.Tbody>
+            {changes.map((c) => {
+              const moved = c.delta !== 0;
+              return (
+                <Table.Tr key={`${c.id}-${c.to}`} style={{ opacity: moved ? 1 : 0.5 }} data-moved={moved || undefined}>
+                  <Table.Td w={36}><Text ff="monospace" fz="md" ta="right">{c.to}</Text></Table.Td>
+                  <Table.Td>
+                    <Group gap="xs" wrap="nowrap" miw={0}>
+                      <SongArt video={board.videoOf(c.id)} size={28} />
+                      <Box miw={0}>
+                        <Text fz="md" fw={moved ? 600 : 400} truncate="end">{board.nameOf(c.id)}</Text>
+                        <Text fz="sm" c="dimmed" truncate="end">{board.artistOf(c.id)}</Text>
+                      </Box>
+                    </Group>
+                  </Table.Td>
+                  <Table.Td w={120}>
+                    {moved ? (
+                      <Group gap="3xs" wrap="nowrap" justify="flex-end">
+                        <Text fz="sm" c="dimmed">was {c.from}</Text>
+                        <Badge
+                          variant="light"
+                          color={c.delta > 0 ? 'accent' : 'gray'}
+                          leftSection={c.delta > 0 ? <ArrowUp size={12} /> : <ArrowDown size={12} />}
+                          aria-label={`${c.delta > 0 ? 'up' : 'down'} ${Math.abs(c.delta)}`}
+                        >
+                          {Math.abs(c.delta)}
+                        </Badge>
+                      </Group>
+                    ) : (
+                      <Text fz="sm" c="dimmed" ta="right">stays</Text>
+                    )}
+                  </Table.Td>
+                </Table.Tr>
+              );
+            })}
+          </Table.Tbody>
+        </Table>
+      </Accordion.Panel>
+    </Accordion.Item>
   );
 }

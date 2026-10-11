@@ -88,6 +88,41 @@ export function moveKind(from, to) {
 
 export const record = (s) => `${s.wins}–${s.losses}–${s.draws}`;
 
+// How sure a move is, in words: a ranked song's confidence (from the engine)
+// is the chance it belongs in the new tier *or beyond*; a to-do song's is
+// the chance of that tier itself.
+export function confidenceText(s, tierName) {
+  const kind = moveKind(s.from, s.to);
+  const beyond = kind === 'new' ? '' : kind === 'up' ? ' or higher' : ' or lower';
+  return `${pct(s.confidence)} ${tierName(s.to)}${beyond}`;
+}
+
+// What a "leaning" move still lacks (the API's `unmet`), one phrase each.
+export function shortfallText(u) {
+  switch (u.kind) {
+    case 'CONFIDENCE': return `needs ${pct(u.need)}`;
+    case 'DUELS': return `${u.have} of ${u.need} duels`;
+    case 'BORDER_OPPONENTS': return `${u.have} of ${u.need} opponents near the border`;
+    case 'FRESH_DUELS': return `${u.have} of ${u.need} fresh duels since Keep`;
+    default: return 'locked';
+  }
+}
+
+// "83% B or higher · needs 85% · 3 of 4 duels".
+export const leaningText = (s, tierName) => [confidenceText(s, tierName), ...(s.unmet ?? []).map(shortfallText)].join(' · ');
+
+// A tier's proposed order against the board's: each song at its new place
+// with where it was (1-based positions - ranks are positions) and how far it
+// moved (+ = up). Display only; the order itself is the engine's.
+export function orderChanges(current, proposed) {
+  const was = new Map();
+  current.forEach((id, i) => was.has(id) || was.set(id, i + 1));
+  return proposed.map((id, i) => {
+    const from = was.get(id) ?? null;
+    return { id, from, to: i + 1, delta: from == null ? 0 : from - (i + 1) };
+  });
+}
+
 // Where an accepted move lands in its new tier: among that tier's songs by
 // score, best first (`muOf(id)` -> score; songs without one go last).
 export function dropIndexByScore(targetIds, mu, muOf) {

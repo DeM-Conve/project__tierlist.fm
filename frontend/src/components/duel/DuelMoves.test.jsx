@@ -93,13 +93,39 @@ describe('DuelMoves', () => {
     expect(h.decision.mock.calls[1][0]).toMatchObject({ videoId: IDS.todo, decision: 'ACCEPTED' });
   });
 
-  it('offers to sort a tier by score', () => {
+  it('offers to sort a tier by score, showing the new order first', async () => {
     h.analysis = analysis({ suggestions: [], tierOrders: { A: [IDS.mid2, IDS.mid] } });
     const store = page();
     expect(screen.getByText('No moves to review. Duel more and the strongest cases show up here.')).toBeInTheDocument();
     expect(screen.getByText('2 of 2 songs change places')).toBeInTheDocument();
+    // The (first) tier starts open on the new order before anything changes: each song at its new place, where it was.
+    const rows = within(await screen.findByRole('table', { name: 'New A order' })).getAllByRole('row');
+    expect(rows.map((r) => r.textContent)).toEqual([
+      expect.stringMatching(/^1Other Song.*was 2/),
+      expect.stringMatching(/^2Middle Song.*was 1/),
+    ]);
+    expect(within(rows[0]).getByLabelText('up 1')).toBeInTheDocument();
+    expect(within(rows[1]).getByLabelText('down 1')).toBeInTheDocument();
+    expect(store.getState().tiers.tierItems.A.map((v) => v.videoId)).toEqual([IDS.mid, IDS.mid2]);
     fireEvent.click(screen.getByRole('button', { name: 'Sort A by score' }));
     expect(store.getState().tiers.tierItems.A.map((v) => v.videoId)).toEqual([IDS.mid2, IDS.mid]);
+  });
+
+  it('nothing sure yet: says which song is closest and why, and lists the leaning moves to act on', () => {
+    const lean = suggestion({
+      song: IDS.mid2, from: 'A', to: 'S', confidence: 0.83,
+      unmet: [{ kind: 'CONFIDENCE', have: 0.83, need: 0.85 }, { kind: 'DUELS', have: 3, need: 4 }],
+    });
+    h.analysis = analysis({ suggestions: [], leaning: [lean] });
+    const store = page();
+    expect(screen.getByText('Nothing is sure enough to suggest yet. Closest: Other Song - 83% S or higher · needs 85% · 3 of 4 duels.')).toBeInTheDocument();
+    expect(screen.getByText('Leaning · not sure yet')).toBeInTheDocument();
+    expect(screen.getByText(/needs 85% · 3 of 4 duels$/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Move all 0 at ≥90%' })).toBeDisabled();
+    fireEvent.click(screen.getByRole('button', { name: 'Move' }));
+    expect(tierOf(store, IDS.mid2)).toBe('S');
+    expect(h.decision.mock.calls[0][0]).toMatchObject({ videoId: IDS.mid2, decision: 'ACCEPTED', from: 'A', to: 'S' });
+    expect(screen.getByText('Moved to S')).toBeInTheDocument();
   });
 
   it('a failed load says why and offers Retry', () => {
