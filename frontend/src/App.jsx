@@ -30,7 +30,7 @@ import TierRail from './components/TierRail';
 import { CANVAS_TOP, CANVAS_X, PART_GAP, SHELL_Y } from './layout/spacing';
 import { CanvasContext } from './layout/canvas';
 import PendingChanges from './components/PendingChanges';
-import { loadBoard, moveWithFeedback, undoEdit } from './tierActions';
+import { loadBoard, moveWithFeedback } from './tierActions';
 import { buildSyncPlan, succeeded, touchedPlaylists } from './syncPlan';
 import { dragEnded, transfersDiscarded, transfersPushed } from './store/transfersSlice';
 import TierBoardView from './components/TierBoardView';
@@ -47,6 +47,7 @@ import { videoIdsFromText } from './addSongs/youtubeLink';
 import { addVideos } from './store/addSongsSlice';
 import LinkHints from './keyboard/LinkHints';
 import { useVimKeys } from './keyboard/useVimKeys';
+import { useWorkbenchKeys } from './keyboard/useWorkbenchKeys';
 import SettingsView from './components/SettingsView';
 import ShortcutsModal from './components/ShortcutsModal';
 import LoginView from './components/LoginView';
@@ -54,7 +55,7 @@ import { setLoggedIn, setPlaylists } from './store/authSlice';
 import { detectedNaming } from './store/namingSlice';
 import { useSettingsSync } from './api/useSettingsSync';
 import { detectNaming } from './naming';
-import { setCurrentCategory, setHomeQuery, setSidebarQuery, setMobileSidebarOpen, toggleSidebarCollapsed, showSidebarView, setSidebarCollapsed } from './store/viewSlice';
+import { setCurrentCategory, setHomeQuery, setSidebarQuery, setMobileSidebarOpen, showSidebarView, setSidebarCollapsed } from './store/viewSlice';
 import {
   setTierItems,
   applySyncedMoves,
@@ -328,13 +329,9 @@ function Layout() {
   // of its own (see shortcuts.js's header comment for why the others still
   // have bespoke handlers) - a flat, always-on binding is exactly what
   // useHotkeys is for, and it already ignores keydowns while typing.
-  useHotkeys([
-    ['shift+?', () => shortcutsHandlers.open()],
-    // Every tier edit is one undo step (see tierActions.jsx).
-    ['mod+Z', () => dispatch(undoEdit())],
-    // Like VS Code: fold the sidebar to icons (on a phone: the drawer).
-    ['mod+B', () => dispatch(narrow ? setMobileSidebarOpen(!mobileSidebarOpen) : toggleSidebarCollapsed())],
-  ]);
+  useHotkeys([['shift+?', () => shortcutsHandlers.open()]]);
+  // VS Code's modifier keys: undo / redo, Ctrl+B, the panel views, Ctrl+,.
+  useWorkbenchKeys({ narrow });
 
   async function syncChanges(category) {
     dispatch(setSyncStatus('syncing'));

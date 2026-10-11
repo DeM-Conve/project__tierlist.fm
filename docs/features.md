@@ -72,7 +72,7 @@
 - Filter box (`/` focuses it, `Esc` clears) filters by title, channel or artist (same matching as the board's `/` search); drag rows to reorder (drop position maps back to the real position even while filtered).
 
 ## Instant feedback & undo
-- Every tier edit - drag, menu, chip, bulk move, rail, player rating, duel result - shows a toast (""Song" → S", "Moved 5 videos → A" - with your tier names) with **Undo**, and `Ctrl/Cmd+Z` undoes the last edit anywhere (up to 50 steps; a bulk move or a whole duel result is one step). Undo history resets when the board is reloaded or discarded.
+- Every tier edit - drag, menu, chip, bulk move, rail, player rating, duel result - shows a toast (""Song" → S", "Moved 5 videos → A" - with your tier names) with **Undo**, and `Ctrl/Cmd+Z` undoes the last edit anywhere (up to 50 steps; a bulk move or a whole duel result is one step); `Ctrl/Cmd+Shift+Z` or `Ctrl/Cmd+Y` redoes it ("Redone") until you make a new edit. Undo history resets when the board is reloaded or discarded.
 
 ## Drag-and-drop tier editing
 - Drag a video from one tier row to another, reorder within a row, drop onto the "+N" tile (appends), onto the Tier Rail, onto a tier tab, or reorder within a tier page's list. Rows tint in their tier color while hovered.
@@ -136,8 +136,8 @@ Duels collect evidence; a single duel never moves a song. Every duel feeds a hid
 
 ## Keyboard shortcuts (full list)
 Source of truth is `frontend/src/shortcuts.js` (rendered by the `?` modal and Settings → Keyboard shortcuts) - keep this list in sync with it.
-- Global: `Ctrl/Cmd+K` command palette, `?` shortcut help, `Ctrl/Cmd+Z` undo last tier edit, `Ctrl+V` paste YouTube link(s) (outside a text box) to add them via Add songs.
-- Navigation (Vimium-style, anywhere outside a text box): `f` **link hints** - every visible clickable gets a letter label, type it to click/focus (`Backspace` edits, `Esc`/scroll/click cancels); `o` command palette; `a` Add songs; `g h` Home, `g s` Settings, `g u` up one level (tier page → board → Home), `g b` this board, `g p` playing song's board, `g t` its TODO list, `g d` duel; `[` / `]` previous/next board; `H` / `L` back/forward; `g g` / `G` top/bottom; `y y` copy the playing song's YouTube link. The key after a `g`/`y` prefix is never also taken by a page shortcut.
+- Global: `Ctrl/Cmd+K` command palette (VS Code's `Ctrl/Cmd+P`, `Ctrl/Cmd+Shift+P` and `F1` open it too), `?` shortcut help, `Ctrl/Cmd+Z` undo last tier edit, `Ctrl/Cmd+Shift+Z` / `Ctrl/Cmd+Y` redo it (until a new edit, a push, a discard or a reload), `Ctrl/Cmd+B` open / close the panel, `Ctrl/Cmd+Shift+E` show the Tier lists view, `Ctrl/Cmd+Shift+F` show the Playlists view (both open the panel - on a phone the drawer - and never close it), `Ctrl/Cmd+,` Settings, `Ctrl+V` paste YouTube link(s) (outside a text box) to add them via Add songs.
+- Navigation (Vimium-style, anywhere outside a text box): `f` **link hints** - every visible clickable gets a letter label, type it to click/focus (`Backspace` edits, `Esc`/scroll/click cancels); `o` command palette; `a` Add songs; `g h` Home, `g s` Settings, `g u` up one level (tier page → board → Home), `g b` this board, `g p` playing song's board, `g t` its TODO list, `g d` duel; `[` / `]` previous/next board; `H` / `L` back/forward; `g g` / `G` top/bottom; `Ctrl+d` / `Ctrl+u` half a page down/up (Vim; Ctrl on a Mac too); `g i` focus the page's first text box; `y y` copy the playing song's YouTube link. The key after a `g`/`y` prefix is never also taken by a page shortcut.
 - Home: `/` jumps to the "Filter boards & playlists" box (`Esc` leaves it).
 - Add songs: `Shift+1`-`5` put in tier 1-5, `t` save to TODO, `Enter` listen, `s` skip, `x` remove, `b` pick board, `/` or `a` the input, `u` / `Ctrl+Z` undo.
 - Tier board: `/` search, `n` / `N` next/previous match, `Enter` play match (or step), `Esc` close search, `Shift+P` push to YouTube (any board page).

@@ -15,6 +15,7 @@ import reducer, {
   setTierForCategory,
   setTierItems,
   undoLastEdit,
+  redoLastEdit,
 } from './tiersSlice';
 import { REMOVED_TIER } from '../tiers';
 
@@ -589,5 +590,51 @@ describe('applySyncedMoves', () => {
     const before = loaded({ S: ['a'] });
     const s = reducer(before, applySyncedMoves({ moves: [] }));
     expect(s).toEqual(before);
+  });
+});
+
+describe('redoLastEdit', () => {
+  const move = (s, videoId, toTier) => reducer(s, moveVideoToTier({ fromTier: 'S', toTier, videoId }));
+
+  it('re-applies what undo took back, and can be undone again', () => {
+    let s = move(loaded({ S: ['a', 'b'], A: [] }), 'a', 'A');
+    s = reducer(s, undoLastEdit());
+    expect(ids(s.tierItems.A)).toEqual([]);
+    s = reducer(s, redoLastEdit());
+    expect(ids(s.tierItems.A)).toEqual(['a']);
+    expect(ids(s.tierItems.S)).toEqual(['b']);
+    expect(s.redoStack).toEqual([]);
+    s = reducer(s, undoLastEdit());
+    expect(ids(s.tierItems.S)).toEqual(['a', 'b']);
+  });
+
+  it('redoes several undone steps in order', () => {
+    let s = move(move(loaded({ S: ['a', 'b'], A: [] }), 'a', 'A'), 'b', 'A');
+    s = reducer(reducer(s, undoLastEdit()), undoLastEdit());
+    s = reducer(s, redoLastEdit());
+    expect(ids(s.tierItems.A)).toEqual(['a']);
+    s = reducer(s, redoLastEdit());
+    expect(ids(s.tierItems.A)).toEqual(['a', 'b']);
+  });
+
+  it('does nothing with nothing undone', () => {
+    const s = move(loaded({ S: ['a'], A: [] }), 'a', 'A');
+    expect(reducer(s, redoLastEdit())).toBe(s);
+  });
+
+  it('a new edit after an undo drops the redo history', () => {
+    let s = move(loaded({ S: ['a', 'b'], A: [], B: [] }), 'a', 'A');
+    s = reducer(s, undoLastEdit());
+    s = move(s, 'b', 'B');
+    expect(s.redoStack).toEqual([]);
+    s = reducer(s, redoLastEdit());
+    expect(ids(s.tierItems.A)).toEqual([]);
+  });
+
+  it('discarding or reloading the board drops the redo history', () => {
+    let s = reducer(move(loaded({ S: ['a'], A: [] }), 'a', 'A'), undoLastEdit());
+    expect(reducer(s, discardTierChanges()).redoStack).toEqual([]);
+    expect(reducer(s, resetTierBoard({ presentTiers: ['S'] })).redoStack).toEqual([]);
+    expect(reducer(s, setTierItems({ S: [] })).redoStack).toEqual([]);
   });
 });

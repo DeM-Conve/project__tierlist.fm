@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { SHORTCUTS, hotkeyForCommand } from './shortcuts';
+import { PALETTE_HOTKEYS, SHORTCUTS, hotkeyForCommand } from './shortcuts';
 
 describe('SHORTCUTS', () => {
   it('is a non-empty list', () => {
@@ -59,6 +59,11 @@ describe('hotkeyForCommand', () => {
     expect(hotkeyForCommand('action-sync')).toEqual(['Shift', 'P']);
   });
 
+  it('gives the palette its VS Code hints: Settings Ctrl+, and help ?', () => {
+    expect(hotkeyForCommand('page-settings')).toEqual(['Ctrl', ',']);
+    expect(hotkeyForCommand('action-shortcuts')).toEqual(['?']);
+  });
+
   it('undefined for an unknown command', () => {
     expect(hotkeyForCommand('nope')).toBeUndefined();
   });
@@ -66,5 +71,11 @@ describe('hotkeyForCommand', () => {
   it('documents: an undefined command id matches the first shortcut without a commandId', () => {
     // `s.commandId === undefined` is true for every entry lacking one.
     expect(hotkeyForCommand(undefined)).toEqual(SHORTCUTS[0].keys);
+  });
+});
+
+describe('PALETTE_HOTKEYS', () => {
+  it('opens the palette on Ctrl+K and VS Code’s Ctrl+P / Ctrl+Shift+P / F1', () => {
+    expect(PALETTE_HOTKEYS).toEqual(['mod + K', 'mod + P', 'mod + shift + P', 'F1']);
   });
 });

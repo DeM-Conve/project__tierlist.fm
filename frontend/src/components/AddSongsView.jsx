@@ -178,7 +178,7 @@ export default function AddSongsView({ addSongs, actions, onAddLinks }) {
         e.preventDefault();
         e.stopImmediatePropagation();
       };
-      if (mod && e.key.toLowerCase() === 'z' && addSongs.history.length) {
+      if (mod && !e.shiftKey && e.key.toLowerCase() === 'z' && addSongs.history.length) {
         claim();
         actions.undo();
         return;

@@ -6,6 +6,7 @@ import {
   applyTierOrder,
   moveVideos,
   undoLastEdit,
+  redoLastEdit,
   setDraggedVideoId,
   setDragOverTier,
   transferArrived,
@@ -131,6 +132,17 @@ export const undoEdit = ({ silent = false } = {}) => (dispatch, getState) => {
   if (!silent) {
     notifications.hide(TOAST_ID);
     notifications.show({ id: TOAST_ID, autoClose: 1800, withCloseButton: false, message: 'Undone' });
+  }
+};
+
+// Ctrl+Shift+Z / Ctrl+Y: re-applies the last undone edit (one step).
+export const redoEdit = ({ silent = false } = {}) => (dispatch, getState) => {
+  if (getState().tiers.redoStack.length === 0) return;
+  dispatch(redoLastEdit());
+  resyncFocusedTier(dispatch, getState);
+  if (!silent) {
+    notifications.hide(TOAST_ID);
+    notifications.show({ id: TOAST_ID, autoClose: 1800, withCloseButton: false, message: 'Redone' });
   }
 };
 

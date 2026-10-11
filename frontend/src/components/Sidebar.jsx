@@ -24,7 +24,7 @@ import { selectNaming } from '../store/selectors';
 import { SHELL_Y, SIDEBAR_X } from '../layout/spacing';
 import { useBoardDropOpen } from '../layout/useBoardDropOpen';
 
-const TOGGLE_KEYS = 'Ctrl+B';
+const TOGGLE_KEYS = 'Ctrl+Shift+E · Ctrl+B';
 
 // A row of a list on the window chrome, VS Code's way: the full ink, a
 // neutral chrome-toned selection (list.inactiveSelectionBackground) rather
@@ -166,7 +166,7 @@ export function ActivityBar({ openView, onShowView, onOpenPalette, waitingCount,
       </ActivityIcon>
     ),
     playlists: (
-      <ActivityIcon label="Playlists" marked={openView === 'playlists'} aria-pressed={openView === 'playlists'} onClick={() => onShowView('playlists')}>
+      <ActivityIcon label="Playlists" keys="Ctrl+Shift+F" marked={openView === 'playlists'} aria-pressed={openView === 'playlists'} onClick={() => onShowView('playlists')}>
         <ListMusic {...ICON} />
       </ActivityIcon>
     ),
@@ -213,7 +213,7 @@ export function ActivityBar({ openView, onShowView, onOpenPalette, waitingCount,
       <ActivityIcon label="Keyboard shortcuts" keys="?" onClick={onOpenShortcuts}>
         <Keyboard {...ICON} />
       </ActivityIcon>
-      <ActivityIcon label="Settings" keys="g s" onClick={onSelectSettings}>
+      <ActivityIcon label="Settings" keys="g s / Ctrl+," onClick={onSelectSettings}>
         <Settings {...ICON} />
       </ActivityIcon>
       <ActivityIcon label="Log out" onClick={onLogout}>

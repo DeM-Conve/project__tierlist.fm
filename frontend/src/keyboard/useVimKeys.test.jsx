@@ -9,10 +9,11 @@ vi.mock('@mantine/notifications', () => ({ notifications: { show: vi.fn(), hide:
 
 const entries = [{ tier: 'S', video: { videoId: 'a', title: 'Song' } }];
 
-function setup() {
+function setup({ canvas = null } = {}) {
   const hintsRef = { current: { open: vi.fn() } };
+  const canvasRef = { current: canvas };
   function Keys() {
-    useVimKeys({ hintsRef, canvasRef: { current: null }, categories: [], hasTodo: false });
+    useVimKeys({ hintsRef, canvasRef, categories: [], hasTodo: false });
     return null;
   }
   const store = makeStore();
@@ -45,5 +46,52 @@ describe('useVimKeys f', () => {
     });
     fireEvent.keyDown(document, { key: 'f', code: 'KeyF' });
     expect(open).toHaveBeenCalledTimes(1);
+  });
+});
+
+function fakeCanvas() {
+  const el = document.createElement('div');
+  el.innerHTML = '<input type="checkbox"><input type="text" placeholder="Filter">';
+  Object.defineProperty(el, 'clientHeight', { value: 600 });
+  el.scrollBy = vi.fn();
+  document.body.appendChild(el);
+  return el;
+}
+
+describe('useVimKeys Ctrl+d / Ctrl+u', () => {
+  it('scrolls the canvas half a page down / up', () => {
+    const canvas = fakeCanvas();
+    setup({ canvas });
+    fireEvent.keyDown(document, { key: 'd', code: 'KeyD', ctrlKey: true });
+    expect(canvas.scrollBy).toHaveBeenLastCalledWith({ top: 300, behavior: 'smooth' });
+    fireEvent.keyDown(document, { key: 'u', code: 'KeyU', ctrlKey: true });
+    expect(canvas.scrollBy).toHaveBeenLastCalledWith({ top: -300, behavior: 'smooth' });
+  });
+
+  it('plain d / u do not scroll (pages use u for undo)', () => {
+    const canvas = fakeCanvas();
+    setup({ canvas });
+    fireEvent.keyDown(document, { key: 'u', code: 'KeyU' });
+    expect(canvas.scrollBy).not.toHaveBeenCalled();
+  });
+
+  it('stands down while the full-screen player covers the page', () => {
+    const canvas = fakeCanvas();
+    const { store } = setup({ canvas });
+    act(() => {
+      store.dispatch(openFocus({ videoId: 'a', queue: ['a'], entries, category: 'Rap' }));
+    });
+    fireEvent.keyDown(document, { key: 'd', code: 'KeyD', ctrlKey: true });
+    expect(canvas.scrollBy).not.toHaveBeenCalled();
+  });
+});
+
+describe('useVimKeys g i', () => {
+  it('focuses the page’s first text box', () => {
+    const canvas = fakeCanvas();
+    setup({ canvas });
+    fireEvent.keyDown(document, { key: 'g', code: 'KeyG' });
+    fireEvent.keyDown(document, { key: 'i', code: 'KeyI' });
+    expect(document.activeElement).toBe(canvas.querySelector('input[type=text]'));
   });
 });

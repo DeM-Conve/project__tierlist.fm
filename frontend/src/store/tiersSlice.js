@@ -35,6 +35,7 @@ function applyMove(state, { fromTier, toTier, videoId, dropIndex }) {
 function pushUndo(state) {
   state.undoStack.push(original(state.tierItems));
   if (state.undoStack.length > UNDO_LIMIT) state.undoStack.shift();
+  state.redoStack = [];
 }
 
 const tiersSlice = createSlice({
@@ -63,9 +64,15 @@ const tiersSlice = createSlice({
     // move, rating, duel result) - newest last. Cleared when the board is
     // reloaded or discarded, since those replace the baseline itself.
     undoStack: [],
+    // Snapshots undone by Ctrl+Z, newest last, for Ctrl+Shift+Z / Ctrl+Y.
+    // Only valid while tierItems is exactly what the last undo/redo left:
+    // a new edit (pushUndo) or anything else that rewrites tierItems (a
+    // load, sync, transfer, discard) clears it - see dropRedo.
+    redoStack: [],
   },
   reducers: {
     resetTierBoard: (state, action) => {
+      state.redoStack = [];
       const { presentTiers } = action.payload;
       state.tierItems = {};
       state.tierLoading = Object.fromEntries(presentTiers.map((t) => [t, true]));
@@ -81,6 +88,7 @@ const tiersSlice = createSlice({
       state.loadedCategory = action.payload;
     },
     setTierForCategory: (state, action) => {
+      state.redoStack = [];
       const { tier, videos } = action.payload;
       state.tierItems[tier] = videos;
       state.tierLoading[tier] = false;
@@ -91,6 +99,7 @@ const tiersSlice = createSlice({
       });
     },
     setTierItems: (state, action) => {
+      state.redoStack = [];
       state.tierItems = action.payload;
     },
     // Applies a sync's succeeded moves straight to the local draft instead
@@ -106,6 +115,7 @@ const tiersSlice = createSlice({
     // for a dedupe, actually removing the now-deleted duplicate) rather
     // than re-deriving it from a server round trip.
     applySyncedMoves: (state, action) => {
+      state.redoStack = [];
       const { moves } = action.payload;
       moves.forEach((m) => {
         if (m.kind === 'remove') {
@@ -141,6 +151,7 @@ const tiersSlice = createSlice({
     // A song filed from Add songs is already on YouTube, so it joins the
     // loaded board's draft *and* its baseline - it's not a pending change.
     addSyncedVideo: (state, action) => {
+      state.redoStack = [];
       const { tier, video } = action.payload;
       state.tierItems[tier] = [...(state.tierItems[tier] || []), video];
       state.originalTierItems[tier] = [...(state.originalTierItems[tier] || []), video];
@@ -148,6 +159,7 @@ const tiersSlice = createSlice({
     },
     // Undo of addSyncedVideo (the playlist item was deleted again).
     removeSyncedVideo: (state, action) => {
+      state.redoStack = [];
       const { tier, videoId } = action.payload;
       state.tierItems[tier] = (state.tierItems[tier] || []).filter((v) => v.videoId !== videoId);
       state.originalTierItems[tier] = (state.originalTierItems[tier] || []).filter((v) => v.videoId !== videoId);
@@ -155,6 +167,7 @@ const tiersSlice = createSlice({
       if (!state.originalTierOf[videoId].length) delete state.originalTierOf[videoId];
     },
     discardTierChanges: (state) => {
+      state.redoStack = [];
       state.tierItems = JSON.parse(JSON.stringify(state.originalTierItems));
       state.syncStatus = 'idle';
       state.undoStack = [];
@@ -195,12 +208,14 @@ const tiersSlice = createSlice({
     },
     // The board just loaded, as it looks with the staged transfers.
     transfersOverlaid: (state, action) => {
+      state.redoStack = [];
       const { transfers, category } = action.payload;
       state.tierItems = overlayTransfers(state.tierItems, transfers, category);
     },
     // A transfer taken back on the open board: the arrived card leaves, or
     // the song that left comes back to its tier.
     transferUndone: (state, action) => {
+      state.redoStack = [];
       const t = action.payload;
       for (const tier of Object.keys(state.tierItems)) {
         state.tierItems[tier] = state.tierItems[tier].filter((v) => v.transfer !== t.id);
@@ -212,6 +227,7 @@ const tiersSlice = createSlice({
     // Pushed transfers become the open board's new baseline: an arrived song
     // is simply in its tier now; a song that left is gone from the baseline.
     transfersApplied: (state, action) => {
+      state.redoStack = [];
       for (const t of action.payload) {
         if (state.loadedCategory === t.fromCategory) {
           state.originalTierItems[t.fromTier] = (state.originalTierItems[t.fromTier] || []).filter((v) => transferId(v) !== t.id);
@@ -235,7 +251,18 @@ const tiersSlice = createSlice({
     },
     undoLastEdit: (state) => {
       const previous = state.undoStack.pop();
-      if (previous) state.tierItems = previous;
+      if (!previous) return;
+      state.redoStack.push(original(state.tierItems));
+      state.tierItems = previous;
+    },
+    // The inverse of undoLastEdit: re-applies the last undone edit, and it
+    // can be undone again.
+    redoLastEdit: (state) => {
+      const next = state.redoStack.pop();
+      if (!next) return;
+      state.undoStack.push(original(state.tierItems));
+      if (state.undoStack.length > UNDO_LIMIT) state.undoStack.shift();
+      state.tierItems = next;
     },
   },
 });
@@ -256,6 +283,7 @@ export const {
   moveVideos,
   applyTierOrder,
   undoLastEdit,
+  redoLastEdit,
   transferArrived,
   transfersOverlaid,
   transferUndone,

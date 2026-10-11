@@ -1,6 +1,6 @@
 import { Kbd, Group } from '@mantine/core';
 import { Spotlight } from '@mantine/spotlight';
-import { hotkeyForCommand } from '../shortcuts';
+import { hotkeyForCommand, PALETTE_HOTKEYS } from '../shortcuts';
 
 // Mantine's Spotlight is a purpose-built command palette: it owns its own
 // open/close state, the Cmd/Ctrl+K shortcut, filtering, keyboard roving and
@@ -35,7 +35,9 @@ export default function CommandPalette({ items }) {
   return (
     <Spotlight
       actions={actionsGroups}
-      shortcut={['mod + K']}
+      // Ctrl+K, plus VS Code's Quick Open (Ctrl+P), Command Palette
+      // (Ctrl+Shift+P) and F1 - Spotlight binds them all itself.
+      shortcut={PALETTE_HOTKEYS}
       nothingFound="No matches"
       searchProps={{ placeholder: 'Jump to a board, playlist, or action...' }}
     />

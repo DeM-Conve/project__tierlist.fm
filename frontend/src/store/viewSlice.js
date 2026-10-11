@@ -47,8 +47,14 @@ const viewSlice = createSlice({
         state.sidebarView = action.payload;
       }
     },
+    // Ctrl+Shift+E / Ctrl+Shift+F: like VS Code's view shortcuts these
+    // always *show* the view (they never close an open panel).
+    openSidebarView: (state, action) => {
+      state.sidebarCollapsed = false;
+      state.sidebarView = action.payload;
+    },
   },
 });
 
-export const { setCurrentCategory, setSidebarQuery, setHomeQuery, setMobileSidebarOpen, toggleSidebarCollapsed, showSidebarView, setSidebarCollapsed } = viewSlice.actions;
+export const { setCurrentCategory, setSidebarQuery, setHomeQuery, setMobileSidebarOpen, toggleSidebarCollapsed, showSidebarView, setSidebarCollapsed, openSidebarView } = viewSlice.actions;
 export default viewSlice.reducer;

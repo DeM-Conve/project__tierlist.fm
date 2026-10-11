@@ -13,9 +13,14 @@
 // what's actually bound.
 export const SHORTCUTS = [
   { id: 'palette', keys: ['Ctrl', 'K'], description: 'Open command palette', category: 'Global' },
-  { id: 'help', keys: ['?'], description: 'Show this shortcut list', category: 'Global' },
+  { id: 'palette-vscode', keys: ['Ctrl', 'P'], description: 'Command palette, like VS Code’s Quick Open (Ctrl+Shift+P and F1 too)', category: 'Global' },
+  { id: 'help', keys: ['?'], description: 'Show this shortcut list', category: 'Global', commandId: 'action-shortcuts' },
   { id: 'sidebar', keys: ['Ctrl', 'B'], description: 'Open / close the board panel next to the activity bar, like VS Code (on a phone: the menu)', category: 'Global' },
+  { id: 'view-boards', keys: ['Ctrl', 'Shift', 'E'], description: 'Show the Tier lists view in the panel (like VS Code’s Explorer)', category: 'Global' },
+  { id: 'view-playlists', keys: ['Ctrl', 'Shift', 'F'], description: 'Show the Playlists view in the panel (like VS Code’s Search)', category: 'Global' },
+  { id: 'settings', keys: ['Ctrl', ','], description: 'Open Settings, like VS Code', category: 'Global', commandId: 'page-settings' },
   { id: 'undo', keys: ['Ctrl', 'Z'], description: 'Undo the last tier edit (drag, move, rating, bulk, duel result)', category: 'Global' },
+  { id: 'redo', keys: ['Ctrl', 'Shift', 'Z'], description: 'Redo the last undone tier edit (Ctrl+Y too)', category: 'Global' },
 
   { id: 'hints', keys: ['f'], description: 'Link hints: label everything clickable, type a label to click it', category: 'Navigation (Vim)' },
   { id: 'omnibar', keys: ['o'], description: 'Open the command palette (like Ctrl+K)', category: 'Navigation (Vim)' },
@@ -31,6 +36,9 @@ export const SHORTCUTS = [
   { id: 'history', keys: ['H', 'L'], description: 'Back / forward', category: 'Navigation (Vim)' },
   { id: 'scroll-top', keys: ['gg'], description: 'Scroll to the top of the page', category: 'Navigation (Vim)' },
   { id: 'scroll-bottom', keys: ['G'], description: 'Scroll to the bottom of the page', category: 'Navigation (Vim)' },
+  { id: 'half-page-down', keys: ['Ctrl', 'D'], description: 'Scroll half a page down (Vim)', category: 'Navigation (Vim)' },
+  { id: 'half-page-up', keys: ['Ctrl', 'U'], description: 'Scroll half a page up (Vim)', category: 'Navigation (Vim)' },
+  { id: 'focus-input', keys: ['gi'], description: 'Focus the page’s first text box (filter, link box…)', category: 'Navigation (Vim)' },
   { id: 'yank', keys: ['yy'], description: 'Copy the playing song’s YouTube link', category: 'Navigation (Vim)' },
 
   { id: 'home-filter', keys: ['/'], description: 'Filter boards & playlists', category: 'Home' },
@@ -120,6 +128,10 @@ export const SHORTCUTS = [
   { id: 'duel-end', keys: ['e'], description: 'End the session and see the summary', category: 'Duel' },
   { id: 'duel-moves', keys: ['m', 'x', 'l', 'p'], description: 'Suggested moves: move / keep / lock / play (↑↓ browse)', category: 'Duel' },
 ];
+
+// What the command palette (Mantine Spotlight) opens on - Ctrl+K plus VS
+// Code's Quick Open, Command Palette and F1. Spotlight binds them itself.
+export const PALETTE_HOTKEYS = ['mod + K', 'mod + P', 'mod + shift + P', 'F1'];
 
 export function hotkeyForCommand(commandId) {
   return SHORTCUTS.find((s) => s.commandId === commandId)?.keys;

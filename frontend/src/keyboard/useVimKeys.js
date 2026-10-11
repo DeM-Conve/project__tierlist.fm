@@ -64,6 +64,32 @@ export function useVimKeys({ hintsRef, canvasRef, categories, currentCategory, p
     canvasRef.current?.scrollTo({ top: canvasRef.current.scrollHeight, behavior: 'smooth' })
   );
 
+  // Half a page down / up, like Vim's Ctrl+d / Ctrl+u (Ctrl, not Cmd, on a
+  // Mac too - as in Vim; it also keeps Cmd+D / Cmd+U for the browser).
+  const halfPage = (dir) => (e) => {
+    const el = canvasRef.current;
+    if (!el) return;
+    e.preventDefault();
+    el.scrollBy({ top: (dir * el.clientHeight) / 2, behavior: 'smooth' });
+  };
+  useHotkeys('ctrl+d', halfPage(1), { enabled: !playerCoversPage });
+  useHotkeys('ctrl+u', halfPage(-1), { enabled: !playerCoversPage });
+
+  // Vimium's "g i": focus the page's first text box (Home's filter, a tier
+  // page's filter, Add songs' link box, Settings' template...).
+  useHotkeys(
+    'g>i',
+    (e) => {
+      const input = canvasRef.current?.querySelector(
+        'input:not([type=hidden]):not([type=checkbox]):not([type=radio]):not([disabled]), textarea:not([disabled])'
+      );
+      if (!input) return;
+      e.preventDefault();
+      input.focus();
+    },
+    { enabled: !playerCoversPage }
+  );
+
   // Previous / next board, in sidebar order (from anywhere: the first/last).
   useHotkeys(
     ['[', ']'],
