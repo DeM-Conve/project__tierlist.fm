@@ -10,7 +10,7 @@ import java.util.Set;
 
 // The reorderable top group of the activity bar (the left icon strip) -
 // frontend/src/store/appearanceSlice.js ACTIVITY_ITEMS. Constant names are the
-// labels of the Postgres enum `activity_item` (V1 migration); `key` is the id
+// labels of the Postgres enum `activity_item` (V1; DUELS added by V2); `key` is the id
 // the frontend uses, and what the API speaks. Declaration order is the default
 // order.
 public enum ActivityItem {
@@ -18,7 +18,8 @@ public enum ActivityItem {
     JUMP("jump"),
     BOARDS("boards"),
     PLAYLISTS("playlists"),
-    ADD_SONGS("addSongs");
+    ADD_SONGS("addSongs"),
+    DUELS("duels");
 
     public static final List<ActivityItem> DEFAULT_ORDER = List.of(values());
 

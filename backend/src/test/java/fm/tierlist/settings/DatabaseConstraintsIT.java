@@ -179,6 +179,7 @@ class DatabaseConstraintsIT extends PostgresIT {
         insert(row());
         item(0, "HOME");
         item(1, "ADD_SONGS");
+        item(2, "DUELS"); // added by V2
         jdbc.update("DELETE FROM user_settings");
         assertThat(jdbc.queryForObject("SELECT count(*) FROM activity_bar_item", Integer.class)).isZero();
     }

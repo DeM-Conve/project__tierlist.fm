@@ -50,7 +50,8 @@ class SettingsEnumsTest {
     void activityItemKeysAreTheFrontendIdsInDefaultOrder() {
         assertThat(keys(ActivityItem.values(), v -> ((ActivityItem) v).key())).containsExactly(
             Map.entry("HOME", "home"), Map.entry("JUMP", "jump"), Map.entry("BOARDS", "boards"),
-            Map.entry("PLAYLISTS", "playlists"), Map.entry("ADD_SONGS", "addSongs"));
+            Map.entry("PLAYLISTS", "playlists"), Map.entry("ADD_SONGS", "addSongs"),
+            Map.entry("DUELS", "duels"));
         assertThat(ActivityItem.DEFAULT_ORDER).containsExactly(ActivityItem.values());
     }
 
@@ -59,7 +60,8 @@ class SettingsEnumsTest {
         assertThat(ActivityItem.completeOrder(null)).isEqualTo(ActivityItem.DEFAULT_ORDER);
         assertThat(ActivityItem.completeOrder(java.util.List.of())).isEqualTo(ActivityItem.DEFAULT_ORDER);
         assertThat(ActivityItem.completeOrder(java.util.List.of(ActivityItem.ADD_SONGS, ActivityItem.BOARDS)))
-            .containsExactly(ActivityItem.ADD_SONGS, ActivityItem.BOARDS, ActivityItem.HOME, ActivityItem.JUMP, ActivityItem.PLAYLISTS);
+            .containsExactly(ActivityItem.ADD_SONGS, ActivityItem.BOARDS, ActivityItem.HOME, ActivityItem.JUMP, ActivityItem.PLAYLISTS,
+                ActivityItem.DUELS);
         assertThatThrownBy(() -> ActivityItem.completeOrder(java.util.List.of(ActivityItem.HOME, ActivityItem.HOME)))
             .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("home");
         assertThatThrownBy(() -> ActivityItem.completeOrder(java.util.Arrays.asList(ActivityItem.HOME, null)))

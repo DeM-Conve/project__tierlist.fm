@@ -143,7 +143,7 @@ class SettingsDtoTest {
     @Test
     void anActivityOrderRoundTripsAndAPartialOrMissingOneIsCompleted() {
         List<ActivityItem> mine = List.of(ActivityItem.ADD_SONGS, ActivityItem.HOME, ActivityItem.PLAYLISTS,
-            ActivityItem.JUMP, ActivityItem.BOARDS);
+            ActivityItem.JUMP, ActivityItem.BOARDS, ActivityItem.DUELS);
         SettingsDto custom = new SettingsDto(new AppearanceDto(Theme.TOKYO, Accent.BLUE, TierPalette.VIVID, mine),
             naming("{category} {tier}", DEFAULT, null, null, Map.of()));
         assertThat(custom.toActivityOrder()).isEqualTo(mine);
@@ -153,7 +153,7 @@ class SettingsDtoTest {
         SettingsDto partial = new SettingsDto(new AppearanceDto(Theme.TOKYO, Accent.BLUE, TierPalette.VIVID,
             List.of(ActivityItem.PLAYLISTS, ActivityItem.JUMP)), naming("{category} {tier}", DEFAULT, null, null, Map.of()));
         assertThat(partial.toActivityOrder()).containsExactly(ActivityItem.PLAYLISTS, ActivityItem.JUMP,
-            ActivityItem.HOME, ActivityItem.BOARDS, ActivityItem.ADD_SONGS);
+            ActivityItem.HOME, ActivityItem.BOARDS, ActivityItem.ADD_SONGS, ActivityItem.DUELS);
 
         assertThat(dto(naming("{category} {tier}", DEFAULT, null, null, Map.of())).toActivityOrder())
             .isEqualTo(ActivityItem.DEFAULT_ORDER);

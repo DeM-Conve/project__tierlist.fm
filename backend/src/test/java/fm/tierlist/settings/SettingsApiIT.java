@@ -159,7 +159,7 @@ class SettingsApiIT extends PostgresIT {
             .andExpect(header().string(HttpHeaders.ETAG, "\"0\""))
             .andExpect(jsonPath("$.appearance.activityOrder[0]").value("addSongs"));
         assertThat(jdbc.queryForList("SELECT item::text FROM activity_bar_item WHERE user_id = 'alice' ORDER BY position",
-            String.class)).containsExactly("ADD_SONGS", "BOARDS", "HOME", "PLAYLISTS", "JUMP");
+            String.class)).containsExactly("ADD_SONGS", "BOARDS", "HOME", "PLAYLISTS", "JUMP", "DUELS");
 
         // Swap the top two only (rows rewritten in place - the deferred UNIQUE lets it through).
         String swapped = "[\"boards\", \"addSongs\", \"home\", \"playlists\", \"jump\"]";
@@ -170,7 +170,7 @@ class SettingsApiIT extends PostgresIT {
 
         mvc.perform(get("/api/settings").with(alice))
             .andExpect(header().string(HttpHeaders.ETAG, etag))
-            .andExpect(jsonPath("$.appearance.activityOrder.length()").value(5))
+            .andExpect(jsonPath("$.appearance.activityOrder.length()").value(6))
             .andExpect(jsonPath("$.appearance.activityOrder[0]").value("boards"))
             .andExpect(jsonPath("$.appearance.activityOrder[1]").value("addSongs"))
             .andExpect(jsonPath("$.appearance.activityOrder[4]").value("jump"));
@@ -196,7 +196,7 @@ class SettingsApiIT extends PostgresIT {
             .andExpect(jsonPath("$.appearance.activityOrder[0]").value("playlists"))
             .andExpect(jsonPath("$.appearance.activityOrder[1]").value("home"))
             .andExpect(jsonPath("$.appearance.activityOrder[4]").value("addSongs"));
-        assertThat(jdbc.queryForObject("SELECT count(*) FROM activity_bar_item", Integer.class)).isEqualTo(5);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM activity_bar_item", Integer.class)).isEqualTo(6);
     }
 
     @Test

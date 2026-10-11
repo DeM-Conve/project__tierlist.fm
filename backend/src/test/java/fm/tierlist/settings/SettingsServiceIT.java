@@ -105,7 +105,7 @@ class SettingsServiceIT extends PostgresIT {
     @Test
     void anActivityOrderChangeAloneIsANewVersion() {
         List<ActivityItem> mine = List.of(ActivityItem.PLAYLISTS, ActivityItem.HOME, ActivityItem.JUMP,
-            ActivityItem.BOARDS, ActivityItem.ADD_SONGS);
+            ActivityItem.BOARDS, ActivityItem.ADD_SONGS, ActivityItem.DUELS);
         UserSettings first = service.save("alice", new MustNotExist(), LOOK, NAMING, Map.of(), null);
         assertThat(first.getVersion()).isZero();
         assertThat(service.find("alice").orElseThrow().getActivityOrder()).isEqualTo(ActivityItem.DEFAULT_ORDER);
