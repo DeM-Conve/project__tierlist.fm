@@ -1,6 +1,7 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, screen } from '@testing-library/react';
 import DuelMatch from './DuelMatch';
+import { CanvasContext } from '../../layout/canvas';
 import { IDS, renderDuel, song } from '../../test/duelFixtures';
 
 vi.mock('@mantine/notifications', () => ({ notifications: { show: vi.fn(), hide: vi.fn() } }));
@@ -249,6 +250,84 @@ describe('DuelMatch', () => {
     // It scrolls instead of cutting the list short.
     expect(sessionCard.querySelector('.mantine-ScrollArea-root')).not.toBeNull();
     expect(screen.getAllByText((_, el) => el?.tagName === 'P' && el.textContent === 'Middle Song over Top Song')).toHaveLength(9);
+  });
+
+  describe('fitting the canvas (two columns, lg and up)', () => {
+    let media;
+    beforeEach(() => {
+      // Every min-width query matches: a wide desktop window.
+      media = vi.spyOn(window, 'matchMedia').mockImplementation((query) => ({
+        matches: query.includes('min-width'), media: query, onchange: null,
+        addListener: () => {}, removeListener: () => {}, addEventListener: () => {}, removeEventListener: () => {}, dispatchEvent: () => false,
+      }));
+    });
+    afterEach(() => media.mockRestore());
+
+    const fitted = () => renderDuel(
+      <CanvasContext.Provider value={{ ref: { current: null }, height: 700 }}>
+        <DuelMatch category="Rock" sessionId="s1" boardLoading={false} base="/tier/Rock" />
+      </CanvasContext.Provider>
+    );
+    const resultAfterVerdict = () => {
+      h.spies.verdict.mockImplementation(() => {
+        h.session = {
+          ...h.session,
+          duels: [{ id: 1, a: IDS.mid, b: IDS.top, verdict: 'A' }],
+          previous: { duel: { id: 1, a: IDS.mid, b: IDS.top, verdict: 'A' }, a: song(IDS.mid, 'A', { mu: 26 }), b: song(IDS.top, 'S', { mu: 29 }) },
+          matchup: matchup(IDS.mid2, IDS.top),
+        };
+      });
+    };
+
+    it('the page is the canvas height (less its padding) and the players shrink when the column runs short', () => {
+      fitted();
+      const page = document.querySelector('.duel-view');
+      expect(page).toHaveAttribute('data-fit', 'true');
+      expect(page.style.height).toContain(`${668 / 16}rem`);
+      // The cards box and each player's frame may shrink below their content (never grow into empty space).
+      for (const el of [screen.getByTestId('duel-cards'), ...screen.getAllByTestId('duel-clip-frame')]) {
+        expect(el.style.flex).toBe('0 1 auto');
+        expect(el.style.minHeight).toBe('0px');
+      }
+    });
+
+    it('the result takes the verdict buttons\' place instead of adding a row; the hint row stays, now with Enter', () => {
+      resultAfterVerdict();
+      fitted();
+      const area = screen.getByTestId('duel-verdict-area');
+      expect(screen.getByTestId('duel-hints')).toHaveTextContent('Don’t know one of them');
+      fireEvent.keyDown(window, { key: 'ArrowLeft' });
+      const result = screen.getByTestId('duel-result');
+      expect(area).toContainElement(result);
+      expect(result).toHaveTextContent('Middle Song edges it.');
+      expect(result).toHaveTextContent('Undo');
+      expect(result).toHaveTextContent('Next duel');
+      // The verdict buttons stay (so the area keeps its height) but hidden and inert.
+      const verdicts = area.querySelector('[aria-label="Your verdict"]');
+      expect(verdicts).toHaveAttribute('aria-hidden', 'true');
+      expect(verdicts.style.visibility).toBe('hidden');
+      expect(screen.getByTestId('duel-hints')).toHaveTextContent(/Enter\s*next duel/);
+      expect(screen.getByTestId('duel-hints')).not.toHaveTextContent('Don’t know');
+    });
+
+    it('the side column keeps "Review suggested moves" visible under a scrolling "This session"', () => {
+      h.session.duels = Array.from({ length: 30 }, (_, i) => ({ id: i + 1, a: IDS.mid, b: IDS.top, verdict: 'A' }));
+      fitted();
+      const side = screen.getByTestId('duel-side');
+      const sessionCard = screen.getByTestId('duel-session');
+      expect(sessionCard.querySelector('.mantine-ScrollArea-root')).not.toBeNull();
+      const link = screen.getByRole('link', { name: /Review suggested moves/ });
+      expect(side).toContainElement(link);
+      // Its own row after the session card, never inside the scrolling list.
+      expect(sessionCard).not.toContainElement(link);
+      expect(sessionCard.compareDocumentPosition(link) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    });
+  });
+
+  it('narrow screens flow (and may scroll) instead of fitting', () => {
+    page();
+    expect(document.querySelector('.duel-view')).not.toHaveAttribute('data-fit');
+    expect(screen.getByTestId('duel-cards').style.flex).toBe('');
   });
 
   it('Undo is off before the first verdict', () => {
