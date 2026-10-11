@@ -13,7 +13,7 @@ import {
   useOutletContext,
 } from 'react-router-dom';
 import { spotlight } from '@mantine/spotlight';
-import { ActionIcon, Affix, Box, Center, Flex, Loader } from '@mantine/core';
+import { ActionIcon, Affix, Alert, Box, Button, Center, Flex, Loader } from '@mantine/core';
 import { Menu as MenuIcon } from 'lucide-react';
 import { useDisclosure, useElementSize, useHotkeys, useMediaQuery, useMergedRef, useWindowEvent } from '@mantine/hooks';
 import { notifications } from '@mantine/notifications';
@@ -114,7 +114,7 @@ import {
 function useLoadTierBoard(category, tiers) {
   const dispatch = useDispatch();
   const loadedCategory = useSelector((s) => s.tiers.loadedCategory);
-  const { data, isLoading } = useTierBoardQueries(category, tiers);
+  const { data, isLoading, error, retry } = useTierBoardQueries(category, tiers);
   const boardLoading = !tiers || isLoading || loadedCategory !== category;
 
   useEffect(() => {
@@ -128,9 +128,11 @@ function useLoadTierBoard(category, tiers) {
 
   // The top-of-page progress bar while switching boards (skeletons show in
   // TierRow while `loading`; this is the accompanying visual feedback).
-  useLoadProgress(boardLoading, category);
+  useLoadProgress(boardLoading && !error, category);
 
-  return { isLoading: boardLoading };
+  // `error`: a tier playlist couldn't be read - the board is NOT loaded (still
+  // `isLoading`), so pages show why (BoardShell) instead of an empty board.
+  return { isLoading: boardLoading, error: boardLoading ? error : null, retry };
 }
 
 export default function App() {
@@ -766,25 +768,35 @@ function useBoardPage(category) {
     if (!tierGroups[category]) navigate('/', { replace: true });
   }, [category, playlists, tierGroups, navigate]);
 
-  const { isLoading } = useLoadTierBoard(category, tierGroups[category]);
+  const { isLoading, error, retry } = useLoadTierBoard(category, tierGroups[category]);
   const tiers = BOARD_TIERS.filter((t) => tierGroups[category]?.[t]);
   const tierLoading = useMemo(
     () => (isLoading ? Object.fromEntries(tiers.map((t) => [t, true])) : {}),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [isLoading, tiers.join()]
   );
-  return { tierGroups, tiers, isLoading, tierLoading };
+  return { tierGroups, tiers, isLoading, tierLoading, error, retry };
 }
 
 // Board pages sit beside the Tier Rail (desktop) and above the shared
 // staged-changes bar.
 // (The Tier Rail itself is global - mounted in Layout, see railCategory.)
-function BoardShell({ children }) {
+// A board whose playlists couldn't be read says why (never skeletons forever).
+function BoardShell({ children, error, onRetry }) {
   return (
     <>
-      {children}
+      {error ? <BoardLoadError error={error} onRetry={onRetry} /> : children}
       <PendingChanges />
     </>
+  );
+}
+
+function BoardLoadError({ error, onRetry }) {
+  return (
+    <Alert color="red" title="Couldn’t load this board">
+      {errorMessage(error, 'The app couldn’t load this board’s playlists from YouTube.')}
+      <Box mt="sm"><Button size="xs" onClick={onRetry}>Retry</Button></Box>
+    </Alert>
   );
 }
 
@@ -861,7 +873,7 @@ function TierBoardPage() {
   const tierItems = useSelector((s) => s.tiers.tierItems);
   const pendingMoves = useSelector(selectPendingMoves);
   const playingVideoId = useSelector(selectPlayingVideoIdOnBoard);
-  const { tierGroups, tierLoading, isLoading } = useBoardPage(category);
+  const { tierGroups, tierLoading, isLoading, error, retry } = useBoardPage(category);
   // null, or which tiers the "create playlists" modal should preselect.
   const [addingTiers, setAddingTiers] = useState(null);
   // "Add a TODO list": link an existing playlist first, create as a fallback.
@@ -869,7 +881,7 @@ function TierBoardPage() {
   const base = `/tier/${encodeURIComponent(category)}`;
 
   return (
-    <BoardShell>
+    <BoardShell error={error} onRetry={retry}>
       {addingTodo && (
         <TodoListModal
           category={category}
@@ -918,7 +930,7 @@ function TierFocusPage() {
   const tierItems = useSelector((s) => s.tiers.tierItems);
   const playingVideoId = useSelector(selectPlayingVideoIdOnBoard);
   const pendingRemovalKeys = usePendingRemovalKeys();
-  const { tiers, isLoading } = useBoardPage(category);
+  const { tiers, isLoading, error, retry } = useBoardPage(category);
   const base = `/tier/${encodeURIComponent(category)}`;
 
   useEffect(() => {
@@ -926,7 +938,7 @@ function TierFocusPage() {
   }, [isLoading, tiers, tier, base, navigate]);
 
   return (
-    <BoardShell>
+    <BoardShell error={error} onRetry={retry}>
       <TierFocusView
         category={category}
         tier={tier}
@@ -950,7 +962,8 @@ function TierFocusPage() {
 function DuelPage({ view: View }) {
   const category = useCategoryParam();
   const { sessionId } = useParams();
-  const { isLoading } = useBoardPage(category);
+  const { isLoading, error, retry } = useBoardPage(category);
+  if (error) return <BoardLoadError error={error} onRetry={retry} />;
   return <View category={category} sessionId={sessionId} boardLoading={isLoading} base={`/tier/${encodeURIComponent(category)}`} />;
 }
 

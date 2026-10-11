@@ -34,11 +34,17 @@ export function useTierBoardQueries(category, tiers) {
   });
 
   const isLoading = presentTiers.length > 0 && results.some((r) => r.isLoading);
-  const data = isLoading
+  // A playlist that couldn't be read (quota, login expired, ...) is an error,
+  // never an empty tier: faking [] "loaded" the board with no songs, and the
+  // duel hub then analysed an empty layout (empty score map, 0% certainty).
+  const failed = results.find((r) => r.isError && r.data === undefined);
+  const error = failed ? failed.error : null;
+  const data = isLoading || error
     ? null
     : Object.fromEntries(presentTiers.map((t, i) => [t, results[i]?.data || []]));
+  const retry = () => results.forEach((r) => r.isError && r.refetch());
 
-  return { data, isLoading, presentTiers };
+  return { data, isLoading, error, retry, presentTiers };
 }
 
 export function useTierSyncMutation() {
