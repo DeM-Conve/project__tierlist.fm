@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { act, cleanup, screen } from '@testing-library/react';
+import { act, cleanup, fireEvent, screen } from '@testing-library/react';
 import { useSelector } from 'react-redux';
 import { MemoryRouter } from 'react-router-dom';
 import { ContextMenuProvider } from 'mantine-contextmenu';
@@ -24,7 +24,7 @@ const playlists = TIERS.map((t) => ({ id: `pl-${t}`, title: `Rock ${t}`, itemCou
 const songs = (tier, n) => Array.from({ length: n }, (_, i) => ({ videoId: `${tier}${i}`, id: `item-${tier}${i}`, title: `Band - Song ${tier}${i}` }));
 const data = Object.fromEntries(TIERS.map((t) => [t, songs(t, 30)]));
 
-function Board({ boardLoading = false }) {
+function Board({ boardLoading = false, handlers = {} }) {
   const tierGroups = useSelector(selectTierGroups);
   const tierItems = useSelector((s) => s.tiers.tierItems);
   const tierLoading = useSelector((s) => s.tiers.tierLoading);
@@ -46,13 +46,14 @@ function Board({ boardLoading = false }) {
       onOpenTier={noop}
       onAddMissingTiers={noop}
       onRenameBoard={noop}
+      {...handlers}
     />
   );
 }
 
 // A 700px canvas: six rows only just fit at the full 88px tile size - the
 // case where taking the bar's 80px out of the room shrank every tile.
-function renderBoard(height = 700, { loading = false } = {}) {
+function renderBoard(height = 700, { loading = false, handlers } = {}) {
   // Loading: the playlists list hasn't arrived, so not even the tiers are known.
   const store = makeStore({ playlists: loading ? [] : playlists, naming: NAMING });
   if (!loading) store.dispatch(loadBoard({ category: 'Rock', data }));
@@ -61,7 +62,7 @@ function renderBoard(height = 700, { loading = false } = {}) {
     <MemoryRouter>
       <ContextMenuProvider>
         <CanvasContext.Provider value={canvas}>
-          <Board boardLoading={loading} />
+          <Board boardLoading={loading} handlers={handlers} />
         </CanvasContext.Provider>
       </ContextMenuProvider>
     </MemoryRouter>,
@@ -137,5 +138,79 @@ describe('TierBoardView - the loading board is the real board, loading', () => {
     expect(tiles.length).toBeGreaterThan(1);
     const m = /([\d.]+)rem/.exec(tiles[0].style.width);
     expect(m ? Math.round(Number(m[1]) * 16) : Number.parseFloat(tiles[0].style.width)).toBe(loadedTile);
+  });
+});
+
+describe('TierBoardView - header buttons and their keys', () => {
+  const press = (key, init = {}) => {
+    const code = /^[a-z]$/i.test(key) ? `Key${key.toUpperCase()}` : key;
+    fireEvent.keyDown(document.body, { key, code, ...init });
+    fireEvent.keyUp(document.body, { key, code, ...init });
+  };
+  const setup = () => {
+    const handlers = { onStartDuel: vi.fn(), onPlayFrom: vi.fn(), onShufflePlay: vi.fn() };
+    renderBoard(700, { handlers });
+    return handlers;
+  };
+
+  it('has no Triage button (the TODO row\'s own play button triages)', () => {
+    setup();
+    expect(screen.queryByRole('button', { name: /^Triage/ })).toBeNull();
+    expect(screen.getByLabelText(/Triage: play and rate/)).toBeInTheDocument();
+  });
+
+  it('prints each key on its button, the way Find shows /', () => {
+    setup();
+    expect(screen.getByRole('button', { name: /Find/ })).toHaveAttribute('aria-keyshortcuts', '/');
+    expect(screen.getByRole('button', { name: /Duel/ })).toHaveTextContent('d');
+    expect(screen.getByRole('button', { name: /Duel/ })).toHaveAttribute('aria-keyshortcuts', 'd');
+    expect(screen.getByRole('button', { name: /^Play/ })).toHaveAttribute('aria-keyshortcuts', 'p');
+    expect(screen.getByRole('button', { name: 'Shuffle play' })).toHaveAttribute('aria-keyshortcuts', 's');
+  });
+
+  it('d duels, p plays the whole board, s shuffles it', () => {
+    const h = setup();
+    press('d');
+    expect(h.onStartDuel).toHaveBeenCalledTimes(1);
+    press('p');
+    expect(h.onPlayFrom).toHaveBeenCalledWith(null);
+    press('s');
+    expect(h.onShufflePlay).toHaveBeenCalledTimes(1);
+  });
+
+  it('leaves Shift+P (push), Ctrl+D (half page) and Ctrl+S alone', () => {
+    const h = setup();
+    press('P', { shiftKey: true });
+    press('d', { ctrlKey: true });
+    press('s', { ctrlKey: true });
+    expect(h.onPlayFrom).not.toHaveBeenCalled();
+    expect(h.onStartDuel).not.toHaveBeenCalled();
+    expect(h.onShufflePlay).not.toHaveBeenCalled();
+  });
+
+  it('is not the second key of a Vim sequence (gd, gp, gs navigate)', () => {
+    const h = setup();
+    for (const key of ['d', 'p', 's']) {
+      press('g');
+      press(key);
+    }
+    expect(h.onStartDuel).not.toHaveBeenCalled();
+    expect(h.onPlayFrom).not.toHaveBeenCalled();
+    expect(h.onShufflePlay).not.toHaveBeenCalled();
+  });
+
+  it('is ignored while typing in a text box', () => {
+    const h = setup();
+    const input = document.createElement('input');
+    document.body.appendChild(input);
+    input.focus();
+    for (const key of ['d', 'p', 's']) {
+      fireEvent.keyDown(input, { key, code: `Key${key.toUpperCase()}` });
+      fireEvent.keyUp(input, { key, code: `Key${key.toUpperCase()}` });
+    }
+    input.remove();
+    expect(h.onStartDuel).not.toHaveBeenCalled();
+    expect(h.onPlayFrom).not.toHaveBeenCalled();
+    expect(h.onShufflePlay).not.toHaveBeenCalled();
   });
 });

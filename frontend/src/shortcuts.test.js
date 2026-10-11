@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { PALETTE_HOTKEYS, SHORTCUTS, hotkeyForCommand } from './shortcuts';
+import { PALETTE_HOTKEYS, SHORTCUTS, hotkeyForCommand, shortcutKey } from './shortcuts';
 
 describe('SHORTCUTS', () => {
   it('is a non-empty list', () => {
@@ -51,6 +51,36 @@ describe('SHORTCUTS', () => {
     const sequences = SHORTCUTS.filter((s) => s.category === 'Navigation (Vim)').flatMap((s) => s.keys).filter((k) => k.length === 2);
     expect(sequences.length).toBeGreaterThan(0);
     sequences.forEach((k) => expect(SEQUENCE_PREFIXES).toContain(k[0]));
+  });
+});
+
+describe('the board header keys', () => {
+  const BOARD = ['board-duel', 'board-play', 'board-shuffle'];
+
+  it('are single, unmodified keys', () => {
+    expect(BOARD.map(shortcutKey)).toEqual(['d', 'p', 's']);
+  });
+
+  it('collide with no key that is live on a board page', async () => {
+    const { SEQUENCE_PREFIXES } = await import('./keyboard/sequence');
+    // Global, Vim and player keys work everywhere; the board's own search too.
+    const live = new Set(
+      SHORTCUTS.filter((s) => ['Global', 'Navigation (Vim)', 'Player'].includes(s.category) || (s.category === 'Tier board' && !BOARD.includes(s.id)))
+        .filter((s) => s.keys.length === 1 || !s.keys.some((k) => ['Ctrl', 'Shift', 'Alt', 'Cmd'].includes(k)))
+        .flatMap((s) => s.keys)
+    );
+    for (const id of BOARD) {
+      const key = shortcutKey(id);
+      expect(live.has(key), `${id}: ${key}`).toBe(false);
+      expect(SEQUENCE_PREFIXES).not.toContain(key);
+    }
+  });
+});
+
+describe('shortcutKey', () => {
+  it('throws for an unknown or multi-key shortcut', () => {
+    expect(() => shortcutKey('nope')).toThrow();
+    expect(() => shortcutKey('palette')).toThrow();
   });
 });
 

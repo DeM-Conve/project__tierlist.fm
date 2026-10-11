@@ -2,7 +2,9 @@
 // `keys`: with a modifier (Ctrl/Shift/Alt/Cmd) the keys are one combo
 // (Ctrl+K); otherwise each entry is an alternative ([ or ]), and a Vim
 // sequence is one string ('gh' = g then h). Nothing
-// here wires up a listener by itself - components still own their own
+// here wires up a listener by itself, though a component can bind and print
+// an entry's key via shortcutKey() (the board header does) so the two can't
+// drift. Components still own their own
 // context-specific keydown handling (see the comments in TierBoardView,
 // PlayerDock and DuelView for why: several of these are small state
 // machines - the vim search box, the player's j/k mode transitions, shift+
@@ -52,13 +54,18 @@ export const SHORTCUTS = [
     category: 'Tier board',
   },
   { id: 'search-close', keys: ['Esc'], description: 'Close search', category: 'Tier board' },
+  // The board header's buttons. TierBoardView binds these exact keys and
+  // prints them on the buttons (shortcutKey), so list and binding can't drift.
+  { id: 'board-duel', keys: ['d'], description: 'Duel on this board (like the Duel button; gd too)', category: 'Tier board' },
+  { id: 'board-play', keys: ['p'], description: 'Play the whole board from the top tier', category: 'Tier board' },
+  { id: 'board-shuffle', keys: ['s'], description: 'Shuffle play the whole board', category: 'Tier board' },
 
   { id: 'focus-filter', keys: ['/'], description: 'Filter this tier', category: 'Tier (full list)' },
   { id: 'focus-clear', keys: ['Esc'], description: 'Clear the filter', category: 'Tier (full list)' },
   {
     id: 'push',
     keys: ['Shift', 'P'],
-    description: 'Push pending changes to YouTube',
+    description: 'Push pending changes to YouTube (any board page)',
     category: 'Tier board',
     // Matches the command palette's own "Sync ... to YouTube" action id, so
     // that entry can show this key as a hint instead of the two drifting.
@@ -71,12 +78,12 @@ export const SHORTCUTS = [
   { id: 'add-skip', keys: ['s'], description: 'Skip to the next waiting song', category: 'Add songs' },
   { id: 'add-remove', keys: ['x'], description: 'Remove it from the waiting list', category: 'Add songs' },
   { id: 'add-board', keys: ['b'], description: 'Pick a different board', category: 'Add songs' },
-  { id: 'add-input', keys: ['/'], description: 'Back to the link / search box', category: 'Add songs' },
+  { id: 'add-input', keys: ['/', 'a'], description: 'Back to the link / search box', category: 'Add songs' },
   { id: 'add-undo', keys: ['u'], description: 'Undo the last add (Ctrl+Z works too)', category: 'Add songs' },
   { id: 'add-paste', keys: ['Ctrl', 'V'], description: 'Paste YouTube link(s) anywhere to add those songs', category: 'Global' },
 
-  { id: 'player-prev', keys: ['h'], description: 'Previous track', category: 'Player' },
-  { id: 'player-next', keys: ['l'], description: 'Next track', category: 'Player' },
+  { id: 'player-prev', keys: ['h'], description: 'Previous track (← too, unless expanded)', category: 'Player' },
+  { id: 'player-next', keys: ['l'], description: 'Next track (→ too, unless expanded)', category: 'Player' },
   {
     id: 'player-seek',
     keys: ['←', '→'],
@@ -123,7 +130,8 @@ export const SHORTCUTS = [
   { id: 'duel-close', keys: ['↓'], description: 'Too close to call', category: 'Duel' },
   { id: 'duel-listen', keys: ['Tab'], description: 'Switch which clip is playing', category: 'Duel' },
   { id: 'duel-skip', keys: ['s'], description: "Don't know one of them (skip the opponent)", category: 'Duel' },
-  { id: 'duel-next', keys: ['Space'], description: 'Play / pause the clip (after a verdict: next duel)', category: 'Duel' },
+  { id: 'duel-start', keys: ['Enter'], description: 'Start the session (duel hub)', category: 'Duel' },
+  { id: 'duel-next', keys: ['Space'], description: 'Play / pause the clip (after a verdict: next duel, Enter too)', category: 'Duel' },
   { id: 'duel-undo', keys: ['u'], description: 'Undo the last verdict', category: 'Duel' },
   { id: 'duel-end', keys: ['e'], description: 'End the session and see the summary', category: 'Duel' },
   { id: 'duel-moves', keys: ['m', 'x', 'l', 'p'], description: 'Suggested moves: move / keep / lock / play (↑↓ browse)', category: 'Duel' },
@@ -132,6 +140,13 @@ export const SHORTCUTS = [
 // What the command palette (Mantine Spotlight) opens on - Ctrl+K plus VS
 // Code's Quick Open, Command Palette and F1. Spotlight binds them itself.
 export const PALETTE_HOTKEYS = ['mod + K', 'mod + P', 'mod + shift + P', 'F1'];
+
+// The single key of a one-key shortcut - what a component binds and shows.
+export function shortcutKey(id) {
+  const entry = SHORTCUTS.find((s) => s.id === id);
+  if (!entry || entry.keys.length !== 1) throw new Error(`No one-key shortcut "${id}"`);
+  return entry.keys[0];
+}
 
 export function hotkeyForCommand(commandId) {
   return SHORTCUTS.find((s) => s.commandId === commandId)?.keys;

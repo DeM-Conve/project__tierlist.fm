@@ -17,6 +17,7 @@ import {
   UnstyledButton,
 } from '@mantine/core';
 import { useElementSize, useMediaQuery } from '@mantine/hooks';
+import { useHotkeys } from 'react-hotkeys-hook';
 import { ChevronDown, ChevronUp, ListTodo, Play, Plus, Search, Shuffle, Swords } from 'lucide-react';
 import { BOARD_TIERS, TIER_COLORS, TIER_ORDER, TODO_TIER } from '../tiers';
 import { moveWithFeedback, useTierDnd } from '../tierActions';
@@ -25,10 +26,17 @@ import { TierMixBar, TierTile } from './TierBits';
 import BoardNameEditor from './BoardNameEditor';
 import { TIER_INK, indexForPointInFlow, videoMatches } from '../tierUtils';
 import { isSequenceKey } from '../keyboard/sequence';
+import { shortcutKey } from '../shortcuts';
 import { useCanvas } from '../layout/canvas';
 import { SECTION_GAP, SHELL_Y, spacingPx } from '../layout/spacing';
 import { EMPTY_ROW, GAP_KEY, INSET_KEY, TODO_GAP_KEY, allocateLines, fitBoard, tilesPerLine } from '../layout/boardFit';
 import PageHeader from './PageHeader';
+
+// The header buttons' keys, from shortcuts.js (the "?" list reads the same).
+const KEY_FIND = shortcutKey('search');
+const KEY_DUEL = shortcutKey('board-duel');
+const KEY_PLAY = shortcutKey('board-play');
+const KEY_SHUFFLE = shortcutKey('board-shuffle');
 
 function DropIndicator({ size }) {
   return <Box w={3} h={size} bg="accent" style={{ borderRadius: 2, flexShrink: 0 }} />;
@@ -495,6 +503,21 @@ export default function TierBoardView({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchOpen, matches, onPlay, playerCoversPage]);
 
+  // The header buttons' own keys (react-hotkeys-hook, like the tier page's
+  // "/": ignored in text fields, exact modifiers - so Shift+P stays push and
+  // Ctrl+D half a page). Only while this board is mounted, not under the
+  // full-screen player, and never the second key of a Vim sequence (gd, gs,
+  // gp are navigation).
+  const headerKey = (run) => (e) => {
+    if (isSequenceKey(e) || e.repeat) return;
+    e.preventDefault();
+    run();
+  };
+  const headerKeyOptions = { enabled: hasVideos && !playerCoversPage };
+  useHotkeys(KEY_DUEL, headerKey(() => onStartDuel()), headerKeyOptions, [onStartDuel]);
+  useHotkeys(KEY_PLAY, headerKey(() => onPlayFrom(null)), headerKeyOptions, [onPlayFrom]);
+  useHotkeys(KEY_SHUFFLE, headerKey(() => onShufflePlay()), headerKeyOptions, [onShufflePlay]);
+
   const matchedKeys = useMemo(() => new Set(matches.map((e) => `${e.tier}:${e.video.videoId}`)), [matches]);
   const activeMatch = matches.length > 0 ? matches[matchIndex % matches.length] : null;
   const activeMatchKey = activeMatch ? `${activeMatch.tier}:${activeMatch.video.videoId}` : null;
@@ -512,7 +535,8 @@ export default function TierBoardView({
             <Button
               variant="default"
               leftSection={<Search size={15} />}
-              rightSection={<Kbd size="xs">/</Kbd>}
+              rightSection={<Kbd size="xs">{KEY_FIND}</Kbd>}
+              aria-keyshortcuts={KEY_FIND}
               onClick={openSearch}
               disabled={!hasVideos}
             >
@@ -520,16 +544,37 @@ export default function TierBoardView({
             </Button>
           </Tooltip>
           <Tooltip label="Pick the better of two until it's ranked" withArrow>
-            <Button variant="default" leftSection={<Swords size={15} />} onClick={onStartDuel} disabled={!hasVideos}>
+            <Button
+              variant="default"
+              leftSection={<Swords size={15} />}
+              rightSection={<Kbd size="xs">{KEY_DUEL}</Kbd>}
+              aria-keyshortcuts={KEY_DUEL}
+              onClick={onStartDuel}
+              disabled={!hasVideos}
+            >
               Duel
             </Button>
           </Tooltip>
           <Button.Group>
-            <Button leftSection={<Play size={15} fill="currentColor" />} onClick={() => onPlayFrom(null)} disabled={!hasVideos}>
+            <Button
+              leftSection={<Play size={15} fill="currentColor" />}
+              rightSection={<Kbd size="xs">{KEY_PLAY}</Kbd>}
+              aria-keyshortcuts={KEY_PLAY}
+              onClick={() => onPlayFrom(null)}
+              disabled={!hasVideos}
+            >
               Play
             </Button>
             <Tooltip label="Shuffle the whole board" withArrow>
-              <Button px="sm" onClick={() => onShufflePlay()} disabled={!hasVideos} aria-label="Shuffle play" style={{ borderLeft: '1px solid color-mix(in srgb, var(--accent-on) 25%, transparent)' }}>
+              <Button
+                px="sm"
+                rightSection={<Kbd size="xs">{KEY_SHUFFLE}</Kbd>}
+                aria-keyshortcuts={KEY_SHUFFLE}
+                onClick={() => onShufflePlay()}
+                disabled={!hasVideos}
+                aria-label="Shuffle play"
+                style={{ borderLeft: '1px solid color-mix(in srgb, var(--accent-on) 25%, transparent)' }}
+              >
                 <Shuffle size={15} />
               </Button>
             </Tooltip>
