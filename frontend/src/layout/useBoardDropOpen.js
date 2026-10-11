@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useTimeout } from '@mantine/hooks';
 import { useSelector } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
 import { notifications } from '@mantine/notifications';
@@ -18,26 +19,23 @@ export function useBoardDropOpen(category) {
   const loadedCategory = useSelector((s) => s.tiers.loadedCategory);
   const pendingCount = useSelector(selectPendingMoves).length;
   const [hovering, setHovering] = useState(false);
-  const timer = useRef(null);
+  // Mantine useTimeout: start() is a no-op while one is pending (dragenter
+  // fires again for every child), and it's cleared on unmount.
+  const { start, clear } = useTimeout(() => navigate(`/tier/${encodeURIComponent(category)}`), OPEN_DELAY_MS);
 
   const active = !!drag && category !== loadedCategory;
-  const clear = () => {
-    clearTimeout(timer.current);
-    timer.current = null;
-  };
-  useEffect(() => clear, []);
   useEffect(() => {
     if (!drag) {
       clear();
       setHovering(false);
     }
-  }, [drag]);
+  }, [drag, clear]);
 
   function onDragEnter(e) {
     if (!active) return;
     e.preventDefault();
     setHovering(true);
-    if (timer.current) return;
+    // (No timer can be pending here: with staged moves none is started.)
     if (pendingCount > 0) {
       notifications.show({
         id: 'board-drop-blocked',
@@ -46,10 +44,7 @@ export function useBoardDropOpen(category) {
       });
       return;
     }
-    timer.current = setTimeout(() => {
-      timer.current = null;
-      navigate(`/tier/${encodeURIComponent(category)}`);
-    }, OPEN_DELAY_MS);
+    start();
   }
 
   return {

@@ -67,6 +67,17 @@ describe('useBoardDropOpen', () => {
     expect(screen.getByTestId('path').textContent).toBe('/tier/Pop Hits');
   });
 
+  it('dragenter firing again over child elements does not restart the delay', () => {
+    const store = setup();
+    drag(store);
+    const pop = screen.getByTestId('Pop Hits');
+    fireEvent.dragEnter(pop);
+    act(() => vi.advanceTimersByTime(OPEN_DELAY_MS / 2));
+    fireEvent.dragEnter(pop);
+    act(() => vi.advanceTimersByTime(OPEN_DELAY_MS / 2));
+    expect(screen.getByTestId('path').textContent).toBe('/tier/Pop Hits');
+  });
+
   it('moving off the board before the delay cancels', () => {
     const store = setup();
     drag(store);
