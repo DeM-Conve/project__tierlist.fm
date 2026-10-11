@@ -28,12 +28,12 @@ beforeEach(() => {
 
 describe('DuelMoves', () => {
 
-  it('shows the "← parent  g u" crumb to /tier/Rock/duel', () => {
+  it('shows the "← parent  Alt ←" crumb to /tier/Rock/duel', () => {
     page();
     const up = screen.getByRole('link', { name: /Rock · Duel/ });
     expect(up).toHaveAttribute('href', '/tier/Rock/duel');
-    expect(up).toHaveAttribute('aria-keyshortcuts', 'g u');
-    expect(within(up).getByText('g u', { selector: 'kbd' })).toBeInTheDocument();
+    expect(up).toHaveAttribute('aria-keyshortcuts', 'Alt+ArrowLeft g u');
+    expect(within(up).getByText('Alt', { selector: 'kbd' })).toBeInTheDocument();
   });
   it('lists every suggested move with its record, sure ones first, and filters by kind', () => {
     page();

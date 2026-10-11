@@ -47,17 +47,17 @@ export function useVimKeys({ hintsRef, canvasRef, categories, currentCategory, p
   useHotkeys('g>b', (e) => currentCategory && go(board(currentCategory))(e), deps);
   // Vimium's "go up": one level up (upLevel.js - the same target as every
   // page's "← parent" crumb). Home has no parent.
+  // Alt+← (the primary key, shown on every crumb - VS Code's Go Back) does
+  // the same; on Home, with no parent, it falls through to the browser's back.
   const { pathname } = useLocation();
-  useHotkeys(
-    'g>u',
-    (e) => {
-      const up = parentOf(pathname);
-      if (!up) return;
-      e.preventDefault();
-      navigate(up.to);
-    },
-    [pathname]
-  );
+  const goUp = (e) => {
+    const up = parentOf(pathname);
+    if (!up) return;
+    e.preventDefault();
+    navigate(up.to);
+  };
+  useHotkeys('g>u', goUp, [pathname]);
+  useHotkeys('alt+left', goUp, [pathname]);
   useHotkeys('g>d', (e) => currentCategory && go(board(currentCategory, '/duel'))(e), deps);
   useHotkeys('g>t', (e) => currentCategory && hasTodo && go(board(currentCategory, `/t/${TODO_TIER}`))(e), deps);
   // The page canvas scrolls, not the window (see layout/canvas.js).

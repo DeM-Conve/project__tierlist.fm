@@ -121,6 +121,12 @@ describe('useVimKeys g u', () => {
     expect(screen.getByTestId('where')).toHaveTextContent(new RegExp(`^${to}$`));
   });
 
+  it('Alt+← (the key on every crumb) goes up the same way', () => {
+    setup({ path: '/tier/Rock/duel/moves' });
+    fireEvent.keyDown(document, { key: 'ArrowLeft', code: 'ArrowLeft', altKey: true });
+    expect(screen.getByTestId('where')).toHaveTextContent(/^\/tier\/Rock\/duel$/);
+  });
+
   it('does nothing on Home', () => {
     setup({ path: '/' });
     goUp();

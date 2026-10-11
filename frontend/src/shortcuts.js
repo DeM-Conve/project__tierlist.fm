@@ -24,7 +24,7 @@ export const SHORTCUTS = [
   { id: 'settings', keys: ['Ctrl', ','], description: 'Open Settings, like VS Code', category: 'Global', commandId: 'page-settings' },
   { id: 'undo', keys: ['Ctrl', 'Z'], description: 'Undo the last tier edit (drag, move, rating, bulk, duel result)', category: 'Global' },
   { id: 'redo', keys: ['Ctrl', 'Shift', 'Z'], description: 'Redo the last undone tier edit (Ctrl+Y too)', category: 'Global' },
-  { id: 'back', keys: ['Alt', '←'], description: 'Go back, like VS Code’s Go Back (the browser’s own key)', category: 'Global' },
+  { id: 'back', keys: ['Alt', '←'], description: 'Up one level, like VS Code’s Go Back (every page: tier page → board → Home, duel pages → hub → board; g u too)', category: 'Global' },
   { id: 'forward', keys: ['Alt', '→'], description: 'Go forward, like VS Code’s Go Forward (the browser’s own key)', category: 'Global' },
 
   { id: 'hints', keys: ['f'], description: 'Link hints: label everything clickable, type a label to click it', category: 'Navigation (Vim)' },
