@@ -1,11 +1,20 @@
 import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from './client';
 import { BOARD_TIERS } from '../tiers';
+import { queryKeys } from './queryKeys';
+import { claimBoardCache } from './boardCache';
 
+// Also hands the board cache to the signed-in account before anything can
+// read it: another account's cached playlists are dropped right here, before
+// this query resolves and the app renders a single page.
 export function useAuthStatusQuery() {
   return useQuery({
-    queryKey: ['auth-status'],
-    queryFn: async () => (await api.get('/api/auth/status')).data,
+    queryKey: queryKeys.authStatus,
+    queryFn: async ({ client }) => {
+      const status = (await api.get('/api/auth/status')).data;
+      if (status.loggedIn) claimBoardCache(client, status.userId);
+      return status;
+    },
     retry: false,
     staleTime: Infinity,
   });
@@ -13,7 +22,7 @@ export function useAuthStatusQuery() {
 
 export function usePlaylistsQuery(enabled) {
   return useQuery({
-    queryKey: ['playlists'],
+    queryKey: queryKeys.playlists,
     queryFn: async () => (await api.get('/api/playlists')).data,
     enabled,
   });
@@ -22,18 +31,23 @@ export function usePlaylistsQuery(enabled) {
 // One query per tier's underlying playlist, run in parallel and combined -
 // a tier board is really N independent playlists rendered as one page.
 // Each is cached by playlist id, so re-visiting a board (or a duel) that's
-// still fresh serves instantly from cache instead of refetching.
+// still fresh serves instantly from cache instead of refetching. A copy
+// restored from the board cache (boardCache.js) is served at once too, and
+// refetched in the background (it's stale - see staleUnlessFromCache).
 export function useTierBoardQueries(category, tiers) {
   const presentTiers = tiers ? BOARD_TIERS.filter((t) => tiers[t]) : [];
 
   const results = useQueries({
     queries: presentTiers.map((t) => ({
-      queryKey: ['playlist-items', tiers[t].id],
+      queryKey: queryKeys.playlistItems(tiers[t].id),
       queryFn: async () => (await api.get(`/api/playlists/${tiers[t].id}/items`)).data,
     })),
   });
 
-  const isLoading = presentTiers.length > 0 && results.some((r) => r.isLoading);
+  // isPending, not isLoading: "no data yet" - also while the board cache is
+  // being restored, when nothing is fetching (isLoading false) and an
+  // isLoading check would have "loaded" the board with empty tiers.
+  const isLoading = presentTiers.length > 0 && results.some((r) => r.isPending);
   // A playlist that couldn't be read (quota, login expired, ...) is an error,
   // never an empty tier: faking [] "loaded" the board with no songs, and the
   // duel hub then analysed an empty layout (empty score map, 0% certainty).
@@ -43,8 +57,15 @@ export function useTierBoardQueries(category, tiers) {
     ? null
     : Object.fromEntries(presentTiers.map((t, i) => [t, results[i]?.data || []]));
   const retry = () => results.forEach((r) => r.isError && r.refetch());
+  // Background refresh of data already shown (from the board cache): when
+  // the data shown dates from, whether it's due a refetch / mid-refetch, and
+  // why a refetch failed (the board stays up - see useLoadTierBoard).
+  const dataUpdatedAt = Math.max(0, ...results.map((r) => r.dataUpdatedAt));
+  const isStale = results.some((r) => r.isStale);
+  const isFetching = results.some((r) => r.isFetching);
+  const refreshError = results.find((r) => r.isError && r.data !== undefined)?.error ?? null;
 
-  return { data, isLoading, error, retry, presentTiers };
+  return { data, isLoading, error, retry, presentTiers, dataUpdatedAt, isStale, isFetching, refreshError };
 }
 
 export function useTierSyncMutation() {
@@ -60,7 +81,7 @@ export function useInvalidatePlaylistItems() {
   const queryClient = useQueryClient();
   return (playlistIds) =>
     Promise.all(
-      playlistIds.map((id) => queryClient.invalidateQueries({ queryKey: ['playlist-items', id] }))
+      playlistIds.map((id) => queryClient.invalidateQueries({ queryKey: queryKeys.playlistItems(id) }))
     );
 }
 
@@ -81,7 +102,7 @@ export function useApplyPlaylistTitles() {
   const queryClient = useQueryClient();
   return (renames) => {
     const titleOf = new Map(renames.map((r) => [r.id, r.title]));
-    return queryClient.setQueryData(['playlists'], (old) =>
+    return queryClient.setQueryData(queryKeys.playlists, (old) =>
       old?.map((p) => (titleOf.has(p.id) ? { ...p, title: titleOf.get(p.id) } : p))
     );
   };
@@ -89,7 +110,7 @@ export function useApplyPlaylistTitles() {
 
 export function useInvalidatePlaylists() {
   const queryClient = useQueryClient();
-  return () => queryClient.invalidateQueries({ queryKey: ['playlists'] });
+  return () => queryClient.invalidateQueries({ queryKey: queryKeys.playlists });
 }
 
 // New tier list / missing tiers: [{ title, privacyStatus? }] -> per-item results.
@@ -97,7 +118,7 @@ export function useCreatePlaylistsMutation() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (playlists) => (await api.post('/api/playlists/create', playlists)).data,
-    onSettled: () => queryClient.invalidateQueries({ queryKey: ['playlists'] }),
+    onSettled: () => queryClient.invalidateQueries({ queryKey: queryKeys.playlists }),
   });
 }
 
@@ -134,13 +155,13 @@ export function useSaveSettingsMutation() {
 // ---- Add songs -----------------------------------------------------------
 
 // Every tier playlist's items that are *already cached* (boards opened this
-// session) - never fetched from here: scanning every playlist would cost
+// session, or kept in the board cache) - never fetched from here: scanning every playlist would cost
 // ~1 quota unit per 50 songs across all boards. "Add songs" uses this to
 // guess a board from the artist and to spot songs it knows are placed.
 export function useCachedTierItems(tierPlaylists) {
   const results = useQueries({
     queries: (tierPlaylists ?? []).map((p) => ({
-      queryKey: ['playlist-items', p.id],
+      queryKey: queryKeys.playlistItems(p.id),
       queryFn: async () => (await api.get(`/api/playlists/${p.id}/items`)).data,
       enabled: false,
     })),
@@ -168,10 +189,10 @@ export function useAddToPlaylistMutation() {
     mutationFn: async ({ playlistId, videoId }) =>
       (await api.post(`/api/playlists/${playlistId}/items`, { videoId })).data,
     onSuccess: (item, { playlistId, video }) => {
-      queryClient.setQueryData(['playlist-items', playlistId], (old) =>
+      queryClient.setQueryData(queryKeys.playlistItems(playlistId), (old) =>
         old ? [...old, { ...video, ...item, channelTitle: item.channelTitle ?? video.channelTitle }] : old
       );
-      queryClient.invalidateQueries({ queryKey: ['playlists'] }); // item counts
+      queryClient.invalidateQueries({ queryKey: queryKeys.playlists }); // item counts
     },
   });
 }
@@ -181,8 +202,8 @@ export function useRemovePlaylistItemMutation() {
   return useMutation({
     mutationFn: async ({ itemId }) => (await api.delete(`/api/playlist-items/${itemId}`)).data,
     onSuccess: (_, { playlistId, itemId }) => {
-      queryClient.setQueryData(['playlist-items', playlistId], (old) => old?.filter((v) => v.id !== itemId));
-      queryClient.invalidateQueries({ queryKey: ['playlists'] });
+      queryClient.setQueryData(queryKeys.playlistItems(playlistId), (old) => old?.filter((v) => v.id !== itemId));
+      queryClient.invalidateQueries({ queryKey: queryKeys.playlists });
     },
   });
 }

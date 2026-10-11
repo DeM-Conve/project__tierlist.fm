@@ -130,6 +130,16 @@ export const selectPendingMoves = createSelector(
   }
 );
 
+// Has the user changed the loaded board since it loaded - an edit (drag,
+// move, duel result, an arrived transfer: all undo steps), a staged move or
+// a sync in flight? Auto-staged duplicate removals don't count: they're
+// derived from the data, so fresh data re-derives them.
+export const selectHasLocalEdits = createSelector(
+  [(s) => s.tiers.undoStack, (s) => s.tiers.syncStatus, selectPendingMoves],
+  (undoStack, syncStatus, moves) =>
+    undoStack.length > 0 || syncStatus === 'syncing' || moves.some((m) => m.kind !== 'dedupe')
+);
+
 export const selectDuelPool = createSelector([selectTierItems], (tierItems) =>
   TIER_ORDER.flatMap((t) => tierItems[t] || [])
 );

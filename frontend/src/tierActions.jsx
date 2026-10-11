@@ -14,8 +14,10 @@ import {
   resetTierBoard,
   setTierForCategory,
   setLoadedCategory,
+  setAwaitingRefresh,
   transfersOverlaid,
 } from './store/tiersSlice';
+import { selectHasLocalEdits } from './store/selectors';
 import { dragEnded, dragStarted, transferCancelled, transferStaged, transfersCommitted } from './store/transfersSlice';
 import { effectiveTransfers } from './transfers';
 import { transferId } from './transfers';
@@ -175,7 +177,11 @@ export const transferWithFeedback = ({ video, fromCategory, fromTier }, toTier, 
 // hands its transfers' current targets to the store (its draft - where an
 // arrived song was dragged since - is about to be replaced), then the new
 // board is shown with the staged transfers laid over it.
-export const loadBoard = ({ category, data }) => (dispatch, getState) => {
+//
+// `refreshingSince`: the data is a copy being refreshed in the background
+// (from the board cache) - its dataUpdatedAt, so landBoardRefresh can tell
+// the fresh copy when it arrives.
+export const loadBoard = ({ category, data, refreshingSince = null }) => (dispatch, getState) => {
   const { tiers, transfers } = getState();
   if (tiers.loadedCategory) {
     dispatch(transfersCommitted(effectiveTransfers(transfers.list, tiers.loadedCategory, tiers.tierItems)));
@@ -185,6 +191,23 @@ export const loadBoard = ({ category, data }) => (dispatch, getState) => {
   presentTiers.forEach((tier) => dispatch(setTierForCategory({ tier, videos: data[tier] })));
   dispatch(transfersOverlaid({ category, transfers: getState().transfers.list }));
   dispatch(setLoadedCategory(category));
+  dispatch(setAwaitingRefresh(refreshingSince == null ? null : { category, since: refreshingSince }));
+};
+
+// The background refresh of a board shown from the board cache has finished
+// (`isFetching` false). Newer data replaces the board - once, and only while
+// the user hasn't touched it: a drag, staged move or duel result is never
+// overwritten (it stays on the cached copy, like any unsynced edit). A
+// failed refresh just ends the wait, the cached board stays up. Ending the
+// wait matters: a later refetch (e.g. after a sync) can lag behind YouTube's
+// own write, so it must never be applied over the draft - see applySyncedMoves.
+export const landBoardRefresh = ({ category, data, dataUpdatedAt }) => (dispatch, getState) => {
+  const { awaitingRefresh, loadedCategory } = getState().tiers;
+  if (!awaitingRefresh || awaitingRefresh.category !== category || loadedCategory !== category) return;
+  dispatch(setAwaitingRefresh(null));
+  if (!data || dataUpdatedAt <= awaitingRefresh.since) return;
+  if (selectHasLocalEdits(getState())) return;
+  dispatch(loadBoard({ category, data }));
 };
 
 // "Put back" on a staged transfer (the review list).

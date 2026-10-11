@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { act, render, screen } from '@testing-library/react';
 import { Provider } from 'react-redux';
 import { MemoryRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -8,6 +8,7 @@ import App from './App';
 import AppearanceRoot from './components/AppearanceRoot';
 import { store } from './store/store';
 import { setLoadedCategory } from './store/tiersSlice';
+import { moveWithFeedback } from './tierActions';
 
 // A smoke test of the real shell (Layout: activity bar, resizable panel,
 // canvas card, routes): every page mounts without throwing. It caught a
@@ -30,7 +31,11 @@ vi.mock('./api/useSettingsSync', () => ({ useSettingsSync: () => ({ ready: true 
 
 function renderApp(path) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false, enabled: false } } });
-  return render(
+  return render(appTree(queryClient, path));
+}
+
+function appTree(queryClient, path) {
+  return (
     <QueryClientProvider client={queryClient}>
       <Provider store={store}>
         <MemoryRouter initialEntries={[path]}>
@@ -69,5 +74,53 @@ describe('a board that failed to load', () => {
     expect(screen.queryByText('Settle the board.')).not.toBeInTheDocument();
     screen.getByRole('button', { name: 'Retry' }).click();
     expect(retry).toHaveBeenCalled();
+  });
+});
+
+// A board opened from the board cache (IndexedDB): shown at once from that
+// copy; the background refresh replaces it only if nothing was edited.
+describe('a board shown from the board cache', () => {
+  const song = (videoId) => ({ videoId, id: `item-${videoId}`, title: `Song ${videoId}`, thumbnail: null });
+  const CACHED = { S: [song('cached00001')], A: [song('cached00002')] };
+  const FRESH = { S: [song('cached00001'), song('fresh000001')], A: [song('cached00002')] };
+  const board = (over) => ({ isLoading: false, error: null, retry: vi.fn(), presentTiers: ['S', 'A'], refreshError: null, ...over });
+  const cached = board({ data: CACHED, dataUpdatedAt: 1000, isStale: true, isFetching: true });
+  const fresh = board({ data: FRESH, dataUpdatedAt: 2000, isStale: false, isFetching: false });
+  const sIds = () => store.getState().tiers.tierItems.S.map((v) => v.videoId);
+
+  function openFromCache() {
+    store.dispatch(setLoadedCategory(null));
+    h.board = cached;
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false, enabled: false } } });
+    const view = render(appTree(queryClient, '/tier/Rap'));
+    return (next) => { h.board = next; view.rerender(appTree(queryClient, '/tier/Rap')); };
+  }
+  afterEach(() => { h.board = null; });
+
+  it('loads the cached copy, then the fresh one when it lands', async () => {
+    const land = openFromCache();
+    await screen.findByRole('navigation', { name: 'Activity bar' });
+    expect(sIds()).toEqual(['cached00001']);
+    land(fresh);
+    expect(sIds()).toEqual(['cached00001', 'fresh000001']);
+  });
+
+  it('a refresh landing after a drag does not clobber it', async () => {
+    const land = openFromCache();
+    await screen.findByRole('navigation', { name: 'Activity bar' });
+    act(() => { store.dispatch(moveWithFeedback([{ fromTier: 'S', toTier: 'A', videoId: 'cached00001', dropIndex: null }])); });
+    land(fresh);
+    expect(sIds()).toEqual([]);
+    expect(store.getState().tiers.tierItems.A.map((v) => v.videoId)).toEqual(['cached00002', 'cached00001']);
+  });
+
+  it('a failed refresh keeps the board up, with a quiet notice instead of an error page', async () => {
+    const land = openFromCache();
+    await screen.findByRole('navigation', { name: 'Activity bar' });
+    const quota = { response: { data: { detail: 'YouTube’s daily API quota for this app is used up.' } } };
+    land(board({ data: CACHED, dataUpdatedAt: 1000, isStale: true, isFetching: false, refreshError: quota }));
+    expect(await screen.findByText(/Showing the copy saved on this device/)).toBeInTheDocument();
+    expect(screen.queryByText('Couldn’t load this board')).not.toBeInTheDocument();
+    expect(sIds()).toEqual(['cached00001']);
   });
 });

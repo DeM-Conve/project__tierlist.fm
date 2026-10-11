@@ -13,7 +13,7 @@ import {
   useOutletContext,
 } from 'react-router-dom';
 import { spotlight } from '@mantine/spotlight';
-import { ActionIcon, Affix, Alert, Box, Button, Center, Flex, Loader } from '@mantine/core';
+import { ActionIcon, Affix, Alert, Box, Button, Center, Flex, Loader, Text } from '@mantine/core';
 import { Menu as MenuIcon } from 'lucide-react';
 import { useDisclosure, useElementSize, useHotkeys, useMediaQuery, useMergedRef, useWindowEvent } from '@mantine/hooks';
 import { notifications } from '@mantine/notifications';
@@ -31,7 +31,7 @@ import TierRail from './components/TierRail';
 import { CANVAS_TOP, CANVAS_X, PART_GAP, SHELL_Y } from './layout/spacing';
 import { CanvasContext } from './layout/canvas';
 import PendingChanges from './components/PendingChanges';
-import { loadBoard, moveWithFeedback } from './tierActions';
+import { landBoardRefresh, loadBoard, moveWithFeedback } from './tierActions';
 import { buildSyncPlan, succeeded, touchedPlaylists } from './syncPlan';
 import { dragEnded, transfersDiscarded, transfersPushed } from './store/transfersSlice';
 import TierBoardView from './components/TierBoardView';
@@ -55,6 +55,7 @@ import LoginView from './components/LoginView';
 import { setLoggedIn, setPlaylists } from './store/authSlice';
 import { detectedNaming } from './store/namingSlice';
 import { useSettingsSync } from './api/useSettingsSync';
+import { clearBoardCache } from './api/boardCache';
 import { detectNaming } from './naming';
 import { setCurrentCategory, setHomeQuery, setSidebarQuery, setMobileSidebarOpen, showSidebarView, setSidebarCollapsed } from './store/viewSlice';
 import {
@@ -63,6 +64,7 @@ import {
   transfersApplied,
   discardTierChanges,
   setSyncStatus,
+  setAwaitingRefresh,
 } from './store/tiersSlice';
 import {
   openFocus as openFocusAction,
@@ -112,10 +114,15 @@ import {
 // re-applies once per fresh dataset: re-entering an already-loaded board
 // (e.g. returning from a duel) must not stomp an unsynced local edit just
 // because the query cache still holds data for it.
+// A board restored from the board cache (IndexedDB) loads from that copy at
+// once; its background refresh then lands once via landBoardRefresh, which
+// never overwrites a local edit.
 function useLoadTierBoard(category, tiers) {
   const dispatch = useDispatch();
   const loadedCategory = useSelector((s) => s.tiers.loadedCategory);
-  const { data, isLoading, error, retry } = useTierBoardQueries(category, tiers);
+  const awaitingRefresh = useSelector((s) => s.tiers.awaitingRefresh);
+  const { data, isLoading, error, retry, dataUpdatedAt, isStale, isFetching, refreshError } =
+    useTierBoardQueries(category, tiers);
   const boardLoading = !tiers || isLoading || loadedCategory !== category;
 
   useEffect(() => {
@@ -123,9 +130,17 @@ function useLoadTierBoard(category, tiers) {
     // a refresh / deep link straight onto a board). Without this guard the
     // empty result from "no tiers yet" got marked as this board's loaded
     // data, and the board stayed blank until you navigated away and back.
-    if (!tiers || !data || loadedCategory === category) return;
-    dispatch(loadBoard({ category, data }));
-  }, [data, tiers, category, loadedCategory, dispatch]);
+    if (!tiers || !data) return;
+    if (loadedCategory !== category) {
+      dispatch(loadBoard({ category, data, refreshingSince: isStale || isFetching ? dataUpdatedAt : null }));
+    } else if (awaitingRefresh && !isFetching) {
+      // Settled: fresh data arrived, or the refetch failed (or there's
+      // nothing left to refresh). Stale, idle and no error means the
+      // refetch hasn't started yet - keep waiting.
+      const settled = dataUpdatedAt > awaitingRefresh.since || refreshError || !isStale;
+      if (settled) dispatch(landBoardRefresh({ category, data, dataUpdatedAt }));
+    }
+  }, [data, tiers, category, loadedCategory, awaitingRefresh, isStale, isFetching, dataUpdatedAt, refreshError, dispatch]);
 
   // The top-of-page progress bar while switching boards (skeletons show in
   // TierRow while `loading`; this is the accompanying visual feedback).
@@ -133,7 +148,20 @@ function useLoadTierBoard(category, tiers) {
 
   // `error`: a tier playlist couldn't be read - the board is NOT loaded (still
   // `isLoading`), so pages show why (BoardShell) instead of an empty board.
-  return { isLoading: boardLoading, error: boardLoading ? error : null, retry };
+  // `refreshError`: the board is up (from the board cache) but refreshing it
+  // from YouTube failed - a quiet notice, never an error page.
+  // Its Retry waits for the fresh copy again, so a successful retry lands.
+  const retryRefresh = () => {
+    dispatch(setAwaitingRefresh({ category, since: dataUpdatedAt }));
+    retry();
+  };
+  return {
+    isLoading: boardLoading,
+    error: boardLoading ? error : null,
+    refreshError: boardLoading ? null : refreshError,
+    retry,
+    retryRefresh,
+  };
 }
 
 export default function App() {
@@ -491,6 +519,8 @@ function Layout() {
   async function logout() {
     await api.post('/api/auth/logout');
     queryClient.clear();
+    // This device forgets the account's cached playlists too.
+    clearBoardCache();
     dispatch(setLoggedIn(false));
     dispatch(setPlaylists(null));
     dispatch(setTierItems({}));
@@ -791,26 +821,46 @@ function useBoardPage(category) {
     if (!tierGroups[category]) navigate('/', { replace: true });
   }, [category, playlists, tierGroups, navigate]);
 
-  const { isLoading, error, retry } = useLoadTierBoard(category, tierGroups[category]);
+  const { isLoading, error, retry, refreshError, retryRefresh } = useLoadTierBoard(category, tierGroups[category]);
   const tiers = BOARD_TIERS.filter((t) => tierGroups[category]?.[t]);
   const tierLoading = useMemo(
     () => (isLoading ? Object.fromEntries(tiers.map((t) => [t, true])) : {}),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [isLoading, tiers.join()]
   );
-  return { tierGroups, tiers, isLoading, tierLoading, error, retry };
+  return { tierGroups, tiers, isLoading, tierLoading, error, retry, refreshError, retryRefresh };
 }
 
 // Board pages sit beside the Tier Rail (desktop) and above the shared
 // staged-changes bar.
 // (The Tier Rail itself is global - mounted in Layout, see railCategory.)
 // A board whose playlists couldn't be read says why (never skeletons forever).
-function BoardShell({ children, error, onRetry }) {
+// One shown from the board cache whose refresh failed stays up, with a note.
+function BoardShell({ children, error, onRetry, refreshError, onRetryRefresh }) {
   return (
     <>
-      {error ? <BoardLoadError error={error} onRetry={onRetry} /> : children}
+      {error ? <BoardLoadError error={error} onRetry={onRetry} /> : (
+        <>
+          {refreshError && <BoardRefreshNotice error={refreshError} onRetry={onRetryRefresh} />}
+          {children}
+        </>
+      )}
       <PendingChanges />
     </>
+  );
+}
+
+function BoardRefreshNotice({ error, onRetry }) {
+  return (
+    <Alert color="gray" variant="light" mb="sm" p="2xs">
+      <Flex gap="2xs" justify="space-between" align="center">
+        <Text fz="sm">
+          Showing the copy saved on this device - couldn’t refresh it from YouTube.{' '}
+          {errorMessage(error, '')}
+        </Text>
+        <Button size="xs" variant="subtle" onClick={onRetry}>Retry</Button>
+      </Flex>
+    </Alert>
   );
 }
 
@@ -896,7 +946,7 @@ function TierBoardPage() {
   const tierItems = useSelector((s) => s.tiers.tierItems);
   const pendingMoves = useSelector(selectPendingMoves);
   const playingVideoId = useSelector(selectPlayingVideoIdOnBoard);
-  const { tierGroups, tierLoading, isLoading, error, retry } = useBoardPage(category);
+  const { tierGroups, tierLoading, isLoading, error, retry, refreshError, retryRefresh } = useBoardPage(category);
   // null, or which tiers the "create playlists" modal should preselect.
   const [addingTiers, setAddingTiers] = useState(null);
   // "Add a TODO list": link an existing playlist first, create as a fallback.
@@ -904,7 +954,7 @@ function TierBoardPage() {
   const base = `/tier/${encodeURIComponent(category)}`;
 
   return (
-    <BoardShell error={error} onRetry={retry}>
+    <BoardShell error={error} onRetry={retry} refreshError={refreshError} onRetryRefresh={retryRefresh}>
       {addingTodo && (
         <TodoListModal
           category={category}
@@ -953,7 +1003,7 @@ function TierFocusPage() {
   const tierItems = useSelector((s) => s.tiers.tierItems);
   const playingVideoId = useSelector(selectPlayingVideoIdOnBoard);
   const pendingRemovalKeys = usePendingRemovalKeys();
-  const { tiers, isLoading, error, retry } = useBoardPage(category);
+  const { tiers, isLoading, error, retry, refreshError, retryRefresh } = useBoardPage(category);
   const base = `/tier/${encodeURIComponent(category)}`;
 
   useEffect(() => {
@@ -961,7 +1011,7 @@ function TierFocusPage() {
   }, [isLoading, tiers, tier, base, navigate]);
 
   return (
-    <BoardShell error={error} onRetry={retry}>
+    <BoardShell error={error} onRetry={retry} refreshError={refreshError} onRetryRefresh={retryRefresh}>
       <TierFocusView
         category={category}
         tier={tier}

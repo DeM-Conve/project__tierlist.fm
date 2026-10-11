@@ -60,6 +60,11 @@ const tiersSlice = createSlice({
     // tier board page every time you navigate back to it (e.g. after a
     // duel), which must NOT re-trigger a fetch for the same category.
     loadedCategory: null,
+    // `{ category, since }` while the loaded board shows data that is being
+    // refreshed in the background (a copy from the board cache): `since` is
+    // that data's dataUpdatedAt. The fresh copy replaces the board once, and
+    // only if nothing was edited meanwhile - see tierActions' landBoardRefresh.
+    awaitingRefresh: null,
     // Snapshots of tierItems before each local edit (drag, menu move, bulk
     // move, rating, duel result) - newest last. Cleared when the board is
     // reloaded or discarded, since those replace the baseline itself.
@@ -86,6 +91,9 @@ const tiersSlice = createSlice({
     // refetch starts - see the useLoadTierBoard hook in App.jsx.
     setLoadedCategory: (state, action) => {
       state.loadedCategory = action.payload;
+    },
+    setAwaitingRefresh: (state, action) => {
+      state.awaitingRefresh = action.payload;
     },
     setTierForCategory: (state, action) => {
       state.redoStack = [];
@@ -270,6 +278,7 @@ const tiersSlice = createSlice({
 export const {
   resetTierBoard,
   setLoadedCategory,
+  setAwaitingRefresh,
   setTierForCategory,
   setTierItems,
   applySyncedMoves,
