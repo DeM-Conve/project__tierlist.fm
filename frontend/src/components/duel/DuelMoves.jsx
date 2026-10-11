@@ -1,40 +1,48 @@
 import { useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useHotkeys } from 'react-hotkeys-hook';
+import { useHover } from '@mantine/hooks';
 import {
-  Accordion, Alert, Anchor, Badge, Box, Button, Checkbox, Chip, Container, Group, Kbd, Paper, Skeleton, Stack, Table, Text, Title,
-  UnstyledButton,
+  Accordion, Alert, Anchor, Badge, Box, Button, Checkbox, Chip, Container, Group, Kbd, Paper, Progress, Skeleton, Stack, Table, Text,
+  ThemeIcon, Title, UnstyledButton,
 } from '@mantine/core';
-import { ArrowDown, ArrowUp, Play, Square } from 'lucide-react';
+import { ArrowDown, ArrowUp, Hourglass, Play, Square, Swords } from 'lucide-react';
 import { useTierName } from '../../tierLabels';
 import { TIER_ORDER } from '../../tiers';
 import { TierChip } from '../TierBits';
 import EmbeddedPlayer from '../EmbeddedPlayer';
-import { useDuelAnalysisQuery } from '../../api/queries';
+import { useDuelAnalysisQuery, useStartDuelMutation } from '../../api/queries';
 import { errorMessage } from '../../api/client';
 import { useDuelBoard } from '../../duel/useDuelBoard';
-import { leaningText, moveKind, orderChanges, pct, record, shortfallText } from '../../duel/duelText';
+import { leaningConfidence, leaningText, moveKind, orderChanges, pct, record, shortfallText } from '../../duel/duelText';
 import { ProbabilityBars, ScoreTrend, SectionLabel, SongArt } from './DuelBits';
 import PageHeader from '../PageHeader';
 import { SECTION_GAP } from '../../layout/spacing';
 
 // One suggested move: song, from -> to, confidence, Move / Keep (or what was decided, with Undo).
-// `leaning`: short of the bar - the confidence bar is drawn faint.
-export function MoveRow({ s, board, selected, decided, onSelect, onMove, onKeep, onUndo, detail, leaning = false }) {
+// The whole row is one click target: an UnstyledButton stretched over it
+// (the "stretched link" pattern - no button inside a button), with the
+// Keep / Move buttons raised above it so they still work on their own.
+export function MoveRow({ s, board, selected, decided, onSelect, onMove, onKeep, onUndo, detail }) {
   const tierName = useTierName();
+  const { hovered, ref } = useHover();
   return (
     <Group
+      ref={ref}
       wrap="wrap"
       gap="md"
       px="lg"
       py="sm"
+      pos="relative"
+      data-selected={selected || undefined}
       style={{
         borderBottom: '1px solid var(--border)',
-        background: selected ? 'var(--surface-2)' : undefined,
+        background: selected ? 'var(--surface-2)' : hovered ? 'var(--mantine-color-default-hover)' : undefined,
         boxShadow: selected ? 'inset 3px 0 0 var(--accent)' : undefined,
       }}
     >
-      <UnstyledButton onClick={onSelect} style={{ flex: '1 1 260px', minWidth: 0 }} aria-label={`Show evidence for ${board.nameOf(s.song)}`}>
+      <UnstyledButton onClick={onSelect} pos="absolute" inset={0} aria-label={`Show evidence for ${board.nameOf(s.song)}`} />
+      <Box style={{ flex: '1 1 260px', minWidth: 0 }}>
         <Group gap="md" wrap="nowrap">
           <SongArt video={board.videoOf(s.song)} />
           <Box miw={0}>
@@ -44,7 +52,7 @@ export function MoveRow({ s, board, selected, decided, onSelect, onMove, onKeep,
             </Text>
           </Box>
         </Group>
-      </UnstyledButton>
+      </Box>
       <Group gap="2xs" w={130} wrap="nowrap">
         <TierChip tier={s.from} size={20} />
         <Text c="dimmed">→</Text>
@@ -52,24 +60,88 @@ export function MoveRow({ s, board, selected, decided, onSelect, onMove, onKeep,
       </Group>
       <Group gap="2xs" w={130} wrap="nowrap">
         <Box h={6} style={{ flex: 1, background: 'var(--surface-3)', borderRadius: 3, overflow: 'hidden' }}>
-          <Box h="100%" w={pct(s.confidence)} style={{ background: leaning ? 'var(--text-faint)' : 'var(--accent)' }} />
+          <Box h="100%" w={pct(s.confidence)} style={{ background: 'var(--accent)' }} />
         </Box>
         <Text ff="monospace" fz="md">{pct(s.confidence)}</Text>
       </Group>
       {decided ? (
-        <Group gap="xs" miw={150}>
+        <Group gap="xs" miw={150} pos="relative" style={{ zIndex: 1 }}>
           <Text fz="md" fw={700} c={decided === 'move' ? 'accent' : 'dimmed'}>
             {decided === 'move' ? `Moved to ${tierName(s.to)}` : `Kept in ${tierName(s.from)}`}
           </Text>
           <Anchor component="button" fz="md" c="dimmed" onClick={onUndo}>Undo</Anchor>
         </Group>
       ) : (
-        <Group gap="3xs" miw={150}>
+        <Group gap="3xs" miw={150} pos="relative" style={{ zIndex: 1 }}>
           <Button variant="default" onClick={onKeep}>Keep</Button>
           <Button onClick={onMove}>Move</Button>
         </Group>
       )}
     </Group>
+  );
+}
+
+// A move the engine leans towards but isn't sure of. Deliberately not a
+// MoveRow: dimmed, no selection bar, a neutral bar instead of the accent and
+// only quiet actions - duel it more (the useful one) or move it anyway.
+function LeaningRow({ s, board, decided, onDuel, onMove, onUndo, starting }) {
+  const tierName = useTierName();
+  const others = (s.unmet ?? []).filter((u) => u.kind !== 'CONFIDENCE').map(shortfallText);
+  return (
+    <Group wrap="wrap" gap="md" px="lg" py="xs" data-testid="leaning-row" style={{ borderTop: '1px solid var(--border-soft)' }}>
+      <Group gap="md" wrap="nowrap" style={{ flex: '1 1 260px', minWidth: 0, opacity: 0.75 }}>
+        <SongArt video={board.videoOf(s.song)} size={32} />
+        <Box miw={0}>
+          <Text fz="md" truncate="end">{board.nameOf(s.song)}</Text>
+          <Text fz="sm" c="dimmed" truncate="end">
+            {board.artistOf(s.song)} · {others.length ? others.join(' · ') : `${record(s)} (W–L–D)`}
+          </Text>
+        </Box>
+      </Group>
+      <Group gap="2xs" w={130} wrap="nowrap" style={{ opacity: 0.75 }} aria-label={`Leaning ${tierName(s.from)} to ${tierName(s.to)}`}>
+        <TierChip tier={s.from} size={18} />
+        <Text c="dimmed">→</Text>
+        <TierChip tier={s.to} size={18} />
+      </Group>
+      <Stack gap="4xs" w={130}>
+        <Text fz="sm" c="dimmed">{leaningConfidence(s)}</Text>
+        <Progress value={Math.round(s.confidence * 100)} size={3} color="var(--text-faint)" aria-label="Confidence" />
+      </Stack>
+      {decided ? (
+        <Group gap="xs" miw={190}>
+          <Text fz="md" c="dimmed">{decided === 'move' ? `Moved to ${tierName(s.to)}` : `Kept in ${tierName(s.from)}`}</Text>
+          <Anchor component="button" fz="md" c="dimmed" onClick={onUndo}>Undo</Anchor>
+        </Group>
+      ) : (
+        <Group gap="4xs" miw={190} wrap="nowrap">
+          <Button variant="subtle" color="gray" size="compact-sm" onClick={onMove}>Move anyway</Button>
+          <Button variant="subtle" color="gray" size="compact-sm" leftSection={<Swords size={14} />} onClick={onDuel} disabled={starting}>
+            {s.from === 'TODO' ? 'Duel to-do songs' : 'Duel this song'}
+          </Button>
+        </Group>
+      )}
+    </Group>
+  );
+}
+
+// No move is sure enough yet: say so, name the closest, send them to duel.
+function NothingReady({ closest, board, base }) {
+  const tierName = useTierName();
+  return (
+    <Paper withBorder radius="lg" p="lg">
+      <Group gap="md" wrap="nowrap" align="flex-start">
+        <ThemeIcon variant="light" color="gray" size={36} radius="md"><Hourglass size={18} /></ThemeIcon>
+        <Stack gap="2xs" style={{ flex: 1 }} miw={0}>
+          <Text fw={700}>{closest ? 'Nothing is sure enough to move yet' : 'No moves to review'}</Text>
+          <Text fz="md" c="dimmed">
+            {closest
+              ? `Closest: ${board.nameOf(closest.song)} - ${leaningText(closest, tierName)}.`
+              : 'Duel more and the strongest cases show up here.'}
+          </Text>
+        </Stack>
+        <Button component={Link} to={`${base}/duel`} leftSection={<Swords size={16} />} style={{ flexShrink: 0 }}>Duel more</Button>
+      </Group>
+    </Paper>
   );
 }
 
@@ -177,8 +249,10 @@ const FILTERS = [
 // "Suggested moves": the duels built the case; nothing moves until you say so.
 export default function DuelMoves({ category, boardLoading, base }) {
   const tierName = useTierName();
+  const navigate = useNavigate();
   const board = useDuelBoard(category);
   const analysis = useDuelAnalysisQuery(category, board.duelLayout, !boardLoading);
+  const start = useStartDuelMutation(category);
   const [filter, setFilter] = useState('all');
   const [decided, setDecided] = useState({}); // song -> { s, kind, lean }
   const [selected, setSelected] = useState(null);
@@ -200,11 +274,20 @@ export default function DuelMoves({ category, boardLoading, base }) {
   rows.forEach((s) => (counts[moveKind(s.from, s.to)] += 1));
   const byFilter = (list) => (filter === 'all' ? list : list.filter((s) => moveKind(s.from, s.to) === filter));
   const shown = byFilter(rows);
+  // The chips filter both lists the same way; the leaning header names the filter so its rows don't read as unfiltered.
   const shownLeaning = byFilter(leaningRows);
+  const filterLabel = filter === 'all' ? '' : ` · ${FILTERS.find((f) => f.value === filter).label.toLowerCase()}`;
+  const leaningTitle = `Leaning · ${shownLeaning.length} not sure yet${filterLabel}`;
   const isLeaning = (s) => leaningRows.includes(s);
-  // Browsing (keys, the evidence panel) walks the suggested moves, then the leaning ones.
-  const browsable = [...shown, ...shownLeaning];
+  // Browsing (keys, the evidence panel) walks the ready suggestions only -
+  // leaning moves are never selected, so nothing about them reads as a suggestion.
+  const browsable = shown;
   const current = browsable.find((s) => s.song === selected) ?? browsable[0];
+  // "Duel this song": a One song session pinned on it (to-do songs only duel in Place TODO).
+  const duelSong = (s) => start.mutate(
+    { layout: board.duelLayout.layout, focus: s.from === 'TODO' ? 'PLACE_TODO' : 'ONE_SONG', songId: s.from === 'TODO' ? null : s.song, minutes: 5 },
+    { onSuccess: (session) => navigate(`${base}/duel/play/${session.id}`) }
+  );
   const sure = rows.filter((s) => !decided[s.song] && s.confidence >= 0.9);
 
   // The preview belongs to one song: selecting another stops it.
@@ -268,11 +351,11 @@ export default function DuelMoves({ category, boardLoading, base }) {
           }
           title="Suggested moves"
           meta="Your duels built the case. Nothing moves until you say so - then push to YouTube as usual."
-          actions={
+          actions={rows.length > 0 && (
             <Button disabled={!sure.length} onClick={() => sure.forEach(move)}>
               Move all {sure.length} at ≥90%
             </Button>
-          }
+          )}
         />
 
         <Chip.Group value={filter} onChange={setFilter}>
@@ -295,16 +378,12 @@ export default function DuelMoves({ category, boardLoading, base }) {
             </Paper>
             <EvidenceSkeleton />
           </Group>
+        ) : rows.length === 0 ? (
+          <NothingReady closest={leaningRows.find((l) => !decided[l.song])} board={board} base={base} />
         ) : (
           <Group align="flex-start" gap="lg" wrap="wrap">
             <Paper withBorder radius="lg" style={{ flex: '999 1 560px', minWidth: 0, overflow: 'hidden' }}>
-              {shown.length === 0 && (
-                <Text c="dimmed" p="xl" ta="center">
-                  {shownLeaning.length
-                    ? `Nothing is sure enough to suggest yet. Closest: ${board.nameOf(shownLeaning[0].song)} - ${leaningText(shownLeaning[0], tierName)}.`
-                    : 'No moves to review. Duel more and the strongest cases show up here.'}
-                </Text>
-              )}
+              {shown.length === 0 && <Text c="dimmed" p="xl" ta="center">No {FILTERS.find((f) => f.value === filter).label.toLowerCase()} moves are ready.</Text>}
               {shown.map((s) => (
                 <MoveRow
                   key={s.song}
@@ -318,32 +397,7 @@ export default function DuelMoves({ category, boardLoading, base }) {
                   onUndo={() => undo(s)}
                 />
               ))}
-              {shownLeaning.length > 0 && (
-                <>
-                  <Stack gap="5xs" px="lg" pt="md" pb="2xs" style={{ borderBottom: '1px solid var(--border)' }}>
-                    <SectionLabel>Leaning · not sure yet</SectionLabel>
-                    <Text fz="md" c="dimmed">
-                      Where your duels point, short of the bar for a suggestion. Move or keep one yourself, or duel more.
-                    </Text>
-                  </Stack>
-                  {shownLeaning.map((s) => (
-                    <MoveRow
-                      key={s.song}
-                      s={s}
-                      board={board}
-                      leaning
-                      detail={s.unmet.map(shortfallText).join(' · ')}
-                      selected={current?.song === s.song}
-                      decided={decided[s.song]?.kind}
-                      onSelect={() => setSelected(s.song)}
-                      onMove={() => move(s)}
-                      onKeep={() => keep(s)}
-                      onUndo={() => undo(s)}
-                    />
-                  ))}
-                </>
-              )}
-              <KeyHints />
+              {shown.length > 0 && <KeyHints />}
             </Paper>
 
             {current && (
@@ -411,6 +465,38 @@ export default function DuelMoves({ category, boardLoading, base }) {
             )}
           </Group>
         )}
+
+        {/* Leaning: a separate, quiet, collapsed view - where the duels point
+            short of the bar. Never selected, never a primary action. */}
+        {shownLeaning.length > 0 && (
+          <Paper withBorder radius="lg" style={{ overflow: 'hidden' }}>
+            <Accordion chevronPosition="left" variant="default" styles={{ content: { padding: 0 } }}>
+              <Accordion.Item value="leaning" style={{ borderBottom: 0 }}>
+                <Accordion.Control aria-label={leaningTitle}>
+                  <Stack gap="5xs">
+                    <Text fz="md" fw={600} c="dimmed">{leaningTitle}</Text>
+                    <Text fz="sm" c="dimmed">Not suggestions - where your duels point so far, short of the bar. Duel them more to settle it.</Text>
+                  </Stack>
+                </Accordion.Control>
+                <Accordion.Panel>
+                  {shownLeaning.map((s) => (
+                    <LeaningRow
+                      key={s.song}
+                      s={s}
+                      board={board}
+                      decided={decided[s.song]?.kind}
+                      starting={start.isPending}
+                      onDuel={() => duelSong(s)}
+                      onMove={() => move(s)}
+                      onUndo={() => undo(s)}
+                    />
+                  ))}
+                </Accordion.Panel>
+              </Accordion.Item>
+            </Accordion>
+          </Paper>
+        )}
+        {start.isError && <Alert color="red">{errorMessage(start.error, 'Couldn’t start the session.')}</Alert>}
 
         {data && Object.keys(data.tierOrders).length > 0 && (
           <Stack gap="sm">

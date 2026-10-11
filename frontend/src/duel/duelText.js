@@ -111,6 +111,12 @@ export function shortfallText(u) {
 // "83% B or higher · needs 85% · 3 of 4 duels".
 export const leaningText = (s, tierName) => [confidenceText(s, tierName), ...(s.unmet ?? []).map(shortfallText)].join(' · ');
 
+// "84% · needs 85%": a leaning move's confidence against the bar it hasn't reached.
+export function leaningConfidence(s) {
+  const bar = (s.unmet ?? []).find((u) => u.kind === 'CONFIDENCE');
+  return bar ? `${pct(s.confidence)} · needs ${pct(bar.need)}` : pct(s.confidence);
+}
+
 // A tier's proposed order against the board's: each song at its new place
 // with where it was (1-based positions - ranks are positions) and how far it
 // moved (+ = up). Display only; the order itself is the engine's.

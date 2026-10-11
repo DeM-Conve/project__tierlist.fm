@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  confidenceText, dropIndexByScore, leaningText, likelyTiers, moveKind, orderChanges, shortfallText, outcomeText, pct, reasonText, record, scoreDelta, verdictForKey, verdictHeadline,
+  confidenceText, dropIndexByScore, leaningConfidence, leaningText, likelyTiers, moveKind, orderChanges, shortfallText, outcomeText, pct, reasonText, record, scoreDelta, verdictForKey, verdictHeadline,
 } from './duelText';
 
 const name = (id) => ({ n1: 'Nayaab', m1: 'Melancholy' })[id] ?? id;
@@ -74,6 +74,8 @@ describe('leaning moves and tier orders', () => {
     const s = { from: 'C', to: 'B', confidence: 0.83, unmet: [{ kind: 'CONFIDENCE', have: 0.83, need: 0.85 }, { kind: 'DUELS', have: 3, need: 4 }] };
     expect(leaningText(s, name)).toBe('83% T3 or higher · needs 85% · 3 of 4 duels');
     expect(shortfallText({ kind: 'BORDER_OPPONENTS', have: 1, need: 2 })).toBe('1 of 2 opponents near the border');
+    expect(leaningConfidence(s)).toBe('83% · needs 85%');
+    expect(leaningConfidence({ confidence: 0.9, unmet: [{ kind: 'DUELS', have: 3, need: 4 }] })).toBe('90%');
   });
   it('maps a proposed order onto the board order', () => {
     expect(orderChanges(['a', 'b', 'c', 'a'], ['b', 'a', 'c'])).toEqual([
