@@ -370,6 +370,16 @@ export function cssVariablesResolver() {
     '--mantine-color-default-color': 'var(--text)',
     '--mantine-color-default-border': 'var(--border)',
     '--mantine-primary-color-contrast': 'var(--accent-on)',
+    // The neutral palettes' light/subtle tints. Mantine derives them in a
+    // dark scheme as darken(shade 9, 50%) - and shade 9 of our neutral scale
+    // is the theme's darkest background, so `variant="light" color="gray"`
+    // came out near-black (the odd "black button"). A wash of the text
+    // color instead reads as a soft gray in every theme, dark or light.
+    ...Object.fromEntries(['gray', 'dark'].flatMap((n) => [
+      [`--mantine-color-${n}-light`, 'color-mix(in srgb, var(--text) 8%, transparent)'],
+      [`--mantine-color-${n}-light-hover`, 'color-mix(in srgb, var(--text) 14%, transparent)'],
+      [`--mantine-color-${n}-light-color`, 'var(--text)'],
+    ])),
   };
   return { variables: {}, dark: shared, light: shared };
 }

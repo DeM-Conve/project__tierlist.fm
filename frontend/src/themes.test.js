@@ -297,7 +297,17 @@ describe('cssVariablesResolver', () => {
     expect(r.dark).toEqual(r.light);
     expect(r.dark['--mantine-color-body']).toBe('var(--editor)');
     expect(r.dark['--mantine-color-text']).toBe('var(--text)');
-    Object.values(r.dark).forEach((val) => expect(val).toMatch(/^var\(--[a-z0-9-]+\)$/));
+    // Every value reads our variables: a plain var() or a color-mix of one.
+    Object.values(r.dark).forEach((val) => expect(val).toMatch(/var\(--[a-z0-9-]+\)/));
+  });
+
+  it('gives gray/dark light buttons a text-colored wash, not darken(shade 9) (the near-black button bug)', () => {
+    const r = cssVariablesResolver();
+    ['gray', 'dark'].forEach((n) => {
+      expect(r.dark[`--mantine-color-${n}-light`]).toMatch(/^color-mix\(in srgb, var\(--text\) \d+%, transparent\)$/);
+      expect(r.dark[`--mantine-color-${n}-light-hover`]).toMatch(/var\(--text\)/);
+      expect(r.dark[`--mantine-color-${n}-light-color`]).toBe('var(--text)');
+    });
   });
 });
 
