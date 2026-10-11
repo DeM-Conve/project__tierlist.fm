@@ -50,9 +50,7 @@ class SuggestionRulesTest {
     void opponentsMustComeFromNearTheBorder() {
         assertThat(new BorderOpponentsRule(2).allows(candidate(wins("A", 4), 0.9, null, false))).isTrue();
         assertThat(new BorderOpponentsRule(2).allows(candidate(wins("D", 4), 0.9, null, false))).isFalse();
-        Candidate todo = new Candidate(state(wins("A", 4)), null, "B", 0.9, board, tierOf, null, false);
-        assertThat(todo.direction()).isZero();
-        assertThat(new BorderOpponentsRule(2).allows(todo)).isTrue();
+        assertThat(candidate(List.of(), 0.9, null, false).direction()).isEqualTo(1);
     }
 
     @Test
@@ -124,5 +122,28 @@ class SuggestionRulesTest {
         // A lock is the user's answer: not leaning either. Nor is a song with no duels at all.
         assertThat(p.suggest(List.of(unsure), board, tierOf, Map.of(), Set.of(unsure.id())).leaning()).isEmpty();
         assertThat(p.suggest(List.of(inC(unsure.probabilities(), 2, 0)), board, tierOf, Map.of(), Set.of()).leaning()).isEmpty();
+    }
+
+    // The user's call: "for to-do songs, the person will decide the tier" - a
+    // to-do song gets no suggestion of any kind, however strong its duels.
+    @Test
+    void aToDoSongIsNeverSuggestedNorLeaning() {
+        String td = id("TD", 0);
+        List<Duel> strong = new ArrayList<>();
+        for (int i = 0; i < 8; i++) strong.add(Boards.duel(i, td, id("B", i % 4), Verdict.A_CLEARLY));
+        double[] sureA = {0.02, 0.95, 0.03, 0, 0};
+        // Not in a ranked tier: both how a to-do song used to be marked (null) and the raw to-do tier id.
+        for (String tier : java.util.Arrays.asList(null, "TODO")) {
+            SongState todo = new SongState(td, tier, new Rating(32, 1), sureA, 0.1, 1, strong, List.of(25.0, 32.0));
+            assertThat(SuggestionPolicy.userPlacesIt(todo, board)).isTrue();
+            SuggestionPolicy.Result all = new SuggestionPolicy(List.of(c -> Optional.empty()), 0.85)
+                .suggest(List.of(todo), board, tierOf, Map.of(), Set.of());
+            assertThat(all.ready()).isEmpty();
+            assertThat(all.leaning()).isEmpty();
+            SuggestionPolicy.Result unmet = new SuggestionPolicy(List.of(new ConfidenceRule(0.99)), 0.85)
+                .suggest(List.of(todo), board, tierOf, Map.of(), Set.of());
+            assertThat(unmet.leaning()).isEmpty();
+        }
+        assertThat(SuggestionPolicy.userPlacesIt(state(List.of()), board)).isFalse();
     }
 }

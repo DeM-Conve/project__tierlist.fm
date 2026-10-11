@@ -91,7 +91,7 @@ public final class DuelDtos {
     public record SuggestionDto(String song, String from, String to, double confidence, int wins, int losses, int draws,
                                 List<KeyResultDto> keyResults, List<Double> trend, List<ShortfallDto> unmet) {
         static SuggestionDto from(Suggestion s) {
-            return new SuggestionDto(s.song(), s.from() == null ? TierSlot.TODO.name() : s.from(), s.to(), s.confidence(),
+            return new SuggestionDto(s.song(), s.from(), s.to(), s.confidence(),
                 s.wins(), s.losses(), s.draws(),
                 s.keyResults().stream().map(k -> new KeyResultDto(k.opponent(), k.opponentTier(), k.result())).toList(),
                 s.trend(), s.unmet().stream().map(u -> new ShortfallDto(u.kind(), u.have(), u.need())).toList());
@@ -100,7 +100,7 @@ public final class DuelDtos {
 
     public record BorderDto(String upper, String lower, double score) {}
 
-    public record AnalysisDto(double certainty, List<BorderDto> borders, List<SongDto> songs, int onFence, int unplaced,
+    public record AnalysisDto(double certainty, List<BorderDto> borders, List<SongDto> songs, int onFence,
                               List<SuggestionDto> suggestions, List<SuggestionDto> leaning,
                               Map<String, List<String>> tierOrders, UUID activeSession,
                               long duelsTotal) {
@@ -109,9 +109,8 @@ public final class DuelDtos {
             double[] cuts = a.cutpoints();
             List<BorderDto> borders = new ArrayList<>();
             for (int k = 0; k < cuts.length; k++) borders.add(new BorderDto(tiers.get(k), tiers.get(k + 1), cuts[k]));
-            int unplaced = (int) a.songs().values().stream().filter(s -> s.tier() == null).count();
             return new AnalysisDto(a.certainty(), borders, a.songs().values().stream().map(s -> SongDto.from(s, a)).toList(),
-                a.onFence().size(), unplaced, a.suggestions().stream().map(SuggestionDto::from).toList(),
+                a.onFence().size(), a.suggestions().stream().map(SuggestionDto::from).toList(),
                 a.leaning().stream().map(SuggestionDto::from).toList(), a.tierOrders(),
                 activeSession, duelsTotal);
         }
@@ -145,7 +144,7 @@ public final class DuelDtos {
     public record PairDto(String a, String b) {}
 
     public record SummaryDto(UUID sessionId, int duels, long seconds, double certaintyStart, double certainty,
-                             List<SuggestionDto> newMoves, int movesWaiting, int placed, int bordersSettled,
+                             List<SuggestionDto> newMoves, int movesWaiting, int bordersSettled,
                              int tierOrders, UpsetDto upset, List<PairDto> undecided) {}
 
 }

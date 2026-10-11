@@ -6,10 +6,10 @@ import fm.tierlist.duel.engine.SongState;
 
 import java.util.Map;
 
-// A possible move the rules vote on: `song` from its tier (null = to-do) to
-// `to`, at `confidence`; `decision` is the user's earlier answer for it, if any.
-// For a ranked song `confidence` is the chance it belongs in `to` *or beyond*
-// (P(score past the border of `to`)), for a to-do song the chance of `to` itself.
+// A possible move the rules vote on: a ranked `song` from its tier to `to`, at
+// `confidence` - the chance it belongs in `to` *or beyond* (P(score past the
+// border of `to`)); `decision` is the user's earlier answer for it, if any.
+// To-do songs never become candidates (SuggestionPolicy.userPlacesIt).
 public record Candidate(
     SongState song,
     String from,
@@ -20,9 +20,8 @@ public record Candidate(
     Decision decision,
     boolean locked
 ) {
-    // +1 moving up a tier, -1 down, 0 a to-do song being placed.
+    // +1 moving up a tier, -1 down.
     public int direction() {
-        if (from == null || !layout.isRanked(from)) return 0;
         return Integer.signum(layout.rankOf(from).orElseThrow() - layout.rankOf(to).orElseThrow());
     }
 }

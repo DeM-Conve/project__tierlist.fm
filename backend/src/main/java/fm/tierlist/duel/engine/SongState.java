@@ -3,8 +3,9 @@ package fm.tierlist.duel.engine;
 import java.util.List;
 
 // Everything the engine knows about one song after replaying the log.
-// `tier` is null for an unranked (to-do) song; `probabilities` line up with
-// the layout's ranked tiers, best first.
+// Only ranked songs have one (to-do songs never enter the engine), so `tier`
+// is the song's ranked tier; `probabilities` line up with the layout's ranked
+// tiers, best first.
 public record SongState(
     String id,
     String tier,

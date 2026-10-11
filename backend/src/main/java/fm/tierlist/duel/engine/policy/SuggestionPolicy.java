@@ -25,8 +25,12 @@ import java.util.Set;
  * into a middle tier below the gate: a tier is only ~6 points wide, so even a
  * song settled dead in its centre (sigma ~1.8 after 8 duels, plus the user's
  * own placement noise) tops out near 80%, while moves into the top or bottom
- * tier (no far border) were unbounded. A to-do song has no side: it goes to
- * its most likely tier, at that tier's probability.
+ * tier (no far border) were unbounded.
+ *
+ * <p>To-do songs never get a suggestion of any kind - no move, no leaning
+ * (the user's call: "for to-do songs, the person will decide the tier"). The
+ * engine already leaves them out of the analysis; {@link #userPlacesIt} is the
+ * same rule stated here, so no caller can feed one through.
  *
  * <p>Moves that fail a rule the user hasn't answered (not a lock, not a Keep)
  * and that have at least one duel behind them come back as "leaning", with
@@ -68,12 +72,11 @@ public final class SuggestionPolicy {
         List<Suggestion> ready = new ArrayList<>();
         List<Suggestion> leaning = new ArrayList<>();
         for (SongState s : songs) {
-            if (s.probabilities().length == 0) continue;
-            Optional<Integer> from = layout.rankOf(s.tier());
-            if (from.isPresent() && from.get() == s.bestRank()) continue;
+            if (userPlacesIt(s, layout) || s.probabilities().length == 0) continue;
+            int from = layout.rankOf(s.tier()).orElseThrow();
+            if (from == s.bestRank()) continue;
             int[] to = new int[1];
-            double confidence = from.isEmpty() ? s.bestProbability() : target(s.probabilities(), from.get(), s.bestRank(), to);
-            if (from.isEmpty()) to[0] = s.bestRank();
+            double confidence = target(s.probabilities(), from, s.bestRank(), to);
             Candidate c = new Candidate(s, s.tier(), layout.rankedTiers().get(to[0]), confidence, layout, tierOf,
                 decisions.get(s.id()), locks.contains(s.id()));
             List<Shortfall> unmet = rules.stream().map(r -> r.shortfall(c)).flatMap(Optional::stream).toList();
@@ -84,6 +87,13 @@ public final class SuggestionPolicy {
         ready.sort(surest);
         leaning.sort(surest);
         return new Result(ready, leaning);
+    }
+
+    // Rule "the user places to-do songs": a song outside the ranked tiers (on
+    // the to-do list) is never suggested anywhere, not even as leaning - the
+    // user decides its tier (the user's call).
+    static boolean userPlacesIt(SongState s, BoardLayout layout) {
+        return !layout.isRanked(s.tier());
     }
 
     // The farthest tier towards `best` the song belongs in "or beyond" with at

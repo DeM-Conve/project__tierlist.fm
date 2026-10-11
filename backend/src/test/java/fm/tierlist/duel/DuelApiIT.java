@@ -101,39 +101,84 @@ class DuelApiIT extends PostgresIT {
     }
 
     @Test
-    void placeTodoSessionRoundTrip() throws Exception {
-        JsonNode s = start("PLACE_TODO");
+    void smartMixSessionRoundTrip() throws Exception {
+        JsonNode s = start("SMART_MIX");
         String sid = s.get("id").asText();
-        assertThat(s.get("matchup").get("a").asText()).isEqualTo(id("TD", 0));
-        assertThat(s.get("matchup").get("reason").get("kind").asText()).isEqualTo("PLACE");
+        String a = s.get("matchup").get("a").asText();
+        String b = s.get("matchup").get("b").asText();
+        assertThat(s.get("matchup").get("reason").get("kind").asText()).isEqualTo("BORDER");
         assertThat(s.get("matchup").get("songA").get("probabilities")).hasSize(5);
         assertThat(s.get("done").asBoolean()).isFalse();
 
-        String b = s.get("matchup").get("b").asText();
-        JsonNode after = verdict(sid, id("TD", 0), b, "A_CLEARLY");
+        JsonNode after = verdict(sid, a, b, "A_CLEARLY");
         assertThat(after.get("duels")).hasSize(1);
-        assertThat(after.get("previous").get("a").get("id").asText()).isEqualTo(id("TD", 0));
+        assertThat(after.get("previous").get("a").get("id").asText()).isEqualTo(a);
         assertThat(after.get("matchup")).isNotNull();
 
         JsonNode undone = ok(call(post(BOARD + "/sessions/" + sid + "/undo"), seenBody(sid), alice).andExpect(status().isOk()));
         assertThat(undone.get("duels")).isEmpty();
+        assertThat(undone.get("matchup").get("a").asText()).isEqualTo(a);
         assertThat(undone.get("matchup").get("b").asText()).isEqualTo(b);
         assertThat(ok(call(post(BOARD + "/sessions/" + sid + "/undo"), seenBody(sid), alice)).get("duels")).isEmpty();
 
-        String skipBody = "{\"layout\": %s, \"videoId\": \"%s\", \"seenDuels\": 0}".formatted(layout(), id("TD", 0));
+        String skipBody = "{\"layout\": %s, \"videoId\": \"%s\", \"seenDuels\": 0}".formatted(layout(), a);
         JsonNode skipped = ok(call(post(BOARD + "/sessions/" + sid + "/skips"), skipBody, alice).andExpect(status().isOk()));
-        assertThat(skipped.get("skipped").get(0).asText()).isEqualTo(id("TD", 0));
-        assertThat(skipped.get("matchup").get("a").asText()).isEqualTo(id("TD", 1));
+        assertThat(skipped.get("skipped").get(0).asText()).isEqualTo(a);
+        assertThat(skipped.get("matchup").get("a").asText()).isNotEqualTo(a);
         call(post(BOARD + "/sessions/" + sid + "/skips"), skipBody, alice).andExpect(status().isOk());
 
         JsonNode analysis = ok(call(post(BOARD + "/analysis"), layoutBody(), alice).andExpect(status().isOk()));
         assertThat(analysis.get("activeSession").asText()).isEqualTo(sid);
-        assertThat(analysis.get("unplaced").asInt()).isEqualTo(2);
         assertThat(analysis.get("borders")).hasSize(4);
-        assertThat(jdbc.queryForObject("SELECT count(*) FROM duel_prior", Integer.class)).isEqualTo(27);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM duel_prior", Integer.class)).isEqualTo(25);
 
         JsonNode resumed = ok(call(post(BOARD + "/sessions/" + sid), layoutBody(), alice).andExpect(status().isOk()));
         assertThat(resumed.get("id").asText()).isEqualTo(sid);
+    }
+
+    // The user's call: to-do songs are never part of duels - the user places
+    // them. A board whose to-do songs have strong duel evidence (from the
+    // retired Place TODO mode) gets no suggestion, leaning, score or prior for
+    // them, and the old session still reads fine.
+    @Test
+    void toDoSongsAreNeverPartOfDuels() throws Exception {
+        call(post(BOARD + "/analysis"), layoutBody(), alice).andExpect(status().isOk());
+        String old = "00000000-0000-0000-0000-0000000000bb";
+        jdbc.update("INSERT INTO duel_session (id, user_id, board, focus, minutes, started_at, certainty_start) "
+            + "VALUES (?::uuid, 'alice', 'Rap Board', 'PLACE_TODO', 5, ?, 0.5)", old, java.sql.Timestamp.from(now));
+        for (int i = 0; i < 8; i++) {
+            jdbc.update("INSERT INTO duel (session_id, video_a, video_b, verdict, created_at) VALUES (?::uuid, ?, ?, 'A_CLEARLY', ?)",
+                old, id("TD", 0), id("A", i % 5), java.sql.Timestamp.from(now.plusSeconds(i)));
+            jdbc.update("INSERT INTO duel (session_id, video_a, video_b, verdict, created_at) VALUES (?::uuid, ?, ?, 'B_CLEARLY', ?)",
+                old, id("TD", 1), id("D", i % 5), java.sql.Timestamp.from(now.plusSeconds(i)));
+        }
+        now = now.plusSeconds(30);
+
+        JsonNode a = ok(call(post(BOARD + "/analysis"), layoutBody(), alice).andExpect(status().isOk()));
+        assertThat(a.get("activeSession").asText()).isEqualTo(old);
+        assertThat(a.get("duelsTotal").asInt()).isEqualTo(16);
+        assertThat(a.has("unplaced")).isFalse();
+        for (String field : List.of("songs", "suggestions", "leaning", "tierOrders")) {
+            assertThat(a.get(field).toString()).as(field).doesNotContain(id("TD", 0), id("TD", 1));
+        }
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM duel_prior WHERE video_id LIKE 'TD%'", Integer.class)).isZero();
+
+        // The old Place TODO session resumes (as Smart mix) without a to-do song in it.
+        JsonNode resumed = ok(call(post(BOARD + "/sessions/" + old), layoutBody(), alice).andExpect(status().isOk()));
+        assertThat(resumed.get("duels")).hasSize(16);
+        assertThat(resumed.get("previous").isNull()).isTrue();
+        assertThat(resumed.get("matchup").toString()).doesNotContain(id("TD", 0), id("TD", 1));
+        String todoVerdict = "{\"layout\": %s, \"a\": \"%s\", \"b\": \"%s\", \"verdict\": \"A\", \"seenDuels\": 16}".formatted(layout(), id("TD", 0), id("B", 0));
+        call(post(BOARD + "/sessions/" + old + "/verdicts"), todoVerdict, alice).andExpect(status().isBadRequest());
+        JsonNode summary = ok(call(post(BOARD + "/sessions/" + old + "/end"), layoutBody(), alice).andExpect(status().isOk()));
+        assertThat(summary.get("newMoves").toString()).doesNotContain(id("TD", 0), id("TD", 1));
+        assertThat(summary.has("placed")).isFalse();
+
+        // Nothing new can be started in Place TODO, and no move starts from the to-do list.
+        call(post(BOARD + "/sessions"), "{\"layout\": %s, \"focus\": \"PLACE_TODO\", \"minutes\": 5}".formatted(layout()), alice)
+            .andExpect(status().isBadRequest());
+        call(put(BOARD + "/decisions/" + id("TD", 0)), "{\"from\": \"TODO\", \"to\": \"A\", \"confidence\": 0.9, \"decision\": \"ACCEPTED\"}", alice)
+            .andExpect(status().isBadRequest());
     }
 
     @Test
@@ -145,7 +190,7 @@ class DuelApiIT extends PostgresIT {
         call(post(BOARD + "/analysis"), "{\"layout\": " + moved + "}", alice).andExpect(status().isOk());
         assertThat(jdbc.queryForObject("SELECT tier::text FROM duel_prior WHERE video_id = ?", String.class, id("C", 2))).isEqualTo("S");
         assertThat(jdbc.queryForObject("SELECT mu FROM duel_prior WHERE video_id = ?", Double.class, id("C", 2))).isGreaterThan(before + 6);
-        assertThat(jdbc.queryForObject("SELECT count(*) FROM duel_prior", Integer.class)).isEqualTo(27);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM duel_prior", Integer.class)).isEqualTo(25);
     }
 
     @Test
@@ -274,7 +319,7 @@ class DuelApiIT extends PostgresIT {
         call(put(BOARD + "/decisions/" + id("B", 0)), "{\"from\": \"B\", \"to\": \"A\", \"confidence\": 0.9, \"decision\": \"KEPT\"}", alice);
         call(put("/api/duels/Other/decisions/" + id("B", 0)), "{\"from\": \"B\", \"to\": \"S\", \"confidence\": 0.9, \"decision\": \"ACCEPTED\"}", alice);
         call(post(BOARD + "/rename"), "{\"to\": \"Other\"}", alice).andExpect(status().isNoContent());
-        assertThat(jdbc.queryForObject("SELECT count(*) FROM duel_prior WHERE board = 'Other'", Integer.class)).isEqualTo(27);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM duel_prior WHERE board = 'Other'", Integer.class)).isEqualTo(25);
         assertThat(jdbc.queryForObject("SELECT count(*) FROM duel_prior WHERE board <> 'Other'", Integer.class)).isZero();
         assertThat(jdbc.queryForObject("SELECT count(*) FROM duel_lock", Integer.class)).isEqualTo(1);
         assertThat(jdbc.queryForObject("SELECT decision::text FROM duel_decision", String.class)).isEqualTo("ACCEPTED");

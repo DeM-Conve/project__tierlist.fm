@@ -8,7 +8,7 @@ import java.util.Optional;
 
 // No flip-flopping: after "Keep", the song is only suggested again once
 // `freshDuels` (5) duels since then point the same way - wins for a move up,
-// losses for a move down (any result for a to-do song).
+// losses for a move down.
 public record KeepHysteresisRule(int freshDuels) implements SuggestionRule {
     @Override
     public Optional<Shortfall> shortfall(Candidate c) {
@@ -18,7 +18,7 @@ public record KeepHysteresisRule(int freshDuels) implements SuggestionRule {
         List<Duel> since = duels.subList(Math.min(d.duelsAtDecision(), duels.size()), duels.size());
         String id = c.song().id();
         long agreeing = since.stream()
-            .filter(x -> c.direction() == 0 || Integer.signum(x.resultFor(id)) == c.direction())
+            .filter(x -> Integer.signum(x.resultFor(id)) == c.direction())
             .count();
         return agreeing >= freshDuels ? Optional.empty() : Optional.of(new Shortfall(Shortfall.Kind.FRESH_DUELS, agreeing, freshDuels));
     }

@@ -81,10 +81,17 @@ public final class DuelEngine {
         Map<String, String> tierOf = layout.tierOf();
         Map<String, Rating> start = new HashMap<>(history.priors());
         start.putAll(priors.priorsFor(layout, start));
+        // To-do songs never enter the engine (the user's call: "for the entire
+        // duel concept the todo song will not be there" - the user places them):
+        // old duels with a song that is now on the to-do list are left out of
+        // the replay, and to-do songs get no state below, so nothing - score
+        // map, certainty, fence, pairing, suggestions, tier order - sees them.
+        Set<String> toDo = layout.toDo();
+        List<Duel> log = history.duels().stream().filter(d -> !toDo.contains(d.a()) && !toDo.contains(d.b())).toList();
 
         Replay replay = new Replay(start);
-        replay.run(history.duels());
-        Map<String, Rating> fitted = new HashMap<>(refitter.refit(history.duels(), start, now));
+        replay.run(log);
+        Map<String, Rating> fitted = new HashMap<>(refitter.refit(log, start, now));
         fitted.replaceAll((id, r) -> replay.last.containsKey(id) ? ratings.drift(r, Duration.between(replay.last.get(id), now)) : r);
         java.util.function.Function<String, Rating> rating = id -> fitted.getOrDefault(id, ratings.unknown());
 
@@ -94,19 +101,17 @@ public final class DuelEngine {
         TierModel.Fit fit = tiers.fit(placed, k, priors.cutpointPriors(k));
 
         Map<String, List<Duel>> duelsOf = new HashMap<>();
-        for (Duel d : history.duels()) {
+        for (Duel d : log) {
             duelsOf.computeIfAbsent(d.a(), x -> new ArrayList<>()).add(d);
             duelsOf.computeIfAbsent(d.b(), x -> new ArrayList<>()).add(d);
         }
+        // Ranked songs only (to-do songs never enter the engine, see above).
         Map<String, SongState> songs = new LinkedHashMap<>();
-        List<String> order = new ArrayList<>(layout.ranked());
-        order.addAll(layout.unranked());
-        for (String id : order) {
+        for (String id : layout.ranked()) {
             if (songs.containsKey(id)) continue;
             Rating r = rating.apply(id);
             double[] p = k == 0 ? new double[0] : fit.probabilities(r);
-            String tier = tierOf.get(id);
-            songs.put(id, new SongState(id, layout.isRanked(tier) ? tier : null, r, p, entropy(p), argmax(p),
+            songs.put(id, new SongState(id, tierOf.get(id), r, p, entropy(p), argmax(p),
                 List.copyOf(duelsOf.getOrDefault(id, List.of())), replay.trend(id)));
         }
 
@@ -114,7 +119,6 @@ public final class DuelEngine {
         int ranked = 0;
         List<String> onFence = new ArrayList<>();
         for (SongState s : songs.values()) {
-            if (s.tier() == null) continue;
             int rank = layout.rankOf(s.tier()).orElseThrow();
             certainty += s.probabilities()[rank];
             ranked++;
@@ -125,7 +129,7 @@ public final class DuelEngine {
 
         SuggestionPolicy.Result moves = suggestions.suggest(songs.values(), layout, tierOf, history.decisions(), history.locks());
         return new BoardAnalysis(layout, songs, fit.cutpoints(), ranked == 0 ? 0 : certainty / ranked, onFence, moves.ready(), moves.leaning(),
-            equalsPairs(history.duels()), tierOrders(layout, songs), replay.winnerOdds, history.locks());
+            equalsPairs(log), tierOrders(layout, songs), replay.winnerOdds, history.locks());
     }
 
     // Online replay of the log through the rating model (with drift between a

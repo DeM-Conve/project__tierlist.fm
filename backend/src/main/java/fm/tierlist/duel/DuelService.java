@@ -92,7 +92,8 @@ public class DuelService {
     @Transactional
     public void decide(String userId, String board, String videoId, DuelDtos.DecisionRequest req) {
         requireVideoId(videoId);
-        if (req.to() == TierSlot.TODO || req.from() == req.to()) throw new IllegalArgumentException("A move goes to another ranked tier");
+        // To-do songs are never part of duels: a move is between two ranked tiers.
+        if (!req.from().ranked() || !req.to().ranked() || req.from() == req.to()) throw new IllegalArgumentException("A move goes from one ranked tier to another");
         int count = (int) duels.findBoardLog(userId, board).stream().map(DuelRecord::toDuel).filter(d -> d.involves(videoId)).count();
         decisions.save(new DuelDecision(new BoardSongId(userId, board, videoId), req.from(), req.to(), req.confidence(),
             req.decision(), count, clock.instant()));
@@ -144,6 +145,7 @@ public class DuelService {
 
     @Transactional
     public SessionDto start(String userId, String board, DuelDtos.StartRequest req) {
+        if (req.focus().retired()) throw new IllegalArgumentException("That duel mode was removed: " + req.focus());
         BoardLayout layout = req.layout().toLayout();
         Instant now = clock.instant();
         openSession(userId, board).ifPresent(s -> s.end(now));
@@ -165,7 +167,10 @@ public class DuelService {
         BoardLayout layout = req.layout().toLayout();
         Map<String, String> tierOf = layout.tierOf();
         if (requireVideoId(req.a()).equals(requireVideoId(req.b()))) throw new IllegalArgumentException("A duel needs two songs");
-        if (!tierOf.containsKey(req.a()) || !tierOf.containsKey(req.b())) throw new IllegalArgumentException("Both songs must be on this board");
+        // To-do songs are never part of duels (the user places them): both must be ranked.
+        if (!layout.isRanked(tierOf.get(req.a())) || !layout.isRanked(tierOf.get(req.b()))) {
+            throw new IllegalArgumentException("Both songs must be in a ranked tier of this board");
+        }
         duels.save(new DuelRecord(s.getId(), req.a(), req.b(), req.verdict(), clock.instant()));
         return view(s, layout, null);
     }
@@ -206,10 +211,9 @@ public class DuelService {
             played.add(d.b());
         });
         List<SuggestionDto> newMoves = a.suggestions().stream().filter(x -> played.contains(x.song())).map(SuggestionDto::from).toList();
-        int placed = (int) newMoves.stream().filter(m -> TierSlot.TODO.name().equals(m.from())).count();
         Set<String> subjects = mine.stream().map(Duel::a).collect(Collectors.toSet());
         int settled = (int) subjects.stream().map(a::song)
-            .filter(x -> x != null && x.tier() != null && !a.onFence().contains(x.id())).count();
+            .filter(x -> x != null && !a.onFence().contains(x.id())).count();
         UpsetDto upset = mine.stream()
             .filter(d -> a.winnerOdds().containsKey(d.id()))
             .min(Comparator.comparingDouble(d -> a.winnerOdds().get(d.id())))
@@ -227,7 +231,7 @@ public class DuelService {
             .toList();
         long seconds = Duration.between(s.getStartedAt(), s.getEndedAt()).toSeconds();
         return new SummaryDto(s.getId(), mine.size(), seconds, s.getCertaintyStart(), a.certainty(), newMoves,
-            a.suggestions().size(), placed, settled, a.tierOrders().size(), upset, undecided);
+            a.suggestions().size(), settled, a.tierOrders().size(), upset, undecided);
     }
 
     // ----------------------------------------------------------------- helpers

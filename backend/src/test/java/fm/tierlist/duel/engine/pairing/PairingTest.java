@@ -44,63 +44,52 @@ class PairingTest {
     }
 
     @Test
-    void smartMixAndBorderlinesNeverBringInToDoSongs() {
-        BoardAnalysis a = analyze(List.of(), Set.of());
-        for (Focus focus : List.of(Focus.SMART_MIX, Focus.BORDERLINES)) {
+    @SuppressWarnings("deprecation")
+    void toDoSongsAreNeverPairedNorOpponents() {
+        // Even with an old log full of to-do duels: to-do songs never enter the engine.
+        List<Duel> old = new ArrayList<>();
+        for (int i = 0; i < 6; i++) old.add(Boards.duel(i + 1, id("TD", 0), id("B", i), Verdict.A_CLEARLY));
+        BoardAnalysis a = analyze(old, Set.of());
+        for (Focus focus : List.of(Focus.SMART_MIX, Focus.BORDERLINES, Focus.PLACE_TODO)) {
             for (int i = 0; i < 20; i++) {
-                engine.next(a, new SessionContext(focus, List.of(), Set.of(), List.of(), new Random(i)))
-                    .ifPresent(m -> assertThat(Set.of(m.a(), m.b())).noneMatch(id -> id.startsWith("TD")));
+                engine.next(a, new SessionContext(focus, old, Set.of(), old, new Random(i)))
+                    .ifPresent(m -> assertThat(Set.of(m.a(), m.b())).noneMatch(x -> x.startsWith("TD")));
             }
         }
     }
 
     @Test
+    @SuppressWarnings("deprecation")
+    void aRetiredPlaceTodoSessionPlaysAsSmartMix() {
+        assertThat(Focus.PLACE_TODO.retired()).isTrue();
+        assertThat(Focus.SMART_MIX.retired()).isFalse();
+        BoardAnalysis a = analyze(List.of(), Set.of());
+        assertThat(engine.next(a, session(Focus.PLACE_TODO, List.of(), Set.of())))
+            .isEqualTo(engine.next(a, session(Focus.SMART_MIX, List.of(), Set.of())));
+    }
+
+    @Test
     void lockedAndSkippedSongsAreLeftOut() {
-        Set<String> skipped = Set.of(id("TD", 0), id("TD", 1));
-        BoardAnalysis a = analyze(List.of(), Set.of(id("TD", 2)));
+        Set<String> skipped = Set.of(id("B", 0), id("C", 0));
+        BoardAnalysis a = analyze(List.of(), Set.of(id("B", 1)));
         for (int i = 0; i < 5; i++) {
             Matchup m = engine.next(a, new SessionContext(Focus.SMART_MIX, List.of(), skipped, List.of(), new Random(i))).orElseThrow();
-            assertThat(Set.of(m.a(), m.b())).doesNotContainAnyElementsOf(Set.of(id("TD", 0), id("TD", 1), id("TD", 2)));
+            assertThat(m.a()).isNotIn(id("B", 0), id("C", 0), id("B", 1));
+            assertThat(m.b()).isNotIn(id("B", 0), id("C", 0));
         }
     }
 
     @Test
     void equalsAreNeverAskedAgain() {
-        String x = id("TD", 0);
+        String x = id("B", 0);
         List<Duel> log = new ArrayList<>();
         for (int i = 0; i < 3; i++) log.add(Boards.duel(i, x, id("C", 0), Verdict.TOO_CLOSE));
         BoardAnalysis a = analyze(log, Set.of());
+        assertThat(a.areEquals(x, id("C", 0))).isTrue();
         for (int i = 0; i < 10; i++) {
             Optional<Matchup> m = engine.next(a, new SessionContext(Focus.SMART_MIX, List.of(), Set.of(), log, new Random(i)));
             m.ifPresent(mm -> assertThat(a.areEquals(mm.a(), mm.b())).isFalse());
         }
-    }
-
-    @Test
-    void placeTodoTakesToDoSongsInOrderAndStaysOnOneUntilPlaced() {
-        BoardAnalysis a = analyze(List.of(), Set.of());
-        Matchup first = engine.next(a, session(Focus.PLACE_TODO, List.of(), Set.of())).orElseThrow();
-        assertThat(first.a()).isEqualTo(id("TD", 0));
-        assertThat(first.reason().kind()).isEqualTo(Matchup.Kind.PLACE);
-        List<Duel> mine = List.of(Boards.duel(1, first.a(), first.b(), Verdict.A));
-        BoardAnalysis after = analyze(mine, Set.of());
-        assertThat(engine.next(after, session(Focus.PLACE_TODO, mine, Set.of())).orElseThrow().a()).isEqualTo(id("TD", 0));
-        assertThat(engine.next(after, session(Focus.PLACE_TODO, mine, Set.of(id("TD", 0)))).orElseThrow().a()).isEqualTo(id("TD", 1));
-    }
-
-    @Test
-    void placeTodoMovesOnAfterTheCap() {
-        List<Duel> mine = new ArrayList<>();
-        for (int i = 0; i < 12; i++) mine.add(Boards.duel(i, id("TD", 0), id("B", i % 6), Verdict.TOO_CLOSE));
-        BoardAnalysis a = analyze(mine, Set.of());
-        assertThat(engine.next(a, session(Focus.PLACE_TODO, mine, Set.of())).orElseThrow().a()).isEqualTo(id("TD", 1));
-    }
-
-    @Test
-    void placeTodoWithNothingToPlace() {
-        BoardLayout noTodo = Boards.board(4, 0);
-        BoardAnalysis a = engine.analyze(noTodo, Boards.history(engine, noTodo, List.of()), Boards.T0);
-        assertThat(engine.next(a, session(Focus.PLACE_TODO, List.of(), Set.of()))).isEmpty();
     }
 
     @Test
@@ -122,9 +111,10 @@ class PairingTest {
     @Test
     void rematchExplainsTheSamePair() {
         BoardAnalysis a = analyze(List.of(), Set.of());
-        Matchup m = Matchup.of(a, id("TD", 0), id("B", 0));
-        assertThat(m.reason().kind()).isEqualTo(Matchup.Kind.PLACE);
-        assertThat(Matchup.of(a, id("B", 0), id("C", 0)).reason().kind()).isEqualTo(Matchup.Kind.BORDER);
+        Matchup m = Matchup.of(a, id("B", 0), id("C", 0));
+        assertThat(m.a()).isEqualTo(id("B", 0));
+        assertThat(m.reason().kind()).isEqualTo(Matchup.Kind.BORDER);
+        assertThat(m.reason().upperTier()).isNotNull();
     }
 
     @Test

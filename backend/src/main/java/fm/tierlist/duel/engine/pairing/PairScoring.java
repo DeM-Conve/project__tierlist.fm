@@ -35,10 +35,11 @@ final class PairScoring {
         return r.withMu(r.mu() + r.sigma() * session.random().nextGaussian());
     }
 
-    // Songs that may face `subject`: ranked, not skipped, not equals with it, not itself.
+    // Songs that may face `subject`: not skipped, not equals with it, not itself
+    // (all ranked - to-do songs never enter the engine, so are never opponents).
     static Stream<SongState> opponents(BoardAnalysis analysis, SongState subject, SessionContext session) {
         return analysis.songs().values().stream()
-            .filter(o -> o.tier() != null && !o.id().equals(subject.id()))
+            .filter(o -> !o.id().equals(subject.id()))
             .filter(o -> !session.skipped().contains(o.id()))
             .filter(o -> !analysis.areEquals(subject.id(), o.id()));
     }

@@ -20,10 +20,9 @@ class TierPriorPolicyTest {
     }
 
     @Test
-    void todoSongsStartAtTheMeanCompletelyUnsure() {
+    void toDoSongsGetNoStartingScore() {
         Map<String, Rating> p = policy.priorsFor(Boards.board(3, 2), Map.of());
-        assertThat(p.get(Boards.id("TD", 0)).mu()).isEqualTo(25, org.assertj.core.api.Assertions.within(1e-9));
-        assertThat(p.get(Boards.id("TD", 0)).sigma()).isEqualTo(WengLinBradleyTerry.SIGMA);
+        assertThat(p).doesNotContainKeys(Boards.id("TD", 0), Boards.id("TD", 1)).hasSize(15);
     }
 
     @Test
@@ -42,6 +41,6 @@ class TierPriorPolicyTest {
     @Test
     void emptyBoard() {
         BoardLayout b = new BoardLayout(Boards.TIERS, "TODO", Map.of("TODO", java.util.List.of(Boards.id("TD", 0))));
-        assertThat(policy.priorsFor(b, Map.of()).get(Boards.id("TD", 0)).mu()).isEqualTo(25);
+        assertThat(policy.priorsFor(b, Map.of())).isEmpty();
     }
 }

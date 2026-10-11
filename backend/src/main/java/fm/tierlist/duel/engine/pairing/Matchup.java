@@ -6,12 +6,11 @@ import fm.tierlist.duel.engine.SongState;
 /**
  * The next duel: `a` is the song being settled, `b` its opponent.
  *
- * @param reason why this pairing - BORDER (a sits near the upper/lower border, b anchors it),
- *               PLACE (binary search for a to-do song)
+ * @param reason why this pairing - BORDER (a sits near the upper/lower border, b anchors it)
  */
 public record Matchup(String a, String b, Reason reason) {
 
-    public enum Kind { BORDER, PLACE }
+    public enum Kind { BORDER }
 
     public record Reason(Kind kind, String upperTier, String lowerTier) {}
 
@@ -19,7 +18,6 @@ public record Matchup(String a, String b, Reason reason) {
     public static Matchup of(BoardAnalysis analysis, String a, String b) {
         SongState s = analysis.song(a);
         int border = s == null ? -1 : PairScoring.nearestBorder(analysis.cutpoints(), s.rating().mu());
-        Kind kind = s != null && s.tier() == null ? Kind.PLACE : Kind.BORDER;
-        return new Matchup(a, b, PairScoring.borderReason(analysis, border, kind));
+        return new Matchup(a, b, PairScoring.borderReason(analysis, border, Kind.BORDER));
     }
 }

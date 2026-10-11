@@ -11,7 +11,6 @@ public record EngineConfig(
     int keepFreshDuels,
     int equalsAfterDraws,
     double fenceNeighbourProbability,
-    int placeMaxDuels,
     int recentPairWindow,
     double recentPairPenalty,
     double repeatOpponentPenalty,
@@ -22,6 +21,6 @@ public record EngineConfig(
     double driftPerWeek
 ) {
     public static EngineConfig defaults() {
-        return new EngineConfig(0.85, 4, 2, 5, 3, 0.25, 12, 30, 0.25, 0.5, 0.25, 4, 6, 0.99, 0.25);
+        return new EngineConfig(0.85, 4, 2, 5, 3, 0.25, 30, 0.25, 0.5, 0.25, 4, 6, 0.99, 0.25);
     }
 }

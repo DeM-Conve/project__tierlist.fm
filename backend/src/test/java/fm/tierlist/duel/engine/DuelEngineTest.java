@@ -33,8 +33,8 @@ class DuelEngineTest {
         BoardAnalysis a = analyze(List.of());
         assertThat(a.certainty()).isBetween(0.3, 0.95);
         assertThat(a.suggestions()).isEmpty();
-        assertThat(a.songs()).hasSize(33);
-        assertThat(a.song(id("TD", 0)).tier()).isNull();
+        assertThat(a.songs()).hasSize(30);
+        assertThat(a.song(id("TD", 0))).isNull();
         assertThat(a.cutpoints()).hasSize(4);
         assertThat(a.tierOrders()).isEmpty();
     }
@@ -73,17 +73,45 @@ class DuelEngineTest {
         assertThat(a.winnerOdds().get(1L)).isLessThan(0.5);
     }
 
+    // The user's call: to-do songs are never part of duels - the user places
+    // them. Old duels with a song now on the to-do list (from the retired Place
+    // TODO mode) don't crash anything: they're left out of the analysis.
     @Test
-    void aToDoSongIsPlacedWhereItWins() {
+    void toDoSongsNeverEnterTheEngineEvenWithStrongDuels() {
         String song = id("TD", 0);
         List<Duel> log = new ArrayList<>();
-        // Like the binary search does: close opponents - it loses to B's best, beats B's worst.
-        for (int i = 0; i < 3; i++) log.add(duel(i + 1, song, id("B", i), Verdict.B_CLEARLY));
-        for (int i = 3; i < 6; i++) log.add(duel(i + 1, song, id("B", i), Verdict.A_CLEARLY));
+        for (int i = 0; i < 8; i++) log.add(duel(i + 1, song, id("A", i % 6), Verdict.A_CLEARLY));
+        log.add(duel(20, id("TD", 1), id("TD", 2), Verdict.A_CLEARLY));
         BoardAnalysis a = analyze(log);
-        Suggestion s = a.suggestions().stream().filter(x -> x.song().equals(song)).findFirst().orElseThrow();
-        assertThat(s.from()).isNull();
-        assertThat(s.to()).isEqualTo("B");
+        assertThat(a.song(song)).isNull();
+        assertThat(a.songs().keySet()).noneMatch(x -> x.startsWith("TD"));
+        assertThat(a.suggestions()).noneMatch(s -> s.song().startsWith("TD"));
+        assertThat(a.leaning()).noneMatch(s -> s.song().startsWith("TD"));
+        assertThat(a.tierOrders().values()).allSatisfy(ids -> assertThat(ids).noneMatch(x -> x.startsWith("TD")));
+        assertThat(a.onFence()).noneMatch(x -> x.startsWith("TD"));
+        assertThat(a.winnerOdds()).isEmpty();
+        // Its opponents score as if those duels never happened.
+        BoardAnalysis clean = analyze(List.of());
+        assertThat(a.song(id("A", 0)).rating().mu()).isCloseTo(clean.song(id("A", 0)).rating().mu(), org.assertj.core.api.Assertions.within(1e-9));
+        assertThat(a.certainty()).isCloseTo(clean.certainty(), org.assertj.core.api.Assertions.within(1e-9));
+        // No starting score either.
+        assertThat(engine.newPriors(board, Map.of())).doesNotContainKey(song);
+    }
+
+    @Test
+    void aToDoSongMovedIntoATierJoinsTheEngineWithItsDuels() {
+        String song = id("TD", 0);
+        List<Duel> log = new ArrayList<>();
+        for (int i = 0; i < 4; i++) log.add(duel(i + 1, song, id("A", i), Verdict.A_CLEARLY));
+        Map<String, List<String>> songs = new java.util.LinkedHashMap<>(board.songs());
+        List<String> c = new ArrayList<>(songs.get("C"));
+        c.add(song);
+        songs.put("C", c);
+        BoardLayout placed = new BoardLayout(board.rankedTiers(), "TODO", songs);
+        BoardAnalysis a = engine.analyze(placed, Boards.history(engine, placed, log), Boards.T0.plusSeconds(10_000));
+        assertThat(a.song(song).tier()).isEqualTo("C");
+        assertThat(a.song(song).duels()).hasSize(4);
+        assertThat(placed.toDo()).doesNotContain(song).contains(id("TD", 1));
     }
 
     @Test
@@ -153,7 +181,6 @@ class DuelEngineTest {
         BoardAnalysis a = analyze(beats(id("A", 3), "S", 2));
         SongState s = a.song(id("A", 3));
         assertThat(a.probabilityOfCurrentTier(s)).isEqualTo(s.probabilities()[1]);
-        assertThat(a.probabilityOfCurrentTier(a.song(id("TD", 0)))).isZero();
         assertThat(a.onFence()).isNotEmpty();
     }
 

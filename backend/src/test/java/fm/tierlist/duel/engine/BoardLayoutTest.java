@@ -22,6 +22,14 @@ class BoardLayoutTest {
     }
 
     @Test
+    void toDoSongsAreTheToDoListMinusAnythingAlsoInARankedTier() {
+        BoardLayout both = new BoardLayout(List.of("S"), "TODO", Map.of("S", List.of("s1"), "TODO", List.of("t1", "s1")));
+        assertThat(both.toDo()).containsExactly("t1");
+        assertThat(b.toDo()).containsExactly("t1");
+        assertThat(new BoardLayout(List.of("S"), null, Map.of("S", List.of("s1"))).toDo()).isEmpty();
+    }
+
+    @Test
     void ranksAndNulls() {
         assertThat(b.rankOf("A")).contains(1);
         assertThat(b.rankOf("TODO")).isEmpty();

@@ -3,13 +3,16 @@ package fm.tierlist.duel.engine;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 // The board as the user sees it right now (staged edits included): the ranked
 // tiers best first, the unranked to-do list, and the songs in each, in order.
-// Tier ids are opaque to the engine ("S".."D", "TODO").
+// Tier ids are opaque to the engine ("S".."D", "TODO"). To-do songs are never
+// part of duels (the user's call) - see toDo().
 public record BoardLayout(List<String> rankedTiers, String unrankedTier, Map<String, List<String>> songs) {
 
     public BoardLayout {
@@ -25,6 +28,16 @@ public record BoardLayout(List<String> rankedTiers, String unrankedTier, Map<Str
 
     public List<String> unranked() {
         return unrankedTier == null ? List.of() : songsIn(unrankedTier);
+    }
+
+    // To-do songs: on the to-do list and in no ranked tier. They are never part
+    // of duels - no score, no prior, no pairing, no suggestion; the user places
+    // them (the user's call: "for the entire duel concept the todo song will
+    // not be there").
+    public Set<String> toDo() {
+        Set<String> out = new LinkedHashSet<>(unranked());
+        out.removeAll(ranked());
+        return out;
     }
 
     // Ranked songs, best tier first, each tier in board order.

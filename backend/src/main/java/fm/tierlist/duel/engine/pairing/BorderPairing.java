@@ -75,7 +75,7 @@ public class BorderPairing implements PairingStrategy {
     // For a ranked song whose likeliest tier isn't its own and whose move isn't
     // suggested yet: the border of that tier on the side of its current one. Else -1.
     private static int confirmationBorder(SongState s, BoardAnalysis analysis) {
-        if (s.tier() == null || s.probabilities().length < 2) return -1;
+        if (s.probabilities().length < 2) return -1;
         int current = analysis.layout().rankOf(s.tier()).orElse(-1);
         int best = s.bestRank();
         if (best == current || analysis.suggestions().stream().anyMatch(x -> x.song().equals(s.id()))) return -1;
@@ -89,7 +89,7 @@ public class BorderPairing implements PairingStrategy {
     // has made its case and steps back. The song just heard gets a nudge so a
     // few duels in a row keep it (less switching songs while listening).
     private static double priority(SongState s, BoardAnalysis analysis, String last, SessionContext session, EngineConfig config) {
-        double p = Math.max(s.entropy(), s.tier() == null ? 0 : 1 - analysis.probabilityOfCurrentTier(s));
+        double p = Math.max(s.entropy(), 1 - analysis.probabilityOfCurrentTier(s));
         if (analysis.suggestions().stream().anyMatch(x -> x.song().equals(s.id()))) p *= 0.2;
         if (s.id().equals(last) && session.run(last) < config.stickyMaxRun()) p += config.stickiness();
         return p;

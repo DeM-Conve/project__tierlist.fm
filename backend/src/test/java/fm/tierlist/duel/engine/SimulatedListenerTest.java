@@ -32,9 +32,6 @@ class SimulatedListenerTest {
         for (int i = 0; i < ranked.size(); i++) score.put(ranked.get(i), (double) -i);
         score.put(id("A", 2), 1.0);
         score.put(id("S", 3), -7.5); // the middle of A
-        // To-do songs: TD_0 truly belongs mid-B, TD_1 mid-D.
-        score.put(id("TD", 0), -14.5);
-        score.put(id("TD", 1), -26.5);
         return score;
     }
 
@@ -76,11 +73,13 @@ class SimulatedListenerTest {
         assertThat(up.to()).isEqualTo("S");
     }
 
+    // To-do songs are never part of duels (the user's call): a board with a
+    // to-do list duels and suggests exactly what the same board without one does.
     @org.junit.jupiter.params.ParameterizedTest
     @org.junit.jupiter.params.provider.ValueSource(longs = {1, 2, 3})
-    void placeTodoPutsEachToDoSongInItsTrueTier(long seed) {
-        List<Suggestion> moves = run(Boards.board(6, 2), Focus.PLACE_TODO, 30, seed);
-        assertThat(moves).filteredOn(s -> s.song().equals(id("TD", 0))).extracting(Suggestion::to).containsExactly("B");
-        assertThat(moves).filteredOn(s -> s.song().equals(id("TD", 1))).extracting(Suggestion::to).containsExactly("D");
+    void aToDoListChangesNothing(long seed) {
+        List<Suggestion> with = run(Boards.board(6, 2), Focus.SMART_MIX, 30, seed);
+        assertThat(with).noneMatch(s -> s.song().startsWith("TD"));
+        assertThat(with).isEqualTo(run(Boards.board(6, 0), Focus.SMART_MIX, 30, seed));
     }
 }
