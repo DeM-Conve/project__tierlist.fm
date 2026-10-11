@@ -195,7 +195,9 @@ category.
   third-party rating lib), `Refitter` (`DavidsonBradleyTerryRefit`, run over the
   whole log on every analysis), `PriorPolicy` (`TierPriorPolicy`: a song starts from
   the tier it's in), `TierModel` (`OrdinalProbitTierModel`, Commons Math),
-  `pairing.PairingStrategy` per `Focus` (registry `PairingStrategies`), and
+  `pairing.PairingStrategy` per `Focus` (registry `PairingStrategies`; the focuses
+  are `SMART_MIX`, `PLACE_TODO`, `BORDERLINES` - the "One song" mode was removed,
+  the user's call), and
   `policy.SuggestionPolicy`, a composite of `SuggestionRule`s (the 85% / 4 duels /
   2 border opponents gate, Keep hysteresis, locks). Tunables: `EngineConfig`. The duel
   log is the source of truth (event sourcing): scores are always rebuilt from priors +
@@ -207,7 +209,12 @@ category.
   what the API returns - add ranking logic to the engine, never to the frontend.
   Every duel/user datum lives in Postgres (the user's call), not localStorage.
   **To-do songs only come up in a Place TODO session** (the user's call: they "aren't
-  done yet") - Smart mix, Borderlines, One song and every opponent are ranked songs.
+  done yet") - Smart mix, Borderlines and every opponent are ranked songs.
+  **Retired schema bits, drop at the next schema reset:** V1 still has the
+  `ONE_SONG` label in the `duel_focus` enum, the nullable `duel_session.song_id`
+  column and its `session_song_for_one_song` CHECK. They're harmless (nothing
+  writes them; `DuelSession` no longer maps `song_id`), and V1 is applied on the
+  live DB, so they're left in place rather than editing the migration.
 - **Backend tests**: `mvn verify` - unit tests (`*Test`, surefire) plus
   Testcontainers integration tests (`*IT`, failsafe) against a real `postgres:17-alpine`
   (needs Docker; `testcontainers.version` is pinned in `pom.xml` because Boot 3.3's
