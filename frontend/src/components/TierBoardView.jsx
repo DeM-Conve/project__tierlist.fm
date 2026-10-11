@@ -508,13 +508,6 @@ export default function TierBoardView({
         title={<BoardNameEditor key={category} category={category} onRenamed={onRenameBoard} />}
         meta={anyLoading ? 'Loading videos…' : `${total} videos · ${tiers.length} tiers${hasTodo ? ` · ${todoCount} to do` : ''}`}
         actions={<>
-          {todoCount > 0 && (
-            <Tooltip label="Play the TODO list and give each song a tier - rating one moves on to the next" withArrow multiline maw={260}>
-              <Button variant="default" leftSection={<ListTodo size={15} />} onClick={() => onPlayFrom(TODO_TIER)}>
-                Triage {todoCount}
-              </Button>
-            </Tooltip>
-          )}
           <Tooltip label="Search this board" withArrow>
             <Button
               variant="default"

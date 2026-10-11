@@ -44,7 +44,7 @@ approve each one, then push to YouTube as usual.
 add to queue, shuffle, repeat). Minimize it to a mini bar or a floating corner; it keeps
 playing as you move between boards, and you can rate the playing song with `Shift+1-5`.
 
-**To-do triage** - Save new songs to a `TODO` playlist on your phone, then hit Triage: it
+**To-do triage** - Save new songs to a `TODO` playlist on your phone, then play the TODO row: it
 plays them one by one, and rating the current song files it and moves on to the next.
 
 **Add songs by link** - Paste one or more YouTube / YouTube Music links anywhere (`Ctrl+V`);
