@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useHotkeys } from 'react-hotkeys-hook';
 import {
-  Alert, Anchor, Badge, Button, Container, Group, Kbd, Paper, Select, SegmentedControl, SimpleGrid, Skeleton, Stack, Text, Title,
+  Alert, Anchor, Badge, Button, Container, Group, Kbd, Paper, SegmentedControl, SimpleGrid, Skeleton, Stack, Text, Title,
   UnstyledButton,
 } from '@mantine/core';
 import { Swords } from 'lucide-react';
@@ -12,6 +12,7 @@ import { useDuelBoard } from '../../duel/useDuelBoard';
 import { pct } from '../../duel/duelText';
 import { ScoreMap, StatCard } from './DuelBits';
 import { MoveRow } from './DuelMoves';
+import { SongPickerButton } from './SongPicker';
 import PageHeader from '../PageHeader';
 import { SECTION_GAP } from '../../layout/spacing';
 
@@ -68,7 +69,7 @@ export default function DuelHub({ category, boardLoading, base }) {
 
   const muOf = (id) => data?.songs.find((x) => x.id === id)?.mu;
   const songOptions = data
-    ? data.songs.filter((s) => s.tier).map((s) => ({ value: s.id, label: board.nameOf(s.id) }))
+    ? data.songs.filter((s) => s.tier).map((s) => ({ id: s.id, tier: s.tier, video: board.videoOf(s.id) }))
     : [];
 
   return (
@@ -150,9 +151,8 @@ export default function DuelHub({ category, boardLoading, base }) {
                       ? <Text fz="md" fw={700} c={focus === c.focus ? 'accent' : 'dimmed'}>{c.meta}</Text>
                       : <Skeleton h={12} w="45%" my="4xs" />)}
                     {c.focus === 'ONE_SONG' && (
-                      <Select searchable placeholder={`Search ${category}…`} data={songOptions} value={songId} disabled={!data}
-                        onChange={(v) => { setSongId(v); setFocus('ONE_SONG'); }} onClick={(e) => e.stopPropagation()}
-                        limit={50} nothingFoundMessage="No song by that name" />
+                      <SongPickerButton category={category} songs={songOptions} value={songId} disabled={!data}
+                        active={focus === 'ONE_SONG'} onChange={(v) => { setSongId(v); setFocus('ONE_SONG'); }} />
                     )}
                   </Stack>
                 </Paper>
