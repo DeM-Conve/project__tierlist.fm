@@ -14,7 +14,8 @@ export function useWorkbenchKeys({ narrow }) {
   const navigate = useNavigate();
   const mobileSidebarOpen = useSelector((s) => s.view.mobileSidebarOpen);
 
-  // Like VS Code's Explorer (Ctrl+Shift+E) / Search (Ctrl+Shift+F): always
+  // Like VS Code's Explorer (Ctrl+Shift+E) / Search (Ctrl+Shift+F) / Run
+  // and Debug (Ctrl+Shift+D): always
   // shows that view (on a phone: opens the drawer on it).
   const showView = (view) => () => {
     dispatch(openSidebarView(view));
@@ -30,6 +31,8 @@ export function useWorkbenchKeys({ narrow }) {
     ['mod+B', () => dispatch(narrow ? setMobileSidebarOpen(!mobileSidebarOpen) : toggleSidebarCollapsed())],
     ['mod+shift+E', showView('boards')],
     ['mod+shift+F', showView('playlists')],
+    // Like VS Code's Run and Debug (Ctrl+Shift+D): the Duels view.
+    ['mod+shift+D', showView('duels')],
     ['mod+,', () => navigate('/settings')],
   ]);
 }

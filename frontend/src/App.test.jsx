@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { act, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
+import { spotlight } from '@mantine/spotlight';
 import { Provider } from 'react-redux';
 import { MemoryRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -122,5 +123,23 @@ describe('a board shown from the board cache', () => {
     expect(await screen.findByText(/Showing the copy saved on this device/)).toBeInTheDocument();
     expect(screen.queryByText('Couldn’t load this board')).not.toBeInTheDocument();
     expect(sIds()).toEqual(['cached00001']);
+  });
+});
+
+// Duels are reachable from anywhere: the palette has a "Duel: <board>" for
+// every board, and the side panel's board rows a Duel action.
+describe('duel entry points', () => {
+  it('the palette lists Duel: <board> and goes to that board’s duel hub', async () => {
+    renderApp('/settings');
+    act(() => spotlight.open());
+    fireEvent.click(await screen.findByText('Duel: Rap'));
+    expect(await screen.findByText('Settle the board.')).toBeInTheDocument();
+    act(() => spotlight.close());
+  });
+
+  it('a board row’s Duel action in the side panel opens the duel hub', async () => {
+    renderApp('/settings');
+    fireEvent.click(await screen.findByRole('link', { name: 'Duel Rap' }));
+    expect(await screen.findByText('Settle the board.')).toBeInTheDocument();
   });
 });

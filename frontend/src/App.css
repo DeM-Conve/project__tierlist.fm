@@ -102,6 +102,25 @@
    foreground) - a :hover state, no Mantine prop for it. */
 .activity-icon { color: var(--chrome-fg-muted); transition: color 0.1s ease; }
 .activity-icon:hover, .activity-icon[data-active] { color: var(--text); }
+
+/* A board row's inline action (Duel), VS Code's tree-row actions: hidden
+   until the row is hovered or keyboard-focused (:focus-visible, so a
+   clicked row keeps its count), then shown in place of
+   the row's count - a :hover/:focus-within reveal, no Mantine prop for it.
+   Touch screens have no hover: there the Duels view and the row's menu
+   reach a duel, and the count stays. */
+.board-row-action { opacity: 0; }
+.board-row:has(:focus-visible) .board-row-action { opacity: 1; }
+.board-row:has(:focus-visible) .board-row-meta { visibility: hidden; }
+@media (hover: hover) {
+  .board-row:hover .board-row-action { opacity: 1; }
+  .board-row:hover .board-row-meta { visibility: hidden; }
+  /* Over the action, the row underneath still reads as hovered. */
+  .board-row:hover .chrome-row:not([data-active]) { background-color: var(--chrome-hover); }
+}
+@media (hover: none) {
+  .board-row-action { display: none; }
+}
 .sidebar-scrim { display: none; }
 
 /* Tier board lanes - layout/visuals are Mantine props; only what Mantine

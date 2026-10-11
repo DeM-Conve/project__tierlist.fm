@@ -3,7 +3,9 @@
 // account (backend ActivityItem / `activity_bar_item`). These ids are the
 // API's - keep them in step with the Java enum's keys. The bottom group
 // (shortcuts / settings / log out) is fixed and not listed here.
-export const ACTIVITY_ITEMS = ['home', 'jump', 'boards', 'playlists', 'addSongs'];
+// 'duels' came later (V2 migration): last, so a saved order - which only
+// lists what it knew - completes to the same order a new account starts with.
+export const ACTIVITY_ITEMS = ['home', 'jump', 'boards', 'playlists', 'addSongs', 'duels'];
 
 export const DEFAULT_ACTIVITY_ORDER = ACTIVITY_ITEMS;
 

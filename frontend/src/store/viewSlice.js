@@ -17,7 +17,7 @@ function initialState() {
     homeQuery: '',
     mobileSidebarOpen: false,
     // Desktop: the sidebar folded to an icon strip (Ctrl+B, like VS Code).
-    // Which view the panel shows: 'boards' (tier lists) or 'playlists'.
+    // Which view the panel shows: 'boards' (tier lists), 'playlists' or 'duels'.
     // Both survive a reload (per device, settings.js DEVICE_UI - saved by store.js).
     sidebarCollapsed: collapsed,
     sidebarView: view,

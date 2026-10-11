@@ -13,8 +13,9 @@ import {
   TextInput,
   Tooltip,
 } from '@mantine/core';
-import { Home, Keyboard, LayoutList, ListMusic, ListPlus, LogOut, Search, Settings } from 'lucide-react';
-import { BOARD_TIERS, TIER_ORDER } from '../tiers';
+import { Home, Keyboard, LayoutList, ListMusic, ListPlus, LogOut, Search, Settings, Swords } from 'lucide-react';
+import { BOARD_TIERS, TIER_ORDER, TODO_TIER } from '../tiers';
+import { boardPath, duelPath, useBoardContextMenu } from '../boardMenu';
 import { TierChip } from './TierBits';
 import { exampleTitle } from '../naming';
 import { useDispatch, useSelector } from 'react-redux';
@@ -25,6 +26,9 @@ import { SHELL_Y, SIDEBAR_X } from '../layout/spacing';
 import { useBoardDropOpen } from '../layout/useBoardDropOpen';
 
 const TOGGLE_KEYS = 'Ctrl+Shift+E · Ctrl+B';
+// A row's inline action sits over the end of the row, where its count is
+// (NavLink's own right padding is spacing sm).
+const SIDEBAR_ROW_ACTION_RIGHT = 'var(--mantine-spacing-2xs)';
 
 // A row of a list on the window chrome, VS Code's way: the full ink, a
 // neutral chrome-toned selection (list.inactiveSelectionBackground) rather
@@ -44,33 +48,87 @@ function boardCounts(tiers) {
 }
 
 // One board in the list. A song dragged over it opens the board after a
-// moment, to be dropped on one of its tiers (useBoardDropOpen).
+// moment, to be dropped on one of its tiers (useBoardDropOpen). Like a VS
+// Code tree row, it has an inline action - Duel - that takes the place of
+// its count on hover / keyboard focus (App.css .board-row), and a
+// right-click menu (boardMenu.jsx).
 function BoardLink({ category, tiers, active }) {
-  const base = `/tier/${encodeURIComponent(category)}`;
   const counts = boardCounts(tiers);
   const total = Object.values(counts).reduce((a, b) => a + b, 0);
   const { hovering, handlers } = useBoardDropOpen(category);
+  const boardMenu = useBoardContextMenu();
+  return (
+    // The drag handlers sit on the whole row, so a song dragged over the
+    // inline action still counts as over the board.
+    <Box pos="relative" className="board-row" {...handlers} onContextMenu={boardMenu(category, tiers)}>
+      <NavLink
+        component={Link}
+        to={boardPath(category)}
+        {...CHROME_ROW}
+        // A song dragged over it: the accent fill, so the drop target is loud.
+        variant={hovering ? 'filled' : undefined}
+        vars={hovering ? undefined : CHROME_ROW.vars}
+        // Compact rows so a typical library's boards all fit without
+        // the list scrolling.
+        py="4xs"
+        active={active || hovering}
+        data-drop-target={hovering || undefined}
+        label={
+          <Group justify="space-between" wrap="nowrap" gap="3xs">
+            <Text fz="lg" truncate="end">
+              {category}
+            </Text>
+            <Text className="board-row-meta" fz="md" c={hovering ? undefined : MUTED} style={{ fontVariantNumeric: 'tabular-nums' }}>
+              {total}
+            </Text>
+          </Group>
+        }
+      />
+      <Tooltip label="Duel" position="right" withArrow openDelay={300}>
+        <ActionIcon
+          component={Link}
+          to={duelPath(category)}
+          className="board-row-action"
+          variant="subtle"
+          color="gray"
+          size="sm"
+          aria-label={`Duel ${category}`}
+          pos="absolute"
+          right={SIDEBAR_ROW_ACTION_RIGHT}
+          top="50%"
+          // Vertical centring on the row (geometry, not spacing).
+          style={{ transform: 'translateY(-50%)' }}
+        >
+          <Swords size={14} />
+        </ActionIcon>
+      </Tooltip>
+    </Box>
+  );
+}
+
+// One board in the Duels view: the whole row goes to its duel hub. Its meta
+// is what's cheap and already loaded - the to-do songs waiting to be placed
+// (the to-do playlist's own item count), else its ranked total.
+function DuelBoardLink({ category, tiers, active }) {
+  const boardMenu = useBoardContextMenu();
+  const ranked = Object.values(boardCounts(tiers)).reduce((a, b) => a + b, 0);
+  const todo = tiers[TODO_TIER]?.itemCount ?? 0;
   return (
     <NavLink
       component={Link}
-      to={base}
+      to={duelPath(category)}
       {...CHROME_ROW}
-      // A song dragged over it: the accent fill, so the drop target is loud.
-      variant={hovering ? 'filled' : undefined}
-      vars={hovering ? undefined : CHROME_ROW.vars}
-      // Compact rows so a typical library's boards all fit without
-      // the list scrolling.
       py="4xs"
-      active={active || hovering}
-      data-drop-target={hovering || undefined}
-      {...handlers}
+      active={active}
+      onContextMenu={boardMenu(category, tiers)}
+      leftSection={<Swords size={14} color="currentColor" style={{ color: MUTED }} />}
       label={
         <Group justify="space-between" wrap="nowrap" gap="3xs">
           <Text fz="lg" truncate="end">
             {category}
           </Text>
-          <Text fz="md" c={hovering ? undefined : MUTED} style={{ fontVariantNumeric: 'tabular-nums' }}>
-            {total}
+          <Text fz="md" c={MUTED} style={{ fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>
+            {todo > 0 ? `${todo} to do` : ranked}
           </Text>
         </Group>
       }
@@ -112,6 +170,8 @@ function PlaylistLink({ category, tier, playlist, active }) {
   );
 }
 
+const VIEW_TITLES = { boards: 'Tier lists', playlists: 'Playlists', duels: 'Duels' };
+
 const ACTIVITY_SIZE = 42;
 // VS Code's codicons are 24px line icons; lucide's default stroke reads
 // heavier than theirs at that size.
@@ -141,9 +201,9 @@ function ActivityIcon({ label, keys, marked, children, ...props }) {
   );
 }
 
-// The permanent icon strip, like VS Code's activity bar. "Tier lists" and
-// "Playlists" open / close their view in the panel beside it (Ctrl+B
-// toggles the panel); the rest go places.
+// The permanent icon strip, like VS Code's activity bar. "Tier lists",
+// "Playlists" and "Duels" open / close their view in the panel beside it
+// (Ctrl+B toggles the panel); the rest go places.
 export function ActivityBar({ openView, onShowView, onOpenPalette, waitingCount, onSelectSettings, onOpenShortcuts, onLogout }) {
   const dispatch = useDispatch();
   const order = useSelector(selectActivityOrder);
@@ -168,6 +228,11 @@ export function ActivityBar({ openView, onShowView, onOpenPalette, waitingCount,
     playlists: (
       <ActivityIcon label="Playlists" keys="Ctrl+Shift+F" marked={openView === 'playlists'} aria-pressed={openView === 'playlists'} onClick={() => onShowView('playlists')}>
         <ListMusic {...ICON} />
+      </ActivityIcon>
+    ),
+    duels: (
+      <ActivityIcon label="Duels" keys="Ctrl+Shift+D" marked={openView === 'duels'} aria-pressed={openView === 'duels'} onClick={() => onShowView('duels')}>
+        <Swords {...ICON} />
       </ActivityIcon>
     ),
     addSongs: (
@@ -223,8 +288,8 @@ export function ActivityBar({ openView, onShowView, onOpenPalette, waitingCount,
   );
 }
 
-// The side panel: the open view (Tier lists or Playlists), its filter and
-// its list. On desktop it lives in App's resizable panel group; on a phone,
+// The side panel: the open view (Tier lists, Playlists or Duels), its
+// filter and its list. On desktop it lives in App's resizable panel group; on a phone,
 // in the drawer beside the activity bar.
 export function SidebarPanel({ query, onQueryChange, tierCategories, tierGroups, playlistCount, loading, view = 'boards' }) {
   const naming = useSelector(selectNaming);
@@ -232,6 +297,7 @@ export function SidebarPanel({ query, onQueryChange, tierCategories, tierGroups,
   const q = query.trim().toLowerCase();
   const filteredCategories = tierCategories.filter((c) => c.toLowerCase().includes(q));
   const isPlaylists = view === 'playlists';
+  const isDuels = view === 'duels';
   // Every tier playlist (template-matching only - see selectTierPlaylists),
   // grouped under its board like a file tree, best tier first. The filter
   // matches a playlist's title or its board.
@@ -252,7 +318,7 @@ export function SidebarPanel({ query, onQueryChange, tierCategories, tierGroups,
       <Group justify="space-between" px="2xs" mb="xs" wrap="nowrap">
         {/* VS Code's side bar title: small caps-style, the secondary ink. */}
         <Text fz="lg" fw={700} c="var(--text)">
-          {isPlaylists ? 'Playlists' : 'Tier lists'}
+          {VIEW_TITLES[view] ?? VIEW_TITLES.boards}
         </Text>
         {loading ? (
           <Skeleton h={10} w={14} />
@@ -305,7 +371,17 @@ export function SidebarPanel({ query, onQueryChange, tierCategories, tierGroups,
               No boards match
             </Text>
           )}
-          {!isPlaylists && filteredCategories.map((category) => (
+          {/* Duels: every board, one click from its duel hub. */}
+          {isDuels &&
+            filteredCategories.map((category) => (
+              <DuelBoardLink
+                key={category}
+                category={category}
+                tiers={tierGroups[category] || {}}
+                active={location.pathname === duelPath(category) || location.pathname.startsWith(`${duelPath(category)}/`)}
+              />
+            ))}
+          {!isPlaylists && !isDuels && filteredCategories.map((category) => (
             <BoardLink
               key={category}
               category={category}

@@ -20,6 +20,7 @@ import { notifications } from '@mantine/notifications';
 import './App.css';
 import { BOARD_TIERS, TODO_TIER } from './tiers';
 import Sidebar, { SidebarPanel } from './components/Sidebar';
+import { duelPath } from './boardMenu';
 import { Group, Panel, useDefaultLayout, usePanelRef } from 'react-resizable-panels';
 import { SIDEBAR_PANEL_ID, layoutStorage, restoreSidebarLayout, shouldSaveLayout } from './settings';
 import Sash from './layout/Sash';
@@ -538,6 +539,16 @@ function Layout() {
         section: 'Boards',
         label: `Go to board ${category}`,
         action: () => navigate(`/tier/${encodeURIComponent(category)}`),
+      });
+    }
+    // Every board's duel hub, from anywhere ("duel rap", "versus nippo").
+    for (const category of tierCategories) {
+      list.push({
+        id: `duel-${category}`,
+        section: 'Duels',
+        label: `Duel: ${category}`,
+        keywords: ['duel', 'versus', 'vs', 'compare', 'rank', 'settle'],
+        action: () => navigate(duelPath(category)),
       });
     }
     for (const p of tierPlaylists || []) {

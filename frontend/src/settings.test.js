@@ -50,6 +50,11 @@ describe('device prefs (readDevicePref / writeDevicePref)', () => {
     }
   });
 
+  it('remembers the Duels view too', () => {
+    writeDevicePref('sidebar', { collapsed: false, view: 'duels' });
+    expect(readDevicePref('sidebar')).toEqual({ collapsed: false, view: 'duels' });
+  });
+
   it('invalid values mean the default', () => {
     const bad = {
       repeatMode: ['shuffle', 1, null],

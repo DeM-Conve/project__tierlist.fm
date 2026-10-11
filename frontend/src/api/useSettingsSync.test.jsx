@@ -50,7 +50,7 @@ describe('useSettingsSync', () => {
 
   it('adopts the account’s row and does not re-save an identical copy', async () => {
     const store = makeStore();
-    const mine = ['addSongs', 'home', 'jump', 'boards', 'playlists'];
+    const mine = ['addSongs', 'home', 'jump', 'boards', 'playlists', 'duels'];
     const row = { ...toServer(store.getState()), appearance: { theme: 'dracula', accent: 'violet', tierPalette: 'heat', activityOrder: mine } };
     Object.assign(query, { data: { settings: row, etag: '"3"' }, isSuccess: true });
     mount(store);
@@ -121,7 +121,7 @@ describe('useSettingsSync', () => {
       .mockImplementation(async ({ settings }) => ({ settings, etag: '"3"' }));
     mount(store);
     await settle();
-    const mine = ['playlists', 'boards', 'home', 'jump', 'addSongs'];
+    const mine = ['playlists', 'boards', 'home', 'jump', 'addSongs', 'duels'];
     act(() => {
       store.dispatch(setActivityOrder(mine));
     });

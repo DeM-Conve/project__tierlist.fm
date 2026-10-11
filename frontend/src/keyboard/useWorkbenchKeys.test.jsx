@@ -87,6 +87,15 @@ describe('useWorkbenchKeys panel views', () => {
     expect(store.getState().view).toMatchObject({ sidebarCollapsed: false, sidebarView: 'playlists' });
   });
 
+  it('Ctrl+Shift+D shows the Duels view (VS Code’s Run and Debug key)', () => {
+    const store = setup();
+    act(() => {
+      store.dispatch(setSidebarCollapsed(true));
+    });
+    press('D', { shiftKey: true });
+    expect(store.getState().view).toMatchObject({ sidebarCollapsed: false, sidebarView: 'duels' });
+  });
+
   it('on a phone the view keys open the drawer', () => {
     const store = setup({ narrow: true });
     press('F', { shiftKey: true });

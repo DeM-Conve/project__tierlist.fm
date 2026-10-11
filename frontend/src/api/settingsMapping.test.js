@@ -55,13 +55,13 @@ describe('toServer', () => {
 
   it('sends the activity bar order', () => {
     const s = makeStore();
-    s.dispatch(setActivityOrder(['playlists', 'home', 'jump', 'boards', 'addSongs']));
-    expect(toServer(s.getState()).appearance.activityOrder).toEqual(['playlists', 'home', 'jump', 'boards', 'addSongs']);
+    s.dispatch(setActivityOrder(['playlists', 'home', 'jump', 'boards', 'addSongs', 'duels']));
+    expect(toServer(s.getState()).appearance.activityOrder).toEqual(['playlists', 'home', 'jump', 'boards', 'addSongs', 'duels']);
   });
 
   it('round-trips: DTO -> settingsLoaded -> toServer gives the same DTO', () => {
     const account = dto({
-      appearance: { theme: 'solarized', accent: 'amber', tierPalette: 'heat', activityOrder: ['addSongs', 'jump', 'home', 'boards', 'playlists'] },
+      appearance: { theme: 'solarized', accent: 'amber', tierPalette: 'heat', activityOrder: ['addSongs', 'jump', 'home', 'boards', 'playlists', 'duels'] },
       naming: {
         template: '[{my_label}] {category} - {tier}',
         tierLabels: CUSTOM,
@@ -109,7 +109,7 @@ describe('sameSettings', () => {
 
   it('compares the activity order by value, order mattering', () => {
     expect(sameSettings(dto({ appearance: { activityOrder: [...DEFAULT_ACTIVITY_ORDER] } }), dto())).toBe(true);
-    expect(sameSettings(dto({ appearance: { activityOrder: ['jump', 'home', 'boards', 'playlists', 'addSongs'] } }), dto())).toBe(false);
+    expect(sameSettings(dto({ appearance: { activityOrder: ['jump', 'home', 'boards', 'playlists', 'addSongs', 'duels'] } }), dto())).toBe(false);
   });
 
   it('null vs an object is different; null vs null is the same', () => {
@@ -192,7 +192,7 @@ describe('rebase (three-way merge after a 412)', () => {
   });
 
   it('a reordered activity bar is kept over the newer row, other fields merged', () => {
-    const mine = ['addSongs', 'home', 'jump', 'boards', 'playlists'];
+    const mine = ['addSongs', 'home', 'jump', 'boards', 'playlists', 'duels'];
     const merged = rebase(dto({ appearance: { activityOrder: mine } }), dto(), dto({ appearance: { theme: 'sand' } }));
     expect(merged.appearance).toEqual({ theme: 'sand', accent: 'blue', tierPalette: 'vivid', activityOrder: mine });
     // ...and another device's reorder is taken when this one didn't touch it.

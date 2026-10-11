@@ -40,18 +40,18 @@ describe('appearanceSlice', () => {
   });
 
   it('setActivityOrder stores a complete order, selectActivityOrder reads it', () => {
-    const mine = ['addSongs', 'boards', 'home', 'playlists', 'jump'];
+    const mine = ['addSongs', 'boards', 'home', 'playlists', 'jump', 'duels'];
     const s = appearance(init(appearance), setActivityOrder(mine));
     expect(s.activityOrder).toEqual(mine);
     expect(selectActivityOrder({ appearance: s })).toEqual(mine);
     // Partial / junk input is completed, never stored as-is.
-    expect(appearance(s, setActivityOrder(['playlists'])).activityOrder).toEqual(['playlists', 'home', 'jump', 'boards', 'addSongs']);
+    expect(appearance(s, setActivityOrder(['playlists'])).activityOrder).toEqual(['playlists', 'home', 'jump', 'boards', 'addSongs', 'duels']);
     expect(appearance(s, setActivityOrder(null)).activityOrder).toEqual(DEFAULT_ACTIVITY_ORDER);
   });
 
   it('settingsLoaded adopts the account’s activity order, completing a partial one', () => {
     const s = appearance(init(appearance), settingsLoaded({ appearance: { theme: 'tokyo', accent: 'blue', tierPalette: 'vivid', activityOrder: ['jump', 'settings'] } }));
-    expect(s.activityOrder).toEqual(['jump', 'home', 'boards', 'playlists', 'addSongs']);
+    expect(s.activityOrder).toEqual(['jump', 'home', 'boards', 'playlists', 'addSongs', 'duels']);
   });
 
   it('settingsLoaded without appearance keeps state', () => {
@@ -61,13 +61,13 @@ describe('appearanceSlice', () => {
 });
 
 describe('completeActivityOrder', () => {
-  it('default order is the five items, top to bottom', () => {
-    expect(DEFAULT_ACTIVITY_ORDER).toEqual(['home', 'jump', 'boards', 'playlists', 'addSongs']);
+  it('default order is the six items, top to bottom - Duels (added later) last', () => {
+    expect(DEFAULT_ACTIVITY_ORDER).toEqual(['home', 'jump', 'boards', 'playlists', 'addSongs', 'duels']);
     expect(ACTIVITY_ITEMS).toBe(DEFAULT_ACTIVITY_ORDER);
   });
 
   it('keeps the given order, drops unknown ids and repeats, appends what is missing', () => {
-    expect(completeActivityOrder(['boards', 'nope', 'boards', 'home'])).toEqual(['boards', 'home', 'jump', 'playlists', 'addSongs']);
+    expect(completeActivityOrder(['boards', 'nope', 'boards', 'home'])).toEqual(['boards', 'home', 'jump', 'playlists', 'addSongs', 'duels']);
     expect(completeActivityOrder([])).toEqual(DEFAULT_ACTIVITY_ORDER);
     expect(completeActivityOrder(undefined)).toEqual(DEFAULT_ACTIVITY_ORDER);
     expect(completeActivityOrder('home')).toEqual(DEFAULT_ACTIVITY_ORDER);
@@ -84,7 +84,7 @@ describe('boot cache for appearance', () => {
     localStorage.setItem(SETTINGS.appearance, JSON.stringify({ theme: 'tokyo', activityOrder: ['addSongs', 'home'] }));
     vi.resetModules();
     const { default: fresh } = await import('./appearanceSlice');
-    expect(init(fresh).activityOrder).toEqual(['addSongs', 'home', 'jump', 'boards', 'playlists']);
+    expect(init(fresh).activityOrder).toEqual(['addSongs', 'home', 'jump', 'boards', 'playlists', 'duels']);
   });
 
   it('appearance reads the cached choice', async () => {

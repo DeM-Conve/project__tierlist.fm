@@ -53,7 +53,7 @@ export function setSetting(key, value) {
 
 const oneOf = (values) => (v) => (values.includes(v) ? v : undefined);
 
-export const SIDEBAR_VIEWS = ['boards', 'playlists'];
+export const SIDEBAR_VIEWS = ['boards', 'playlists', 'duels'];
 
 export const DEVICE_UI = {
   // The side panel (App.jsx Layout, viewSlice): shut or open, and its view.
