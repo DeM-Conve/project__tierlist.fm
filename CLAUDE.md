@@ -356,7 +356,25 @@ The user asked for these on top of the Mantine/Redux migration above. Tracked he
   that Mantine (`@mantine/core`/`hooks`), `react-resizable-panels` (the sidebar
   split), `@tanstack/react-virtual`, `@hello-pangea/dnd` or another popular,
   maintained library already covers, and swap them over one at a time with
-  tests. Done so far: the sidebar's resize edge (now `react-resizable-panels`).
+  tests. Done so far: the sidebar's resize edge (now `react-resizable-panels`);
+  `PendingChanges` Shift+P (Mantine `useHotkeys`); the tier page's `/` and
+  filter Escape (`react-hotkeys-hook` + Mantine `getHotkeyHandler`); the
+  dock's progress polling (Mantine `useInterval`, `usePlayerTime.js`); the
+  sidebar's spring-loaded board open (Mantine `useTimeout`); dead App.css
+  rules (`appCss.test.js` now fails on any App.css class nothing uses).
+  Left, each riskier than a one-for-one swap: the big page keydown handlers
+  (`PlayerDock`, `TierBoardView` search, `AddSongsView` - capture phase,
+  ordering with `keyboard/sequence.js` and `LinkHints` matters); `LinkHints`'
+  while-open window listeners (could be `useWindowEvent`, same ordering
+  caveat); `sequence.js`'s module-level listener (react-hotkeys-hook doesn't
+  expose its pending-sequence state); native HTML5 drag-and-drop in
+  `tierActions` `useTierDnd` / board / tier page / queue (`@hello-pangea/dnd`
+  is installed, but the sidebar cross-board drop and the virtualizer drop
+  slot depend on native drag events); `tierUtils.indexForPointInFlow` and the
+  canvas-offset `getBoundingClientRect` reads in `TierBoardView` /
+  `TierFocusView` (board fit maths, virtualizer `scrollMargin`); the dock's
+  click-to-seek line (could be a Mantine `Slider`, but it's the dock's
+  mini/floating CSS).
 - [ ] **React Hook Form** - installed, still nothing to use it on (see Stack section
   above). Not a gap to close proactively.
 - [~] **Stop hand-writing CSS, use Mantine components instead** - in progress, real
