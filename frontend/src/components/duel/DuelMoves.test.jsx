@@ -46,8 +46,9 @@ describe('DuelMoves', () => {
     // New Song (score 24) lands between Middle (26) and Other (22).
     expect(store.getState().tiers.tierItems.A.map((v) => v.videoId)).toEqual([IDS.mid, IDS.todo, IDS.mid2]);
     expect(h.decision.mock.calls[0][0]).toMatchObject({ videoId: IDS.todo, decision: 'ACCEPTED', from: 'TODO', to: 'A', confidence: 0.92 });
-    expect(screen.getByText('Moved to A')).toBeInTheDocument();
-    fireEvent.click(screen.getByText('Undo'));
+    const main = screen.getByTestId('moves-main');
+    expect(within(main).getByText('Moved to A')).toBeInTheDocument();
+    fireEvent.click(within(main).getByText('Undo'));
     expect(tierOf(store, IDS.todo)).toBe('TODO');
     expect(h.decision.mock.calls[1][0]).toMatchObject({ videoId: IDS.todo, decision: null });
   });
@@ -56,7 +57,7 @@ describe('DuelMoves', () => {
     const store = page();
     fireEvent.click(screen.getAllByRole('button', { name: 'Keep' })[0]);
     expect(h.decision.mock.calls[0][0]).toMatchObject({ videoId: IDS.todo, decision: 'KEPT' });
-    expect(screen.getByText('Kept in TODO')).toBeInTheDocument();
+    expect(within(screen.getByTestId('moves-main')).getByText('Kept in TODO')).toBeInTheDocument();
     expect(tierOf(store, IDS.todo)).toBe('TODO');
   });
 
@@ -191,6 +192,36 @@ describe('DuelMoves', () => {
     expect(screen.queryByText(/^Leaning/)).not.toBeInTheDocument();
     fireEvent.click(screen.getByText('Up a tier · 0'));
     expect(screen.getByRole('button', { name: 'Leaning · 1 not sure yet · up a tier' })).toBeInTheDocument();
+  });
+
+  it('Leaning and Tighten tier order sit in the main column under the list, not after the evidence panel', () => {
+    h.analysis = analysis({ suggestions: [suggestion(), up], leaning: [lean], tierOrders: { A: [IDS.mid2, IDS.mid] } });
+    page();
+    const main = screen.getByTestId('moves-main');
+    const panel = screen.getByTestId('evidence-panel');
+    const leaning = screen.getByTestId('leaning-section');
+    const tighten = screen.getByTestId('tighten-section');
+    expect(main).toContainElement(screen.getByRole('button', { name: /Show evidence for New Song/ }));
+    expect(main).toContainElement(leaning);
+    expect(main).toContainElement(tighten);
+    expect(panel).not.toContainElement(leaning);
+    // Main column and panel are side by side (siblings), the panel last.
+    expect(panel.parentElement).toBe(main.parentElement);
+    expect(main.compareDocumentPosition(panel) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(leaning.compareDocumentPosition(panel) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    // Leaning is still collapsed.
+    expect(screen.getByRole('button', { name: 'Leaning · 1 not sure yet' })).toHaveAttribute('aria-expanded', 'false');
+  });
+
+  it('the evidence panel holds its shape: the score readout is there before any hover, and deciding swaps the buttons for Undo in place', () => {
+    page();
+    const panel = screen.getByTestId('evidence-panel');
+    expect(within(panel).getByTestId('score-readout')).toHaveTextContent(/^Latest: score/);
+    fireEvent.click(within(panel).getByRole('button', { name: 'Move to A' }));
+    expect(within(panel).getByTestId('evidence-decided')).toHaveTextContent('Moved to A');
+    fireEvent.click(within(panel).getByRole('button', { name: 'Undo' }));
+    expect(within(panel).getByRole('button', { name: 'Move to A' })).toBeInTheDocument();
+    expect(h.decision.mock.calls[1][0]).toMatchObject({ videoId: IDS.todo, decision: null });
   });
 
   it('a failed load says why and offers Retry', () => {

@@ -1,10 +1,10 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useHotkeys } from 'react-hotkeys-hook';
-import { useHover } from '@mantine/hooks';
+import { useElementSize, useHover } from '@mantine/hooks';
 import {
-  Accordion, Alert, Anchor, Badge, Box, Button, Checkbox, Chip, Container, Group, Kbd, Paper, Progress, Skeleton, Stack, Table, Text,
-  ThemeIcon, Title, UnstyledButton,
+  Accordion, Alert, Anchor, Badge, Box, Button, Checkbox, Chip, Container, Group, Kbd, Paper, Progress, ScrollArea, Skeleton, Stack,
+  Table, Text, ThemeIcon, Title, UnstyledButton,
 } from '@mantine/core';
 import { ArrowDown, ArrowUp, Hourglass, Play, Square, Swords } from 'lucide-react';
 import { useTierName } from '../../tierLabels';
@@ -17,7 +17,13 @@ import { useDuelBoard } from '../../duel/useDuelBoard';
 import { leaningConfidence, leaningText, moveKind, orderChanges, pct, record, shortfallText } from '../../duel/duelText';
 import { ProbabilityBars, ScoreTrend, SectionLabel, SongArt } from './DuelBits';
 import PageHeader from '../PageHeader';
-import { SECTION_GAP } from '../../layout/spacing';
+import { SECTION_GAP, SHELL_Y, spacingPx } from '../../layout/spacing';
+import { useCanvas } from '../../layout/canvas';
+
+// The two columns' minimum widths (px) and the gap between them.
+const MAIN_MIN = 560;
+const PANEL_MIN = 380;
+const COLUMN_GAP = 'lg';
 
 // One suggested move: song, from -> to, confidence, Move / Keep (or what was decided, with Undo).
 // The whole row is one click target: an UnstyledButton stretched over it
@@ -202,6 +208,8 @@ function EvidenceSkeleton() {
             <Text fz="sm" c="dimmed">dashed = tier border</Text>
           </Group>
           <Skeleton h={80} />
+          {/* ScoreTrend's always-there readout line. */}
+          <Skeleton h={12} w={120} mt="4xs" />
         </Stack>
         <Stack gap="4xs">
           <SectionLabel>Key results</SectionLabel>
@@ -252,6 +260,8 @@ export default function DuelMoves({ category, boardLoading, base }) {
   const [decided, setDecided] = useState({}); // song -> { s, kind, lean }
   const [selected, setSelected] = useState(null);
   const [previewSong, setPreviewSong] = useState(null);
+  const { ref: pageRef, width: pageWidth } = useElementSize();
+  const { height: canvasHeight } = useCanvas();
 
   const data = analysis.data;
   const muOf = (id) => data?.songs.find((x) => x.id === id)?.mu;
@@ -330,6 +340,199 @@ export default function DuelMoves({ category, boardLoading, base }) {
   // The dashed line: the border nearest the song's score.
   const border = currentSong && data.borders.reduce((best, b) => (!best || Math.abs(b.score - currentSong.mu) < Math.abs(best.score - currentSong.mu) ? b : best), null);
 
+  // Two columns when the page is wide enough for both (the list's 560 + the
+  // panel's 380 + the gap); unmeasured (first paint, tests) counts as wide.
+  const wide = pageWidth === 0 || pageWidth >= MAIN_MIN + PANEL_MIN + spacingPx(COLUMN_GAP);
+  // The evidence panel sticks to the top of the canvas and scrolls inside
+  // itself, so it never pushes anything below it out of view.
+  const panelMah = wide && canvasHeight > 0 ? canvasHeight - 2 * spacingPx(SHELL_Y) : undefined;
+  const panelProps = wide
+    ? { pos: 'sticky', top: spacingPx(SHELL_Y), style: { flex: `1 1 ${PANEL_MIN}px`, overflow: 'hidden' } }
+    : { style: { overflow: 'hidden' } };
+
+  const evidence = current && (
+    <Paper withBorder radius="lg" {...panelProps} data-testid="evidence-panel">
+      <ScrollArea.Autosize mah={panelMah} type="auto">
+        <Stack gap="lg" p="md">
+          <Group gap="md" wrap="nowrap">
+            <SongArt video={board.videoOf(current.song)} size={60} />
+            <Box style={{ flex: 1 }} miw={0}>
+              <Title order={3} fz="xl" truncate="end">{board.nameOf(current.song)}</Title>
+              <Text c="dimmed" fz="md" truncate="end">{board.artistOf(current.song)}</Text>
+            </Box>
+            <Button radius="xl" w={48} h={48} p={0} aria-label={previewing ? 'Stop' : `Play ${board.nameOf(current.song)}`}
+              onClick={togglePreview}>
+              {previewing ? <Square size={16} fill="currentColor" /> : <Play size={18} fill="currentColor" />}
+            </Button>
+          </Group>
+          {previewing && (
+            <Box style={{ aspectRatio: '16 / 9', borderRadius: 10, overflow: 'hidden', background: 'var(--media-bg)' }}>
+              <EmbeddedPlayer videoId={current.song} autoplay />
+            </Box>
+          )}
+          <Stack gap="xs">
+            <SectionLabel>Where it belongs</SectionLabel>
+            <ProbabilityBars song={currentSong} tiers={TIER_ORDER.filter((t) => currentSong?.probabilities[t] != null)} />
+          </Stack>
+          <Stack gap="2xs">
+            <Group justify="space-between">
+              <SectionLabel>Score over {current.wins + current.losses + current.draws} duels</SectionLabel>
+              <Text fz="sm" c="dimmed">dashed = tier border</Text>
+            </Group>
+            <ScoreTrend trend={current.trend} border={border?.score} />
+          </Stack>
+          <Stack gap="4xs">
+            <SectionLabel>Key results</SectionLabel>
+            {current.keyResults.map((k, i) => (
+              <Group key={i} justify="space-between" py="3xs" style={{ borderBottom: '1px solid var(--border-soft)' }} wrap="nowrap">
+                <Group gap="2xs" wrap="nowrap" miw={0}>
+                  <Text fw={800} w={40} c={k.result > 0 ? 'accent' : 'dimmed'}>
+                    {k.result > 0 ? 'Won' : k.result < 0 ? 'Lost' : 'Draw'}
+                  </Text>
+                  <Text fz="md" truncate="end">{board.nameOf(k.opponent)}</Text>
+                </Group>
+                {k.opponentTier && <TierChip tier={k.opponentTier} size={20} />}
+              </Group>
+            ))}
+          </Stack>
+          <Stack gap="xs">
+            {/* Deciding swaps the buttons for what was decided + Undo in a
+                row of the same height, so the lock below doesn't jump. */}
+            {decided[current.song] ? (
+              <Group gap="2xs" justify="space-between" wrap="nowrap" data-testid="evidence-decided">
+                <Text fz="md" fw={700} c={decided[current.song].kind === 'move' ? 'accent' : 'dimmed'}>
+                  {decided[current.song].kind === 'move' ? `Moved to ${tierName(current.to)}` : `Kept in ${tierName(current.from)}`}
+                </Text>
+                <Button variant="subtle" color="gray" onClick={() => undo(current)}>Undo</Button>
+              </Group>
+            ) : (
+              <Group gap="2xs" grow>
+                <Button variant="default" onClick={() => keep(current)}>Keep in {tierName(current.from)}</Button>
+                <Button onClick={() => move(current)}>Move to {tierName(current.to)}</Button>
+              </Group>
+            )}
+            <Checkbox
+              checked={!!locked[current.song]}
+              onChange={() => toggleLock(current.song)}
+              label={`Lock ${board.nameOf(current.song)} in its tier - never suggest a move again`}
+            />
+            <Text fz="md" c="dimmed">
+              Keeping it raises the bar: it won’t be suggested again until five fresh duels point the same way.
+            </Text>
+          </Stack>
+        </Stack>
+      </ScrollArea.Autosize>
+    </Paper>
+  );
+
+  const list = (
+    <Paper withBorder radius="lg" style={{ overflow: 'hidden' }}>
+      {shown.length === 0 && <Text c="dimmed" p="xl" ta="center">No {FILTERS.find((f) => f.value === filter).label.toLowerCase()} moves are ready.</Text>}
+      {shown.map((s) => (
+        <MoveRow
+          key={s.song}
+          s={s}
+          board={board}
+          selected={current?.song === s.song}
+          decided={decided[s.song]?.kind}
+          onSelect={() => setSelected(s.song)}
+          onMove={() => move(s)}
+          onKeep={() => keep(s)}
+          onUndo={() => undo(s)}
+        />
+      ))}
+      {shown.length > 0 && <KeyHints />}
+    </Paper>
+  );
+
+  // Leaning: a separate, quiet, collapsed view - where the duels point
+  // short of the bar. Never selected, never a primary action.
+  const leaning = shownLeaning.length > 0 && (
+    <Paper withBorder radius="lg" style={{ overflow: 'hidden' }} data-testid="leaning-section">
+      <Accordion chevronPosition="left" variant="default" styles={{ content: { padding: 0 } }}>
+        <Accordion.Item value="leaning" style={{ borderBottom: 0 }}>
+          <Accordion.Control aria-label={leaningTitle}>
+            <Stack gap="5xs">
+              <Text fz="md" fw={600} c="dimmed">{leaningTitle}</Text>
+              <Text fz="sm" c="dimmed">Not suggestions - where your duels point so far, short of the bar. Duel them more to settle it.</Text>
+            </Stack>
+          </Accordion.Control>
+          <Accordion.Panel>
+            {shownLeaning.map((s) => (
+              <LeaningRow
+                key={s.song}
+                s={s}
+                board={board}
+                decided={decided[s.song]?.kind}
+                onMove={() => move(s)}
+                onUndo={() => undo(s)}
+              />
+            ))}
+          </Accordion.Panel>
+        </Accordion.Item>
+      </Accordion>
+    </Paper>
+  );
+
+  const tighten = data && Object.keys(data.tierOrders).length > 0 && (
+    <Stack gap="sm" data-testid="tighten-section">
+      <Title order={2}>Tighten tier order</Title>
+      <Text c="dimmed" fz="md">Order within a tier is the songs sorted by score - positions are ranks on YouTube. Check the new order before you sort.</Text>
+      <Paper withBorder radius="lg" style={{ overflow: 'hidden' }}>
+        {/* The first tier starts open: the change is there to see before Sort. */}
+        <Accordion multiple chevronPosition="left" variant="default" defaultValue={Object.keys(data.tierOrders).slice(0, 1)}>
+          {Object.entries(data.tierOrders).map(([tier, ids]) => (
+            <TierOrderItem key={tier} tier={tier} ids={ids} board={board} />
+          ))}
+        </Accordion>
+      </Paper>
+    </Stack>
+  );
+
+  // Wide: the list, Leaning and Tighten tier order stacked in the main
+  // column - all in view right away - beside the sticky evidence panel.
+  // Narrow (one column): the list, the selected song's evidence, then the rest.
+  const mainColumn = (children) => (
+    <Stack gap={SECTION_GAP} style={{ flex: `999 1 ${MAIN_MIN}px`, minWidth: 0 }} data-testid="moves-main">
+      {children}
+    </Stack>
+  );
+  let body;
+  if (!data) {
+    // Loading keeps the two-column layout: skeleton rows on the left, the evidence panel's sections on the right.
+    const skeletonList = (
+      <Paper withBorder radius="lg" style={{ overflow: 'hidden' }}>
+        {[0, 1, 2, 3, 4].map((i) => <MoveRowSkeleton key={i} />)}
+        <KeyHints />
+      </Paper>
+    );
+    body = wide ? (
+      <Group align="flex-start" gap={COLUMN_GAP} wrap="nowrap">
+        {mainColumn(skeletonList)}
+        <EvidenceSkeleton />
+      </Group>
+    ) : (
+      <Stack gap={SECTION_GAP}>{skeletonList}<EvidenceSkeleton /></Stack>
+    );
+  } else if (rows.length === 0) {
+    body = (
+      <Stack gap={SECTION_GAP}>
+        <NothingReady closest={leaningRows.find((l) => !decided[l.song])} board={board} base={base} />
+        {leaning}
+        {tighten}
+      </Stack>
+    );
+  } else if (wide) {
+    body = (
+      <Group align="flex-start" gap={COLUMN_GAP} wrap="nowrap">
+        {mainColumn(<>{list}{leaning}{tighten}</>)}
+        {evidence}
+      </Group>
+    );
+  } else {
+    body = <Stack gap={SECTION_GAP}>{list}{evidence}{leaning}{tighten}</Stack>;
+  }
+
   return (
     <Container className="duel-view" fluid px={0} py={0}>
       <Stack gap={SECTION_GAP}>
@@ -358,151 +561,12 @@ export default function DuelMoves({ category, boardLoading, base }) {
           </Group>
         </Chip.Group>
 
-        {/* Loading keeps the two-column layout: skeleton rows on the left,
-            the evidence panel's sections on the right. */}
-        {!data ? (
-          <Group align="flex-start" gap="lg" wrap="wrap">
-            <Paper withBorder radius="lg" style={{ flex: '999 1 560px', minWidth: 0, overflow: 'hidden' }}>
-              {[0, 1, 2, 3, 4].map((i) => <MoveRowSkeleton key={i} />)}
-              <KeyHints />
-            </Paper>
-            <EvidenceSkeleton />
-          </Group>
-        ) : rows.length === 0 ? (
-          <NothingReady closest={leaningRows.find((l) => !decided[l.song])} board={board} base={base} />
-        ) : (
-          <Group align="flex-start" gap="lg" wrap="wrap">
-            <Paper withBorder radius="lg" style={{ flex: '999 1 560px', minWidth: 0, overflow: 'hidden' }}>
-              {shown.length === 0 && <Text c="dimmed" p="xl" ta="center">No {FILTERS.find((f) => f.value === filter).label.toLowerCase()} moves are ready.</Text>}
-              {shown.map((s) => (
-                <MoveRow
-                  key={s.song}
-                  s={s}
-                  board={board}
-                  selected={current?.song === s.song}
-                  decided={decided[s.song]?.kind}
-                  onSelect={() => setSelected(s.song)}
-                  onMove={() => move(s)}
-                  onKeep={() => keep(s)}
-                  onUndo={() => undo(s)}
-                />
-              ))}
-              {shown.length > 0 && <KeyHints />}
-            </Paper>
-
-            {current && (
-              <Paper withBorder radius="lg" p="md" style={{ flex: '1 1 380px' }}>
-                <Stack gap="lg">
-                  <Group gap="md" wrap="nowrap">
-                    <SongArt video={board.videoOf(current.song)} size={60} />
-                    <Box style={{ flex: 1 }} miw={0}>
-                      <Title order={3} fz="xl" truncate="end">{board.nameOf(current.song)}</Title>
-                      <Text c="dimmed" fz="md" truncate="end">{board.artistOf(current.song)}</Text>
-                    </Box>
-                    <Button radius="xl" w={48} h={48} p={0} aria-label={previewing ? 'Stop' : `Play ${board.nameOf(current.song)}`}
-                      onClick={togglePreview}>
-                      {previewing ? <Square size={16} fill="currentColor" /> : <Play size={18} fill="currentColor" />}
-                    </Button>
-                  </Group>
-                  {previewing && (
-                    <Box style={{ aspectRatio: '16 / 9', borderRadius: 10, overflow: 'hidden', background: 'var(--media-bg)' }}>
-                      <EmbeddedPlayer videoId={current.song} autoplay />
-                    </Box>
-                  )}
-                  <Stack gap="xs">
-                    <SectionLabel>Where it belongs</SectionLabel>
-                    <ProbabilityBars song={currentSong} tiers={TIER_ORDER.filter((t) => currentSong?.probabilities[t] != null)} />
-                  </Stack>
-                  <Stack gap="2xs">
-                    <Group justify="space-between">
-                      <SectionLabel>Score over {current.wins + current.losses + current.draws} duels</SectionLabel>
-                      <Text fz="sm" c="dimmed">dashed = tier border</Text>
-                    </Group>
-                    <ScoreTrend trend={current.trend} border={border?.score} />
-                  </Stack>
-                  <Stack gap="4xs">
-                    <SectionLabel>Key results</SectionLabel>
-                    {current.keyResults.map((k, i) => (
-                      <Group key={i} justify="space-between" py="3xs" style={{ borderBottom: '1px solid var(--border-soft)' }} wrap="nowrap">
-                        <Group gap="2xs" wrap="nowrap" miw={0}>
-                          <Text fw={800} w={40} c={k.result > 0 ? 'accent' : 'dimmed'}>
-                            {k.result > 0 ? 'Won' : k.result < 0 ? 'Lost' : 'Draw'}
-                          </Text>
-                          <Text fz="md" truncate="end">{board.nameOf(k.opponent)}</Text>
-                        </Group>
-                        {k.opponentTier && <TierChip tier={k.opponentTier} size={20} />}
-                      </Group>
-                    ))}
-                  </Stack>
-                  <Stack gap="xs">
-                    {!decided[current.song] && (
-                      <Group gap="2xs" grow>
-                        <Button variant="default" onClick={() => keep(current)}>Keep in {tierName(current.from)}</Button>
-                        <Button onClick={() => move(current)}>Move to {tierName(current.to)}</Button>
-                      </Group>
-                    )}
-                    <Checkbox
-                      checked={!!locked[current.song]}
-                      onChange={() => toggleLock(current.song)}
-                      label={`Lock ${board.nameOf(current.song)} in its tier - never suggest a move again`}
-                    />
-                    <Text fz="md" c="dimmed">
-                      Keeping it raises the bar: it won’t be suggested again until five fresh duels point the same way.
-                    </Text>
-                  </Stack>
-                </Stack>
-              </Paper>
-            )}
-          </Group>
-        )}
-
-        {/* Leaning: a separate, quiet, collapsed view - where the duels point
-            short of the bar. Never selected, never a primary action. */}
-        {shownLeaning.length > 0 && (
-          <Paper withBorder radius="lg" style={{ overflow: 'hidden' }}>
-            <Accordion chevronPosition="left" variant="default" styles={{ content: { padding: 0 } }}>
-              <Accordion.Item value="leaning" style={{ borderBottom: 0 }}>
-                <Accordion.Control aria-label={leaningTitle}>
-                  <Stack gap="5xs">
-                    <Text fz="md" fw={600} c="dimmed">{leaningTitle}</Text>
-                    <Text fz="sm" c="dimmed">Not suggestions - where your duels point so far, short of the bar. Duel them more to settle it.</Text>
-                  </Stack>
-                </Accordion.Control>
-                <Accordion.Panel>
-                  {shownLeaning.map((s) => (
-                    <LeaningRow
-                      key={s.song}
-                      s={s}
-                      board={board}
-                      decided={decided[s.song]?.kind}
-                      onMove={() => move(s)}
-                      onUndo={() => undo(s)}
-                    />
-                  ))}
-                </Accordion.Panel>
-              </Accordion.Item>
-            </Accordion>
-          </Paper>
-        )}
-
-        {data && Object.keys(data.tierOrders).length > 0 && (
-          <Stack gap="sm">
-            <Title order={2}>Tighten tier order</Title>
-            <Text c="dimmed" fz="md">Order within a tier is the songs sorted by score - positions are ranks on YouTube. Check the new order before you sort.</Text>
-            <Paper withBorder radius="lg" style={{ overflow: 'hidden' }}>
-              {/* The first tier starts open: the change is there to see before Sort. */}
-              <Accordion multiple chevronPosition="left" variant="default" defaultValue={Object.keys(data.tierOrders).slice(0, 1)}>
-                {Object.entries(data.tierOrders).map(([tier, ids]) => (
-                  <TierOrderItem key={tier} tier={tier} ids={ids} board={board} />
-                ))}
-              </Accordion>
-            </Paper>
-          </Stack>
-        )}
+        <Box ref={pageRef}>{body}</Box>
       </Stack>
     </Container>
   );
 }
+
 
 // One tier's proposed order: a header (how many change, Sort) that opens to
 // the songs at their new places - where each was, arrows for how far it
