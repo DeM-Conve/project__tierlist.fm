@@ -1,23 +1,32 @@
 import { createSlice } from '@reduxjs/toolkit';
+import { loadSidebarState } from '../settings';
 
 // "What page" is now owned by React Router (the URL), not this slice.
 // currentCategory is the one piece of routing context still needed outside
 // the routed page component itself - PlayerDock's tier-reassignment needs to
 // know which board's tiers are selectable regardless of which page rendered
 // it (tier board or duel), and it lives at the layout level, above <Outlet/>.
-const viewSlice = createSlice({
-  name: 'view',
-  initialState: {
+// A function, so RTK reads the saved layout lazily (each fresh store - a
+// reload - starts from what this device last had).
+function initialState() {
+  const { collapsed, view } = loadSidebarState();
+  return {
     currentCategory: null,
     // Two independent filters: the sidebar's board list and Home's page.
     sidebarQuery: '',
     homeQuery: '',
     mobileSidebarOpen: false,
     // Desktop: the sidebar folded to an icon strip (Ctrl+B, like VS Code).
-    sidebarCollapsed: false,
     // Which view the panel shows: 'boards' (tier lists) or 'playlists'.
-    sidebarView: 'boards',
-  },
+    // Both survive a reload (per device, settings.js DEVICE_UI - saved by store.js).
+    sidebarCollapsed: collapsed,
+    sidebarView: view,
+  };
+}
+
+const viewSlice = createSlice({
+  name: 'view',
+  initialState,
   reducers: {
     setCurrentCategory: (state, action) => {
       state.currentCategory = action.payload;

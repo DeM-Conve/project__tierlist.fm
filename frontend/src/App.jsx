@@ -20,7 +20,8 @@ import { notifications } from '@mantine/notifications';
 import './App.css';
 import { BOARD_TIERS, TODO_TIER } from './tiers';
 import Sidebar, { SidebarPanel } from './components/Sidebar';
-import { Group, Panel, usePanelRef } from 'react-resizable-panels';
+import { Group, Panel, useDefaultLayout, usePanelRef } from 'react-resizable-panels';
+import { SIDEBAR_PANEL_ID, layoutStorage, restoreSidebarLayout, shouldSaveLayout } from './settings';
 import Sash from './layout/Sash';
 import HomeView from './components/HomeView';
 import TierFocusView from './components/TierFocusView';
@@ -226,11 +227,32 @@ function Layout() {
   const sidebarPanelRef = usePanelRef();
   const sidebarCollapsedRef = useRef(sidebarCollapsed);
   sidebarCollapsedRef.current = sidebarCollapsed;
+  // The panel's width survives a reload like VS Code's (per device):
+  // react-resizable-panels saves the group's layout itself. Only open
+  // layouts are saved, and the group mounts collapsed if the panel was shut
+  // (settings.js DEVICE_UI) - so a reload never flashes it open.
+  const savedLayout = useDefaultLayout({
+    id: 'workbench',
+    panelIds: narrow ? ['page'] : [SIDEBAR_PANEL_ID, 'page'],
+    storage: layoutStorage,
+  });
+  const [mountCollapsed] = useState(sidebarCollapsed);
+  const defaultLayout = narrow ? savedLayout.defaultLayout : restoreSidebarLayout(savedLayout.defaultLayout, mountCollapsed);
+  const onLayoutChanged = (layout, meta) => {
+    if (shouldSaveLayout(layout)) savedLayout.onLayoutChanged(layout, meta);
+  };
+  // The width to reopen at: the last open width (this session's, else the
+  // saved layout's), since a panel that mounted shut has none of its own.
+  const openSizeRef = useRef(null);
+  if (openSizeRef.current === null) {
+    const pct = savedLayout.defaultLayout?.[SIDEBAR_PANEL_ID];
+    openSizeRef.current = pct > 0 ? `${pct}%` : 280;
+  }
   useEffect(() => {
     const panel = sidebarPanelRef.current;
     if (!panel || narrow) return;
     if (sidebarCollapsed && !panel.isCollapsed()) panel.collapse();
-    else if (!sidebarCollapsed && panel.isCollapsed()) panel.expand();
+    else if (!sidebarCollapsed && panel.isCollapsed()) panel.resize(openSizeRef.current);
   }, [sidebarCollapsed, narrow, sidebarPanelRef]);
   const tierPlaylists = useSelector(selectTierPlaylists);
   const focusedVideo = useSelector((s) => s.focus.focusedVideo);
@@ -620,10 +642,10 @@ function Layout() {
         {/* VS Code's sidebar | editor split, from react-resizable-panels:
             drag the separator to resize the panel (double-click resets it),
             drag it shut to collapse it. */}
-        <Group orientation="horizontal" style={{ flex: 1, minWidth: 0 }}>
+        <Group orientation="horizontal" style={{ flex: 1, minWidth: 0 }} defaultLayout={defaultLayout} onLayoutChanged={onLayoutChanged}>
           {!narrow && (
             <Panel
-              id="sidebar-panel"
+              id={SIDEBAR_PANEL_ID}
               panelRef={sidebarPanelRef}
               collapsible
               collapsedSize={0}
@@ -633,6 +655,7 @@ function Layout() {
               groupResizeBehavior="preserve-pixel-size"
               onResize={(size) => {
                 const shut = size.inPixels < 1;
+                if (!shut) openSizeRef.current = size.inPixels;
                 if (shut !== sidebarCollapsedRef.current) dispatch(setSidebarCollapsed(shut));
               }}
             >

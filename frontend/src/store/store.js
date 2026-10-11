@@ -7,7 +7,7 @@ import appearanceReducer from './appearanceSlice';
 import namingReducer from './namingSlice';
 import addSongsReducer from './addSongsSlice';
 import transfersReducer from './transfersSlice';
-import { SETTINGS, setSetting } from '../settings';
+import { SETTINGS, saveSidebarState, setSetting } from '../settings';
 import { syncTierLabels } from '../tierLabels';
 
 export const store = configureStore({
@@ -28,10 +28,19 @@ export const store = configureStore({
 const PERSISTED = { appearance: SETTINGS.appearance, naming: SETTINGS.naming };
 const last = {};
 Object.keys(PERSISTED).forEach((k) => (last[k] = store.getState()[k]));
+// The side panel's open/shut state and view are per-device layout, kept
+// like VS Code's workbench state (settings.js DEVICE_UI); its width is saved by the
+// panel group itself (App.jsx, useDefaultLayout).
+let lastSidebar = { collapsed: store.getState().view.sidebarCollapsed, view: store.getState().view.sidebarView };
 syncTierLabels(store.getState().naming);
 store.subscribe(() => {
   const state = store.getState();
   syncTierLabels(state.naming);
+  const { sidebarCollapsed: collapsed, sidebarView: view } = state.view;
+  if (collapsed !== lastSidebar.collapsed || view !== lastSidebar.view) {
+    lastSidebar = { collapsed, view };
+    saveSidebarState(lastSidebar);
+  }
   Object.entries(PERSISTED).forEach(([k, key]) => {
     if (state[k] !== last[k]) {
       last[k] = state[k];
