@@ -570,10 +570,12 @@ class PlaylistControllerIT extends PostgresIT {
     void authStatusIsPublicAndSaysWhetherYouAreLoggedIn() throws Exception {
         mvc.perform(get("/api/auth/status"))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$.loggedIn").value(false));
+            .andExpect(jsonPath("$.loggedIn").value(false))
+            .andExpect(jsonPath("$.userId").doesNotExist());
         mvc.perform(get("/api/auth/status").with(signedIn()))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$.loggedIn").value(true));
+            .andExpect(jsonPath("$.loggedIn").value(true))
+            .andExpect(jsonPath("$.userId").value("alice"));
     }
 
     @Test

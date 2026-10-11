@@ -47,7 +47,9 @@ public class PlaylistController {
         boolean loggedIn = authentication != null
             && authentication.isAuthenticated()
             && !(authentication instanceof AnonymousAuthenticationToken);
-        return Map.of("loggedIn", loggedIn);
+        // userId (the Google `sub`) lets the browser tell whose board cache
+        // it holds, so one account's cached playlists are never shown to another.
+        return loggedIn ? Map.of("loggedIn", true, "userId", authentication.getName()) : Map.of("loggedIn", false);
     }
 
     @GetMapping("/api/playlists")
