@@ -129,6 +129,21 @@ can't read your playlists and tells you to log in again.
 Want it as a desktop app? In Chrome or Edge, click the install icon in the address bar
 (or menu -> *Install Tierlist.fm*) - it opens in its own window with its own icon.
 
+### Backups and restore
+
+The `backup` service dumps the database every night into `./backups/` (kept: 7 daily,
+4 weekly, 6 monthly). Set `BACKUP_UID` / `BACKUP_GID` in `.env` to your `id -u` / `id -g`
+so the files are yours. Copy that folder somewhere else now and then.
+
+```bash
+scripts/backup.sh                                  # take one now -> backups/manual/
+scripts/restore.sh backups/daily/yt-latest.sql.gz  # replace the data with a dump
+```
+
+`restore.sh` asks you to type the project name, takes a fresh backup first (so a restore
+can be undone), stops the backend while it loads, and loads in one transaction - a broken
+dump changes nothing. `scripts/deploy.sh` takes a backup before every deploy.
+
 <details>
 <summary>Development setup, tests, running without Docker</summary>
 

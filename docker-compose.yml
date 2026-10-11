@@ -42,5 +42,35 @@ services:
     depends_on:
       - backend
 
+  # Scheduled dumps of the db (prodrigestivill/postgres-backup-local): a
+  # gzipped plain-SQL pg_dump every night into ./backups (gitignored), keeping
+  # the last 7 daily, 4 weekly and 6 monthly dumps. Restore one with
+  # scripts/restore.sh; take one now with scripts/backup.sh.
+  backup:
+    image: prodrigestivill/postgres-backup-local:17
+    # Runs as you, so the dumps in ./backups are yours (set BACKUP_UID/GID in .env).
+    user: "${BACKUP_UID:-1000}:${BACKUP_GID:-1000}"
+    environment:
+      POSTGRES_HOST: db
+      POSTGRES_DB: ${POSTGRES_DB:-yt}
+      POSTGRES_USER: ${POSTGRES_USER:-yt}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-yt}
+      POSTGRES_EXTRA_OPTS: -Z6 --no-owner --no-privileges
+      SCHEDULE: ${BACKUP_SCHEDULE:-@daily}
+      BACKUP_KEEP_DAYS: 7
+      BACKUP_KEEP_WEEKS: 4
+      BACKUP_KEEP_MONTHS: 6
+      TZ: ${TZ:-UTC}
+    volumes:
+      - ./backups:/backups
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fs http://localhost:8080/ || exit 1"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+    depends_on:
+      db:
+        condition: service_healthy
+
 volumes:
   pgdata:

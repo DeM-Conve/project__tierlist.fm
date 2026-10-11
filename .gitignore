@@ -10,3 +10,6 @@ target/
 .impeccable/
 .vscode/
 .idea/
+
+# Database dumps (scripts/backup.sh and the compose backup service)
+backups/

@@ -202,6 +202,13 @@ category.
 - **Deploy**: Docker Compose. `docker-compose.yml` (prod-style multi-stage builds) and
   `docker-compose.local.yml` (dev, volume-mounted). Rebuilding either container clears
   the backend's in-memory session, so you'll need to log in again after a redeploy.
+- **Backups**: the `backup` Compose service (`prodrigestivill/postgres-backup-local:17`)
+  dumps `db` nightly into the gitignored `./backups/` (`daily/`, `weekly/`, `monthly/`,
+  `last/`; 7/4/6 kept; runs as `BACKUP_UID`/`BACKUP_GID` from `.env`). `scripts/backup.sh`
+  takes one now (`backups/manual/`, gzipped plain SQL), `scripts/restore.sh <dump>` restores
+  one (type-the-project-name confirmation, fresh backup first, backend stopped, single
+  transaction), and `scripts/deploy.sh` runs `backup.sh` before deploying when `db` is up.
+  Use these instead of hand-made CSV/pg_dump copies before a schema reset.
 
 ## Conventions / decisions worth knowing
 

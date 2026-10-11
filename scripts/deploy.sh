@@ -28,6 +28,10 @@ if [ "$target" != "frontend" ]; then
 fi
 
 echo "==> All tests passed - deploying"
+# Every deploy gets a restore point (scripts/restore.sh <dump> to go back).
+if [ -n "$(docker compose -p tierlistfm -f docker-compose.yml ps --status running -q db 2>/dev/null)" ]; then
+  scripts/backup.sh
+fi
 if [ "$target" = "frontend" ]; then
   docker compose -f docker-compose.yml up -d --build --no-deps frontend
 else
