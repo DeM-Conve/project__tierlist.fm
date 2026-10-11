@@ -26,8 +26,24 @@ describe('DuelBits', () => {
     expect(svg.querySelector('polyline').getAttribute('points').split(' ')).toHaveLength(3);
     expect(svg.querySelector('line')).not.toBeNull();
     svg.getBoundingClientRect = () => ({ left: 0, width: 300 });
+    fireEvent.mouseMove(svg, { clientX: 0 });
+    expect(screen.getByText('Start: score 250')).toBeInTheDocument();
     fireEvent.mouseMove(svg, { clientX: 300 });
     expect(screen.getByText('After duel 2: score 280')).toBeInTheDocument();
+  });
+
+  it('ScoreTrend keeps its readout line when not hovered (latest score), so hovering never shifts the layout', () => {
+    const { container } = renderWithApp(<ScoreTrend trend={[25, 26.5, 28]} border={27} />);
+    const readout = screen.getByTestId('score-readout');
+    expect(readout).toHaveTextContent('Latest: score 280');
+    const svg = container.querySelector('svg');
+    svg.getBoundingClientRect = () => ({ left: 0, width: 300 });
+    fireEvent.mouseMove(svg, { clientX: 150 });
+    // Same element, new text - nothing added or removed.
+    expect(screen.getByTestId('score-readout')).toBe(readout);
+    expect(readout).toHaveTextContent('After duel 1: score 265');
+    fireEvent.mouseLeave(svg);
+    expect(screen.getByTestId('score-readout')).toHaveTextContent('Latest: score 280');
   });
 
   it('ScoreTrend draws nothing without a trend; StatCard is clickable when given onClick', () => {

@@ -124,7 +124,8 @@ export function ScoreMap({ analysis, nameOf, height = 150 }) {
   );
 }
 
-// A song's score over its duels (2px line), the nearest border dashed. Hover for each point.
+// A song's score over its duels (2px line), the nearest border dashed. Hover for each point;
+// at rest the dot and the readout show the latest score.
 export function ScoreTrend({ trend, border, height = 80 }) {
   const [hover, setHover] = useState(null);
   if (!trend?.length) return null;
@@ -135,6 +136,8 @@ export function ScoreTrend({ trend, border, height = 80 }) {
   const y = (v) => height - 6 - ((v - min) / (max - min)) * (height - 12);
   const x = (i) => (trend.length === 1 ? w / 2 : 4 + (i / (trend.length - 1)) * (w - 8));
   const pts = trend.map((v, i) => `${x(i)},${y(v)}`).join(' ');
+  // The point the readout names: the hovered one, else the latest.
+  const point = hover ?? trend.length - 1;
   return (
     <Box pos="relative">
       <svg viewBox={`0 0 ${w} ${height}`} width="100%" height={height} role="img" aria-label="Score over duels"
@@ -147,13 +150,13 @@ export function ScoreTrend({ trend, border, height = 80 }) {
         style={{ color: 'var(--accent)', display: 'block' }}>
         {border != null && <line x1="0" x2={w} y1={y(border)} y2={y(border)} stroke="currentColor" strokeOpacity="0.35" strokeDasharray="4 4" style={{ color: 'var(--text-faint)' }} />}
         <polyline points={pts} fill="none" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" />
-        {hover != null && <circle cx={x(hover)} cy={y(trend[hover])} r="4" fill="currentColor" stroke="var(--surface)" strokeWidth="2" />}
+        <circle cx={x(point)} cy={y(trend[point])} r="4" fill="currentColor" stroke="var(--surface)" strokeWidth="2" />
       </svg>
-      {hover != null && (
-        <Text fz="sm" c="dimmed" mt="4xs">
-          {hover === 0 ? 'Start' : `After duel ${hover}`}: score {score(trend[hover])}
-        </Text>
-      )}
+      {/* Always there - the latest score at rest, the hovered point while
+          hovering - so hovering never adds a line and shifts what's below. */}
+      <Text fz="sm" c="dimmed" mt="4xs" data-testid="score-readout">
+        {hover == null ? 'Latest' : hover === 0 ? 'Start' : `After duel ${hover}`}: score {score(trend[point])}
+      </Text>
     </Box>
   );
 }
