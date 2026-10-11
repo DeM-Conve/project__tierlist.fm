@@ -77,7 +77,7 @@ describe('DuelMatch', () => {
     expect(h.spies.verdict.mock.calls[0][0].verdict).toBe('TOO_CLOSE');
   });
 
-  it('after a verdict: the headline, both score changes and what it did - then Space for the next duel', () => {
+  it('after a verdict: the headline, both score changes and what it did - then Enter for the next duel', () => {
     h.spies.verdict.mockImplementation(() => {
       h.session = {
         ...h.session,
@@ -99,9 +99,31 @@ describe('DuelMatch', () => {
     // Verdict keys wait for "Next duel".
     fireEvent.keyDown(window, { key: 'ArrowRight' });
     expect(h.spies.verdict).toHaveBeenCalledTimes(1);
-    fireEvent.keyDown(window, { key: ' ' });
+    expect(screen.getByRole('button', { name: /Next duel/ })).toHaveTextContent('Enter');
+    fireEvent.keyDown(window, { key: 'Enter' });
     expect(screen.queryByText('Middle Song, clearly.')).not.toBeInTheDocument();
     expect(screen.getByText('Other Song', { selector: 'p' })).toBeInTheDocument();
+  });
+
+  it('after a verdict Space only pauses / resumes the clip - it never starts the next duel', () => {
+    h.spies.verdict.mockImplementation(() => {
+      h.session = {
+        ...h.session,
+        duels: [{ id: 1, a: IDS.mid, b: IDS.top, verdict: 'A' }],
+        previous: { duel: { id: 1, a: IDS.mid, b: IDS.top, verdict: 'A' }, a: song(IDS.mid, 'A', { mu: 26 }), b: song(IDS.top, 'S', { mu: 29 }) },
+        matchup: matchup(IDS.mid2, IDS.top),
+      };
+    });
+    page();
+    fireEvent.keyDown(window, { key: 'ArrowLeft' });
+    expect(screen.getByText('Middle Song edges it.')).toBeInTheDocument();
+    expect(screen.getAllByText('▶ Playing')).toHaveLength(1);
+    fireEvent.keyDown(window, { key: ' ' });
+    expect(screen.getByText('Middle Song edges it.')).toBeInTheDocument();
+    expect(screen.queryByText('▶ Playing')).not.toBeInTheDocument();
+    fireEvent.keyDown(window, { key: ' ' });
+    expect(screen.getAllByText('▶ Playing')).toHaveLength(1);
+    expect(screen.getByText('Middle Song edges it.')).toBeInTheDocument();
   });
 
   it('sends how many duels it saw; a 409 (stale or ended) reloads the session instead of failing', () => {

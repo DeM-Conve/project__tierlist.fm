@@ -245,8 +245,17 @@ export default function DuelMatch({ category, sessionId, boardLoading, base }) {
         finish();
         return;
       }
+      if (e.key === ' ') {
+        // Play / pause the clip being heard, like any player - its only job,
+        // before and after a verdict.
+        e.preventDefault();
+        setPaused((p) => !p);
+        return;
+      }
       if (answered) {
-        if (e.key === ' ' || e.key === 'Enter') {
+        // Enter, not Space (that's play / pause): the next duel. Default
+        // prevented, so a focused button isn't clicked as well.
+        if (e.key === 'Enter') {
           e.preventDefault();
           next();
         } else if (e.key === 'u') takeBack();
@@ -256,10 +265,6 @@ export default function DuelMatch({ category, sessionId, boardLoading, base }) {
       if (v) {
         e.preventDefault();
         pick(v);
-      } else if (e.key === ' ') {
-        // Play / pause the clip being heard, like any player.
-        e.preventDefault();
-        setPaused((p) => !p);
       } else if (e.key === 'Tab') {
         e.preventDefault();
         setListening(listening === 'A' ? 'B' : 'A');
@@ -426,7 +431,7 @@ export default function DuelMatch({ category, sessionId, boardLoading, base }) {
                       </Stack>
                       <Group gap="2xs">
                         <Button variant="default" onClick={takeBack}>Undo</Button>
-                        <Button onClick={next} rightSection={<Kbd size="xs">Space</Kbd>} disabled={!m && !s.done}>
+                        <Button onClick={next} rightSection={<Kbd size="xs">Enter</Kbd>} disabled={!m && !s.done}>
                           {m ? 'Next duel' : 'Finish'}
                         </Button>
                       </Group>
