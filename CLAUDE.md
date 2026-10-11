@@ -57,6 +57,28 @@ category.
     `authSlice` via a `useEffect` (selectors elsewhere in the app read Redux, not the
     query cache, to avoid rewriting them) - see `App.jsx`'s top-level `App()` component
     and the `useLoadTierBoard` hook for the pattern.
+    **Board cache (persistence):** `api/QueryProvider.jsx` is TanStack Query's
+    `PersistQueryClientProvider` with `@tanstack/query-async-storage-persister` over
+    `idb-keyval` (IndexedDB) - no hand-rolled IndexedDB code. `api/boardCache.js` owns
+    the rules: `shouldDehydrateQuery` persists **only** `playlists`, `playlist-items`
+    and `cache-owner` (keys in `api/queryKeys.js`) - big boards open instantly, since
+    YouTube's playlist-items reads are slow. Never persisted: mutations, settings (the
+    account's row wins), duel analysis/sessions (Postgres, must be fresh), auth status.
+    `buster` = `BOARD_CACHE_SCHEMA` (bump it when cached data's shape changes), `maxAge`
+    7 days, those queries' `gcTime` >= maxAge (`configureBoardCache`). It belongs to
+    one account: `/api/auth/status` returns `userId`, and `useAuthStatusQuery`'s
+    queryFn calls `claimBoardCache` *before resolving*, dropping every cached read if
+    the owner differs (or is unknown); logout calls `clearBoardCache`. Restored data
+    predates `SESSION_START`, so the `staleTime` function (`staleUnlessFromCache`,
+    `api/queryClient.js`) makes only it stale -> shown at once, refetched in the
+    background; data fetched this session stays `Infinity` (quota). A board loaded
+    from such data sets `tiersSlice.awaitingRefresh`; `landBoardRefresh`
+    (`tierActions`) applies the fresh copy **once, and only if `selectHasLocalEdits`
+    is false** (no undo steps / staged moves / sync in flight) - never a later
+    refetch, which can lag behind a sync. A failed refresh keeps the board with a
+    quiet notice (`refreshError`). No IndexedDB -> plain `QueryClientProvider`.
+    `useTierBoardQueries` waits on `isPending` (not `isLoading`): during restore
+    nothing fetches, and `isLoading` "loaded" empty tiers.
   - **React Hook Form** (`react-hook-form`, installed) - there is currently no real form
     in this app for it to manage (login is a plain OAuth redirect; filter/search/settings
     inputs are simple controlled inputs with no validation need). Don't force it in
