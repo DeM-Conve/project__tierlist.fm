@@ -23,8 +23,8 @@ import { CLIP_START, firstStart, nextStart, seeked } from '../../duel/clipWindow
 import { SECTION_GAP } from '../../layout/spacing';
 
 // Clips: from the 0:30 mark (no "most replayed" data without an outside
-// service), the song being settled for longer than its known opponent.
-const CLIP_SECONDS = { A: 30, B: 20 };
+// service), the same length on both sides so their parts line up.
+const CLIP_SECONDS = 30;
 
 // One side of the duel: a real YouTube player that plays its clip while it's
 // the side being heard, pauses (and keeps its place) otherwise, and calls
@@ -39,7 +39,7 @@ function ClipCard({ side, video, song, name, artist, active, paused, onListen, o
   const playerRef = useRef(null);
   const [ready, setReady] = useState(false);
   const [progress, setProgress] = useState(0);
-  const length = CLIP_SECONDS[side];
+  const length = CLIP_SECONDS;
   // The current part's start (null until the player knows the duration).
   const segRef = useRef(null);
   const [segStart, setSegStart] = useState(CLIP_START);

@@ -43,6 +43,11 @@ beforeEach(() => {
 });
 
 describe('DuelMatch', () => {
+  it('both sides play a 30-second part from 0:30, so their parts line up', () => {
+    page();
+    expect(screen.getAllByText('0:30 – 1:00')).toHaveLength(2);
+  });
+
   it('shows the duel, why it was picked, where the song belongs and the session so far', () => {
     page();
     expect(screen.getByText('Which one hits harder?')).toBeInTheDocument();
