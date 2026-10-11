@@ -122,10 +122,10 @@ category.
   (`backend/src/main/resources/db/migration/V*__*.sql`; Hibernate is `ddl-auto:
   validate` only). **Proper typed schemas, no JSON/`jsonb` blob columns, and every
   closed option set is a native Postgres `ENUM`, never a free VARCHAR** (the user's
-  explicit calls). **Not in production yet**: while that's true, change `V1` in place
-  and reset the dev volume (`docker compose down && docker volume rm
-  tierlistfm_pgdata`) instead of stacking migrations; once it ships, never edit an
-  applied migration.
+  explicit calls). **`V1` is applied on the live database with real data**: never
+  edit an applied migration (Flyway's checksum check fails the boot) and never
+  reset the volume - a schema change is a new `V<n>__*.sql`. Back up first
+  (`scripts/backup.sh`).
   Tables: `app_user` (Google `sub` as id, recorded on every login by the success
   handler in `SecurityConfig`) and `user_settings` (one row per user: `theme_option`,
   `accent_option`, `tier_palette_option` enums, the naming
