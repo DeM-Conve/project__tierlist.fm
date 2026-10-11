@@ -23,6 +23,7 @@ import { REMOVED_TIER, TIER_COLORS, TODO_TIER } from '../tiers';
 import { RemoveChip, TierChip } from './TierBits';
 import QueuePanel from './QueuePanel';
 import EmbeddedPlayer from './EmbeddedPlayer';
+import { usePlayerTime } from './usePlayerTime';
 import { isSequenceKey } from '../keyboard/sequence';
 
 // Renders in 'expanded' (full-screen modal), 'mini' (YouTube-Music-style
@@ -122,7 +123,6 @@ export default function PlayerDock({
   }, [pauseRequest]);
   const [isPlaying, setIsPlaying] = useState(true);
   // Playback position, polled (see below) for the edge progress line.
-  const [time, setTime] = useState({ cur: 0, dur: 0 });
   const [isMuted, setIsMuted] = useState(false);
   const [volume, setVolume] = useState(100);
   // Remembers the level to restore when unmuting via the button/shortcut,
@@ -153,22 +153,8 @@ export default function PlayerDock({
   }, [expanded]);
 
 
-  // The IFrame API doesn't push time-update events, so the mini bar's
-  // progress line has to be polled from the player instead.
-  useEffect(() => {
-    const id = setInterval(() => {
-      const player = playerRef.current;
-      if (!player?.getDuration) return;
-      const duration = player.getDuration();
-      if (!duration) return;
-      setTime({ cur: player.getCurrentTime(), dur: duration });
-    }, 500);
-    return () => clearInterval(id);
-  }, []);
-
-  useEffect(() => {
-    setTime({ cur: 0, dur: 0 });
-  }, [video.videoId]);
+  // The mini bar's progress line, polled from the player.
+  const [time, setTime] = usePlayerTime(playerRef, video.videoId);
 
   // Vim-style navigation for the dock, active globally (not just while
   // expanded) since the dock is meant to work like a background player:
