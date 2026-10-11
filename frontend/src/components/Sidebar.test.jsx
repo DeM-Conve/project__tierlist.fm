@@ -2,7 +2,8 @@ import { describe, expect, it, vi } from 'vitest';
 import { fireEvent, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import Sidebar from './Sidebar';
-import { renderWithApp } from '../test/render';
+import { makeStore, renderWithApp } from '../test/render';
+import { setActivityOrder } from '../store/appearanceSlice';
 
 const props = (over) => ({
   query: '',
@@ -83,6 +84,15 @@ describe('Sidebar', () => {
     const bar = screen.getByRole('navigation', { name: 'Activity bar' });
     const names = Array.from(bar.querySelectorAll('a, button')).map((el) => el.getAttribute('aria-label'));
     expect(names).toEqual(['Home', 'Jump to…', 'Tier lists', 'Playlists', 'Add songs', 'Keyboard shortcuts', 'Settings', 'Log out']);
+  });
+
+  it("the top icons follow the account's saved order; the bottom group stays fixed", () => {
+    const store = makeStore();
+    store.dispatch(setActivityOrder(['addSongs', 'playlists', 'home', 'boards', 'jump']));
+    renderWithApp(<MemoryRouter><Sidebar {...props()} /></MemoryRouter>, { store });
+    const bar = screen.getByRole('navigation', { name: 'Activity bar' });
+    const names = Array.from(bar.querySelectorAll('a, button')).map((el) => el.getAttribute('aria-label'));
+    expect(names).toEqual(['Add songs', 'Playlists', 'Home', 'Tier lists', 'Jump to…', 'Keyboard shortcuts', 'Settings', 'Log out']);
   });
 
   it('filters the boards', () => {

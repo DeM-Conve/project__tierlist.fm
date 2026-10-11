@@ -17,7 +17,9 @@ import { Home, Keyboard, LayoutList, ListMusic, ListPlus, LogOut, Search, Settin
 import { BOARD_TIERS, TIER_ORDER } from '../tiers';
 import { TierChip } from './TierBits';
 import { exampleTitle } from '../naming';
-import { useSelector } from 'react-redux';
+import { useDispatch, useSelector } from 'react-redux';
+import { DragDropContext, Draggable, Droppable } from '@hello-pangea/dnd';
+import { selectActivityOrder, setActivityOrder } from '../store/appearanceSlice';
 import { selectNaming } from '../store/selectors';
 import { SHELL_Y, SIDEBAR_X } from '../layout/spacing';
 import { useBoardDropOpen } from '../layout/useBoardDropOpen';
@@ -143,25 +145,70 @@ function ActivityIcon({ label, keys, marked, children, ...props }) {
 // "Playlists" open / close their view in the panel beside it (Ctrl+B
 // toggles the panel); the rest go places.
 export function ActivityBar({ openView, onShowView, onOpenPalette, waitingCount, onSelectSettings, onOpenShortcuts, onLogout }) {
-  return (
-    <Stack component="nav" aria-label="Activity bar" gap="3xs" align="center" px="2xs" py="3xs">
+  const dispatch = useDispatch();
+  const order = useSelector(selectActivityOrder);
+  // The top group, by id (activityOrder.js) - drawn in the account's saved
+  // order; the bottom group stays fixed, as in VS Code.
+  const items = {
+    home: (
       <ActivityIcon label="Home" keys="g h" component={Link} to="/">
         <Home {...ICON} />
       </ActivityIcon>
+    ),
+    jump: (
       <ActivityIcon label="Jump to…" keys="o / ⌘K" onClick={onOpenPalette}>
         <Search {...ICON} />
       </ActivityIcon>
+    ),
+    boards: (
       <ActivityIcon label="Tier lists" keys={TOGGLE_KEYS} marked={openView === 'boards'} aria-pressed={openView === 'boards'} onClick={() => onShowView('boards')}>
         <LayoutList {...ICON} />
       </ActivityIcon>
+    ),
+    playlists: (
       <ActivityIcon label="Playlists" marked={openView === 'playlists'} aria-pressed={openView === 'playlists'} onClick={() => onShowView('playlists')}>
         <ListMusic {...ICON} />
       </ActivityIcon>
+    ),
+    addSongs: (
       <Indicator label={waitingCount} size={16} disabled={!waitingCount} offset={12}>
         <ActivityIcon label="Add songs" keys="a" component={Link} to="/add" state={{ focusInput: true }}>
           <ListPlus {...ICON} />
         </ActivityIcon>
       </Indicator>
+    ),
+  };
+
+  // Drag an icon to reorder the top group (@hello-pangea/dnd); the order is
+  // saved to the account with the other settings.
+  function onDragEnd({ source, destination }) {
+    if (!destination || destination.index === source.index) return;
+    const next = [...order];
+    const [moved] = next.splice(source.index, 1);
+    next.splice(destination.index, 0, moved);
+    dispatch(setActivityOrder(next));
+  }
+
+  return (
+    <Stack component="nav" aria-label="Activity bar" gap="3xs" align="center" px="2xs" py="3xs">
+      <DragDropContext onDragEnd={onDragEnd}>
+        <Droppable droppableId="activity-bar">
+          {(drop) => (
+            <Stack ref={drop.innerRef} {...drop.droppableProps} gap="3xs" align="center">
+              {order.map((id, i) => (
+                <Draggable key={id} draggableId={id} index={i}>
+                  {(drag) => (
+                    <div ref={drag.innerRef} {...drag.draggableProps} {...drag.dragHandleProps} data-activity-item={id}>
+                      {items[id]}
+                    </div>
+                  )}
+                </Draggable>
+              ))}
+              {drop.placeholder}
+            </Stack>
+          )}
+        </Droppable>
+      </DragDropContext>
       <Box style={{ flex: 1 }} />
       <ActivityIcon label="Keyboard shortcuts" keys="?" onClick={onOpenShortcuts}>
         <Keyboard {...ICON} />
