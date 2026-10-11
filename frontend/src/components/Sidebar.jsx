@@ -58,16 +58,16 @@ function BoardLink({ category, tiers, active }) {
       vars={hovering ? undefined : CHROME_ROW.vars}
       // Compact rows so a typical library's boards all fit without
       // the list scrolling.
-      py={4}
+      py="4xs"
       active={active || hovering}
       data-drop-target={hovering || undefined}
       {...handlers}
       label={
-        <Group justify="space-between" wrap="nowrap" gap={6}>
-          <Text fz={14} truncate="end">
+        <Group justify="space-between" wrap="nowrap" gap="3xs">
+          <Text fz="lg" truncate="end">
             {category}
           </Text>
-          <Text fz={13} c={hovering ? undefined : MUTED} style={{ fontVariantNumeric: 'tabular-nums' }}>
+          <Text fz="md" c={hovering ? undefined : MUTED} style={{ fontVariantNumeric: 'tabular-nums' }}>
             {total}
           </Text>
         </Group>
@@ -86,8 +86,8 @@ function PlaylistLink({ category, tier, playlist, active }) {
       component={Link}
       to={tierPath(category, tier)}
       {...CHROME_ROW}
-      py={3}
-      pl={10}
+      py="4xs"
+      pl="xs"
       active={active}
       // Fixed chip column so every title starts at the same x (TODO's chip
       // is wider than T1's).
@@ -97,11 +97,11 @@ function PlaylistLink({ category, tier, playlist, active }) {
         </Box>
       }
       label={
-        <Group justify="space-between" wrap="nowrap" gap={8}>
-          <Text fz={14} truncate="end" title={playlist.title}>
+        <Group justify="space-between" wrap="nowrap" gap="2xs">
+          <Text fz="lg" truncate="end" title={playlist.title}>
             {playlist.title}
           </Text>
-          <Text fz={13} c={MUTED} style={{ fontVariantNumeric: 'tabular-nums' }}>
+          <Text fz="md" c={MUTED} style={{ fontVariantNumeric: 'tabular-nums' }}>
             {playlist.itemCount ?? 0}
           </Text>
         </Group>
@@ -144,7 +144,7 @@ function ActivityIcon({ label, keys, marked, children, ...props }) {
 // toggles the panel); the rest go places.
 export function ActivityBar({ openView, onShowView, onOpenPalette, waitingCount, onSelectSettings, onOpenShortcuts, onLogout }) {
   return (
-    <Stack component="nav" aria-label="Activity bar" gap={6} align="center" px={8} py={6}>
+    <Stack component="nav" aria-label="Activity bar" gap="3xs" align="center" px="2xs" py="3xs">
       <ActivityIcon label="Home" keys="g h" component={Link} to="/">
         <Home {...ICON} />
       </ActivityIcon>
@@ -202,15 +202,15 @@ export function SidebarPanel({ query, onQueryChange, tierCategories, tierGroups,
 
   return (
     <Stack h="100%" gap={0} px={SIDEBAR_X} py={SHELL_Y} miw={0}>
-      <Group justify="space-between" px={8} mb={10} wrap="nowrap">
+      <Group justify="space-between" px="2xs" mb="xs" wrap="nowrap">
         {/* VS Code's side bar title: small caps-style, the secondary ink. */}
-        <Text fz={14} fw={700} c="var(--text)">
+        <Text fz="lg" fw={700} c="var(--text)">
           {isPlaylists ? 'Playlists' : 'Tier lists'}
         </Text>
         {loading ? (
           <Skeleton h={10} w={14} />
         ) : (
-          <Text fz={13} c={MUTED}>
+          <Text fz="md" c={MUTED}>
             {isPlaylists ? playlistCount : tierCategories.length}
           </Text>
         )}
@@ -233,8 +233,8 @@ export function SidebarPanel({ query, onQueryChange, tierCategories, tierGroups,
         <Stack gap={0}>
           {isPlaylists &&
             playlistGroups.map(([category, rows]) => (
-              <Box key={category} mb={6}>
-                <Text fz={13} fw={600} c={MUTED} px={10} pt={6} pb={2} truncate="end">
+              <Box key={category} mb="3xs">
+                <Text fz="md" fw={600} c={MUTED} px="xs" pt="3xs" pb="5xs" truncate="end">
                   {category}
                 </Text>
                 {rows.map(({ tier, playlist }) => (
@@ -249,12 +249,12 @@ export function SidebarPanel({ query, onQueryChange, tierCategories, tierGroups,
               </Box>
             ))}
           {isPlaylists && !loading && tierCategories.length > 0 && playlists.length === 0 && (
-            <Text size="sm" c="dimmed" px={8}>
+            <Text size="sm" c="dimmed" px="2xs">
               No playlists match
             </Text>
           )}
           {!isPlaylists && tierCategories.length > 0 && filteredCategories.length === 0 && (
-            <Text size="sm" c="dimmed" px={8}>
+            <Text size="sm" c="dimmed" px="2xs">
               No boards match
             </Text>
           )}
@@ -273,12 +273,12 @@ export function SidebarPanel({ query, onQueryChange, tierCategories, tierGroups,
               not "0 boards" and the naming-convention hint. */}
           {loading &&
             Array.from({ length: 7 }).map((_, i) => (
-              <Stack key={i} gap={7} px={12} py={9}>
+              <Stack key={i} gap="3xs" px="sm" py="2xs">
                 <Skeleton h={10} w={`${55 + ((i * 17) % 35)}%`} />
               </Stack>
             ))}
           {!loading && tierCategories.length === 0 && (
-            <Text size="xs" c="dimmed" px={8}>
+            <Text size="xs" c="dimmed" px="2xs">
               Name playlists like &quot;{exampleTitle(naming, 'Rap', TIER_ORDER[0])}&quot; … &quot;
               {exampleTitle(naming, 'Rap', TIER_ORDER[TIER_ORDER.length - 1])}&quot; and they&apos;ll appear here as a tier
               list.

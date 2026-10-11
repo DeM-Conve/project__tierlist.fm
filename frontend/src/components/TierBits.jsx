@@ -9,7 +9,7 @@ import { songMenuGroups, useSongContextMenu } from '../songMenu';
 
 export function EqualizerMark({ color = TIER_INK, height = 12 }) {
   return (
-    <Group gap={2} align="flex-end" h={height} aria-label="Now playing" wrap="nowrap">
+    <Group gap="5xs" align="flex-end" h={height} aria-label="Now playing" wrap="nowrap">
       {[0, 1, 2].map((i) => (
         <Box key={i} w={3} h={height} bg={color} className="eq-bar" style={{ animationDelay: `${i * 0.18}s` }} />
       ))}
@@ -26,14 +26,14 @@ export function TierChip({ tier, size = 22, active = true, onClick, title, kbd, 
     <Box
       h={size}
       miw={size}
-      px={4}
+      px="4xs"
       bg={active ? TIER_COLORS[tier] : 'transparent'}
       style={{
         borderRadius: 4,
         display: 'inline-flex',
         alignItems: 'center',
         justifyContent: 'center',
-        gap: 4,
+        gap: 'var(--mantine-spacing-4xs)',
         border: active ? 'none' : `1px solid color-mix(in srgb, ${TIER_COLORS[tier]} 55%, transparent)`,
         flexShrink: 0,
       }}
@@ -85,13 +85,13 @@ export function RemoveChip({ size = 22, onClick, disabled, title = 'Remove from 
         <Box
           h={size}
           miw={size}
-          px={label || kbd ? 8 : 4}
+          px={label || kbd ? '2xs' : '4xs'}
           style={{
             borderRadius: 4,
             display: 'inline-flex',
             alignItems: 'center',
             justifyContent: 'center',
-            gap: 6,
+            gap: 'var(--mantine-spacing-3xs)',
             border: `1px solid color-mix(in srgb, ${red} 55%, transparent)`,
             color: red,
           }}
@@ -132,7 +132,7 @@ export function TierMixBar({ tiers, counts, size = 8, onSegmentClick, labels = f
               style={{ cursor: onSegmentClick ? 'pointer' : undefined }}
             >
               {labels && (n / total > 0.06) && (
-                <Progress.Label c={TIER_INK} fz={11} fw={800}>
+                <Progress.Label c={TIER_INK} fz="xs" fw={800}>
                   {tierName(t)} {n}
                 </Progress.Label>
               )}
@@ -249,9 +249,9 @@ export function TierTile({
           left={0}
           right={0}
           bottom={0}
-          px={5}
-          pb={5}
-          pt={size >= 80 ? 16 : 12}
+          px="3xs"
+          pb="3xs"
+          pt={size >= 80 ? 'md' : 'sm'}
           style={{
             borderRadius: '0 0 6px 6px',
             pointerEvents: 'none',
@@ -262,7 +262,7 @@ export function TierTile({
           {/* Big tiles: up to two lines. Small (phone) tiles: one line with an
               ellipsis - two lines there would split words mid-way. */}
           <Text
-            fz={size >= 80 ? 11 : 10}
+            fz={size >= 80 ? 'xs' : '2xs'}
             fw={700}
             lh={1.15}
             c="var(--media-fg)"
@@ -273,13 +273,13 @@ export function TierTile({
             {song}
           </Text>
           {artist && size >= 80 && (
-            <Text fz={9.5} lh={1.2} c="var(--media-fg)" opacity={0.75} truncate="end">
+            <Text fz="2xs" lh={1.2} c="var(--media-fg)" opacity={0.75} truncate="end">
               {artist}
             </Text>
           )}
         </Box>
         {isPlaying && (
-          <Box pos="absolute" top={4} left={4} bg="accent" px={4} py={3} style={{ borderRadius: 3 }}>
+          <Box pos="absolute" top={4} left={4} bg="accent" px="4xs" py="4xs" style={{ borderRadius: 3 }}>
             <EqualizerMark height={9} />
           </Box>
         )}
@@ -290,7 +290,7 @@ export function TierTile({
             left={3}
             right={3}
             ta="center"
-            fz={9}
+            fz="2xs"
             fw={800}
             tt="uppercase"
             c={TIER_INK}

@@ -72,8 +72,8 @@ function showToast(dispatch, message) {
         <Text size="sm" truncate="end" flex={1} miw={0}>
           {message}
         </Text>
-        <Group gap={4} wrap="nowrap" flex="none">
-          <Group gap={2} wrap="nowrap" visibleFrom="sm">
+        <Group gap="4xs" wrap="nowrap" flex="none">
+          <Group gap="5xs" wrap="nowrap" visibleFrom="sm">
             <Kbd size="xs">Ctrl</Kbd>
             <Kbd size="xs">Z</Kbd>
           </Group>

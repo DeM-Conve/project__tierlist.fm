@@ -68,7 +68,7 @@ function Thumb({ index, w = 72, lifted = false }) {
         pos="absolute"
         bottom={3}
         right={3}
-        px={3}
+        px="4xs"
         fz={8}
         fw={600}
         lh="12px"
@@ -96,7 +96,7 @@ function BoardMock() {
         }}
       >
         <Group justify="space-between" mb="sm">
-          <Group gap={8}>
+          <Group gap="2xs">
             <Text ff="var(--font-display)" fw={800} fz="lg">
               Rap
             </Text>
@@ -127,8 +127,8 @@ function BoardMock() {
                 </Text>
               </Box>
               <Group
-                gap={8}
-                p={8}
+                gap="2xs"
+                p="2xs"
                 wrap="nowrap"
                 style={{
                   flex: 1,
@@ -172,10 +172,10 @@ function BoardMock() {
         className="anim-float"
         style={{ boxShadow: '0 24px 50px var(--shadow)' }}
       >
-        <Text fz={10} fw={700} tt="uppercase" c="dimmed" mb={6} style={{ letterSpacing: 1 }}>
+        <Text fz="2xs" fw={700} tt="uppercase" c="dimmed" mb="3xs" style={{ letterSpacing: 1 }}>
           Which is better?
         </Text>
-        <Group gap={8} wrap="nowrap">
+        <Group gap="2xs" wrap="nowrap">
           <Thumb index={1} w={88} />
           <Text ff="var(--font-display)" fw={900} fz="xs" c="accent">
             VS
@@ -213,11 +213,11 @@ export default function LoginView({ onLogin }) {
       }}
     >
       <Container size="lg" w="100%" py="md">
-        <Group gap={10}>
+        <Group gap="xs">
           <ThemeIcon size={30} radius="sm" variant="filled">
             <ListOrdered size={18} />
           </ThemeIcon>
-          <Text fw={800} fz={17}>
+          <Text fw={800} fz="xl">
             Tierlist.fm
           </Text>
         </Group>
@@ -227,7 +227,7 @@ export default function LoginView({ onLogin }) {
           the free height, features in a single row along the bottom - so the
           landing page never needs to scroll on a desktop-sized window. */}
       <Container size="lg" w="100%" style={{ flex: 1, display: 'flex', alignItems: 'center' }}>
-        <SimpleGrid cols={{ base: 1, md: 2 }} spacing={72} py="md" w="100%" style={{ alignItems: 'center' }}>
+        <SimpleGrid cols={{ base: 1, md: 2 }} spacing="4xl" py="md" w="100%" style={{ alignItems: 'center' }}>
           <Stack gap="xl" className="anim-rise">
             <Badge variant="light" size="lg" radius="sm" w="fit-content">
               Your own YouTube account
@@ -252,7 +252,7 @@ export default function LoginView({ onLogin }) {
               you do it.
             </Text>
 
-            <Stack gap={10} align="flex-start">
+            <Stack gap="xs" align="flex-start">
               <Button
                 size="lg"
                 radius="md"
@@ -270,7 +270,7 @@ export default function LoginView({ onLogin }) {
 
           </Stack>
 
-          <Box visibleFrom="md" pb={80}>
+          <Box visibleFrom="md" pb="5xl">
             <BoardMock />
           </Box>
         </SimpleGrid>

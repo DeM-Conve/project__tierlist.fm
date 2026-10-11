@@ -9,9 +9,9 @@ const MODIFIERS = ['Ctrl', 'Shift', 'Alt', 'Cmd', 'Meta'];
 function Keys({ keys }) {
   const combo = keys.some((k) => MODIFIERS.includes(k));
   return (
-    <Group gap={4} wrap="nowrap" justify="flex-end">
+    <Group gap="4xs" wrap="nowrap" justify="flex-end">
       {keys.map((key, i) => (
-        <Group key={i} gap={4} wrap="nowrap">
+        <Group key={i} gap="4xs" wrap="nowrap">
           {i > 0 && (
             <Text span fz="xs" c="dimmed">
               {combo ? '+' : ','}
@@ -30,12 +30,12 @@ function Keys({ keys }) {
 // right-aligned key column then the description.
 export function ShortcutsList({ columns = 2 }) {
   return (
-    <Box style={{ columns: `${columns} 340px`, columnGap: 48 }}>
+    <Box style={{ columns: `${columns} 340px`, columnGap: 'var(--mantine-spacing-3xl)' }}>
       {CATEGORIES.map((category) => (
         <Box key={category} mb="lg" style={{ breakInside: 'avoid' }}>
-          <Box style={{ display: 'grid', gridTemplateColumns: '120px minmax(0, 1fr)', columnGap: 14, rowGap: 6, alignItems: 'center' }}>
+          <Box style={{ display: 'grid', gridTemplateColumns: '120px minmax(0, 1fr)', columnGap: 'var(--mantine-spacing-md)', rowGap: 'var(--mantine-spacing-3xs)', alignItems: 'center' }}>
             <span />
-            <Text fw={700} fz="md" mb={2}>
+            <Text fw={700} fz="md" mb="5xs">
               {category}
             </Text>
             {SHORTCUTS.filter((s) => s.category === category).map((s) => (

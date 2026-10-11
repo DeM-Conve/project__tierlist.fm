@@ -41,7 +41,7 @@ const TRACK_ROW_GRID = {
   display: 'grid',
   gridTemplateColumns: '22px 44px minmax(0, 1fr) auto 30px',
   alignItems: 'center',
-  gap: 12,
+  gap: 'var(--mantine-spacing-sm)',
 };
 // Loading placeholders: enough rows to fill a typical screen.
 const SKELETON_ROWS = 10;
@@ -50,14 +50,14 @@ const SKELETON_ROWS = 10;
 // for the rank, cover, title/artist, one chip per tier and the menu.
 function TrackRowSkeleton({ tiers }) {
   return (
-    <Box px="sm" py={6} style={TRACK_ROW_GRID} data-testid="track-row-skeleton">
+    <Box px="sm" py="3xs" style={TRACK_ROW_GRID} data-testid="track-row-skeleton">
       <Skeleton h={10} w={14} style={{ justifySelf: 'end' }} />
       <Skeleton w={44} h={44} radius={4} />
-      <Stack gap={8}>
+      <Stack gap="2xs">
         <Skeleton h={10} w="60%" />
         <Skeleton h={8} w="30%" />
       </Stack>
-      <Group gap={4} wrap="nowrap">
+      <Group gap="4xs" wrap="nowrap">
         {tiers.map((t) => <Skeleton key={t} w={24} h={24} radius={4} />)}
       </Group>
       <Skeleton w={28} h={28} radius="sm" />
@@ -102,7 +102,7 @@ const TrackRow = memo(function TrackRow({
       tabIndex={0}
       aria-label={`Play ${video.title}`}
       px="sm"
-      py={6}
+      py="3xs"
       style={{
         // Exact px (not Mantine's rem-scaled h): the virtualizer positions rows in px.
         ...TRACK_ROW_GRID,
@@ -136,7 +136,7 @@ const TrackRow = memo(function TrackRow({
           {isPendingRemoval ? 'Duplicate - also in a higher tier, removed on sync' : artist || ' '}
         </Text>
       </Box>
-      <Group gap={4} wrap="nowrap" className="row-chips">
+      <Group gap="4xs" wrap="nowrap" className="row-chips">
         {tiers.map((t) => (
           <TierChip
             key={t}
@@ -303,24 +303,24 @@ export default function TierFocusView({
   const counts = (t) => tierItems[t]?.length ?? 0;
 
   return (
-    <Box component="section" pb={hasPendingBar ? 96 : 0}>
-      <UnstyledButton onClick={onBack} mb="sm" className="crumb">
-        <Group gap={6} c="dimmed">
+    <Box component="section" pb={hasPendingBar ? '5xl' : 0}>
+      <UnstyledButton onClick={onBack} mb="xs" className="crumb">
+        <Group gap="3xs" c="dimmed">
           <ArrowLeft size={14} />
           <Text fz="sm">{category} · tier list</Text>
           <Kbd size="xs">g u</Kbd>
         </Group>
       </UnstyledButton>
 
-      <Group justify="space-between" align="flex-end" wrap="wrap" gap="md" mb="md">
-        <Group gap="md" wrap="nowrap">
-          <Box w={72} h={72} bg={color} style={{ borderRadius: 12, display: 'grid', placeItems: 'center', flexShrink: 0 }}>
-            <Text ff="var(--font-display)" fw={900} fz={isTodo ? 20 : 30} c={TIER_INK}>
+      <Group justify="space-between" align="flex-end" wrap="wrap" gap="md" mb="sm">
+        <Group gap="sm" wrap="nowrap">
+          <Box w={48} h={48} bg={color} style={{ borderRadius: 8, display: 'grid', placeItems: 'center', flexShrink: 0 }}>
+            <Text ff="var(--font-display)" fw={900} fz={isTodo ? 'sm' : '2xl'} c={TIER_INK}>
               {tierName(tier)}
             </Text>
           </Box>
-          <Stack gap={2}>
-            <Title order={1} fz={{ base: 26, sm: 34 }} fw={900} lh={1.05}>
+          <Stack gap="5xs">
+            <Title order={1}>
               {tierName(tier)} <Text span inherit c="dimmed" fw={700}>in {category}</Text>
             </Title>
             <Text c="dimmed" fz="sm">
@@ -361,7 +361,7 @@ export default function TierFocusView({
             </Tabs.Tab>
           ))}
           {/* The filter shares the tab row (right end) instead of its own row. */}
-          <Group ml="auto" gap="sm" wrap="nowrap" pb={6} style={{ alignSelf: 'center' }}>
+          <Group ml="auto" gap="sm" wrap="nowrap" pb="3xs" style={{ alignSelf: 'center' }}>
             {q && (
               <Text fz="xs" c="dimmed">
                 {visible.length} of {items.length}
@@ -382,7 +382,7 @@ export default function TierFocusView({
       </Tabs>
 
       {/* The list sits straight on the page, VS Code-style - no box around it. */}
-      <Paper radius="md" p={4} bg="var(--editor)">
+      <Paper radius="md" p="4xs" bg="var(--editor)">
         <Box
           ref={listRef}
           pos="relative"

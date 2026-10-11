@@ -111,9 +111,9 @@ export default function PlaylistNamingSettings() {
       : null;
 
   return (
-    <Stack gap={28}>
+    <Stack gap="lg">
       <div>
-        <Title order={2} fz={18} mb={6}>
+        <Title order={2} mb="3xs">
           Playlist naming
         </Title>
         <Text c="dimmed" fz="sm">
@@ -163,12 +163,12 @@ export default function PlaylistNamingSettings() {
             value={draft.template}
             onChange={(e) => setTemplate(e.target.value)}
             error={templateErrors[0]}
-            styles={{ input: { fontFamily: 'monospace', fontSize: 15 } }}
+            styles={{ input: { fontFamily: 'var(--mantine-font-family-monospace)', fontSize: 'var(--mantine-font-size-lg)' } }}
             size="md"
             aria-label="Template"
           />
-          <Group gap={6} wrap="wrap">
-            <Text fz="xs" c="dimmed" mr={4}>
+          <Group gap="3xs" wrap="wrap">
+            <Text fz="xs" c="dimmed" mr="4xs">
               Insert:
             </Text>
             {REQUIRED_TOKENS.map((t) => (
@@ -238,7 +238,7 @@ export default function PlaylistNamingSettings() {
           </Group>
           <SimpleGrid cols={{ base: 2, xs: 3, md: 6 }} spacing="sm">
             {BOARD_TIERS.map((slot, i) => (
-              <Stack key={slot} gap={6}>
+              <Stack key={slot} gap="3xs">
                 <TextInput
                   label={slot === TODO_TIER ? 'To-do' : `Tier ${i + 1}${i === 0 ? ' (best)' : ''}`}
                   description="In playlist names"
@@ -246,7 +246,7 @@ export default function PlaylistNamingSettings() {
                   onChange={(e) => setLabel(slot, e.target.value)}
                   error={labelErrors[slot]}
                   leftSection={<TierChip tier={slot} size={16} label="" />}
-                  styles={{ input: { fontFamily: 'monospace' } }}
+                  styles={{ input: { fontFamily: 'var(--mantine-font-family-monospace)' } }}
                 />
                 <TextInput
                   size="xs"
@@ -265,7 +265,7 @@ export default function PlaylistNamingSettings() {
 
       <Paper withBorder radius="md" p="md" bg="var(--surface)">
         <Group justify="space-between" mb="sm" wrap="wrap">
-          <Group gap={8}>
+          <Group gap="2xs">
             <Text fw={600} fz="sm">
               Matching playlists
             </Text>
@@ -289,7 +289,7 @@ export default function PlaylistNamingSettings() {
           </Text>
         ) : (
           <ScrollArea.Autosize mah={360} type="auto">
-            <Table striped highlightOnHover fz="sm" verticalSpacing={6}>
+            <Table striped highlightOnHover fz="sm" verticalSpacing="3xs">
               <Table.Thead>
                 <Table.Tr>
                   <Table.Th>Playlist</Table.Th>

@@ -19,7 +19,7 @@ export function SongArt({ video, size = 44 }) {
 
 export function SectionLabel({ children }) {
   return (
-    <Text fz={12} fw={800} c="dimmed" tt="uppercase" style={{ letterSpacing: '0.1em' }}>
+    <Text fz="sm" fw={800} c="dimmed" tt="uppercase" style={{ letterSpacing: '0.1em' }}>
       {children}
     </Text>
   );
@@ -29,16 +29,16 @@ export function SectionLabel({ children }) {
 export function ProbabilityBars({ song, tiers }) {
   const list = tiers ?? TIER_ORDER.filter((t) => song?.probabilities?.[t] != null);
   return (
-    <Stack gap={8}>
+    <Stack gap="2xs">
       {list.map((t) => {
         const p = song?.probabilities?.[t] ?? 0;
         return (
-          <Group key={t} gap={10} wrap="nowrap">
+          <Group key={t} gap="xs" wrap="nowrap">
             <TierChip tier={t} size={22} />
             <Box h={10} style={{ flex: 1, background: 'var(--surface-3)', borderRadius: 5, overflow: 'hidden' }}>
               <Box h="100%" w={pct(p)} style={{ background: TIER_COLORS[t], borderRadius: 5, transition: 'width 300ms ease' }} />
             </Box>
-            <Text ff="monospace" fz={13} w={40} ta="right">{pct(p)}</Text>
+            <Text ff="monospace" fz="md" w={40} ta="right">{pct(p)}</Text>
           </Group>
         );
       })}
@@ -99,25 +99,25 @@ export function ScoreMap({ analysis, nameOf, height = 150 }) {
         />
       ))}
       {hover && (
-        <Paper pos="absolute" left={`${hover.left}%`} top={Math.max(0, hover.top - 34)} px={8} py={3} shadow="sm" withBorder
+        <Paper pos="absolute" left={`${hover.left}%`} top={Math.max(0, hover.top - 34)} px="2xs" py="4xs" shadow="sm" withBorder
           style={{ transform: 'translateX(-50%)', pointerEvents: 'none', whiteSpace: 'nowrap', zIndex: 2 }}>
-          <Text fz={12} fw={700}>
+          <Text fz="sm" fw={700}>
             {nameOf(hover.id)} · {pct(hover.bestProbability)} {tierName(hover.bestTier)} · score {score(hover.mu)}
           </Text>
         </Paper>
       )}
       <Box pos="absolute" left={0} right={0} bottom={0} h={28}>
         {bands.map((b) => (
-          <Text key={b.tier} pos="absolute" left={`${b.from}%`} w={`${b.to - b.from}%`} ff="var(--font-display)" fw={900} fz={13} ta="center"
+          <Text key={b.tier} pos="absolute" left={`${b.from}%`} w={`${b.to - b.from}%`} ff="var(--font-display)" fw={900} fz="md" ta="center"
             c="dimmed">
             {tierName(b.tier)} · {b.count}
           </Text>
         ))}
       </Box>
-      <Text pos="absolute" bottom={-22} left={0} fz={12} c="dimmed" aria-hidden>
+      <Text pos="absolute" bottom={-22} left={0} fz="sm" c="dimmed" aria-hidden>
         {score(lo)}
       </Text>
-      <Text pos="absolute" bottom={-22} right={0} fz={12} c="dimmed" aria-hidden>
+      <Text pos="absolute" bottom={-22} right={0} fz="sm" c="dimmed" aria-hidden>
         {score(hi)}
       </Text>
     </Box>
@@ -150,7 +150,7 @@ export function ScoreTrend({ trend, border, height = 80 }) {
         {hover != null && <circle cx={x(hover)} cy={y(trend[hover])} r="4" fill="currentColor" stroke="var(--surface)" strokeWidth="2" />}
       </svg>
       {hover != null && (
-        <Text fz={12} c="dimmed" mt={4}>
+        <Text fz="sm" c="dimmed" mt="4xs">
           {hover === 0 ? 'Start' : `After duel ${hover}`}: score {score(trend[hover])}
         </Text>
       )}
@@ -162,14 +162,14 @@ export function ScoreTrend({ trend, border, height = 80 }) {
 // as Skeleton blocks of the same size, so the hub doesn't jump when data lands.
 export function StatCard({ label, value, aside, children, highlight, onClick, loading }) {
   return (
-    <Paper withBorder radius="md" p="lg" onClick={onClick}
+    <Paper withBorder radius="md" p="md" onClick={onClick}
       className={onClick ? 'duel-card' : undefined}
       style={{ cursor: onClick ? 'pointer' : undefined, borderColor: highlight ? 'var(--accent)' : undefined }}>
-      <Stack gap={6}>
-        <Text fz={13} fw={700} c={highlight ? 'accent' : 'dimmed'} tt="uppercase" style={{ letterSpacing: '0.08em' }}>{label}</Text>
-        <Group gap={10} align="baseline">
-          {loading ? <Skeleton h={44} w={96} radius="sm" /> : <Text ff="var(--font-display)" fw={900} fz={44} lh={1}>{value}</Text>}
-          {loading ? aside != null && <Skeleton h={14} w={120} /> : aside && <Text fz={14} c="dimmed">{aside}</Text>}
+      <Stack gap="3xs">
+        <Text fz="md" fw={700} c={highlight ? 'accent' : 'dimmed'} tt="uppercase" style={{ letterSpacing: '0.08em' }}>{label}</Text>
+        <Group gap="xs" align="baseline">
+          {loading ? <Skeleton h={44} w={96} radius="sm" /> : <Text ff="var(--font-display)" fw={900} fz="3xl" lh={1}>{value}</Text>}
+          {loading ? aside != null && <Skeleton h={14} w={120} /> : aside && <Text fz="md" c="dimmed">{aside}</Text>}
         </Group>
         {children}
       </Stack>

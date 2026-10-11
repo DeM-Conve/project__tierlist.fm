@@ -29,7 +29,7 @@ function toast(message, onUndo, color) {
           {message}
         </Text>
         {onUndo && (
-          <Group gap={4} wrap="nowrap" flex="none">
+          <Group gap="4xs" wrap="nowrap" flex="none">
             <Kbd size="xs" visibleFrom="sm">
               u
             </Kbd>

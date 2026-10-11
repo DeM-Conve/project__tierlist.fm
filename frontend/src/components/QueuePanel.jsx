@@ -24,10 +24,10 @@ const Row = memo(function Row({ entry, section, index, dimmed, isCurrent, onPlay
   return (
     <Group
       className="queue-row"
-      gap={10}
+      gap="xs"
       wrap="nowrap"
-      px={6}
-      py={6}
+      px="3xs"
+      py="3xs"
       pos="relative"
       bg={
         isCurrent
@@ -151,8 +151,8 @@ export default function QueuePanel({ queue, current, onJump, onRemove, onMove, o
 
   return (
     <>
-      <Group h={30} gap={8} wrap="nowrap" className="player-queue-head">
-        <Text fz={11} fw={800} tt="uppercase" c="dimmed" style={{ letterSpacing: 1 }}>
+      <Group h={30} gap="2xs" wrap="nowrap" className="player-queue-head">
+        <Text fz="xs" fw={800} tt="uppercase" c="dimmed" style={{ letterSpacing: 1 }}>
           Queue
         </Text>
         {contextLabel && (
@@ -211,7 +211,7 @@ export default function QueuePanel({ queue, current, onJump, onRemove, onMove, o
                             top: item.start,
                             left: 0,
                             width: '100%',
-                            paddingBottom: 2,
+                            paddingBottom: 'var(--mantine-spacing-5xs)',
                           }}
                         >
                           {isCurrent ? (
@@ -249,7 +249,7 @@ function QueueViewport({ droppableRef, viewportRef, droppableProps, children }) 
     <ScrollArea
       viewportRef={ref}
       viewportProps={droppableProps}
-      mt={8}
+      mt="2xs"
       style={{ flex: 1, minHeight: 0 }}
       type="hover"
       scrollbars="y"
@@ -267,11 +267,11 @@ function NowAndUpNext({ current, upcomingCount }) {
   return (
     <>
       <Row entry={current} isCurrent />
-      <Text fz={11} fw={800} tt="uppercase" c="dimmed" mt="md" mb={4} px={6} style={{ letterSpacing: 1 }}>
+      <Text fz="xs" fw={800} tt="uppercase" c="dimmed" mt="md" mb="4xs" px="3xs" style={{ letterSpacing: 1 }}>
         Up next{upcomingCount > 0 ? ` · ${upcomingCount}` : ''}
       </Text>
       {upcomingCount === 0 && (
-        <Text fz="xs" c="dimmed" px={6} py={10}>
+        <Text fz="xs" c="dimmed" px="3xs" py="xs">
           End of the queue. Use Play next / Add to queue in any song's ⋯ menu, or drag a played song back down here.
         </Text>
       )}

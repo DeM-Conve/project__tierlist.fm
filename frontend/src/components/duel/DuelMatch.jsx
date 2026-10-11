@@ -70,11 +70,11 @@ function ClipCard({ side, video, song, name, artist, active, paused, onListen, o
   }, [active, paused, ready, length]);
 
   return (
-    <Paper withBorder radius={18} p={18} style={{ borderColor: active ? 'var(--accent)' : undefined, borderWidth: active ? 2 : 1 }}>
-      <Stack gap={16}>
+    <Paper withBorder radius="lg" p="md" style={{ borderColor: active ? 'var(--accent)' : undefined, borderWidth: active ? 2 : 1 }}>
+      <Stack gap="md">
         <Group justify="space-between">
           <ThemeIcon variant="light" color="gray" size={34} radius="md" fw={900}>{side}</ThemeIcon>
-          <Text fz={13} fw={700} c={active && !paused ? 'accent' : 'dimmed'}>{active && !paused ? '▶ Playing' : 'Paused'}</Text>
+          <Text fz="md" fw={700} c={active && !paused ? 'accent' : 'dimmed'}>{active && !paused ? '▶ Playing' : 'Paused'}</Text>
         </Group>
         <Box pos="relative" style={{ aspectRatio: '16 / 9', borderRadius: 12, overflow: 'hidden', background: 'var(--media-bg)' }}>
           <EmbeddedPlayer
@@ -96,17 +96,17 @@ function ClipCard({ side, video, song, name, artist, active, paused, onListen, o
             </Box>
           )}
         </Box>
-        <Stack gap={3}>
-          <Text ff="var(--font-display)" fw={800} fz={24} lh={1.15} truncate="end" title={name}>{name}</Text>
-          <Text fz={15} c="dimmed" truncate="end">{artist}{song && !song.tier ? ' · new to this board' : song ? ` · ${tierName(song.tier)}` : ''}</Text>
+        <Stack gap="4xs">
+          <Text ff="var(--font-display)" fw={800} fz="xl" lh={1.15} truncate="end" title={name}>{name}</Text>
+          <Text fz="lg" c="dimmed" truncate="end">{artist}{song && !song.tier ? ' · new to this board' : song ? ` · ${tierName(song.tier)}` : ''}</Text>
         </Stack>
-        <Stack gap={6}>
+        <Stack gap="3xs">
           <Progress value={progress * 100} size="sm" radius="xl" color={active ? 'accent' : 'gray'} />
           <Group justify="space-between">
-            <Text ff="monospace" fz={12} c="dimmed">
+            <Text ff="monospace" fz="sm" c="dimmed">
               {fmt(start)} – {fmt(start + length)}
             </Text>
-            <Text ff="monospace" fz={12} c="dimmed">from 0:30</Text>
+            <Text ff="monospace" fz="sm" c="dimmed">from 0:30</Text>
           </Group>
         </Stack>
         {/* Tab switches to the other song, so only the paused side shows it. */}
@@ -244,7 +244,7 @@ export default function DuelMatch({ category, sessionId, boardLoading, base }) {
 
   if (session.isError) {
     return (
-      <Container className="duel-view" size={900} py={48}>
+      <Container className="duel-view" size={900} py="xs">
         <Alert color="red" title="Couldn’t open this duel session">
           {errorMessage(session.error, 'The app couldn’t reach the server.')}
           <Group mt="sm">
@@ -259,36 +259,36 @@ export default function DuelMatch({ category, sessionId, boardLoading, base }) {
     return (
       // Same containers, columns and block sizes as the loaded page below,
       // so nothing jumps when the session arrives.
-      <Container className="duel-view" size={1320} py={32} data-testid="duel-match-loading">
-        <Stack gap={28}>
-          <Group justify="space-between" wrap="wrap" gap={16}>
+      <Container className="duel-view" size={1320} py="xs" data-testid="duel-match-loading">
+        <Stack gap="lg">
+          <Group justify="space-between" wrap="wrap" gap="md">
             <Button variant="default" component={Link} to={`${base}/duel`}>← {category} · Duel</Button>
-            <Stack gap={8} style={{ flex: '1 1 360px', maxWidth: 560 }}>
+            <Stack gap="2xs" style={{ flex: '1 1 360px', maxWidth: 560 }}>
               <Skeleton h={14} w={180} />
               <Skeleton h={10} radius="xl" />
             </Stack>
-            <Group gap={8}>
+            <Group gap="2xs">
               <Skeleton h={36} w={96} radius="sm" />
               <Skeleton h={36} w={150} radius="sm" />
             </Group>
           </Group>
-          <Grid gutter={28}>
+          <Grid gutter="lg">
             <Grid.Col span={{ base: 12, lg: 8 }}>
-              <Stack gap={22}>
-                <Stack gap={6} align="center" ta="center">
-                  <Title order={1} fz={34} ff="var(--font-display)" fw={900}>Which one hits harder?</Title>
-                  <Text fz={15} c="dimmed">Both clips start at 0:30. Trust your gut - you can be unsure.</Text>
+              <Stack gap="lg">
+                <Stack gap="3xs" align="center" ta="center">
+                  <Title order={1}>Which one hits harder?</Title>
+                  <Text fz="lg" c="dimmed">Both clips start at 0:30. Trust your gut - you can be unsure.</Text>
                 </Stack>
-                <SimpleGrid cols={{ base: 1, sm: 2 }} spacing={18}>
+                <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md">
                   {[0, 1].map((i) => <Skeleton key={i} h={540} radius="lg" />)}
                 </SimpleGrid>
-                <SimpleGrid cols={{ base: 2, sm: 5 }} spacing={8}>
+                <SimpleGrid cols={{ base: 2, sm: 5 }} spacing="2xs">
                   {[0, 1, 2, 3, 4].map((i) => <Skeleton key={i} h={108} radius="md" />)}
                 </SimpleGrid>
               </Stack>
             </Grid.Col>
             <Grid.Col span={{ base: 12, lg: 4 }}>
-              <Stack gap={16}>
+              <Stack gap="md">
                 <Skeleton h={198} radius="md" />
                 <Skeleton h={250} radius="md" />
                 <Skeleton h={110} radius="md" />
@@ -308,45 +308,45 @@ export default function DuelMatch({ category, sessionId, boardLoading, base }) {
   const v = (id) => board.videoOf(id) ?? { videoId: id };
 
   return (
-    <Container className="duel-view" size={1320} py={32}>
-      <Stack gap={28}>
-        <Group justify="space-between" wrap="wrap" gap={16}>
+    <Container className="duel-view" size={1320} py="xs">
+      <Stack gap="lg">
+        <Group justify="space-between" wrap="wrap" gap="md">
           <Button variant="default" component={Link} to={`${base}/duel`}>← {category} · Duel</Button>
-          <Stack gap={8} style={{ flex: '1 1 360px', maxWidth: 560 }}>
+          <Stack gap="2xs" style={{ flex: '1 1 360px', maxWidth: 560 }}>
             <Group justify="space-between">
-              <Text fz={13} fw={700}>
+              <Text fz="md" fw={700}>
                 Certainty <Text span c="accent" inherit>{gain >= 0 ? '+' : '−'}{pct(Math.abs(gain))}</Text> · {s.duels.length} duels
               </Text>
-              <Text fz={13} fw={700} c="dimmed">{secondsLeft > 0 ? `~${Math.ceil(secondsLeft / 60)} min left` : 'Time’s up'}</Text>
+              <Text fz="md" fw={700} c="dimmed">{secondsLeft > 0 ? `~${Math.ceil(secondsLeft / 60)} min left` : 'Time’s up'}</Text>
             </Group>
             <Progress value={Math.min(100, (elapsed / (s.minutes * 60)) * 100)} size="md" radius="xl" />
           </Stack>
-          <Group gap={8}>
+          <Group gap="2xs">
             <Button variant="default" onClick={takeBack} disabled={!s.duels.length || busy} rightSection={<Kbd size="xs">U</Kbd>}>Undo</Button>
             <Button variant="light" color="gray" onClick={finish} loading={end.isPending} rightSection={<Kbd size="xs">E</Kbd>}>End session</Button>
           </Group>
         </Group>
 
         {/* Fixed columns (Grid), so long song names never resize the layout between duels. */}
-        <Grid gutter={28}>
+        <Grid gutter="lg">
           <Grid.Col span={{ base: 12, lg: 8 }}>
-          <Stack gap={22}>
+          <Stack gap="lg">
             {!shown ? (
-              <Paper withBorder radius="lg" p={40}>
+              <Paper withBorder radius="lg" p="md">
                 <Stack align="center" gap="sm">
-                  <Title order={2} ff="var(--font-display)">{secondsLeft > 0 ? 'Nothing left worth asking.' : 'Time’s up.'}</Title>
+                  <Title order={2}>{secondsLeft > 0 ? 'Nothing left worth asking.' : 'Time’s up.'}</Title>
                   <Text c="dimmed">{s.duels.length} duels this session. See what they settled.</Text>
-                  <Button size="md" onClick={finish} loading={end.isPending}>See the summary</Button>
+                  <Button onClick={finish} loading={end.isPending}>See the summary</Button>
                 </Stack>
               </Paper>
             ) : (
               <>
-                <Stack gap={6} align="center" ta="center">
-                  <Title order={1} fz={34} ff="var(--font-display)" fw={900}>Which one hits harder?</Title>
-                  <Text fz={15} c="dimmed">Both clips start at 0:30. Trust your gut - you can be unsure.</Text>
+                <Stack gap="3xs" align="center" ta="center">
+                  <Title order={1}>Which one hits harder?</Title>
+                  <Text fz="lg" c="dimmed">Both clips start at 0:30. Trust your gut - you can be unsure.</Text>
                 </Stack>
                 <Box pos="relative">
-                  <SimpleGrid cols={{ base: 1, sm: 2 }} spacing={18}>
+                  <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md">
                     <ClipCard side="A" video={v(shown.a)} song={shown.songA} name={board.nameOf(shown.a)} artist={board.artistOf(shown.a)}
                       active={listening === 'A'} paused={paused} onListen={() => setListening('A')}
                       onClipEnd={() => !blocked[shown.b] && setListening('B')}
@@ -361,49 +361,49 @@ export default function DuelMatch({ category, sessionId, boardLoading, base }) {
                 </Box>
 
                 {showResult ? (
-                  <Paper radius="lg" p={22} style={{ background: 'color-mix(in srgb, var(--accent) 10%, var(--surface))', border: '1px solid var(--accent)' }}>
-                    <Group justify="space-between" wrap="wrap" gap={22}>
-                      <Stack gap={10} style={{ flex: '1 1 360px' }}>
-                        <Text ff="var(--font-display)" fw={800} fz={18}>
+                  <Paper radius="lg" p="md" style={{ background: 'color-mix(in srgb, var(--accent) 10%, var(--surface))', border: '1px solid var(--accent)' }}>
+                    <Group justify="space-between" wrap="wrap" gap="lg">
+                      <Stack gap="xs" style={{ flex: '1 1 360px' }}>
+                        <Text ff="var(--font-display)" fw={800} fz="xl">
                           {verdictHeadline(prev.duel.verdict, board.nameOf(prev.duel.a), board.nameOf(prev.duel.b))}
                         </Text>
-                        <Group gap={18} wrap="nowrap">
+                        <Group gap="lg" wrap="nowrap">
                           {[[prev.duel.a, answered.songA.mu, prev.a.mu], [prev.duel.b, answered.songB.mu, prev.b.mu]].map(([id, before, after]) => (
-                            <Text key={id} fz={14} truncate="end" miw={0}>
+                            <Text key={id} fz="md" truncate="end" miw={0}>
                               {board.nameOf(id)} <Text span ff="monospace" fw={700} inherit>{scoreDelta(before, after)}</Text>
                             </Text>
                           ))}
                         </Group>
-                        <Text fz={14}>{outcomeText(prev.a, board.nameOf(prev.duel.a), tierName)}</Text>
+                        <Text fz="md">{outcomeText(prev.a, board.nameOf(prev.duel.a), tierName)}</Text>
                       </Stack>
-                      <Group gap={8}>
+                      <Group gap="2xs">
                         <Button variant="default" onClick={takeBack}>Undo</Button>
-                        <Button size="md" onClick={next} rightSection={<Kbd size="xs">Space</Kbd>} disabled={!m && !s.done}>
+                        <Button onClick={next} rightSection={<Kbd size="xs">Space</Kbd>} disabled={!m && !s.done}>
                           {m ? 'Next duel' : 'Finish'}
                         </Button>
                       </Group>
                     </Group>
                   </Paper>
                 ) : (
-                  <Stack gap={12}>
-                    <SimpleGrid cols={{ base: 2, sm: 5 }} spacing={8} role="group" aria-label="Your verdict">
+                  <Stack gap="sm">
+                    <SimpleGrid cols={{ base: 2, sm: 5 }} spacing="2xs" role="group" aria-label="Your verdict">
                       {VERDICTS.map((x) => (
                         <UnstyledButton key={x.verdict} onClick={() => pick(x.verdict)} disabled={busy || !!answered}>
-                          <Paper withBorder radius="md" py={16} px={10} className="duel-card"
+                          <Paper withBorder radius="md" py="md" px="xs" className="duel-card"
                             style={{ background: x.verdict === 'TOO_CLOSE' ? 'var(--surface)' : 'var(--surface-2)' }}>
-                            <Stack gap={8} align="center">
-                              <Text ff="var(--font-display)" fw={800} fz={16}>{x.label}</Text>
-                              <Group gap={2}>{x.keys.map((k) => <Kbd key={k} size="xs">{k}</Kbd>)}</Group>
+                            <Stack gap="2xs" align="center">
+                              <Text ff="var(--font-display)" fw={800} fz="lg">{x.label}</Text>
+                              <Group gap="5xs">{x.keys.map((k) => <Kbd key={k} size="xs">{k}</Kbd>)}</Group>
                             </Stack>
                           </Paper>
                         </UnstyledButton>
                       ))}
                     </SimpleGrid>
-                    <Group justify="center" gap={22}>
-                      <Text fz={13} c="dimmed">Margin matters: “clearly” moves scores twice as far</Text>
-                      <Group gap={6}><Kbd size="xs">Space</Kbd><Text fz={13} c="dimmed">play / pause</Text></Group>
+                    <Group justify="center" gap="lg">
+                      <Text fz="md" c="dimmed">Margin matters: “clearly” moves scores twice as far</Text>
+                      <Group gap="3xs"><Kbd size="xs">Space</Kbd><Text fz="md" c="dimmed">play / pause</Text></Group>
                       <UnstyledButton onClick={dontKnow}>
-                        <Group gap={6}><Text fz={13} c="dimmed">Don’t know one of them</Text><Kbd size="xs">S</Kbd></Group>
+                        <Group gap="3xs"><Text fz="md" c="dimmed">Don’t know one of them</Text><Kbd size="xs">S</Kbd></Group>
                       </UnstyledButton>
                     </Group>
                   </Stack>
@@ -414,44 +414,44 @@ export default function DuelMatch({ category, sessionId, boardLoading, base }) {
           </Grid.Col>
 
           <Grid.Col span={{ base: 12, lg: 4 }}>
-          <Stack gap={16}>
+          <Stack gap="md">
             {shown && (
               <>
-                <Paper withBorder radius="md" p={18}>
-                  <Stack gap={10}>
+                <Paper withBorder radius="md" p="md">
+                  <Stack gap="xs">
                     <SectionLabel>Why this duel</SectionLabel>
-                    <Text fz={15} lh={1.55}>{reasonText(shown, board.nameOf, tierName)}</Text>
+                    <Text fz="lg" lh={1.55}>{reasonText(shown, board.nameOf, tierName)}</Text>
                   </Stack>
                 </Paper>
-                <Paper withBorder radius="md" p={18}>
-                  <Stack gap={12}>
+                <Paper withBorder radius="md" p="md">
+                  <Stack gap="sm">
                     <SectionLabel>{board.nameOf(shown.a)} - where it belongs</SectionLabel>
                     <ProbabilityBars song={showResult ? prev.a : shown.songA} tiers={likelyTiers(shown.songA, 3).map((x) => x.tier)} />
-                    <Text fz={13} c="dimmed">A move is suggested once one tier passes <b>85%</b> with at least 4 duels behind it.</Text>
+                    <Text fz="md" c="dimmed">A move is suggested once one tier passes <b>85%</b> with at least 4 duels behind it.</Text>
                   </Stack>
                 </Paper>
               </>
             )}
-            <Paper withBorder radius="md" p={18}>
-              <Stack gap={10}>
+            <Paper withBorder radius="md" p="md">
+              <Stack gap="xs">
                 <SectionLabel>This session</SectionLabel>
-                {s.duels.length === 0 && <Text fz={14} c="dimmed">Your verdicts show up here.</Text>}
+                {s.duels.length === 0 && <Text fz="md" c="dimmed">Your verdicts show up here.</Text>}
                 {[...s.duels].reverse().slice(0, 6).map((d) => {
                   const aWins = d.verdict === 'A' || d.verdict === 'A_CLEARLY';
                   const draw = d.verdict === 'TOO_CLOSE';
                   return (
-                    <Group key={d.id} justify="space-between" gap={8} wrap="nowrap">
-                      <Text fz={14} truncate="end" style={{ flex: 1, minWidth: 0 }}>
+                    <Group key={d.id} justify="space-between" gap="2xs" wrap="nowrap">
+                      <Text fz="md" truncate="end" style={{ flex: 1, minWidth: 0 }}>
                         <b>{board.nameOf(aWins || draw ? d.a : d.b)}</b> {draw ? '≈' : 'over'} {board.nameOf(aWins || draw ? d.b : d.a)}
                       </Text>
-                      <Text fz={13} c="dimmed" style={{ flexShrink: 0 }}>{draw ? 'too close' : d.verdict.endsWith('CLEARLY') ? 'clearly' : ''}</Text>
+                      <Text fz="md" c="dimmed" style={{ flexShrink: 0 }}>{draw ? 'too close' : d.verdict.endsWith('CLEARLY') ? 'clearly' : ''}</Text>
                     </Group>
                   );
                 })}
-                {s.skipped.length > 0 && <Text fz={13} c="dimmed">{s.skipped.length} skipped as unknown</Text>}
+                {s.skipped.length > 0 && <Text fz="md" c="dimmed">{s.skipped.length} skipped as unknown</Text>}
               </Stack>
             </Paper>
-            <Anchor component={Link} to={`${base}/duel/moves`} fz={14} fw={700}>Review suggested moves →</Anchor>
+            <Anchor component={Link} to={`${base}/duel/moves`} fz="md" fw={700}>Review suggested moves →</Anchor>
           </Stack>
           </Grid.Col>
         </Grid>

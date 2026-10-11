@@ -21,9 +21,9 @@ export function MoveRow({ s, board, selected, decided, onSelect, onMove, onKeep,
   return (
     <Group
       wrap="wrap"
-      gap={14}
-      px={18}
-      py={12}
+      gap="md"
+      px="lg"
+      py="sm"
       style={{
         borderBottom: '1px solid var(--border)',
         background: selected ? 'var(--surface-2)' : undefined,
@@ -31,36 +31,36 @@ export function MoveRow({ s, board, selected, decided, onSelect, onMove, onKeep,
       }}
     >
       <UnstyledButton onClick={onSelect} style={{ flex: '1 1 260px', minWidth: 0 }} aria-label={`Show evidence for ${board.nameOf(s.song)}`}>
-        <Group gap={14} wrap="nowrap">
+        <Group gap="md" wrap="nowrap">
           <SongArt video={board.videoOf(s.song)} />
           <Box miw={0}>
             <Text fw={700} truncate="end">{board.nameOf(s.song)}</Text>
-            <Text fz={13} c="dimmed" truncate="end">
+            <Text fz="md" c="dimmed" truncate="end">
               {board.artistOf(s.song)} · {detail ?? `${record(s)} (W–L–D)`}
             </Text>
           </Box>
         </Group>
       </UnstyledButton>
-      <Group gap={8} w={130} wrap="nowrap">
+      <Group gap="2xs" w={130} wrap="nowrap">
         <TierChip tier={s.from} size={20} />
         <Text c="dimmed">→</Text>
         <TierChip tier={s.to} size={20} />
       </Group>
-      <Group gap={8} w={130} wrap="nowrap">
+      <Group gap="2xs" w={130} wrap="nowrap">
         <Box h={6} style={{ flex: 1, background: 'var(--surface-3)', borderRadius: 3, overflow: 'hidden' }}>
           <Box h="100%" w={pct(s.confidence)} style={{ background: 'var(--accent)' }} />
         </Box>
-        <Text ff="monospace" fz={13}>{pct(s.confidence)}</Text>
+        <Text ff="monospace" fz="md">{pct(s.confidence)}</Text>
       </Group>
       {decided ? (
-        <Group gap={10} miw={150}>
-          <Text fz={14} fw={700} c={decided === 'move' ? 'accent' : 'dimmed'}>
+        <Group gap="xs" miw={150}>
+          <Text fz="md" fw={700} c={decided === 'move' ? 'accent' : 'dimmed'}>
             {decided === 'move' ? `Moved to ${tierName(s.to)}` : `Kept in ${tierName(s.from)}`}
           </Text>
-          <Anchor component="button" fz={13} c="dimmed" onClick={onUndo}>Undo</Anchor>
+          <Anchor component="button" fz="md" c="dimmed" onClick={onUndo}>Undo</Anchor>
         </Group>
       ) : (
-        <Group gap={6} miw={150}>
+        <Group gap="3xs" miw={150}>
           <Button onClick={onMove}>Move</Button>
           <Button variant="default" onClick={onKeep}>Keep</Button>
         </Group>
@@ -73,24 +73,24 @@ export function MoveRow({ s, board, selected, decided, onSelect, onMove, onKeep,
 // Skeleton blocks for the song, the tier change, the bar and the buttons.
 function MoveRowSkeleton() {
   return (
-    <Group wrap="wrap" gap={14} px={18} py={12} style={{ borderBottom: '1px solid var(--border)' }} data-testid="move-row-skeleton">
-      <Group gap={14} wrap="nowrap" style={{ flex: '1 1 260px', minWidth: 0 }}>
+    <Group wrap="wrap" gap="md" px="lg" py="sm" style={{ borderBottom: '1px solid var(--border)' }} data-testid="move-row-skeleton">
+      <Group gap="md" wrap="nowrap" style={{ flex: '1 1 260px', minWidth: 0 }}>
         <Skeleton w={44} h={44} radius="sm" style={{ flexShrink: 0 }} />
-        <Stack gap={10} style={{ flex: 1 }}>
+        <Stack gap="xs" style={{ flex: 1 }}>
           <Skeleton h={12} w="55%" />
           <Skeleton h={10} w="35%" />
         </Stack>
       </Group>
-      <Group gap={8} w={130} wrap="nowrap">
+      <Group gap="2xs" w={130} wrap="nowrap">
         <Skeleton w={20} h={20} radius={4} />
         <Text c="dimmed">→</Text>
         <Skeleton w={20} h={20} radius={4} />
       </Group>
-      <Group gap={8} w={130} wrap="nowrap">
+      <Group gap="2xs" w={130} wrap="nowrap">
         <Skeleton h={6} style={{ flex: 1 }} />
         <Skeleton h={10} w={30} />
       </Group>
-      <Group gap={6} miw={150}>
+      <Group gap="3xs" miw={150}>
         <Skeleton h={36} w={68} radius="sm" />
         <Skeleton h={36} w={64} radius="sm" />
       </Group>
@@ -101,21 +101,21 @@ function MoveRowSkeleton() {
 // The evidence panel's sections (real labels) with Skeleton content.
 function EvidenceSkeleton() {
   return (
-    <Paper withBorder radius="lg" p={22} style={{ flex: '1 1 380px' }} data-testid="evidence-skeleton">
-      <Stack gap={20}>
-        <Group gap={14} wrap="nowrap">
+    <Paper withBorder radius="lg" p="md" style={{ flex: '1 1 380px' }} data-testid="evidence-skeleton">
+      <Stack gap="lg">
+        <Group gap="md" wrap="nowrap">
           <Skeleton w={60} h={60} radius="sm" style={{ flexShrink: 0 }} />
-          <Stack gap={10} style={{ flex: 1 }}>
+          <Stack gap="xs" style={{ flex: 1 }}>
             <Skeleton h={18} w="70%" />
             <Skeleton h={12} w="40%" />
           </Stack>
           <Skeleton w={48} h={48} circle />
         </Group>
-        <Stack gap={10}>
+        <Stack gap="xs">
           <SectionLabel>Where it belongs</SectionLabel>
-          <Stack gap={8}>
+          <Stack gap="2xs">
             {[0, 1, 2].map((i) => (
-              <Group key={i} gap={10} wrap="nowrap">
+              <Group key={i} gap="xs" wrap="nowrap">
                 <Skeleton w={22} h={22} radius={4} />
                 <Skeleton h={10} style={{ flex: 1 }} />
                 <Skeleton h={10} w={40} />
@@ -123,23 +123,23 @@ function EvidenceSkeleton() {
             ))}
           </Stack>
         </Stack>
-        <Stack gap={8}>
+        <Stack gap="2xs">
           <Group justify="space-between">
             <SectionLabel>Score over duels</SectionLabel>
-            <Text fz={12} c="dimmed">dashed = tier border</Text>
+            <Text fz="sm" c="dimmed">dashed = tier border</Text>
           </Group>
           <Skeleton h={80} />
         </Stack>
-        <Stack gap={4}>
+        <Stack gap="4xs">
           <SectionLabel>Key results</SectionLabel>
           {[0, 1].map((i) => (
-            <Group key={i} justify="space-between" py={6} style={{ borderBottom: '1px solid var(--border-soft)' }} wrap="nowrap">
+            <Group key={i} justify="space-between" py="3xs" style={{ borderBottom: '1px solid var(--border-soft)' }} wrap="nowrap">
               <Skeleton h={12} w="50%" />
               <Skeleton w={20} h={20} radius={4} />
             </Group>
           ))}
         </Stack>
-        <Group gap={8} grow>
+        <Group gap="2xs" grow>
           <Skeleton h={42} radius="sm" />
           <Skeleton h={42} radius="sm" />
         </Group>
@@ -152,11 +152,11 @@ const KEY_HINTS = [['↑', '↓', 'browse'], ['M', 'move'], ['X', 'keep'], ['L',
 
 function KeyHints() {
   return (
-    <Group gap={18} px={18} py={14} wrap="wrap">
+    <Group gap="lg" px="lg" py="md" wrap="wrap">
       {KEY_HINTS.map((k) => (
-        <Group key={k.at(-1)} gap={4}>
+        <Group key={k.at(-1)} gap="4xs">
           {k.slice(0, -1).map((x) => <Kbd key={x} size="xs">{x}</Kbd>)}
-          <Text fz={13} c="dimmed">{k.at(-1)}</Text>
+          <Text fz="md" c="dimmed">{k.at(-1)}</Text>
         </Group>
       ))}
     </Group>
@@ -233,7 +233,7 @@ export default function DuelMoves({ category, boardLoading, base }) {
 
   if (analysis.isError) {
     return (
-      <Container className="duel-view" size={1320} py={40}>
+      <Container className="duel-view" size={1320} py="xs">
         <Alert color="red" title="Couldn’t load the suggested moves">
           {errorMessage(analysis.error, 'The app couldn’t reach the server.')}
           <Group mt="sm"><Button size="xs" onClick={() => analysis.refetch()}>Retry</Button></Group>
@@ -247,23 +247,23 @@ export default function DuelMoves({ category, boardLoading, base }) {
   const border = currentSong && data.borders.reduce((best, b) => (!best || Math.abs(b.score - currentSong.mu) < Math.abs(best.score - currentSong.mu) ? b : best), null);
 
   return (
-    <Container className="duel-view" size={1320} py={40}>
-      <Stack gap={26}>
+    <Container className="duel-view" size={1320} py="xs">
+      <Stack gap="lg">
         <Group justify="space-between" align="flex-end" wrap="wrap">
-          <Stack gap={8}>
-            <Anchor component={Link} to={`${base}/duel`} fz={13} fw={700} tt="uppercase" style={{ letterSpacing: '0.14em' }}>
+          <Stack gap="2xs">
+            <Anchor component={Link} to={`${base}/duel`} fz="md" fw={700} tt="uppercase" style={{ letterSpacing: '0.14em' }}>
               ← {category} · Duel
             </Anchor>
-            <Title order={1} fz={44} ff="var(--font-display)" fw={900}>Suggested moves</Title>
+            <Title order={1}>Suggested moves</Title>
             <Text c="dimmed">Your duels built the case. Nothing moves until you say so - then push to YouTube as usual.</Text>
           </Stack>
-          <Button size="md" disabled={!sure.length} onClick={() => sure.forEach(move)}>
+          <Button disabled={!sure.length} onClick={() => sure.forEach(move)}>
             Move all {sure.length} at ≥90%
           </Button>
         </Group>
 
         <Chip.Group value={filter} onChange={setFilter}>
-          <Group gap={8}>
+          <Group gap="2xs">
             {FILTERS.map((f) => (
               <Chip key={f.value} value={f.value} variant="light">
                 {f.label} · {counts[f.value]}
@@ -275,7 +275,7 @@ export default function DuelMoves({ category, boardLoading, base }) {
         {/* Loading keeps the two-column layout: skeleton rows on the left,
             the evidence panel's sections on the right. */}
         {!data ? (
-          <Group align="flex-start" gap={24} wrap="wrap">
+          <Group align="flex-start" gap="lg" wrap="wrap">
             <Paper withBorder radius="lg" style={{ flex: '999 1 560px', minWidth: 0, overflow: 'hidden' }}>
               {[0, 1, 2, 3, 4].map((i) => <MoveRowSkeleton key={i} />)}
               <KeyHints />
@@ -283,7 +283,7 @@ export default function DuelMoves({ category, boardLoading, base }) {
             <EvidenceSkeleton />
           </Group>
         ) : (
-          <Group align="flex-start" gap={24} wrap="wrap">
+          <Group align="flex-start" gap="lg" wrap="wrap">
             <Paper withBorder radius="lg" style={{ flex: '999 1 560px', minWidth: 0, overflow: 'hidden' }}>
               {shown.length === 0 && (
                 <Text c="dimmed" p="xl" ta="center">
@@ -307,13 +307,13 @@ export default function DuelMoves({ category, boardLoading, base }) {
             </Paper>
 
             {current && (
-              <Paper withBorder radius="lg" p={22} style={{ flex: '1 1 380px' }}>
-                <Stack gap={20}>
-                  <Group gap={14} wrap="nowrap">
+              <Paper withBorder radius="lg" p="md" style={{ flex: '1 1 380px' }}>
+                <Stack gap="lg">
+                  <Group gap="md" wrap="nowrap">
                     <SongArt video={board.videoOf(current.song)} size={60} />
                     <Box style={{ flex: 1 }} miw={0}>
-                      <Title order={3} fz={22} ff="var(--font-display)" truncate="end">{board.nameOf(current.song)}</Title>
-                      <Text c="dimmed" fz={14} truncate="end">{board.artistOf(current.song)}</Text>
+                      <Title order={3} fz="xl" truncate="end">{board.nameOf(current.song)}</Title>
+                      <Text c="dimmed" fz="md" truncate="end">{board.artistOf(current.song)}</Text>
                     </Box>
                     <Button radius="xl" w={48} h={48} p={0} aria-label={previewing ? 'Stop' : `Play ${board.nameOf(current.song)}`}
                       onClick={togglePreview}>
@@ -325,36 +325,36 @@ export default function DuelMoves({ category, boardLoading, base }) {
                       <EmbeddedPlayer videoId={current.song} autoplay />
                     </Box>
                   )}
-                  <Stack gap={10}>
+                  <Stack gap="xs">
                     <SectionLabel>Where it belongs</SectionLabel>
                     <ProbabilityBars song={currentSong} tiers={TIER_ORDER.filter((t) => currentSong?.probabilities[t] != null)} />
                   </Stack>
-                  <Stack gap={8}>
+                  <Stack gap="2xs">
                     <Group justify="space-between">
                       <SectionLabel>Score over {current.wins + current.losses + current.draws} duels</SectionLabel>
-                      <Text fz={12} c="dimmed">dashed = tier border</Text>
+                      <Text fz="sm" c="dimmed">dashed = tier border</Text>
                     </Group>
                     <ScoreTrend trend={current.trend} border={border?.score} />
                   </Stack>
-                  <Stack gap={4}>
+                  <Stack gap="4xs">
                     <SectionLabel>Key results</SectionLabel>
                     {current.keyResults.map((k, i) => (
-                      <Group key={i} justify="space-between" py={6} style={{ borderBottom: '1px solid var(--border-soft)' }} wrap="nowrap">
-                        <Group gap={8} wrap="nowrap" miw={0}>
+                      <Group key={i} justify="space-between" py="3xs" style={{ borderBottom: '1px solid var(--border-soft)' }} wrap="nowrap">
+                        <Group gap="2xs" wrap="nowrap" miw={0}>
                           <Text fw={800} w={40} c={k.result > 0 ? 'accent' : 'dimmed'}>
                             {k.result > 0 ? 'Won' : k.result < 0 ? 'Lost' : 'Draw'}
                           </Text>
-                          <Text fz={14} truncate="end">{board.nameOf(k.opponent)}</Text>
+                          <Text fz="md" truncate="end">{board.nameOf(k.opponent)}</Text>
                         </Group>
                         {k.opponentTier && <TierChip tier={k.opponentTier} size={20} />}
                       </Group>
                     ))}
                   </Stack>
-                  <Stack gap={10}>
+                  <Stack gap="xs">
                     {!decided[current.song] && (
-                      <Group gap={8} grow>
-                        <Button size="md" onClick={() => move(current)}>Move to {tierName(current.to)}</Button>
-                        <Button size="md" variant="default" onClick={() => keep(current)}>Keep in {tierName(current.from)}</Button>
+                      <Group gap="2xs" grow>
+                        <Button onClick={() => move(current)}>Move to {tierName(current.to)}</Button>
+                        <Button variant="default" onClick={() => keep(current)}>Keep in {tierName(current.from)}</Button>
                       </Group>
                     )}
                     <Checkbox
@@ -362,7 +362,7 @@ export default function DuelMoves({ category, boardLoading, base }) {
                       onChange={() => toggleLock(current.song)}
                       label={`Lock ${board.nameOf(current.song)} in its tier - never suggest a move again`}
                     />
-                    <Text fz={13} c="dimmed">
+                    <Text fz="md" c="dimmed">
                       Keeping it raises the bar: it won’t be suggested again until five fresh duels point the same way.
                     </Text>
                   </Stack>
@@ -373,16 +373,16 @@ export default function DuelMoves({ category, boardLoading, base }) {
         )}
 
         {data && Object.keys(data.tierOrders).length > 0 && (
-          <Stack gap={12}>
-            <Title order={2} fz={22} ff="var(--font-display)">Tighten tier order</Title>
-            <Text c="dimmed" fz={14}>Order within a tier is the songs sorted by score - positions are ranks on YouTube.</Text>
+          <Stack gap="sm">
+            <Title order={2}>Tighten tier order</Title>
+            <Text c="dimmed" fz="md">Order within a tier is the songs sorted by score - positions are ranks on YouTube.</Text>
             <Paper withBorder radius="lg">
               {Object.entries(data.tierOrders).map(([tier, ids]) => {
                 const now = (board.tierItems[tier] || []).map((v) => v.videoId);
                 const changed = ids.filter((id, i) => now[i] !== id).length;
                 return (
-                  <Group key={tier} justify="space-between" px={18} py={12} style={{ borderBottom: '1px solid var(--border)' }}>
-                    <Group gap={10}>
+                  <Group key={tier} justify="space-between" px="lg" py="sm" style={{ borderBottom: '1px solid var(--border)' }}>
+                    <Group gap="xs">
                       <TierChip tier={tier} size={22} />
                       <Text>{changed} of {ids.length} songs change places</Text>
                     </Group>

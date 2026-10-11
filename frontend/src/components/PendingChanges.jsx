@@ -20,7 +20,7 @@ const putBackLabel = (move) =>
 function ChangeRow({ move, first, onRevert }) {
   const { song, artist } = songLabel(move.video);
   return (
-    <Group gap="sm" wrap="nowrap" py={8} style={first ? undefined : { borderTop: '1px solid var(--border-soft)' }}>
+    <Group gap="sm" wrap="nowrap" py="2xs" style={first ? undefined : { borderTop: '1px solid var(--border-soft)' }}>
       <Image src={move.video.thumbnail || undefined} w={40} h={40} radius={4} fit="cover" alt="" />
       <Box miw={0} flex={1}>
         <Text fz="sm" fw={600} truncate="end" title={move.video.title}>
@@ -32,7 +32,7 @@ function ChangeRow({ move, first, onRevert }) {
       </Box>
       {move.kind === 'transfer' ? (
         // To another board: "Rock [T2] -> Nippo Normal [T3]".
-        <Group gap={6} wrap="nowrap" flex="none" maw="55%">
+        <Group gap="3xs" wrap="nowrap" flex="none" maw="55%">
           <Text fz="xs" c="dimmed" truncate="end" maw={110}>
             {move.fromCategory}
           </Text>
@@ -44,7 +44,7 @@ function ChangeRow({ move, first, onRevert }) {
           <TierChip tier={move.toTier} size={20} />
         </Group>
       ) : move.kind === 'move' ? (
-        <Group gap={6} wrap="nowrap" flex="none">
+        <Group gap="3xs" wrap="nowrap" flex="none">
           <TierChip tier={move.from} size={20} />
           <ArrowRight size={13} color="var(--text-faint)" />
           <TierChip tier={move.to} size={20} />
@@ -63,7 +63,7 @@ function ChangeRow({ move, first, onRevert }) {
           multiline
           maw={260}
         >
-          <Group gap={6} wrap="nowrap" flex="none">
+          <Group gap="3xs" wrap="nowrap" flex="none">
             <Trash2 size={13} color="var(--mantine-color-red-filled)" />
             <Text fz="xs" c="red" fw={600}>
               Remove from
@@ -71,7 +71,7 @@ function ChangeRow({ move, first, onRevert }) {
             <TierChip tier={move.kind === 'dedupe' ? move.tier : move.from} size={20} active={false} />
             {move.kind === 'dedupe' && (
               <>
-                <Text fz="xs" c="dimmed" ml={4}>
+                <Text fz="xs" c="dimmed" ml="4xs">
                   · already in
                 </Text>
                 <TierChip tier={move.keptTier} size={20} />
@@ -183,7 +183,7 @@ export default function PendingChanges() {
           withBorder
           radius="md"
           shadow="xl"
-          p={6}
+          p="3xs"
           pl="md"
           className="anim-rise"
           bg="var(--surface-2)"
@@ -207,7 +207,7 @@ export default function PendingChanges() {
               style={{ borderRadius: '50%', flexShrink: 0 }}
             />
             {count > 0 ? (
-              <Button variant="subtle" color="gray" c="var(--text)" px={6} onClick={() => setReviewOpen(true)}>
+              <Button variant="subtle" color="gray" c="var(--text)" px="3xs" onClick={() => setReviewOpen(true)}>
                 {compact ? `${count} staged` : `${count} change${count === 1 ? '' : 's'} staged · review`}
               </Button>
             ) : (

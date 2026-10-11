@@ -27,7 +27,7 @@ import { TIER_INK, indexForPointInFlow, videoMatches } from '../tierUtils';
 import { isSequenceKey } from '../keyboard/sequence';
 import { useCanvas } from '../layout/canvas';
 import { SHELL_Y, spacingPx } from '../layout/spacing';
-import { GAP, allocateLines, fitBoard, tilesPerLine } from '../layout/boardFit';
+import { EMPTY_ROW, GAP_KEY, INSET_KEY, TODO_GAP_KEY, allocateLines, fitBoard, tilesPerLine } from '../layout/boardFit';
 
 function DropIndicator({ size }) {
   return <Box w={3} h={size} bg="accent" style={{ borderRadius: 2, flexShrink: 0 }} />;
@@ -68,6 +68,8 @@ function TierRow({
   const isOver = dnd.dragOverTier === tier;
   const color = TIER_COLORS[tier];
   const isTodo = tier === TODO_TIER;
+  // An empty row collapses to a slim drop zone (layout/boardFit.js EMPTY_ROW).
+  const collapsed = !loading && !items?.length;
   const playLabel = isTodo ? 'Triage: play and rate one by one' : `Play ${tierName(tier)}`;
 
   const shown = searchActive ? items?.filter((v) => matchedKeys.has(`${tier}:${v.videoId}`)) : items;
@@ -110,7 +112,7 @@ function TierRow({
     >
       <UnstyledButton
         onClick={() => onOpenTier(tier)}
-        w={size < 64 ? 54 : 68}
+        w={size < 64 ? 48 : 60}
         bg={color}
         aria-label={`Open ${tierName(tier)}`}
         className="tier-label-btn"
@@ -120,20 +122,20 @@ function TierRow({
           flexDirection: 'column',
           alignItems: 'center',
           justifyContent: 'center',
-          gap: 2,
-          padding: '6px 0',
+          gap: 'var(--mantine-spacing-5xs)',
+          padding: 'var(--mantine-spacing-3xs) 0',
         }}
       >
-        <Text ff="var(--font-display)" fw={900} fz={(size < 64 ? 18 : 22) * (isTodo ? 0.7 : 1)} lh={1} c={TIER_INK}>
+        <Text ff="var(--font-display)" fw={900} fz={isTodo ? (size < 64 ? 'sm' : 'lg') : size < 64 ? 'xl' : '2xl'} lh={1} c={TIER_INK}>
           {tierName(tier)}
         </Text>
         {!loading && (
-          <Text fz={11} fw={700} c={TIER_INK} opacity={0.7} lh={1.2}>
+          <Text fz="xs" fw={700} c={TIER_INK} opacity={0.7} lh={1.2}>
             {searchActive ? `${total}/${items?.length ?? 0}` : items?.length ?? 0}
           </Text>
         )}
         {!loading && items?.length > 0 && (
-          <Group gap={0} mt={2} wrap="nowrap">
+          <Group gap={0} mt="5xs" wrap="nowrap">
             <Tooltip label={playLabel} withArrow>
               <ActionIcon
                 component="span"
@@ -168,13 +170,13 @@ function TierRow({
         )}
       </UnstyledButton>
 
-      <Box ref={sizeRef} style={{ flex: 1, minWidth: 0 }} p={GAP - 4}>
-        <Group ref={contentRef} gap={GAP} wrap={searchActive || expanded || lines > 1 ? 'wrap' : 'nowrap'} mih={size} p={4} style={{ overflow: 'hidden' }}>
+      <Box ref={sizeRef} style={{ flex: 1, minWidth: 0 }} p={INSET_KEY}>
+        <Group ref={contentRef} gap={GAP_KEY} wrap={searchActive || expanded || lines > 1 ? 'wrap' : 'nowrap'} mih={collapsed ? EMPTY_ROW : size} p={INSET_KEY} style={{ overflow: 'hidden' }}>
           {loading &&
             Array.from({ length: perLine }).map((_, i) => <Skeleton key={i} w={size} h={size} radius={6} style={{ flexShrink: 0 }} />)}
           {!loading && total === 0 && (
             <Box
-              h={size}
+              h={collapsed ? EMPTY_ROW : size}
               px="md"
               style={{
                 border: `1px dashed ${isOver ? color : 'var(--border)'}`,
@@ -196,7 +198,7 @@ function TierRow({
             visible.map((v, i) => {
               const key = `${tier}:${v.videoId}`;
               return (
-                <Group key={v.videoId} gap={GAP} wrap="nowrap" style={{ flexShrink: 0 }}>
+                <Group key={v.videoId} gap={GAP_KEY} wrap="nowrap" style={{ flexShrink: 0 }}>
                   {isOver && overIndex === i && <DropIndicator size={size} />}
                   <TierTile
                     video={v}
@@ -235,10 +237,10 @@ function TierRow({
                 justifyContent: 'center',
               }}
             >
-              <Text ff="var(--font-display)" fw={900} fz={size < 64 ? 15 : 19} lh={1} c={`color-mix(in srgb, ${color} 60%, var(--text))`}>
+              <Text ff="var(--font-display)" fw={900} fz={size < 64 ? 'lg' : 'xl'} lh={1} c={`color-mix(in srgb, ${color} 60%, var(--text))`}>
                 +{hiddenCount}
               </Text>
-              <Text fz={10} c="dimmed" mt={3}>
+              <Text fz="2xs" c="dimmed" mt="4xs">
                 show all
               </Text>
             </UnstyledButton>
@@ -257,7 +259,7 @@ function TierRow({
         <UnstyledButton
           onClick={() => setExpanded((e) => !e)}
           disabled={!overflows}
-          px={6}
+          px="3xs"
           aria-label={expanded ? `Show less of ${tierName(tier)}` : `Expand ${tierName(tier)}`}
           aria-expanded={overflows ? expanded : undefined}
           className="row-open-btn"
@@ -273,7 +275,7 @@ function TierRow({
         >
           <Box
             h={size}
-            mt={GAP}
+            mt={GAP_KEY}
             style={{ position: 'sticky', top: 0, display: 'grid', placeItems: 'center', opacity: overflows ? 1 : 0.3 }}
           >
             {expanded && overflows ? (
@@ -351,14 +353,16 @@ export default function TierBoardView({
   const stagedCount = useSelector(selectStagedChanges).length;
   // Room to scroll the last row clear of the floating staged-changes bar -
   // padding only; it never changes the tile size (layout/boardFit.js).
-  const pendingPad = stagedCount > 0 ? 80 : 0;
+  const pendingPad = stagedCount > 0 ? '5xl' : 0;
+  const emptyRows = unknownTiers ? 0 : rowTiers.filter((t) => !tierLoading[t] && !tierItems[t]?.length).length;
   const { tileSize, perLine, lineBudget } = fitBoard({
     viewportHeight,
     rowsTop,
     footerHeight,
     bottomPad: spacingPx(SHELL_Y),
     hasTodo,
-    rowCount: unknownTiers ? shownTiers.length : rowTiers.length,
+    rowCount: unknownTiers ? shownTiers.length : rowTiers.length - emptyRows,
+    emptyRows,
     rowWidth,
     baseTileSize,
   });
@@ -366,11 +370,12 @@ export default function TierBoardView({
     const allocated = allocateLines(
       rowTiers.map((t) => tierItems[t]?.length ?? 0),
       perLine,
-      lineBudget
+      // allocateLines gives every row a line; the empty ones don't use theirs.
+      lineBudget + emptyRows
     );
     return Object.fromEntries(rowTiers.map((t, i) => [t, allocated[i]]));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [rowTiers.join(), tierItems, perLine, lineBudget, rowWidth, viewportHeight]);
+  }, [rowTiers.join(), tierItems, perLine, lineBudget, emptyRows, rowWidth, viewportHeight]);
 
   function move(fromTier, toTier, videoId, dropIndex) {
     dispatch(moveWithFeedback([{ fromTier, toTier, videoId, dropIndex }]));
@@ -497,9 +502,9 @@ export default function TierBoardView({
   return (
     <Box component="section" pb={pendingPad}>
       <Box ref={headerRef}>
-      <Group justify="space-between" align="flex-end" wrap="wrap" gap="md" mb="md">
-        <Stack gap={4} align="flex-start">
-          <Text fz={11} fw={800} tt="uppercase" c="accent" style={{ letterSpacing: 1.5 }}>
+      <Group justify="space-between" align="flex-end" wrap="wrap" gap="md" mb="sm">
+        <Stack gap="5xs" align="flex-start">
+          <Text fz="xs" fw={800} tt="uppercase" c="accent" style={{ letterSpacing: 1.5 }}>
             Tier list
           </Text>
           <BoardNameEditor key={category} category={category} onRenamed={onRenameBoard} />
@@ -549,7 +554,7 @@ export default function TierBoardView({
 
       {/* Shown (empty) while loading too, so the rows below don't drop when it fills. */}
       {(hasVideos || anyLoading) && (
-        <Box mb="md">
+        <Box mb="sm">
           <TierMixBar tiers={tiers} counts={counts} size={18} labels onSegmentClick={onOpenTier} />
         </Box>
       )}
@@ -584,7 +589,7 @@ export default function TierBoardView({
       {/* The TODO list sits under the ranked tiers: songs waiting to be
           rated, not a tier above S. */}
       {hasTodo && !unknownTiers && (
-        <Paper withBorder radius="md" mt="md" style={{ overflow: 'clip', borderTop: 'none' }} bg="var(--surface)">
+        <Paper withBorder radius="md" mt={TODO_GAP_KEY} style={{ overflow: 'clip', borderTop: 'none' }} bg="var(--surface)">
           <TierRow
             key={`${category}:${TODO_TIER}`}
             tier={TODO_TIER}
@@ -648,7 +653,7 @@ export default function TierBoardView({
           withBorder
           radius="md"
           shadow="xl"
-          p={6}
+          p="3xs"
           className="anim-rise"
           bg="var(--surface-2)"
           style={{
@@ -674,7 +679,7 @@ export default function TierBoardView({
             <Badge variant="light" radius="sm">
               {matches.length > 0 ? `${(matchIndex % matches.length) + 1}/${matches.length}` : '0/0'}
             </Badge>
-            <Group gap={4} visibleFrom="sm" wrap="nowrap">
+            <Group gap="4xs" visibleFrom="sm" wrap="nowrap">
               <Kbd size="xs">↵</Kbd>
               <Kbd size="xs">n</Kbd>
               <Kbd size="xs">N</Kbd>

@@ -1,7 +1,9 @@
-import { DEFAULT_THEME, px } from '@mantine/core';
+import { px } from '@mantine/core';
+import { SPACING } from '../themes';
 
-// The app shell's one spacing standard, in Mantine spacing keys (xs 10 ·
-// sm 12 · md 16 · lg 20 · xl 32) - pass these straight to Mantine's `p`/`px`/
+// The app shell's one spacing standard, in the app's spacing keys
+// (themes.js SPACING: 5xs 2 · 4xs 4 · 3xs 6 · 2xs 8 · xs 10 · sm 12 · md 16 ·
+// lg 20 · xl 32 · 2xl 40 ...) - pass these straight to Mantine's `p`/`px`/
 // `py`/`gap` props, never a raw number, so every column lines up:
 //   - SHELL_Y: the top and bottom edge of every shell column (sidebar,
 //     canvas, rail) - their first/last things sit on the same lines, and the
@@ -23,4 +25,4 @@ export const RAIL_X = 'xs';
 export const CANVAS_TOP = { base: 72, md: SHELL_Y };
 
 // The same values in px, for layout maths (e.g. the tier board's fit).
-export const spacingPx = (key) => px(DEFAULT_THEME.spacing[key]);
+export const spacingPx = (key) => px(SPACING[key]);

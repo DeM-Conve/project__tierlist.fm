@@ -11,20 +11,20 @@ function ThemePreview({ theme, accent, tierColors }) {
   const fill = accent.scale[theme.scheme === 'dark' ? accent.onDark : accent.onLight];
   return (
     <Box h={64} bg={theme.bg} style={{ borderRadius: 6, border: `1px solid ${theme.border}`, display: 'flex', overflow: 'hidden' }}>
-      <Box w={34} bg={theme.surface} style={{ borderRight: `1px solid ${theme.borderSoft}` }} p={6}>
-        <Stack gap={4}>
+      <Box w={34} bg={theme.surface} style={{ borderRight: `1px solid ${theme.borderSoft}` }} p="3xs">
+        <Stack gap="4xs">
           {[0, 1, 2].map((i) => (
             <Box key={i} h={4} bg={i === 0 ? fill : theme.textFaint} style={{ borderRadius: 2 }} />
           ))}
         </Stack>
       </Box>
-      <Stack gap={4} p={6} style={{ flex: 1 }}>
+      <Stack gap="4xs" p="3xs" style={{ flex: 1 }}>
         <Group justify="space-between" wrap="nowrap">
           <Box h={6} w={46} bg={theme.text} style={{ borderRadius: 2 }} />
           <Box h={12} w={30} bg={fill} style={{ borderRadius: 3 }} />
         </Group>
         {TIER_ORDER.slice(0, 3).map((t) => (
-          <Group key={t} gap={3} wrap="nowrap">
+          <Group key={t} gap="4xs" wrap="nowrap">
             <Box w={10} h={8} bg={tierColors[t]} style={{ borderRadius: 2 }} />
             <Box h={8} style={{ flex: 1, borderRadius: 2 }} bg={theme.surface2} />
           </Group>
@@ -42,9 +42,9 @@ export default function AppearanceSettings() {
 
   return (
     // Sized to fit one screen: all six themes in a row on wide screens.
-    <Stack gap={28}>
+    <Stack gap="lg">
       <div>
-        <Title order={2} fz={18} mb={6}>
+        <Title order={2} mb="3xs">
           Theme
         </Title>
         <Text c="dimmed" fz="sm" mb="sm">
@@ -60,10 +60,10 @@ export default function AppearanceSettings() {
         >
           <SimpleGrid cols={{ base: 2, sm: 3, xl: 6 }} spacing="xs">
             {Object.entries(THEMES).map(([key, theme]) => (
-              <Radio.Card key={key} value={key} radius="md" p={8}>
+              <Radio.Card key={key} value={key} radius="md" p="2xs">
                 <ThemePreview theme={theme} accent={accent} tierColors={tierColors} />
-                <Group justify="space-between" mt={8} wrap="nowrap" gap={4}>
-                  <Group gap={6} wrap="nowrap" miw={0}>
+                <Group justify="space-between" mt="2xs" wrap="nowrap" gap="4xs">
+                  <Group gap="3xs" wrap="nowrap" miw={0}>
                     <Radio.Indicator size="xs" />
                     <Text fw={600} fz="sm" truncate="end">
                       {theme.label}
@@ -80,7 +80,7 @@ export default function AppearanceSettings() {
       </div>
 
       <div>
-        <Title order={2} fz={18} mb={6}>
+        <Title order={2} mb="3xs">
           Accent
         </Title>
         <Text c="dimmed" fz="sm" mb="sm">
@@ -90,7 +90,7 @@ export default function AppearanceSettings() {
           <Group gap="sm">
             {Object.entries(ACCENTS).map(([key, a]) => (
               <Radio.Card key={key} value={key} radius="md" p="xs" w="auto">
-                <Group gap={8} wrap="nowrap" pr={6}>
+                <Group gap="2xs" wrap="nowrap" pr="3xs">
                   <ColorSwatch color={a.scale[5]} size={24}>
                     {appearance.accent === key && <CheckIcon size={11} color={a.scale[9]} />}
                   </ColorSwatch>
@@ -105,7 +105,7 @@ export default function AppearanceSettings() {
       </div>
 
       <div>
-        <Title order={2} fz={18} mb={6}>
+        <Title order={2} mb="3xs">
           Tier colors
         </Title>
         <Text c="dimmed" fz="sm" mb="sm">
@@ -115,16 +115,16 @@ export default function AppearanceSettings() {
           <SimpleGrid cols={{ base: 1, sm: 3 }} spacing="sm">
             {Object.entries(TIER_PALETTES).map(([key, p]) => (
               <Radio.Card key={key} value={key} radius="md" p="sm">
-                <Group gap={4} wrap="nowrap" mb={8}>
+                <Group gap="4xs" wrap="nowrap" mb="2xs">
                   {TIER_ORDER.map((t) => (
                     <Box key={t} h={24} bg={p.colors[t]} style={{ flex: 1, borderRadius: 4, display: 'grid', placeItems: 'center' }}>
-                      <Text ff="var(--font-display)" fw={900} fz={11} c="var(--tier-ink)">
+                      <Text ff="var(--font-display)" fw={900} fz="xs" c="var(--tier-ink)">
                         {tierName(t)}
                       </Text>
                     </Box>
                   ))}
                 </Group>
-                <Group gap={8}>
+                <Group gap="2xs">
                   <Radio.Indicator size="xs" />
                   <Text fw={600} fz="sm">
                     {p.label}

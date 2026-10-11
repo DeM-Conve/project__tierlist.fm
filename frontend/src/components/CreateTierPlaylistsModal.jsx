@@ -115,11 +115,11 @@ export default function CreateTierPlaylistsModal({ opened, onClose, category: fi
           />
         ))}
         <div>
-          <Text fz="sm" fw={500} mb={6}>
+          <Text fz="sm" fw={500} mb="3xs">
             Tiers to create
           </Text>
           <Chip.Group multiple value={tiers} onChange={setTiers}>
-            <Group gap={6}>
+            <Group gap="3xs">
               {BOARD_TIERS.map((t) => (
                 <Chip key={t} value={t} disabled={existingTiers.includes(t)} size="sm">
                   {tierName(t)}
@@ -130,7 +130,7 @@ export default function CreateTierPlaylistsModal({ opened, onClose, category: fi
           </Chip.Group>
         </div>
         <div>
-          <Text fz="sm" fw={500} mb={6}>
+          <Text fz="sm" fw={500} mb="3xs">
             Visibility on YouTube
           </Text>
           <SegmentedControl
@@ -145,9 +145,9 @@ export default function CreateTierPlaylistsModal({ opened, onClose, category: fi
         </div>
         {name && titles.length > 0 && (
           <Alert variant="light" color="gray" title="Will create (named by your template)">
-            <Stack gap={4}>
+            <Stack gap="4xs">
               {titles.map((t) => (
-                <Group key={t.tier} gap={8} wrap="nowrap">
+                <Group key={t.tier} gap="2xs" wrap="nowrap">
                   <TierChip tier={t.tier} size={20} />
                   <Text fz="sm" ff="monospace" truncate="end">
                     {t.title}

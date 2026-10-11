@@ -47,32 +47,34 @@
   position: relative;
   /* The gap between two cards (layout/spacing.js PART_GAP). */
   width: var(--shell-gap);
-  overflow: visible;
-  display: flex;
-  align-items: center;
-  justify-content: center;
   cursor: col-resize;
   outline: none;
 }
-.sash::before {
+/* VS Code's sash, measured off the user's screenshot: three 2px dots,
+   6px apart, a few shades above the frame, dead centre of the gap
+   (::after); an accent line down the middle on hover / drag / focus
+   (::before). Pseudo-elements on react-resizable-panels' Separator - no
+   Mantine prop for this. */
+.sash::before,
+.sash::after {
   content: '';
   position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+}
+.sash::before {
   top: 0;
   bottom: 0;
-  left: calc(50% - 1px);
   width: 2px;
-  border-radius: 1px;
   background: transparent;
   transition: background 0.1s ease;
 }
-.sash-grip {
-  /* Just the dots, on the frame inside the gap - no box behind them, so
-     nothing spills onto the cards (VS Code's sash grip). */
-  position: relative;
-  flex-shrink: 0;
-  overflow: visible;
-  color: var(--chrome-fg-muted);
-  transition: color 0.1s ease;
+.sash::after {
+  top: 50%;
+  width: 2px;
+  height: 18px;
+  margin-top: -9px;
+  background: radial-gradient(circle, var(--sash-dot) 1px, transparent 1.1px) center top / 2px 6px repeat-y;
 }
 .sash[data-separator='hover']::before,
 .sash[data-separator='active']::before,
@@ -80,11 +82,10 @@
   background: var(--accent-fill);
   transition-delay: 0.15s;
 }
-.sash[data-separator='hover'] .sash-grip,
-.sash[data-separator='active'] .sash-grip,
-.sash[data-separator='focus'] .sash-grip {
-  color: var(--text);
-  opacity: 1;
+.sash[data-separator='hover']::after,
+.sash[data-separator='active']::after,
+.sash[data-separator='focus']::after {
+  opacity: 0;
 }
 
 /* Lists on the window chrome (Sidebar.jsx's NavLinks): VS Code's
@@ -179,7 +180,7 @@
   align-items: center;
   justify-content: center;
   z-index: 50;
-  padding: 20px;
+  padding: var(--mantine-spacing-lg);
 }
 .player-dock-expanded .player-dock-backdrop {
   position: absolute;
@@ -199,7 +200,7 @@
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 8px;
-  padding: 24px;
+  padding: var(--mantine-spacing-lg);
   box-shadow: 0 24px 64px var(--shadow);
 }
 .player-dock-card:focus { outline: none; }
@@ -212,23 +213,23 @@
 .player-dock-expanded .player-dock-card {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 360px;
-  column-gap: 28px;
+  column-gap: var(--mantine-spacing-xl);
   width: min(1480px, 100%, calc((90vh - 250px) * 16 / 9 + 440px));
   max-width: none;
   max-height: 94vh;
-  padding: 24px 24px 20px;
+  padding: var(--mantine-spacing-lg);
   border-radius: 14px;
 }
-.player-dock-expanded .player-dock-toolbar { top: 22px; right: 24px; }
+.player-dock-expanded .player-dock-toolbar { top: var(--mantine-spacing-lg); right: var(--mantine-spacing-lg); }
 .player-dock-main { min-width: 0; }
 .player-dock-mini .player-dock-main { display: contents; }
 .player-dock-expanded .player-dock-body {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto auto;
   align-items: center;
-  gap: 20px;
+  gap: var(--mantine-spacing-lg);
 }
-.player-dock-expanded .focus-info h2 { font-size: 22px; line-height: 1.25; }
+.player-dock-expanded .focus-info h2 { font-size: var(--mantine-font-size-2xl); line-height: 1.25; }
 /* `contain: size` keeps the (long) queue from growing the grid row, so
    the panel is exactly as tall as the main column and scrolls inside. */
 .player-queue {
@@ -236,7 +237,7 @@
   display: flex;
   flex-direction: column;
   min-width: 0;
-  padding-left: 24px;
+  padding-left: var(--mantine-spacing-lg);
   border-left: 1px solid var(--border-soft);
 }
 .player-queue-head { padding-right: 44px; } /* room for the minimize button */
@@ -247,8 +248,8 @@
 .queue-thumb:hover .queue-thumb-play, .queue-thumb:focus-visible .queue-thumb-play { opacity: 1; }
 @media (max-width: 61.99em) {
   .player-dock-expanded .player-dock-card { grid-template-columns: minmax(0, 1fr); width: 100%; overflow-y: auto; }
-  .player-dock-expanded .player-dock-body { grid-template-columns: minmax(0, 1fr); gap: 12px; }
-  .player-queue { contain: none; height: 420px; padding-left: 0; border-left: 0; margin-top: 20px; }
+  .player-dock-expanded .player-dock-body { grid-template-columns: minmax(0, 1fr); gap: var(--mantine-spacing-sm); }
+  .player-queue { contain: none; height: 420px; padding-left: 0; border-left: 0; margin-top: var(--mantine-spacing-lg); }
   .player-queue-head { padding-right: 0; }
 }
 
@@ -270,7 +271,7 @@
   overflow: visible;
   /* Sides on the shell standard (layout/spacing.js SIDEBAR_X = md), so the
      cover art lines up with the sidebar's content above it. */
-  padding: 6px var(--mantine-spacing-md);
+  padding: var(--mantine-spacing-3xs) var(--mantine-spacing-md);
   /* On the window chrome, like VS Code's status bar: one frame color
      around the page card, a chrome-toned top border. */
   background: var(--chrome);
@@ -289,10 +290,10 @@
   display: grid;
   grid-template-columns: 44px minmax(0, 1fr) auto minmax(0, 1fr) 44px;
   align-items: center;
-  column-gap: 12px;
+  column-gap: var(--mantine-spacing-sm);
 }
 .player-dock-mini .player-dock-secondary { grid-column: 4 / 6; justify-self: end; }
-.player-dock-center { display: flex; flex-direction: column; align-items: center; gap: 2px; min-width: 0; }
+.player-dock-center { display: flex; flex-direction: column; align-items: center; gap: var(--mantine-spacing-5xs); min-width: 0; }
 .player-dock-progress-track {
   position: absolute;
   top: 0;
@@ -315,17 +316,17 @@
 /* The line thickens under the pointer so it's an easy seek target (a :hover state). */
 .player-dock-progress-track:hover .player-dock-progress { top: 3px; height: 4px; }
 @media (max-width: 47.99em) {
-  .player-dock-mini:not(.player-dock-floating) .player-dock-card { grid-template-columns: 44px minmax(0, 1fr) auto auto; padding: 6px 10px; }
+  .player-dock-mini:not(.player-dock-floating) .player-dock-card { grid-template-columns: 44px minmax(0, 1fr) auto auto; padding: var(--mantine-spacing-3xs) var(--mantine-spacing-xs); }
   .player-dock-mini:not(.player-dock-floating) .player-dock-secondary { grid-column: auto; }
   .player-dock-mini:not(.player-dock-floating) .player-dock-extra { display: none; }
 }
 
 .player-dock-toolbar {
   position: absolute;
-  top: 12px;
-  right: 12px;
+  top: var(--mantine-spacing-sm);
+  right: var(--mantine-spacing-sm);
   display: flex;
-  gap: 8px;
+  gap: var(--mantine-spacing-2xs);
   z-index: 2;
 }
 .player-dock-mini .focus-media {
@@ -340,8 +341,8 @@
 .player-dock-mini .player-dock-body { display: contents; }
 .player-dock-mini .focus-info { min-width: 0; cursor: pointer; }
 .player-dock-mini .focus-info h2 {
-  font-size: 14px;
-  margin: 0 0 2px;
+  font-size: var(--mantine-font-size-lg);
+  margin: 0 0 var(--mantine-spacing-5xs);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -357,8 +358,8 @@
 .player-dock-mini.player-dock-floating {
   position: fixed;
   left: auto;
-  right: 24px;
-  bottom: 24px;
+  right: var(--mantine-spacing-lg);
+  bottom: var(--mantine-spacing-lg);
   width: 300px;
   z-index: 45;
 }
@@ -375,8 +376,8 @@
 }
 .player-dock-floating .player-dock-toolbar {
   position: absolute;
-  top: 8px;
-  right: 8px;
+  top: var(--mantine-spacing-2xs);
+  right: var(--mantine-spacing-2xs);
   z-index: 3;
 }
 .player-dock-floating .focus-media {
@@ -389,8 +390,8 @@
   display: flex;
   flex-direction: column;
   align-items: stretch;
-  gap: 4px;
-  padding: 8px 12px 10px;
+  gap: var(--mantine-spacing-4xs);
+  padding: var(--mantine-spacing-2xs) var(--mantine-spacing-sm) var(--mantine-spacing-xs);
 }
 .player-dock-floating .player-dock-progress-track { top: auto; bottom: 0; margin-top: 0; }
 .player-dock-floating .player-dock-progress { top: auto; bottom: 0; }
@@ -399,7 +400,7 @@
 .focus-media-slot { position: relative; }
 .focus-media {
   position: relative;
-  margin-bottom: 16px;
+  margin-bottom: var(--mantine-spacing-md);
 }
 .focus-embed {
   position: relative;
@@ -421,7 +422,7 @@
   align-items: center;
   justify-content: center;
   color: var(--text-faint);
-  font-size: 13px;
+  font-size: var(--mantine-font-size-md);
 }
 .focus-embed-blocked {
   width: 100%;
@@ -430,27 +431,27 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 14px;
-  padding: 20px;
+  gap: var(--mantine-spacing-md);
+  padding: var(--mantine-spacing-lg);
   text-align: center;
   color: var(--text-dim);
-  font-size: 14px;
+  font-size: var(--mantine-font-size-md);
 }
 .focus-info h2 {
   font-family: var(--font-display);
-  font-size: 19px;
-  margin: 0 0 4px;
+  font-size: var(--mantine-font-size-xl);
+  margin: 0 0 var(--mantine-spacing-4xs);
 }
 .focus-hint {
-  margin: 14px 2px 0;
+  margin: var(--mantine-spacing-md) var(--mantine-spacing-5xs) 0;
   color: var(--text-faint);
-  font-size: 12px;
+  font-size: var(--mantine-font-size-sm);
 }
 
 /* Board name on a tier board (BoardNameEditor): renamed in place like an
    Office document name. CSS because no Mantine prop covers these: the
    outline is revealed by :hover / :focus (the width is field-sizing, set
-   via the input's Mantine styles prop). The -9px shift keeps the text aligned
+   via the input's Mantine styles prop). The shift left keeps the text aligned
    with the label above when the outline is invisible - a translate, not a
    negative margin: that shrank the title's width and max-width: 100% then
    cut the name off. */
@@ -465,8 +466,9 @@
   min-height: 0;
   font: inherit;
   letter-spacing: inherit;
-  padding: 2px 8px;
-  translate: -9px 0;
+  padding: var(--mantine-spacing-5xs) var(--mantine-spacing-2xs);
+  /* the padding + the 1px border */
+  translate: calc(-1 * var(--mantine-spacing-2xs) - 1px) 0;
   border: 1px solid transparent;
   border-radius: 6px;
   color: inherit;

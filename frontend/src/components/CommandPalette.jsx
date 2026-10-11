@@ -19,7 +19,7 @@ export default function CommandPalette({ items }) {
       // it here, sourced from shortcuts.js so the hint can't drift out of
       // sync with what the page actually binds.
       rightSection: hotkey ? (
-        <Group gap={4} wrap="nowrap">
+        <Group gap="4xs" wrap="nowrap">
           {hotkey.map((k, i) => (
             <Kbd key={i} size="xs">
               {k}

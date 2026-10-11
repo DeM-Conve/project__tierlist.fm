@@ -11,6 +11,7 @@ import appearanceReducer from '../store/appearanceSlice';
 import namingReducer from '../store/namingSlice';
 import addSongsReducer from '../store/addSongsSlice';
 import transfersReducer from '../store/transfersSlice';
+import { SPACING } from '../themes';
 
 const reducer = {
   auth: authReducer,
@@ -36,7 +37,10 @@ export function makeStore({ playlists = [], naming = {} } = {}) {
   });
 }
 
-// Renders `ui` inside the app's providers.
+// Renders `ui` inside the app's providers - Mantine with the app's spacing
+// scale (themes.js SPACING), so keys like gap="2xs" resolve as in the app.
+const theme = { spacing: SPACING };
+
 export function renderWithApp(ui, { store = makeStore(), queryClient = new QueryClient() } = {}) {
   return {
     store,
@@ -44,7 +48,7 @@ export function renderWithApp(ui, { store = makeStore(), queryClient = new Query
     ...render(
       <QueryClientProvider client={queryClient}>
         <Provider store={store}>
-          <MantineProvider>{ui}</MantineProvider>
+          <MantineProvider theme={theme}>{ui}</MantineProvider>
         </Provider>
       </QueryClientProvider>
     ),

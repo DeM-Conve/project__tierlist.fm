@@ -95,7 +95,7 @@ export default function BoardNameEditor({ category, onRenamed }) {
             <Code>{naming.template}</Code>.
           </Text>
           <Table.ScrollContainer minWidth={520}>
-            <Table striped highlightOnHover withTableBorder fz="sm" verticalSpacing={6}>
+            <Table striped highlightOnHover withTableBorder fz="sm" verticalSpacing="3xs">
               <Table.Thead>
                 <Table.Tr>
                   <Table.Th w={56}>Tier</Table.Th>
@@ -157,7 +157,7 @@ export default function BoardNameEditor({ category, onRenamed }) {
         {/* The browser sizes the box to the text itself (field-sizing:
             content), so it hugs the name at any length and in any font -
             no measuring. See .board-name in App.css for the hover/focus look. */}
-        <Title order={1} fz={{ base: 30, sm: 40 }} fw={900} lh={1.15} className="board-name" data-dirty={name !== category || undefined}>
+        <Title order={1} lh={1.15} className="board-name" data-dirty={name !== category || undefined}>
           <TextInput
             ref={inputRef}
             variant="unstyled"

@@ -55,7 +55,7 @@ function TierTarget({ tier, hotkey, disabled, onClick }) {
         flexDirection: 'column',
         alignItems: 'center',
         justifyContent: 'center',
-        gap: 4,
+        gap: 'var(--mantine-spacing-4xs)',
         opacity: disabled ? 0.3 : 1,
         cursor: disabled ? 'not-allowed' : 'pointer',
       }}
@@ -226,12 +226,12 @@ export default function AddSongsView({ addSongs, actions, onAddLinks }) {
   const upNext = current ? list.filter((v) => v.videoId !== current.videoId) : [];
 
   return (
-    <Stack gap="xl" maw={1100}>
-      <Stack gap={4}>
-        <Text fz={11} fw={800} tt="uppercase" c="accent" style={{ letterSpacing: 1.5 }}>
+    <Stack gap="lg" maw={1100}>
+      <Stack gap="4xs">
+        <Text fz="xs" fw={800} tt="uppercase" c="accent" style={{ letterSpacing: 1.5 }}>
           Add songs
         </Text>
-        <Title order={1} fz={{ base: 30, sm: 40 }} fw={900} lh={1}>
+        <Title order={1} lh={1}>
           Add a song
         </Title>
         <Text c="dimmed" fz="sm">
@@ -243,7 +243,7 @@ export default function AddSongsView({ addSongs, actions, onAddLinks }) {
 
       {current && (
         <Paper withBorder radius="lg" p={{ base: 'md', sm: 'xl' }} bg="var(--surface)">
-          <Flex gap="xl" direction={{ base: 'column', sm: 'row' }}>
+          <Flex gap="lg" direction={{ base: 'column', sm: 'row' }}>
             <UnstyledButton
               onClick={() => actions.listen(current)}
               pos="relative"
@@ -252,7 +252,7 @@ export default function AddSongsView({ addSongs, actions, onAddLinks }) {
               aria-label={`Play ${label.song}`}
             >
               <Image src={current.thumbnail} alt="" style={{ aspectRatio: '16 / 9' }} fit="cover" />
-              <Group pos="absolute" left={10} bottom={10} gap={6} px={10} py={6} bg="var(--media-control-bg)" style={{ borderRadius: 999 }}>
+              <Group pos="absolute" left={10} bottom={10} gap="3xs" px="xs" py="3xs" bg="var(--media-control-bg)" style={{ borderRadius: 999 }}>
                 {isPlaying ? (
                   <EqualizerMark color="var(--media-fg)" height={11} />
                 ) : (
@@ -266,8 +266,8 @@ export default function AddSongsView({ addSongs, actions, onAddLinks }) {
             </UnstyledButton>
 
             <Stack gap="md" style={{ flex: 1, minWidth: 0 }}>
-              <Stack gap={4}>
-                <Title order={2} fz={{ base: 24, sm: 30 }} lh={1.15} lineClamp={2} title={current.title}>
+              <Stack gap="4xs">
+                <Title order={2} fz="xl" lh={1.15} lineClamp={2} title={current.title}>
                   {label.song}
                 </Title>
                 <Text c="dimmed">{label.artist}</Text>
@@ -309,7 +309,7 @@ export default function AddSongsView({ addSongs, actions, onAddLinks }) {
                       w={230}
                       aria-label="Board"
                       leftSection={
-                        <Text fz={11} fw={700} c="dimmed">
+                        <Text fz="xs" fw={700} c="dimmed">
                           BOARD
                         </Text>
                       }
@@ -372,7 +372,7 @@ export default function AddSongsView({ addSongs, actions, onAddLinks }) {
 
       {upNext.length > 0 && (
         <Stack gap="xs">
-          <Group gap={8}>
+          <Group gap="2xs">
             <Text fz="xs" fw={700} tt="uppercase" c="dimmed" style={{ letterSpacing: 1 }}>
               Waiting
             </Text>
@@ -387,10 +387,10 @@ export default function AddSongsView({ addSongs, actions, onAddLinks }) {
                 return (
                   <UnstyledButton key={v.videoId} w={150} onClick={() => dispatch(setCurrent(v.videoId))} style={{ flex: 'none' }}>
                     <Thumb video={v} w={150} />
-                    <Text fz="xs" fw={600} mt={6} truncate="end" title={v.title}>
+                    <Text fz="xs" fw={600} mt="3xs" truncate="end" title={v.title}>
                       {l.song}
                     </Text>
-                    <Text fz={11} c="dimmed" truncate="end">
+                    <Text fz="xs" c="dimmed" truncate="end">
                       {l.artist}
                     </Text>
                   </UnstyledButton>
@@ -411,11 +411,11 @@ export default function AddSongsView({ addSongs, actions, onAddLinks }) {
               Undo last
             </Button>
           </Group>
-          <Paper withBorder radius="md" p={4}>
+          <Paper withBorder radius="md" p="4xs">
             {filed.map((entry) => {
               const l = songLabel(entry.video);
               return (
-                <Group key={`${entry.video.videoId}:${entry.tier}`} gap="sm" wrap="nowrap" p={6}>
+                <Group key={`${entry.video.videoId}:${entry.tier}`} gap="sm" wrap="nowrap" p="3xs">
                   <Thumb video={entry.video} w={56} />
                   <Stack gap={0} style={{ flex: 1, minWidth: 0 }}>
                     <Text fz="sm" fw={600} truncate="end">

@@ -55,7 +55,7 @@ export default function DuelHub({ category, boardLoading, base }) {
 
   if (analysis.isError) {
     return (
-      <Container className="duel-view" size={1280} py={48}>
+      <Container className="duel-view" size={1280} py="xs">
         <Alert color="red" title="Couldn’t load this board’s duels">
           {errorMessage(analysis.error, 'The app couldn’t reach the server.')}
           <Group mt="sm"><Button size="xs" onClick={() => analysis.refetch()}>Retry</Button></Group>
@@ -70,24 +70,24 @@ export default function DuelHub({ category, boardLoading, base }) {
     : [];
 
   return (
-    <Container className="duel-view" size={1280} py={48}>
-      <Stack gap={36}>
-        <Group justify="space-between" align="flex-end" wrap="wrap" gap={24}>
-          <Stack gap={10} maw={720}>
-            <Text fz={13} fw={700} c="accent" tt="uppercase" style={{ letterSpacing: '0.14em' }}>{category} · Duel</Text>
-            <Title order={1} fz={52} ff="var(--font-display)" fw={900} lh={1}>Settle the board.</Title>
-            <Text fz={17} c="dimmed">
+    <Container className="duel-view" size={1280} py="xs">
+      <Stack gap="lg">
+        <Group justify="space-between" align="flex-end" wrap="wrap" gap="lg">
+          <Stack gap="xs" maw={720}>
+            <Text fz="md" fw={700} c="accent" tt="uppercase" style={{ letterSpacing: '0.14em' }}>{category} · Duel</Text>
+            <Title order={1} lh={1}>Settle the board.</Title>
+            <Text fz="xl" c="dimmed">
               Every duel nudges a hidden score. A song changes tier only when the evidence is overwhelming - and only after you approve the move.
             </Text>
           </Stack>
-          <Stack align="flex-end" gap={12}>
+          <Stack align="flex-end" gap="sm">
             <SegmentedControl value={minutes} onChange={setMinutes} data={LENGTHS} aria-label="Session length" />
-            <Button size="lg" leftSection={<Swords size={18} />} rightSection={<Kbd size="xs">Enter</Kbd>} onClick={begin}
+            <Button leftSection={<Swords size={18} />} rightSection={<Kbd size="xs">Enter</Kbd>} onClick={begin}
               loading={start.isPending} disabled={!canStart}>
               {data?.activeSession ? 'Start a new session' : 'Start duelling'}
             </Button>
             {data?.activeSession && (
-              <Anchor component={Link} to={`${base}/duel/play/${data.activeSession}`} fz={14} fw={700}>
+              <Anchor component={Link} to={`${base}/duel/play/${data.activeSession}`} fz="md" fw={700}>
                 Resume the session in progress →
               </Anchor>
             )}
@@ -97,58 +97,58 @@ export default function DuelHub({ category, boardLoading, base }) {
 
         {/* Loading draws the same sections (headings, cards, map) with
             Skeleton blocks where the numbers go, so nothing jumps when they land. */}
-        <SimpleGrid cols={{ base: 1, sm: 3 }} spacing={16}>
+        <SimpleGrid cols={{ base: 1, sm: 3 }} spacing="md">
           <StatCard label="Board certainty" loading={!data} value={data && pct(data.certainty)} aside={data ? `${data.duelsTotal} duels so far` : ''}>
-            <Text fz={14} c="dimmed">How sure the model is that each song sits in the right tier.</Text>
+            <Text fz="md" c="dimmed">How sure the model is that each song sits in the right tier.</Text>
           </StatCard>
           <StatCard label="Moves waiting" loading={!data} value={data?.suggestions.length} highlight={data?.suggestions.length > 0}
             aside={data ? `${data.suggestions.filter((s) => s.confidence >= 0.9).length} at ≥90% confidence` : ''}
             onClick={data ? () => navigate(`${base}/duel/moves`) : undefined}>
-            <Text fz={14} fw={600}>Review suggestions →</Text>
+            <Text fz="md" fw={600}>Review suggestions →</Text>
           </StatCard>
           <StatCard label="On the fence" loading={!data} value={data?.onFence}>
-            <Text fz={14} c="dimmed">Songs within reach of a neighbouring tier.</Text>
+            <Text fz="md" c="dimmed">Songs within reach of a neighbouring tier.</Text>
           </StatCard>
         </SimpleGrid>
 
-        <Paper withBorder radius="lg" p={28} pb={40}>
-          <Stack gap={18}>
+        <Paper withBorder radius="lg" p="md">
+          <Stack gap="lg">
             <Group justify="space-between" align="baseline" wrap="wrap">
-              <Stack gap={4}>
-                <Title order={2} fz={22} ff="var(--font-display)">Score map</Title>
-                <Text fz={14} c="dimmed">Each dot is a song, placed by its score. Ringed dots sit on a border - that is where duels go first.</Text>
+              <Stack gap="4xs">
+                <Title order={2}>Score map</Title>
+                <Text fz="md" c="dimmed">Each dot is a song, placed by its score. Ringed dots sit on a border - that is where duels go first.</Text>
               </Stack>
             </Group>
             {data ? <ScoreMap analysis={data} nameOf={board.nameOf} /> : <Skeleton h={150} radius={10} data-testid="score-map-skeleton" />}
-            <Text fz={13} c="dimmed" mt={8}>Lower score ← → Higher score · borders are learned from where you already put songs</Text>
+            <Text fz="md" c="dimmed" mt="2xs">Lower score ← → Higher score · borders are learned from where you already put songs</Text>
           </Stack>
         </Paper>
 
-        <Stack gap={14}>
-          <Title order={2} fz={22} ff="var(--font-display)">What should this session sharpen?</Title>
-          <SimpleGrid cols={{ base: 1, sm: 2, lg: 4 }} spacing={14}>
+        <Stack gap="md">
+          <Title order={2}>What should this session sharpen?</Title>
+          <SimpleGrid cols={{ base: 1, sm: 2, lg: 4 }} spacing="md">
             {focusCards(data, Number(minutes)).map((c) => (
               <UnstyledButton key={c.focus} disabled={c.disabled} onClick={() => setFocus(c.focus)}
                 style={{ opacity: c.disabled && data ? 0.5 : 1 }}>
-                <Paper withBorder radius="lg" p={20} h="100%" className={c.disabled ? undefined : 'duel-card'}
+                <Paper withBorder radius="lg" p="md" h="100%" className={c.disabled ? undefined : 'duel-card'}
                   style={{
                     borderColor: focus === c.focus ? 'var(--accent)' : undefined,
                     borderWidth: focus === c.focus ? 2 : undefined,
                     background: focus === c.focus ? 'color-mix(in srgb, var(--accent) 10%, var(--surface))' : undefined,
                   }}>
-                  <Stack gap={10}>
+                  <Stack gap="xs">
                     <Group justify="space-between">
-                      <Text ff="var(--font-display)" fw={800} fz={18}>{c.title}</Text>
+                      <Text ff="var(--font-display)" fw={800} fz="xl">{c.title}</Text>
                       {c.recommended && <Badge>Recommended</Badge>}
                     </Group>
                     {data ? (
-                      <Text fz={14} c="dimmed">{c.body}</Text>
+                      <Text fz="md" c="dimmed">{c.body}</Text>
                     ) : (
-                      <Stack gap={8} py={4}>{[100, 92, 60].map((w) => <Skeleton key={w} h={12} w={`${w}%`} />)}</Stack>
+                      <Stack gap="2xs" py="4xs">{[100, 92, 60].map((w) => <Skeleton key={w} h={12} w={`${w}%`} />)}</Stack>
                     )}
                     {c.meta && (data
-                      ? <Text fz={13} fw={700} c={focus === c.focus ? 'accent' : 'dimmed'}>{c.meta}</Text>
-                      : <Skeleton h={12} w="45%" my={4} />)}
+                      ? <Text fz="md" fw={700} c={focus === c.focus ? 'accent' : 'dimmed'}>{c.meta}</Text>
+                      : <Skeleton h={12} w="45%" my="4xs" />)}
                     {c.focus === 'ONE_SONG' && (
                       <Select searchable placeholder={`Search ${category}…`} data={songOptions} value={songId} disabled={!data}
                         onChange={(v) => { setSongId(v); setFocus('ONE_SONG'); }} onClick={(e) => e.stopPropagation()}
@@ -162,10 +162,10 @@ export default function DuelHub({ category, boardLoading, base }) {
         </Stack>
 
         {data?.suggestions.length > 0 && (
-          <Stack gap={14}>
+          <Stack gap="md">
             <Group justify="space-between" align="baseline">
-              <Title order={2} fz={22} ff="var(--font-display)">Ready to move</Title>
-              <Anchor component={Link} to={`${base}/duel/moves`} fw={700} fz={14}>Review all {data.suggestions.length} →</Anchor>
+              <Title order={2}>Ready to move</Title>
+              <Anchor component={Link} to={`${base}/duel/moves`} fw={700} fz="md">Review all {data.suggestions.length} →</Anchor>
             </Group>
             <Paper withBorder radius="lg" style={{ overflow: 'hidden' }}>
               {data.suggestions.slice(0, 3).map((s) => (

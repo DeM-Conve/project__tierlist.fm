@@ -1,4 +1,4 @@
-import { DEFAULT_THEME, createTheme, defaultVariantColorsResolver, isLightColor } from '@mantine/core';
+import { DEFAULT_THEME, createTheme, defaultVariantColorsResolver, isLightColor, rem } from '@mantine/core';
 import { colord, extend } from 'colord';
 import mixPlugin from 'colord/plugins/mix';
 import labPlugin from 'colord/plugins/lab';
@@ -17,6 +17,63 @@ extend([mixPlugin, labPlugin]);
 // App.css read, and (b) the Mantine theme, so Mantine components match.
 // Nothing else in the app should hard-code a color - reference a variable
 // (or TIER_COLORS / TIER_INK, which are themselves variables).
+
+// THE spacing scale - every margin, padding and gap in the app is one of
+// these keys (Mantine props: gap="2xs", p="md"; CSS: var(--mantine-spacing-2xs)),
+// never a hand-typed number. Mantine's own xs..xl (10 12 16 20 32px) stay as
+// they are (its components use them), with steps added below xs (Mantine has
+// none) and above xl, named by how many steps they sit from xs/xl:
+//   5xs 2 · 4xs 4 · 3xs 6 · 2xs 8 · xs 10 · sm 12 · md 16 · lg 20 · xl 32 ·
+//   2xl 40 · 3xl 48 · 4xl 64 · 5xl 80   (px at the default 16px root)
+// Every key becomes a --mantine-spacing-<key> CSS variable.
+export const SPACING = {
+  '5xs': rem(2),
+  '4xs': rem(4),
+  '3xs': rem(6),
+  '2xs': rem(8),
+  ...DEFAULT_THEME.spacing,
+  '2xl': rem(40),
+  '3xl': rem(48),
+  '4xl': rem(64),
+  '5xl': rem(80),
+};
+
+// THE type scale - every font size in the app is one of these keys (Mantine
+// props: fz="md", size="sm"; CSS: var(--mantine-font-size-md)), never a
+// hand-typed number. Set to VS Code's density, not Mantine's roomier
+// defaults: 13px body (md - Mantine's default text size), 12px secondary,
+// 11px uppercase section labels, modest headings. Mantine's components read
+// the same keys, so menus, inputs, tooltips and buttons follow.
+//   2xs 10 · xs 11 · sm 12 · md 13 · lg 14 · xl 16 · 2xl 20 · 3xl 26 · 4xl 32
+export const FONT_SIZES = {
+  '2xs': rem(10),
+  xs: rem(11),
+  sm: rem(12),
+  md: rem(13),
+  lg: rem(14),
+  xl: rem(16),
+  '2xl': rem(20),
+  '3xl': rem(26),
+  '4xl': rem(32),
+};
+// Title order -> size: a page title (h1) is 3xl, a section heading (h2)
+// xl, a card/sub heading (h3) lg - so a <Title> needs no fz of its own.
+export const HEADING_SIZES = {
+  h1: { fontSize: FONT_SIZES['3xl'], lineHeight: '1.2' },
+  h2: { fontSize: FONT_SIZES.xl, lineHeight: '1.3' },
+  h3: { fontSize: FONT_SIZES.lg, lineHeight: '1.35' },
+  h4: { fontSize: FONT_SIZES.md, lineHeight: '1.4' },
+  h5: { fontSize: FONT_SIZES.sm, lineHeight: '1.4' },
+  h6: { fontSize: FONT_SIZES.xs, lineHeight: '1.4' },
+};
+// Control heights at the same density (VS Code's buttons and inputs are
+// ~26-30px, Mantine's default sm is 36px): the default size (sm) is 30px
+// with body-size text, xs 26px. Larger sizes keep Mantine's values.
+export const CONTROL = {
+  sm: { height: rem(30), fz: 'var(--mantine-font-size-md)', padX: 'var(--mantine-spacing-sm)' },
+  xs: { height: rem(26), fz: 'var(--mantine-font-size-sm)', padX: 'var(--mantine-spacing-xs)' },
+};
+const control = (size) => CONTROL[size ?? 'sm'];
 
 // Dark themes follow widely used editor/terminal palettes so each has a
 // clearly different character; `accent` = its signature accent, applied when
@@ -219,6 +276,9 @@ export function buildAppearance(choice) {
     '--chrome-hover': mix(side, t.text, 0.05),
     '--chrome-selected': mix(side, t.text, 0.1),
     '--chrome-input': mix(side, t.text, 0.06),
+    // The sash's grip dots: a few shades above the frame (VS Code #767676
+    // on #3C3C3C).
+    '--sash-dot': step(chrome, t.text, 0.12),
     '--chrome-input-border': mix(side, t.text, 0.14),
     '--surface': t.surface,
     '--surface-2': t.surface2,
@@ -253,13 +313,28 @@ export function buildAppearance(choice) {
     colors: { dark: scale, gray: scale, accent: a.scale },
     // Type and shape are variables too (index.css :root).
     fontFamily: 'var(--font-body)',
-    headings: { fontFamily: 'var(--font-display)', fontWeight: '800' },
+    headings: { fontFamily: 'var(--font-display)', fontWeight: '700', sizes: HEADING_SIZES },
+    fontSizes: FONT_SIZES,
     defaultRadius: 'var(--radius)',
+    spacing: SPACING,
     variantColorResolver,
     components: {
       // Check marks sit on the accent fill too.
       Checkbox: { defaultProps: { iconColor: 'var(--accent-on)' } },
       Radio: { defaultProps: { iconColor: 'var(--accent-on)' } },
+      // Control density (CONTROL above).
+      Button: {
+        vars: (_, { size }) => {
+          const c = control(size);
+          return c ? { root: { '--button-height': c.height, '--button-fz': c.fz, '--button-padding-x': c.padX } } : { root: {} };
+        },
+      },
+      Input: {
+        vars: (_, { size }) => {
+          const c = control(size);
+          return c ? { wrapper: { '--input-height': c.height, '--input-fz': c.fz } } : { wrapper: {} };
+        },
+      },
     },
     black: dark ? t.bg : t.text,
     white: dark ? t.text : t.surface,

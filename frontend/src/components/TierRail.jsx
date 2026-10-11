@@ -93,7 +93,7 @@ export default function TierRail({ category, activeTier }) {
             flexDirection: 'column',
             alignItems: 'center',
             justifyContent: 'center',
-            gap: 2,
+            gap: 'var(--mantine-spacing-5xs)',
             position: 'relative',
             cursor: action.run ? 'pointer' : 'default',
             outline: isOver ? '3px solid var(--text)' : isActive ? '2px solid var(--text)' : undefined,
@@ -102,14 +102,14 @@ export default function TierRail({ category, activeTier }) {
             opacity: dnd.draggedVideoId && !isOver ? 0.85 : 1,
           }}
         >
-          <Text ff="var(--font-display)" fw={900} fz={isTodo ? 13 : 20} lh={1} c={TIER_INK}>
+          <Text ff="var(--font-display)" fw={900} fz={isTodo ? 'md' : 'xl'} lh={1} c={TIER_INK}>
             {tierName(tier)}
           </Text>
-          <Text fz={11} fw={700} c={TIER_INK} opacity={0.7} lh={1}>
+          <Text fz="xs" fw={700} c={TIER_INK} opacity={0.7} lh={1}>
             {count}
           </Text>
           {playingHere && !isTodo && (
-            <Text fz={9} fw={700} c={TIER_INK} opacity={0.55} lh={1}>
+            <Text fz="2xs" fw={700} c={TIER_INK} opacity={0.55} lh={1}>
               ⇧{i + 1}
             </Text>
           )}
@@ -124,7 +124,7 @@ export default function TierRail({ category, activeTier }) {
               style={{ transform: 'translateY(-50%)', borderRadius: 5, boxShadow: '0 4px 12px var(--shadow)' }}
             >
               <Image src={playingVideo.thumbnail} w={24} h={24} radius={5} fit="cover" alt="" />
-              <Box pos="absolute" bottom={2} left={2} bg="accent" px={2} py={1} style={{ borderRadius: 2 }}>
+              <Box pos="absolute" bottom={2} left={2} bg="accent" px="5xs" py={1} style={{ borderRadius: 2 }}>
                 <EqualizerMark height={6} />
               </Box>
             </Box>
@@ -149,10 +149,10 @@ export default function TierRail({ category, activeTier }) {
         zIndex: 20,
         display: 'flex',
         flexDirection: 'column',
-        gap: 6,
+        gap: 'var(--mantine-spacing-3xs)',
       }}
     >
-      <Text fz={10} fw={700} tt="uppercase" c={playingHere ? 'accent' : 'var(--chrome-fg-muted)'} ta="center" style={{ letterSpacing: 0.6 }}>
+      <Text fz="2xs" fw={700} tt="uppercase" c={playingHere ? 'accent' : 'var(--chrome-fg-muted)'} ta="center" style={{ letterSpacing: 0.6 }}>
         {caption}
       </Text>
 
@@ -160,14 +160,14 @@ export default function TierRail({ category, activeTier }) {
           no cap - a capped rail left dead space under D); below a divider,
           the two slots that aren't tiers - TODO and Remove - get one equal,
           fixed size, big enough to be easy drop targets. */}
-      <Stack gap={6} style={{ flex: 1, minHeight: 0 }}>
+      <Stack gap="3xs" style={{ flex: 1, minHeight: 0 }}>
         {ranked.map((tier, i) => renderTier(tier, i))}
       </Stack>
 
       {(todo || loaded) && (
         <>
-          <Divider color="var(--chrome-border)" my={2} />
-          <Stack gap={6} style={{ flexShrink: 0 }}>
+          <Divider color="var(--chrome-border)" my="5xs" />
+          <Stack gap="3xs" style={{ flexShrink: 0 }}>
             {todo && renderTier(todo, ranked.length)}
             {loaded && (
               <Tooltip
@@ -206,17 +206,17 @@ export default function TierRail({ category, activeTier }) {
                     flexDirection: 'column',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    gap: 3,
+                    gap: 'var(--mantine-spacing-4xs)',
                     cursor: playingHere ? 'pointer' : 'default',
                     transform: removeOver ? 'scale(1.06)' : undefined,
                   }}
                 >
                   <Trash2 size={17} />
-                  <Text fz={10} fw={800} lh={1} inherit>
+                  <Text fz="2xs" fw={800} lh={1} inherit>
                     {removedCount > 0 ? `${removedCount} staged` : 'Remove'}
                   </Text>
                   {playingHere && (
-                    <Text fz={9} fw={700} lh={1} c="dimmed">
+                    <Text fz="2xs" fw={700} lh={1} c="dimmed">
                       Del
                     </Text>
                   )}

@@ -2,12 +2,14 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { colord, extend } from 'colord';
 import a11yPlugin from 'colord/plugins/a11y';
 import labPlugin from 'colord/plugins/lab';
-import { DEFAULT_THEME, mergeMantineTheme } from '@mantine/core';
+import { DEFAULT_THEME, mergeMantineTheme, px } from '@mantine/core';
 import {
   ACCENTS,
   DEFAULT_APPEARANCE,
   DEMO_ART,
   MEDIA,
+  FONT_SIZES,
+  SPACING,
   THEMES,
   TIER_PALETTES,
   applyCssVars,
@@ -31,6 +33,7 @@ const REQUIRED_VARS = [
   '--chrome-selected',
   '--chrome-input',
   '--chrome-input-border',
+  '--sash-dot',
   '--surface',
   '--surface-2',
   '--surface-3',
@@ -129,6 +132,36 @@ describe('resolveAppearance', () => {
 
   it('drops extra fields', () => {
     expect(resolveAppearance({ ...DEFAULT_APPEARANCE, extra: 1 })).toEqual(DEFAULT_APPEARANCE);
+  });
+});
+
+describe('spacing scale', () => {
+  const PX = { '5xs': 2, '4xs': 4, '3xs': 6, '2xs': 8, xs: 10, sm: 12, md: 16, lg: 20, xl: 32, '2xl': 40, '3xl': 48, '4xl': 64, '5xl': 80 };
+
+  it('the Mantine theme carries every spacing key, so each is a --mantine-spacing-* variable', () => {
+    const theme = mergeMantineTheme(DEFAULT_THEME, buildAppearance({ theme: 'tokyo' }).mantineTheme);
+    expect(Object.keys(theme.spacing).sort()).toEqual(Object.keys(PX).sort());
+    Object.entries(PX).forEach(([key, value]) => expect(px(theme.spacing[key])).toBe(value));
+  });
+
+  it("keeps Mantine's own xs..xl untouched (its components use them)", () => {
+    ['xs', 'sm', 'md', 'lg', 'xl'].forEach((k) => expect(SPACING[k]).toBe(DEFAULT_THEME.spacing[k]));
+  });
+});
+
+describe('type scale', () => {
+  const PX = { '2xs': 10, xs: 11, sm: 12, md: 13, lg: 14, xl: 16, '2xl': 20, '3xl': 26, '4xl': 32 };
+
+  it('the Mantine theme carries every font-size key at VS Code density (13px body)', () => {
+    const theme = mergeMantineTheme(DEFAULT_THEME, buildAppearance({ theme: 'tokyo' }).mantineTheme);
+    Object.entries(PX).forEach(([key, value]) => expect(px(theme.fontSizes[key])).toBe(value));
+    expect(Object.keys(FONT_SIZES).sort()).toEqual(Object.keys(PX).sort());
+  });
+
+  it('titles size from the scale: h1 3xl, h2 xl', () => {
+    const { headings } = mergeMantineTheme(DEFAULT_THEME, buildAppearance({ theme: 'tokyo' }).mantineTheme);
+    expect(headings.sizes.h1.fontSize).toBe(FONT_SIZES['3xl']);
+    expect(headings.sizes.h2.fontSize).toBe(FONT_SIZES.xl);
   });
 });
 

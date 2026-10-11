@@ -52,19 +52,19 @@ function BoardCard({ category, tiers, onOpen, onDuel }) {
       style={{ display: 'flex', flexDirection: 'column' }}
     >
       <UnstyledButton onClick={onOpen} w="100%" aria-label={`Open ${category}`}>
-        <Group justify="space-between" mb="sm" wrap="nowrap">
-          <Text ff="var(--font-display)" fw={900} fz={20} truncate="end">
+        <Group justify="space-between" mb="xs" wrap="nowrap">
+          <Text ff="var(--font-display)" fw={700} fz="lg" truncate="end">
             {category}
           </Text>
           <Text fz="xs" c="dimmed" style={{ whiteSpace: 'nowrap' }}>
             {total} videos
           </Text>
         </Group>
-        <Stack gap={5}>
+        <Stack gap="4xs">
           {present.map((t) => (
-            <Group key={t} gap={8} wrap="nowrap">
-              <TierChip tier={t} size={22} />
-              <PlaylistArt playlist={tiers[t]} tier={t} w={40} h={22} radius={3} iconSize={13} style={{ flexShrink: 0 }} />
+            <Group key={t} gap="2xs" wrap="nowrap">
+              <TierChip tier={t} size={20} />
+              <PlaylistArt playlist={tiers[t]} tier={t} w={36} h={20} radius={3} iconSize={13} style={{ flexShrink: 0 }} />
               <Box style={{ flex: 1 }} h={8} bg="var(--surface-2)" pos="relative">
                 <Box
                   h={8}
@@ -80,7 +80,7 @@ function BoardCard({ category, tiers, onOpen, onDuel }) {
           ))}
         </Stack>
       </UnstyledButton>
-      <Group gap={6} mt="auto" pt="md">
+      <Group gap="3xs" mt="auto" pt="sm">
         <Button size="compact-sm" variant="light" onClick={onOpen}>
           Open
         </Button>
@@ -98,23 +98,23 @@ function BoardCardSkeleton() {
   return (
     <Paper withBorder radius="md" p="md" bg="var(--surface)" h="100%" data-testid="board-card-skeleton"
       style={{ display: 'flex', flexDirection: 'column' }}>
-      <Group justify="space-between" mb="sm" wrap="nowrap" h={31}>
+      <Group justify="space-between" mb="xs" wrap="nowrap" h={22}>
         <Skeleton h={20} w="45%" />
         <Skeleton h={10} w={60} />
       </Group>
-      <Stack gap={5}>
+      <Stack gap="4xs">
         {TIER_ORDER.map((t, i) => (
-          <Group key={t} gap={8} wrap="nowrap">
-            <Skeleton w={22} h={22} radius={4} style={{ flexShrink: 0 }} />
-            <Skeleton w={40} h={22} radius={3} style={{ flexShrink: 0 }} />
+          <Group key={t} gap="2xs" wrap="nowrap">
+            <Skeleton w={20} h={20} radius={4} style={{ flexShrink: 0 }} />
+            <Skeleton w={36} h={20} radius={3} style={{ flexShrink: 0 }} />
             <Box style={{ flex: 1 }}>
               <Skeleton h={8} w={`${90 - i * 15}%`} radius={2} />
             </Box>
-            <Skeleton h={10} w={20} ml={8} />
+            <Skeleton h={10} w={20} ml="2xs" />
           </Group>
         ))}
       </Stack>
-      <Group gap={6} mt="auto" pt="md">
+      <Group gap="3xs" mt="auto" pt="sm">
         <Skeleton h={26} w={56} radius="sm" />
         <Skeleton h={26} w={68} radius="sm" />
       </Group>
@@ -129,8 +129,8 @@ function PlaylistCardSkeleton() {
       <Card.Section>
         <Skeleton h={100} radius={0} />
       </Card.Section>
-      <Skeleton h={12} w="85%" mt={12} />
-      <Skeleton h={10} w="50%" mt={9} mb={4} />
+      <Skeleton h={12} w="85%" mt="sm" />
+      <Skeleton h={10} w="50%" mt="2xs" mb="4xs" />
     </Card>
   );
 }
@@ -166,13 +166,13 @@ export default function HomeView({
   const shownPlaylists = (playlists || []).filter((p) => p.title.toLowerCase().includes(q));
 
   return (
-    <Stack gap={36} component="section">
+    <Stack gap="lg" component="section">
       <Group justify="space-between" align="flex-end" wrap="wrap" gap="md">
-        <Stack gap={4}>
-          <Text fz={11} fw={800} tt="uppercase" c="accent" style={{ letterSpacing: 1.5 }}>
+        <Stack gap="4xs">
+          <Text fz="xs" fw={800} tt="uppercase" c="accent" style={{ letterSpacing: 1.5 }}>
             Home
           </Text>
-          <Title order={1} fz={{ base: 30, sm: 40 }} fw={900} lh={1}>
+          <Title order={1} lh={1}>
             Your tier lists
           </Title>
           <Text c="dimmed" fz="sm">
@@ -213,7 +213,7 @@ export default function HomeView({
             <Group gap="sm" wrap="nowrap" style={{ minWidth: 0 }}>
               <Image src={nowPlaying.video.thumbnail} w={48} h={48} radius={6} fit="cover" alt="" />
               <Box style={{ minWidth: 0 }}>
-                <Group gap={6} wrap="nowrap">
+                <Group gap="3xs" wrap="nowrap">
                   <EqualizerMark color="var(--accent)" height={10} />
                   <Text fz="xs" c="accent" fw={700} tt="uppercase">
                     Now playing
@@ -251,15 +251,15 @@ export default function HomeView({
           </Alert>
         )}
         {!loadError && playlists === null && (
-          <SimpleGrid cols={{ base: 1, sm: 2, xl: 3 }} spacing="md">
+          <SimpleGrid cols={{ base: 1, sm: 2, xl: 3 }} spacing="sm">
             {Array.from({ length: 6 }).map((_, i) => (
               <BoardCardSkeleton key={i} />
             ))}
           </SimpleGrid>
         )}
         {playlists !== null && tierCategories.length === 0 && (
-          <Paper withBorder radius="md" p="xl" ta="center" bg="var(--surface)">
-            <Title order={3} mb={6}>
+          <Paper withBorder radius="md" p="md" ta="center" bg="var(--surface)">
+            <Title order={3} mb="3xs">
               No tier lists yet
             </Title>
             <Text c="dimmed" fz="sm" maw={520} mx="auto">
@@ -275,7 +275,7 @@ export default function HomeView({
             No boards match "{query}".
           </Text>
         )}
-        <SimpleGrid cols={{ base: 1, sm: 2, xl: 3 }} spacing="md">
+        <SimpleGrid cols={{ base: 1, sm: 2, xl: 3 }} spacing="sm">
           {boards.map((c) => (
             <BoardCard
               key={c}
@@ -290,7 +290,7 @@ export default function HomeView({
 
       <div>
         <Group justify="space-between" mb="sm" wrap="wrap">
-          <Title order={2} fz={20}>
+          <Title order={2}>
             Playlists
           </Title>
           {hiddenCount > 0 && (
@@ -341,7 +341,7 @@ export default function HomeView({
                     </Badge>
                   )}
                 </Card.Section>
-                <Text fz="sm" fw={600} lineClamp={2} mt={8} title={p.title}>
+                <Text fz="sm" fw={600} lineClamp={2} mt="2xs" title={p.title}>
                   {p.title}
                 </Text>
                 <Text fz="xs" c="dimmed">

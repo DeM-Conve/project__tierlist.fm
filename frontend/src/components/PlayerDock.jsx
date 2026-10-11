@@ -59,9 +59,9 @@ function VolumeControl({ volume, muted, onToggleMute, onChange, size }) {
           {off ? <VolumeX size={17} /> : <Volume2 size={17} />}
         </ActionIcon>
       </HoverCard.Target>
-      <HoverCard.Dropdown px={6} py={10}>
-        <Stack align="center" gap={8}>
-          <Text fz={11} fw={700} c="dimmed" w={24} ta="center">
+      <HoverCard.Dropdown px="3xs" py="xs">
+        <Stack align="center" gap="2xs">
+          <Text fz="xs" fw={700} c="dimmed" w={24} ta="center">
             {volume}
           </Text>
           <Slider
@@ -416,7 +416,7 @@ export default function PlayerDock({
         {/* Floating/expanded only: the mini bar keeps these in its right
             cluster instead. */}
         {mode !== 'mini' && (
-          <Group className="player-dock-toolbar" gap={6} wrap="nowrap">
+          <Group className="player-dock-toolbar" gap="3xs" wrap="nowrap">
             {expanded ? (
               // Closing the expanded view minimizes it to the bottom bar
               // instead of stopping playback - matches how YouTube Music's
@@ -471,8 +471,8 @@ export default function PlayerDock({
           <div className="player-dock-body">
             <div className="focus-info" onClick={!expanded ? onExpand : undefined}>
               <h2>{video.title}</h2>
-              <Group gap={8} wrap="nowrap" align="center" mt={expanded ? 4 : 0}>
-                <Text className="dock-artist" c="dimmed" fz={expanded ? 14 : 12} lh={1.3} truncate="end" miw={0}>
+              <Group gap="2xs" wrap="nowrap" align="center" mt={expanded ? '4xs' : 0}>
+                <Text className="dock-artist" c="dimmed" fz={expanded ? 'md' : 'sm'} lh={1.3} truncate="end" miw={0}>
                   {video.channelTitle}
                 </Text>
                 {(isShuffling || isTriage) && expanded && (
@@ -484,7 +484,7 @@ export default function PlayerDock({
             </div>
 
             <div className="player-dock-center">
-            <Group className="player-dock-controls" gap={expanded ? 6 : 4} wrap="nowrap">
+            <Group className="player-dock-controls" gap={expanded ? '3xs' : '4xs'} wrap="nowrap">
               {!expanded && (
                 <ActionIcon
                   className="player-dock-extra"
@@ -543,9 +543,9 @@ export default function PlayerDock({
             </Group>
             </div>
 
-            <Group className="player-dock-secondary" gap={2} wrap="nowrap">
+            <Group className="player-dock-secondary" gap="5xs" wrap="nowrap">
               {availableTiers.length > 0 && mode === 'mini' && (
-                <Group gap={3} wrap="nowrap" mr={6} visibleFrom="sm">
+                <Group gap="4xs" wrap="nowrap" mr="3xs" visibleFrom="sm">
                   {availableTiers.map((t, i) => (
                     <TierChip
                       key={t}
@@ -590,15 +590,15 @@ export default function PlayerDock({
           </div>
 
           {expanded && (
-            <Stack gap={10} mt="lg">
+            <Stack gap="xs" mt="lg">
               {isTriage && currentTier === TODO_TIER && availableTiers.length > 0 && (
                 <Text fz="xs" c="dimmed">
                   From your TODO list - pick its tier and the next one starts
                 </Text>
               )}
               {availableTiers.length > 0 && (
-                <Group gap={8} wrap="wrap">
-                  <Text fz="xs" fw={700} c="dimmed" tt="uppercase" mr={4} style={{ letterSpacing: 1 }}>
+                <Group gap="2xs" wrap="wrap">
+                  <Text fz="xs" fw={700} c="dimmed" tt="uppercase" mr="4xs" style={{ letterSpacing: 1 }}>
                     Rate
                   </Text>
                   {availableTiers.map((t, i) => (
@@ -624,7 +624,7 @@ export default function PlayerDock({
                   />
                 </Group>
               )}
-              <Text fz={11} c="dimmed" opacity={0.75}>
+              <Text fz="xs" c="dimmed" opacity={0.75}>
                 esc/j minimize · ← → seek 10s · h l navigate · space play/pause · m mute · f fullscreen · 0-9 seek %
                 {availableTiers.length > 0 && ` · shift+1-${availableTiers.length} set tier · del remove`}
               </Text>
