@@ -30,7 +30,7 @@ describe('DuelWrap', () => {
     expect(screen.getByText('Your Rock board got sharper.')).toBeInTheDocument();
     expect(screen.getByText('64%')).toBeInTheDocument();
     expect(screen.getByText('71%')).toBeInTheDocument();
-    expect(screen.getByText(/borders settled/)).toHaveTextContent('3 borders settled');
+    expect(screen.getByText('Borders settled').parentElement).toHaveTextContent('Borders settled3');
     expect(screen.getByText('1 new move from this session')).toBeInTheDocument();
     expect(screen.getByText('Review all 7 waiting →')).toBeInTheDocument();
     expect(screen.getByText(/beat/)).toHaveTextContent('Other Song beat Top Song - clearly. (It had a 12% chance.)');
@@ -58,6 +58,17 @@ describe('DuelWrap', () => {
     page();
     expect(screen.getByTestId('wrap-skeleton')).toBeInTheDocument();
     expect(structure()).toEqual(after);
+  });
+
+  it('uses the app’s button system: secondaries (default variant) first, the one primary (filled) last', () => {
+    page();
+    const buttons = screen.getAllByRole('link').filter((a) => a.className.includes('Button'));
+    // Mantine leaves data-variant off for its default variant, filled.
+    expect(buttons.map((b) => [b.textContent, b.getAttribute('data-variant') ?? 'filled'])).toEqual([
+      ['Back to board', 'default'],
+      ['Another session', 'default'],
+      ['Review moves', 'filled'],
+    ]);
   });
 
   it('a failed load says why', () => {
