@@ -14,7 +14,7 @@ import {
   Tooltip,
 } from '@mantine/core';
 import { Home, Keyboard, LayoutList, ListMusic, ListPlus, LogOut, Search, Settings, Swords } from 'lucide-react';
-import { BOARD_TIERS, TIER_ORDER, TODO_TIER } from '../tiers';
+import { BOARD_TIERS, TIER_ORDER } from '../tiers';
 import { boardPath, duelPath, useBoardContextMenu } from '../boardMenu';
 import { TierChip } from './TierBits';
 import { exampleTitle } from '../naming';
@@ -107,12 +107,11 @@ function BoardLink({ category, tiers, active }) {
 }
 
 // One board in the Duels view: the whole row goes to its duel hub. Its meta
-// is what's cheap and already loaded - the to-do songs waiting to be placed
-// (the to-do playlist's own item count), else its ranked total.
+// is what's cheap and already loaded: its ranked total (playlist item counts) -
+// the songs duels work on; to-do songs are never part of duels.
 function DuelBoardLink({ category, tiers, active }) {
   const boardMenu = useBoardContextMenu();
   const ranked = Object.values(boardCounts(tiers)).reduce((a, b) => a + b, 0);
-  const todo = tiers[TODO_TIER]?.itemCount ?? 0;
   return (
     <NavLink
       component={Link}
@@ -128,7 +127,7 @@ function DuelBoardLink({ category, tiers, active }) {
             {category}
           </Text>
           <Text fz="md" c={MUTED} style={{ fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>
-            {todo > 0 ? `${todo} to do` : ranked}
+            {ranked}
           </Text>
         </Group>
       }

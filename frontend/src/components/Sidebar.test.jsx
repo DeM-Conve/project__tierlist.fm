@@ -152,10 +152,11 @@ describe('Sidebar', () => {
     expect(screen.getByText('Duels', { selector: 'p' })).toBeInTheDocument();
     const rap = screen.getByRole('link', { name: /^Rap/ });
     expect(rap).toHaveAttribute('href', '/tier/Rap/duel');
-    // Quiet meta from the playlists already loaded: to-do songs waiting, else the ranked total.
+    // Quiet meta from the playlists already loaded: the ranked total (to-do songs are never part of duels).
     expect(rap).toHaveTextContent('42');
     const rock = screen.getByRole('link', { name: /^Rock/ });
-    expect(rock).toHaveTextContent('3 to do');
+    expect(rock).toHaveTextContent('4');
+    expect(rock).not.toHaveTextContent('to do');
     expect(rock).toHaveAttribute('data-active', 'true');
     expect(rap).not.toHaveAttribute('data-active');
     fireEvent.click(rap);
