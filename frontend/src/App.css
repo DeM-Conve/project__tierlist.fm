@@ -347,8 +347,6 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.player-dock-controls { display: flex; align-items: center; }
-.player-dock-secondary { display: flex; align-items: center; }
 
 /* Floating corner mode: an in-page floating box pinned to the bottom-right
    corner, the way YouTube Music's own in-app miniplayer works - a CSS-only
@@ -441,11 +439,6 @@
   font-family: var(--font-display);
   font-size: var(--mantine-font-size-xl);
   margin: 0 0 var(--mantine-spacing-4xs);
-}
-.focus-hint {
-  margin: var(--mantine-spacing-md) var(--mantine-spacing-5xs) 0;
-  color: var(--text-faint);
-  font-size: var(--mantine-font-size-sm);
 }
 
 /* Board name on a tier board (BoardNameEditor): renamed in place like an

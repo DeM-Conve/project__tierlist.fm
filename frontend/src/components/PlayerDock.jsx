@@ -470,7 +470,7 @@ export default function PlayerDock({
             </div>
 
             <div className="player-dock-center">
-            <Group className="player-dock-controls" gap={expanded ? '3xs' : '4xs'} wrap="nowrap">
+            <Group gap={expanded ? '3xs' : '4xs'} wrap="nowrap">
               {!expanded && (
                 <ActionIcon
                   className="player-dock-extra"
