@@ -17,7 +17,7 @@ beforeEach(() => {
   h.error = null;
   h.summary = {
     sessionId: 's1', duels: 14, seconds: 252, certaintyStart: 0.64, certainty: 0.71,
-    newMoves: [suggestion({ confidence: 0.88 })], movesWaiting: 7, placed: 1, bordersSettled: 3, tierOrders: 2,
+    newMoves: [suggestion({ confidence: 0.88 })], movesWaiting: 7, bordersSettled: 3, tierOrders: 2,
     upset: { winner: IDS.mid2, loser: IDS.top, odds: 0.12, clearly: true },
     undecided: [{ a: IDS.mid, b: IDS.mid2 }],
   };
@@ -31,6 +31,8 @@ describe('DuelWrap', () => {
     expect(screen.getByText('64%')).toBeInTheDocument();
     expect(screen.getByText('71%')).toBeInTheDocument();
     expect(screen.getByText('Borders settled').parentElement).toHaveTextContent('Borders settled3');
+    // To-do songs are never part of duels: no "songs placed" count.
+    expect(screen.queryByText(/songs placed/)).not.toBeInTheDocument();
     expect(screen.getByText('1 new move from this session')).toBeInTheDocument();
     expect(screen.getByText('Review all 7 waiting →')).toBeInTheDocument();
     expect(screen.getByText(/beat/)).toHaveTextContent('Other Song beat Top Song - clearly. (It had a 12% chance.)');

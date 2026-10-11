@@ -1,4 +1,4 @@
-import { TODO_TIER, TIER_ORDER } from '../tiers';
+import { TIER_ORDER } from '../tiers';
 
 // Words and small calculations for the duel screens - kept out of the
 // components so they're testable without React. The ranking itself is the
@@ -43,12 +43,6 @@ export function reasonText(matchup, name, tierName) {
   const a = name(matchup.a);
   const b = name(matchup.b);
   const opponent = songB.tier ? `a ${songB.onFence ? '' : 'settled '}${tierName(songB.tier)} song` : 'a song';
-  if (reason.kind === 'PLACE') {
-    if (!songA.tier) {
-      return `${a} is new: each duel against an anchor halves where it could land. Right now it's most likely ${tierName(songA.bestTier)} (${pct(songA.bestProbability)}); ${b} is ${opponent} from the middle of that range.`;
-    }
-    return `Finding ${a}'s true spot: ${b} is ${opponent} from the middle of where it could be.`;
-  }
   if (!reason.upperTier) return `${a} against ${b}.`;
   const up = songA.probabilities?.[reason.upperTier] ?? 0;
   return `${a} sits near the ${tierName(reason.upperTier)} / ${tierName(reason.lowerTier)} border - ${pct(up)} likely ${tierName(reason.upperTier)}. ${b} is ${opponent} near that border, so this result tells the most.`;
@@ -66,34 +60,28 @@ export function verdictHeadline(verdict, nameA, nameB) {
 }
 
 // What the verdict did to a song (`after` = its state now), in a sentence.
+// Every duelled song is ranked: to-do songs are never part of duels.
 export function outcomeText(after, name, tierName, threshold = 0.85) {
   if (!after?.bestTier) return '';
   const best = tierName(after.bestTier);
   const p = pct(after.bestProbability);
-  if (!after.tier) {
-    return after.bestProbability >= threshold && after.duels >= 4
-      ? `${name} is ${p} ${best} - a placement is ready to review.`
-      : `${name} is now most likely ${best} (${p}).`;
-  }
   if (after.bestTier === after.tier) return `${name} looks like a solid ${best} (${p}).`;
   if (after.bestProbability >= threshold && after.duels >= 4) return `${name} is now ${p} ${best} - a move is ready to review.`;
   const dir = TIER_ORDER.indexOf(after.bestTier) < TIER_ORDER.indexOf(after.tier) ? 'up' : 'down';
   return `${name} is now ${p} ${best} - leaning ${dir}, not decided yet.`;
 }
 
+// Every move is between ranked tiers: to-do songs never get a suggestion.
 export function moveKind(from, to) {
-  if (from === TODO_TIER) return 'new';
   return TIER_ORDER.indexOf(to) < TIER_ORDER.indexOf(from) ? 'up' : 'down';
 }
 
 export const record = (s) => `${s.wins}–${s.losses}–${s.draws}`;
 
-// How sure a move is, in words: a ranked song's confidence (from the engine)
-// is the chance it belongs in the new tier *or beyond*; a to-do song's is
-// the chance of that tier itself.
+// How sure a move is, in words: the confidence (from the engine) is the
+// chance the song belongs in the new tier *or beyond*.
 export function confidenceText(s, tierName) {
-  const kind = moveKind(s.from, s.to);
-  const beyond = kind === 'new' ? '' : kind === 'up' ? ' or higher' : ' or lower';
+  const beyond = moveKind(s.from, s.to) === 'up' ? ' or higher' : ' or lower';
   return `${pct(s.confidence)} ${tierName(s.to)}${beyond}`;
 }
 

@@ -9,10 +9,11 @@ import { loadBoard } from '../tierActions';
 
 export const NAMING = { template: '{category} {tier}', tierLabels: { S: 'S', A: 'A', B: 'B', C: 'C', D: 'D', TODO: 'TODO' } };
 const vid = (id, title) => ({ videoId: id, id: `item-${id}`, title, channelTitle: 'Band', thumbnail: '' });
-export const IDS = { top: 'sssssssssss', mid: 'aaaaaaaaaaa', mid2: 'bbbbbbbbbbb', todo: 'ttttttttttt' };
+export const IDS = { top: 'sssssssssss', mid: 'aaaaaaaaaaa', mid2: 'bbbbbbbbbbb', low: 'ccccccccccc', todo: 'ttttttttttt' };
 export const BOARD = {
   S: [vid(IDS.top, 'Top Song')],
   A: [vid(IDS.mid, 'Middle Song'), vid(IDS.mid2, 'Other Song')],
+  B: [vid(IDS.low, 'Low Song')],
   TODO: [vid(IDS.todo, 'New Song')],
 };
 
@@ -21,16 +22,17 @@ export const song = (id, tier, over = {}) => ({
   duels: 3, wins: 2, losses: 1, draws: 0, onFence: true, ...over,
 });
 
+// A to-do song never gets one (the backend leaves to-do songs out of duels).
 export const suggestion = (over = {}) => ({
-  song: IDS.todo, from: 'TODO', to: 'A', confidence: 0.92, wins: 4, losses: 1, draws: 0,
+  song: IDS.low, from: 'B', to: 'A', confidence: 0.92, wins: 4, losses: 1, draws: 0,
   keyResults: [{ opponent: IDS.mid, opponentTier: 'A', result: 1 }, { opponent: IDS.top, opponentTier: 'S', result: -1 }],
   trend: [25, 26, 27], ...over,
 });
 
 export const analysis = (over = {}) => ({
-  certainty: 0.64, duelsTotal: 12, onFence: 2, unplaced: 1, activeSession: null,
+  certainty: 0.64, duelsTotal: 12, onFence: 2, activeSession: null,
   borders: [{ upper: 'S', lower: 'A', score: 28 }],
-  songs: [song(IDS.top, 'S', { mu: 31, onFence: false }), song(IDS.mid, 'A', { mu: 26 }), song(IDS.mid2, 'A', { mu: 22, onFence: false }), song(IDS.todo, null, { mu: 24 })],
+  songs: [song(IDS.top, 'S', { mu: 31, onFence: false }), song(IDS.mid, 'A', { mu: 26 }), song(IDS.mid2, 'A', { mu: 22, onFence: false }), song(IDS.low, 'B', { mu: 24 })],
   suggestions: [suggestion()],
   tierOrders: {},
   ...over,
@@ -41,7 +43,7 @@ export const mutation = (fn = vi.fn()) => ({ mutate: fn, isPending: false, isErr
 
 // Renders `ui` at /tier/Rock/duel... with the board loaded; returns the store.
 export function renderDuel(ui, path = '/tier/Rock/duel') {
-  const store = makeStore({ playlists: ['S', 'A', 'TODO'].map((t) => ({ id: `pl-${t}`, title: `Rock ${t}`, itemCount: 1 })), naming: NAMING });
+  const store = makeStore({ playlists: ['S', 'A', 'B', 'TODO'].map((t) => ({ id: `pl-${t}`, title: `Rock ${t}`, itemCount: 1 })), naming: NAMING });
   store.dispatch(loadBoard({ category: 'Rock', data: BOARD }));
   renderWithApp(
     <MemoryRouter initialEntries={[path]}>

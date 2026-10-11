@@ -248,7 +248,6 @@ const FILTERS = [
   { value: 'all', label: 'All' },
   { value: 'up', label: 'Up a tier' },
   { value: 'down', label: 'Down a tier' },
-  { value: 'new', label: 'New placements' },
 ];
 
 // "Suggested moves": the duels built the case; nothing moves until you say so.
@@ -275,7 +274,7 @@ export default function DuelMoves({ category, boardLoading, base }) {
     ].sort((a, b) => b.confidence - a.confidence);
     return [list(data.suggestions, false), list(data.leaning ?? [], true)];
   }, [data, decided]);
-  const counts = { all: rows.length, up: 0, down: 0, new: 0 };
+  const counts = { all: rows.length, up: 0, down: 0 };
   rows.forEach((s) => (counts[moveKind(s.from, s.to)] += 1));
   const byFilter = (list) => (filter === 'all' ? list : list.filter((s) => moveKind(s.from, s.to) === filter));
   const shown = byFilter(rows);

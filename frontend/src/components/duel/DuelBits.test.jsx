@@ -15,7 +15,7 @@ describe('DuelBits', () => {
     const { container } = renderWithApp(<ScoreMap analysis={analysis()} nameOf={(id) => `song ${id.slice(0, 3)}`} />);
     expect(screen.getByText('S · 1')).toBeInTheDocument();
     const dots = [...container.querySelectorAll('div')].filter((d) => d.style.borderRadius === '50%');
-    expect(dots).toHaveLength(3); // the to-do song isn't placed yet
+    expect(dots).toHaveLength(4); // one per song the analysis returns
     fireEvent.mouseEnter(dots[0]);
     expect(screen.getByText(/song sss · 58% S · score 310/)).toBeInTheDocument();
   });

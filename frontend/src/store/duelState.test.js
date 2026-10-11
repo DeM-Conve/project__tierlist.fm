@@ -14,7 +14,8 @@ const board = () => {
 describe('selectDuelLayout', () => {
   it('is the board as tier -> ids, in board order, tiers in S..D, TODO order', () => {
     const { layout } = selectDuelLayout(board().getState());
-    expect(Object.keys(layout.tiers)).toEqual(['S', 'A', 'TODO']);
+    // The to-do list goes too, so the backend knows which songs to leave out of duels.
+    expect(Object.keys(layout.tiers)).toEqual(['S', 'A', 'B', 'TODO']);
     expect(layout.tiers.A).toEqual([IDS.mid, IDS.mid2]);
   });
 

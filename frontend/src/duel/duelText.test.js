@@ -30,13 +30,10 @@ describe('duelText', () => {
     expect(likelyTiers(null)).toEqual([]);
   });
 
-  it('explains a border duel and a placement', () => {
+  it('explains a border duel', () => {
     const border = { a: 'n1', b: 'm1', reason: { kind: 'BORDER', upperTier: 'S', lowerTier: 'A' }, songA: song(), songB: song({ id: 'm1', tier: 'S', onFence: false }) };
     expect(reasonText(border, name, tierName)).toBe(
       'Nayaab sits near the T1 / T2 border - 58% likely T1. Melancholy is a settled T1 song near that border, so this result tells the most.');
-    const place = { ...border, reason: { kind: 'PLACE', upperTier: 'S', lowerTier: 'A' }, songA: song({ tier: null }) };
-    expect(reasonText(place, name, tierName)).toMatch(/^Nayaab is new: .* most likely T1 \(58%\)/);
-    expect(reasonText({ ...place, songA: song() }, name, tierName)).toMatch(/^Finding Nayaab's true spot/);
     expect(reasonText({ ...border, reason: { kind: 'BORDER' } }, name, tierName)).toBe('Nayaab against Melancholy.');
   });
 
@@ -46,8 +43,6 @@ describe('duelText', () => {
     expect(outcomeText(song(), 'Nayaab', tierName)).toBe('Nayaab is now 58% T1 - leaning up, not decided yet.');
     expect(outcomeText(song({ bestProbability: 0.9, duels: 5 }), 'Nayaab', tierName)).toBe('Nayaab is now 90% T1 - a move is ready to review.');
     expect(outcomeText(song({ bestTier: 'A', bestProbability: 0.7 }), 'Nayaab', tierName)).toBe('Nayaab looks like a solid T2 (70%).');
-    expect(outcomeText(song({ tier: null }), 'Nayaab', tierName)).toBe('Nayaab is now most likely T1 (58%).');
-    expect(outcomeText(song({ tier: null, bestProbability: 0.9, duels: 6 }), 'Nayaab', tierName)).toMatch(/placement is ready/);
     expect(outcomeText(song({ tier: 'S', bestTier: 'A' }), 'Nayaab', tierName)).toMatch(/leaning down/);
     expect(outcomeText(null, 'x', tierName)).toBe('');
   });
@@ -55,7 +50,6 @@ describe('duelText', () => {
   it('move kinds and where a move lands', () => {
     expect(moveKind('A', 'S')).toBe('up');
     expect(moveKind('S', 'B')).toBe('down');
-    expect(moveKind('TODO', 'B')).toBe('new');
     const mu = { x: 30, y: 25, z: 20 };
     expect(dropIndexByScore(['x', 'y', 'z'], 26, (id) => mu[id])).toBe(1);
     expect(dropIndexByScore(['x', 'y', 'z'], 10, (id) => mu[id])).toBe(3);
@@ -68,7 +62,6 @@ describe('leaning moves and tier orders', () => {
   it('says how sure a move is, by direction', () => {
     expect(confidenceText({ from: 'C', to: 'B', confidence: 0.834 }, name)).toBe('83% T3 or higher');
     expect(confidenceText({ from: 'B', to: 'C', confidence: 0.72 }, name)).toBe('72% T4 or lower');
-    expect(confidenceText({ from: 'TODO', to: 'A', confidence: 0.6 }, name)).toBe('60% T2');
   });
   it('lists what a leaning move lacks', () => {
     const s = { from: 'C', to: 'B', confidence: 0.83, unmet: [{ kind: 'CONFIDENCE', have: 0.83, need: 0.85 }, { kind: 'DUELS', have: 3, need: 4 }] };

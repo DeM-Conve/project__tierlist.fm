@@ -27,10 +27,10 @@ const LENGTHS = [
 // Before the analysis arrives (`data` null) the cards keep their titles and
 // layout; the hub draws their data-dependent text as Skeleton lines.
 function focusCards(data, minutes) {
-  if (!data) data = { unplaced: 0, onFence: 0, loading: true };
+  if (!data) data = { onFence: 0, loading: true };
+  // To-do songs are never part of duels (the user's call) - you place them yourself.
   return [
-    { focus: 'SMART_MIX', title: 'Smart mix', recommended: true, body: 'We choose whichever duel would settle the most among your ranked songs - borderlines, shaky rankings. To-do songs stay out.', meta: `~${minutes * 6} duels` },
-    { focus: 'PLACE_TODO', title: 'Place TODO songs', body: 'No tier guess needed. Each new song meets anchors from across the board and lands where it wins.', meta: `${data.unplaced} waiting · 5–10 duels each`, disabled: data.loading || !data.unplaced },
+    { focus: 'SMART_MIX', title: 'Smart mix', recommended: true, body: 'We choose whichever duel would settle the most among your ranked songs - borderlines, shaky rankings. To-do songs stay out: you place those yourself.', meta: `~${minutes * 6} duels` },
     { focus: 'BORDERLINES', title: 'Borderlines only', body: `Just the ${data.onFence} ringed dots. The fastest way to clean up songs filed a tier off.`, meta: `${data.onFence} songs · ~3 duels each`, disabled: data.loading || !data.onFence },
   ];
 }
@@ -125,7 +125,7 @@ export default function DuelHub({ category, boardLoading, base }) {
 
         <Stack gap="md">
           <Title order={2}>What should this session sharpen?</Title>
-          <SimpleGrid cols={{ base: 1, sm: 3 }} spacing="md">
+          <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md">
             {focusCards(data, Number(minutes)).map((c) => (
               <UnstyledButton key={c.focus} disabled={c.disabled} onClick={() => setFocus(c.focus)}
                 style={{ opacity: c.disabled && data ? 0.5 : 1 }}>

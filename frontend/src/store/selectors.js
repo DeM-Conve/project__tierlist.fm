@@ -222,6 +222,8 @@ export const selectStagedChanges = createSelector([selectPendingMoves, selectTra
 // The board as the duel API wants it - tier -> video ids, in board order,
 // staged edits included - plus a short key that changes when it does (for
 // query keys; the full id list would be a huge key).
+// The to-do list goes too: the backend needs it to leave those songs out -
+// to-do songs are never part of duels (old duels with them are dropped).
 export const selectDuelLayout = createSelector([selectTierItems], (tierItems) => {
   const tiers = {};
   let hash = 0;

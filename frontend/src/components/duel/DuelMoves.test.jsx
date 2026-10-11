@@ -16,7 +16,7 @@ vi.mock('../../api/queries', () => ({
 const page = () => renderDuel(<DuelMoves category="Rock" boardLoading={false} base="/tier/Rock" />, '/tier/Rock/duel/moves');
 const tierOf = (store, id) => Object.keys(store.getState().tiers.tierItems).find((t) => store.getState().tiers.tierItems[t].some((v) => v.videoId === id));
 
-// Two moves: a sure new placement (TODO -> A, 92%) and a less sure move up (A -> S, 87%).
+// Two moves up: a sure one (B -> A, 92%) and a less sure one (A -> S, 87%).
 const up = suggestion({ song: IDS.mid2, from: 'A', to: 'S', confidence: 0.87, wins: 5, losses: 1, keyResults: [{ opponent: IDS.top, opponentTier: 'S', result: 1 }] });
 
 beforeEach(() => {
@@ -32,39 +32,45 @@ describe('DuelMoves', () => {
     expect(screen.getByText('Suggested moves')).toBeInTheDocument();
     expect(screen.getByText(/4–1–0 \(W–L–D\)/)).toBeInTheDocument();
     expect(screen.getByText('All · 2')).toBeInTheDocument();
-    expect(screen.getByText('Up a tier · 1')).toBeInTheDocument();
-    expect(screen.getByText('New placements · 1')).toBeInTheDocument();
-    fireEvent.click(screen.getByText('Up a tier · 1'));
-    expect(screen.queryByRole('button', { name: /Show evidence for New Song/ })).not.toBeInTheDocument();
+    expect(screen.getByText('Up a tier · 2')).toBeInTheDocument();
+    expect(screen.getByText('Down a tier · 0')).toBeInTheDocument();
+    // To-do songs never get a suggestion, so there's no "New placements" filter.
+    expect(screen.queryByText(/New placements/)).not.toBeInTheDocument();
+    expect(screen.getAllByRole('radio')).toHaveLength(3);
+    fireEvent.click(screen.getByText('Down a tier · 0'));
+    expect(screen.queryByRole('button', { name: /Show evidence for Low Song/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Show evidence for Other Song/ })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByText('Up a tier · 2'));
+    expect(screen.getByRole('button', { name: /Show evidence for Low Song/ })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Show evidence for Other Song/ })).toBeInTheDocument();
   });
 
   it('Move stages the move on the board (placed by score) and records it; Undo takes both back', () => {
     const store = page();
     fireEvent.click(screen.getAllByRole('button', { name: 'Move' })[0]);
-    expect(tierOf(store, IDS.todo)).toBe('A');
-    // New Song (score 24) lands between Middle (26) and Other (22).
-    expect(store.getState().tiers.tierItems.A.map((v) => v.videoId)).toEqual([IDS.mid, IDS.todo, IDS.mid2]);
-    expect(h.decision.mock.calls[0][0]).toMatchObject({ videoId: IDS.todo, decision: 'ACCEPTED', from: 'TODO', to: 'A', confidence: 0.92 });
+    expect(tierOf(store, IDS.low)).toBe('A');
+    // Low Song (score 24) lands between Middle (26) and Other (22).
+    expect(store.getState().tiers.tierItems.A.map((v) => v.videoId)).toEqual([IDS.mid, IDS.low, IDS.mid2]);
+    expect(h.decision.mock.calls[0][0]).toMatchObject({ videoId: IDS.low, decision: 'ACCEPTED', from: 'B', to: 'A', confidence: 0.92 });
     const main = screen.getByTestId('moves-main');
     expect(within(main).getByText('Moved to A')).toBeInTheDocument();
     fireEvent.click(within(main).getByText('Undo'));
-    expect(tierOf(store, IDS.todo)).toBe('TODO');
-    expect(h.decision.mock.calls[1][0]).toMatchObject({ videoId: IDS.todo, decision: null });
+    expect(tierOf(store, IDS.low)).toBe('B');
+    expect(h.decision.mock.calls[1][0]).toMatchObject({ videoId: IDS.low, decision: null });
   });
 
   it('Keep records the decision and leaves the board alone', () => {
     const store = page();
     fireEvent.click(screen.getAllByRole('button', { name: 'Keep' })[0]);
-    expect(h.decision.mock.calls[0][0]).toMatchObject({ videoId: IDS.todo, decision: 'KEPT' });
-    expect(within(screen.getByTestId('moves-main')).getByText('Kept in TODO')).toBeInTheDocument();
-    expect(tierOf(store, IDS.todo)).toBe('TODO');
+    expect(h.decision.mock.calls[0][0]).toMatchObject({ videoId: IDS.low, decision: 'KEPT' });
+    expect(within(screen.getByTestId('moves-main')).getByText('Kept in B')).toBeInTheDocument();
+    expect(tierOf(store, IDS.low)).toBe('B');
   });
 
   it('Move all at >= 90% moves only the sure ones', () => {
     const store = page();
     fireEvent.click(screen.getByRole('button', { name: 'Move all 1 at ≥90%' }));
-    expect(tierOf(store, IDS.todo)).toBe('A');
+    expect(tierOf(store, IDS.low)).toBe('A');
     expect(tierOf(store, IDS.mid2)).toBe('A');
     expect(h.decision).toHaveBeenCalledTimes(1);
   });
@@ -106,7 +112,7 @@ describe('DuelMoves', () => {
     expect(h.decision.mock.calls[0][0]).toMatchObject({ videoId: IDS.mid2, decision: 'KEPT' });
     fireEvent.keyDown(document, { key: 'ArrowUp', code: 'ArrowUp' });
     fireEvent.keyDown(document, { key: 'm', code: 'KeyM' });
-    expect(h.decision.mock.calls[1][0]).toMatchObject({ videoId: IDS.todo, decision: 'ACCEPTED' });
+    expect(h.decision.mock.calls[1][0]).toMatchObject({ videoId: IDS.low, decision: 'ACCEPTED' });
   });
 
   it('offers to sort a tier by score, showing the new order first', async () => {
@@ -184,7 +190,7 @@ describe('DuelMoves', () => {
     expect(screen.queryByRole('button', { name: 'Move to S' })).not.toBeInTheDocument();
     fireEvent.keyDown(document, { key: 'm', code: 'KeyM' });
     expect(h.decision).toHaveBeenCalledTimes(1);
-    expect(h.decision.mock.calls[0][0]).toMatchObject({ videoId: IDS.todo, decision: 'ACCEPTED' });
+    expect(h.decision.mock.calls[0][0]).toMatchObject({ videoId: IDS.low, decision: 'ACCEPTED' });
     expect(screen.getByRole('button', { name: 'Leaning · 1 not sure yet' })).toHaveAttribute('aria-expanded', 'false');
   });
 
@@ -194,7 +200,7 @@ describe('DuelMoves', () => {
     fireEvent.click(screen.getByText('Down a tier · 0'));
     expect(screen.getByText('No down a tier moves are ready.')).toBeInTheDocument();
     expect(screen.queryByText(/^Leaning/)).not.toBeInTheDocument();
-    fireEvent.click(screen.getByText('Up a tier · 0'));
+    fireEvent.click(screen.getByText('Up a tier · 1'));
     expect(screen.getByRole('button', { name: 'Leaning · 1 not sure yet · up a tier' })).toBeInTheDocument();
   });
 
@@ -205,7 +211,7 @@ describe('DuelMoves', () => {
     const panel = screen.getByTestId('evidence-panel');
     const leaning = screen.getByTestId('leaning-section');
     const tighten = screen.getByTestId('tighten-section');
-    expect(main).toContainElement(screen.getByRole('button', { name: /Show evidence for New Song/ }));
+    expect(main).toContainElement(screen.getByRole('button', { name: /Show evidence for Low Song/ }));
     expect(main).toContainElement(leaning);
     expect(main).toContainElement(tighten);
     expect(panel).not.toContainElement(leaning);
@@ -225,7 +231,7 @@ describe('DuelMoves', () => {
     expect(within(panel).getByTestId('evidence-decided')).toHaveTextContent('Moved to A');
     fireEvent.click(within(panel).getByRole('button', { name: 'Undo' }));
     expect(within(panel).getByRole('button', { name: 'Move to A' })).toBeInTheDocument();
-    expect(h.decision.mock.calls[1][0]).toMatchObject({ videoId: IDS.todo, decision: null });
+    expect(h.decision.mock.calls[1][0]).toMatchObject({ videoId: IDS.low, decision: null });
   });
 
   it('a failed load says why and offers Retry', () => {

@@ -45,7 +45,7 @@ describe('DuelHub', () => {
     fireEvent.click(screen.getByText('Deep · 15 min'));
     fireEvent.click(screen.getByRole('button', { name: /Start duelling/ }));
     expect(h.start.mock.calls[0][0]).toEqual({
-      layout: { tiers: { S: [IDS.top], A: [IDS.mid, IDS.mid2], TODO: [IDS.todo] } },
+      layout: { tiers: { S: [IDS.top], A: [IDS.mid, IDS.mid2], B: [IDS.low], TODO: [IDS.todo] } },
       focus: 'SMART_MIX', minutes: 15,
     });
     expect(screen.getByTestId('where')).toHaveTextContent('/tier/Rock/duel/play/new-session');
@@ -68,17 +68,13 @@ describe('DuelHub', () => {
     expect(h.start.mock.calls[0][0]).toMatchObject({ focus: 'BORDERLINES', minutes: 5 });
   });
 
-  it('offers exactly three focuses - there is no One song mode', () => {
+  it('offers two focuses - no Place TODO (to-do songs are never part of duels) and no One song', () => {
     page();
-    for (const l of ['Smart mix', 'Place TODO songs', 'Borderlines only']) expect(screen.getByText(l)).toBeInTheDocument();
+    for (const l of ['Smart mix', 'Borderlines only']) expect(screen.getByText(l)).toBeInTheDocument();
+    expect(screen.queryByText(/Place TODO/)).not.toBeInTheDocument();
     expect(screen.queryByText('One song')).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Choose a song/ })).not.toBeInTheDocument();
-  });
-
-  it('Place TODO is off when nothing is waiting', () => {
-    h.analysis = analysis({ unplaced: 0 });
-    page();
-    expect(screen.getByText('Place TODO songs').closest('button')).toBeDisabled();
+    expect(screen.getByText(/To-do songs stay out: you place those yourself/)).toBeInTheDocument();
   });
 
   it('offers to resume a session in progress', () => {
@@ -92,7 +88,7 @@ describe('DuelHub', () => {
     page();
     expect(screen.getByText('Ready to move')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Move' }));
-    expect(h.decision.mock.calls[0][0]).toMatchObject({ videoId: IDS.todo, decision: 'ACCEPTED' });
+    expect(h.decision.mock.calls[0][0]).toMatchObject({ videoId: IDS.low, decision: 'ACCEPTED' });
   });
 
   it('while loading there is nothing to start', () => {
@@ -105,7 +101,7 @@ describe('DuelHub', () => {
     const structure = () => ({
       headings: screen.getAllByRole('heading').map((x) => x.textContent).filter((t) => t !== 'Ready to move'),
       stats: ['Board certainty', 'Moves waiting', 'On the fence'].map((l) => !!screen.queryByText(l)),
-      focus: ['Smart mix', 'Place TODO songs', 'Borderlines only'].map((l) => !!screen.queryByText(l)),
+      focus: ['Smart mix', 'Borderlines only'].map((l) => !!screen.queryByText(l)),
     });
     page();
     const after = structure();

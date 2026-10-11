@@ -8,8 +8,6 @@ import { pct } from '../../duel/duelText';
 import { SectionLabel } from './DuelBits';
 import PageHeader from '../PageHeader';
 import { SECTION_GAP } from '../../layout/spacing';
-import { useTierName } from '../../tierLabels';
-import { TODO_TIER } from '../../tiers';
 
 const minSec = (s) => `${Math.floor(s / 60)} min ${s % 60} s`;
 
@@ -42,11 +40,10 @@ function Stat({ value, label }) {
 // The session summary. One tree for loading and loaded (Skeletons where the
 // numbers go), so nothing moves when the summary arrives:
 //   header (+ actions)
-//   [certainty: before -> after, bar]   [3 stat tiles]
+//   [certainty: before -> after, bar]   [2 stat tiles]
 //   [this session's moves              ]  [upset / undecided]
 export default function DuelWrap({ category, sessionId, boardLoading, base }) {
   const board = useDuelBoard(category);
-  const tierName = useTierName();
   const summary = useDuelSummaryQuery(category, sessionId, board.duelLayout, !boardLoading);
   const s = summary.data;
 
@@ -97,9 +94,8 @@ export default function DuelWrap({ category, sessionId, boardLoading, base }) {
             </Paper>
           </Grid.Col>
           <Grid.Col span={{ base: 12, md: 7 }}>
-            <SimpleGrid cols={{ base: 1, xs: 3 }} spacing="md" h="100%">
+            <SimpleGrid cols={{ base: 1, xs: 2 }} spacing="md" h="100%">
               <Stat value={s?.bordersSettled} label="Borders settled" />
-              <Stat value={s?.placed} label={`${tierName(TODO_TIER)} songs placed`} />
               <Stat value={s?.tierOrders} label="Tier orders to tighten" />
             </SimpleGrid>
           </Grid.Col>

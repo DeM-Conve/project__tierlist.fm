@@ -167,7 +167,7 @@ function ClipCard({ side, video, song, name, artist, active, paused, fit, onList
         </Center>
         <Stack gap="5xs">
           <Text ff="var(--font-display)" fw={800} fz="xl" lh={1.2} truncate="end" title={name}>{name}</Text>
-          <Text fz="lg" c="dimmed" truncate="end">{artist}{song && !song.tier ? ' · new to this board' : song ? ` · ${tierName(song.tier)}` : ''}</Text>
+          <Text fz="lg" c="dimmed" truncate="end">{artist}{song?.tier ? ` · ${tierName(song.tier)}` : ''}</Text>
         </Stack>
         {/* The part being played: its window, a progress line, its number - one row. */}
         <Group gap="2xs" wrap="nowrap">
