@@ -31,7 +31,9 @@ every YouTube / YouTube Music device you own plays the result.
 
 **Tier boards** - Playlists named by your template (`Rap S` ... `Rap D`) group themselves
 into one board per category. The whole board fits on one screen as album-art tiles; drag a
-song between tiers, or onto the always-visible Tier Rail.
+song between tiers, or onto the always-visible Tier Rail. Boards you've opened are kept on
+your device, so even one with hundreds of songs opens instantly while the fresh copy loads
+from YouTube in the background.
 
 **Duels** - Hear two songs' hooks back to back and say which hits harder (clearly, a bit, or
 too close). Every verdict feeds a hidden score; the app picks the duels that settle the most,
