@@ -80,6 +80,18 @@ category.
     ordinary page actions. A new value means a new key, not a literal. Exempt:
     intrinsic sizes (icon `size`, tile/thumbnail `w`/`h`), sizes derived from the
     tile size, and geometry (centering offsets, hairlines).
+  - **One button system** (the user's call: "fix CSS, buttons and UIs" - three
+    looks side by side read as foreign). Four kinds, plain Mantine props:
+    **primary** = Mantine's default (filled accent), at most one per view;
+    **secondary** = `variant="default"`; **quiet** = `variant="subtle"
+    color="gray"` (Reset, Add missing tiers, low-weight links); **danger** =
+    `variant="light" color="red"`. No accent `variant="light"` buttons and no
+    `color="dark"`. **Order: lightest first, the primary last (rightmost)** -
+    page actions go in `PageHeader`'s `actions` slot, pairs read Keep / Move,
+    Cancel / Create, Reset / Save. Size: the default (30px) for page and dialog
+    actions, `compact-sm` inside cards, alerts, toasts and dense rows. Gray
+    light/subtle tints are a `--text` wash (`cssVariablesResolver`) - Mantine's
+    own `darken(shade 9)` made them black in dark themes.
   - **Every page header is `components/PageHeader.jsx`** (the user's call: spacing
     "coherent across pages"): eyebrow-or-crumb slot, optional badge, the h1 title,
     meta line, actions top-aligned with the title - so titles and first content line
