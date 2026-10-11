@@ -19,24 +19,33 @@ import {
   VERDICTS, likelyTiers, outcomeText, pct, reasonText, scoreDelta, verdictForKey, verdictHeadline,
 } from '../../duel/duelText';
 import { ProbabilityBars, SectionLabel } from './DuelBits';
+import { CLIP_START, firstStart, nextStart, seeked } from '../../duel/clipWindow';
 
 // Clips: from the 0:30 mark (no "most replayed" data without an outside
 // service), the song being settled for longer than its known opponent.
-const CLIP_START = 30;
 const CLIP_SECONDS = { A: 30, B: 20 };
 
 // One side of the duel: a real YouTube player that plays its clip while it's
 // the side being heard, pauses (and keeps its place) otherwise, and calls
-// onClipEnd when the clip has played out.
+// onClipEnd when the clip has played out. The clip is a moving window: each
+// time it's this side's turn again it plays the NEXT part of the song
+// (0:30-1:00, then 1:00-1:30, ...; back to the first part after the end),
+// so waiting longer hears more of the song. Seeking in the player (a jump the
+// clock can't explain) starts the window where you seeked to - never treated
+// as the clip ending.
 function ClipCard({ side, video, song, name, artist, active, paused, onListen, onClipEnd, onBlocked }) {
   const tierName = useTierName();
   const playerRef = useRef(null);
   const [ready, setReady] = useState(false);
   const [progress, setProgress] = useState(0);
-  const [duration, setDuration] = useState(0);
   const length = CLIP_SECONDS[side];
-  // A song shorter than 0:30 + the clip plays its last `length` seconds.
-  const start = duration ? Math.max(0, Math.min(CLIP_START, duration - length)) : CLIP_START;
+  // The current part's start (null until the player knows the duration).
+  const segRef = useRef(null);
+  const [segStart, setSegStart] = useState(CLIP_START);
+  const moveSeg = (t) => {
+    segRef.current = t;
+    setSegStart(t);
+  };
   const endRef = useRef(onClipEnd);
   useEffect(() => {
     endRef.current = onClipEnd;
@@ -56,18 +65,33 @@ function ClipCard({ side, video, song, name, artist, active, paused, onListen, o
       return undefined;
     }
     const d = p.getDuration?.() || 0;
-    const from = d ? Math.max(0, Math.min(CLIP_START, d - length)) : CLIP_START;
+    if (segRef.current === null) moveSeg(firstStart(d, length));
     const t = p.getCurrentTime?.() ?? 0;
-    if (t < from || t >= from + length) p.seekTo(from, true);
+    if (t < segRef.current || t >= segRef.current + length) p.seekTo(segRef.current, true);
     p.playVideo?.();
+    let last = null;
     const id = setInterval(() => {
       const now = p.getCurrentTime?.() ?? 0;
-      setDuration(p.getDuration?.() || 0);
+      const dur = p.getDuration?.() || 0;
+      // A jump more than the tick could cover: the listener seeked.
+      if (seeked(last, now)) moveSeg(Math.max(0, Math.floor(now)));
+      last = now;
+      const from = segRef.current;
       setProgress(Math.min(1, Math.max(0, (now - from) / length)));
-      if (now >= from + length) endRef.current?.();
+      if (now >= from + length || (dur && now >= dur - 0.5)) {
+        // Next time it's this side's turn: the next part, or the first again.
+        moveSeg(nextStart(from, length, dur));
+        endRef.current?.();
+      }
     }, 250);
     return () => clearInterval(id);
   }, [active, paused, ready, length]);
+
+  // "Replay clip": the current part from its start.
+  function replay() {
+    playerRef.current?.seekTo?.(segRef.current ?? CLIP_START, true);
+    setProgress(0);
+  }
 
   return (
     <Paper withBorder radius="lg" p="md" style={{ borderColor: active ? 'var(--accent)' : undefined, borderWidth: active ? 2 : 1 }}>
@@ -104,13 +128,13 @@ function ClipCard({ side, video, song, name, artist, active, paused, onListen, o
           <Progress value={progress * 100} size="sm" radius="xl" color={active ? 'accent' : 'gray'} />
           <Group justify="space-between">
             <Text ff="monospace" fz="sm" c="dimmed">
-              {fmt(start)} – {fmt(start + length)}
+              {fmt(segStart)} – {fmt(segStart + length)}
             </Text>
-            <Text ff="monospace" fz="sm" c="dimmed">from 0:30</Text>
+            <Text ff="monospace" fz="sm" c="dimmed">part {Math.max(1, Math.round((segStart - CLIP_START) / length) + 1)}</Text>
           </Group>
         </Stack>
         {/* Tab switches to the other song, so only the paused side shows it. */}
-        <Button variant="default" onClick={onListen} rightSection={active ? null : <Kbd size="xs">Tab</Kbd>}>
+        <Button variant="default" onClick={active ? replay : onListen} rightSection={active ? null : <Kbd size="xs">Tab</Kbd>}>
           {active ? 'Replay clip' : `Hear ${side}`}
         </Button>
       </Stack>
@@ -277,7 +301,7 @@ export default function DuelMatch({ category, sessionId, boardLoading, base }) {
               <Stack gap="lg">
                 <Stack gap="3xs" align="center" ta="center">
                   <Title order={1}>Which one hits harder?</Title>
-                  <Text fz="lg" c="dimmed">Both clips start at 0:30. Trust your gut - you can be unsure.</Text>
+                  <Text fz="lg" c="dimmed">Both clips start at 0:30 - still deciding? Each turn plays the next part. Trust your gut.</Text>
                 </Stack>
                 <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md">
                   {[0, 1].map((i) => <Skeleton key={i} h={540} radius="lg" />)}
@@ -343,7 +367,7 @@ export default function DuelMatch({ category, sessionId, boardLoading, base }) {
               <>
                 <Stack gap="3xs" align="center" ta="center">
                   <Title order={1}>Which one hits harder?</Title>
-                  <Text fz="lg" c="dimmed">Both clips start at 0:30. Trust your gut - you can be unsure.</Text>
+                  <Text fz="lg" c="dimmed">Both clips start at 0:30 - still deciding? Each turn plays the next part. Trust your gut.</Text>
                 </Stack>
                 <Box pos="relative">
                   <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md">
