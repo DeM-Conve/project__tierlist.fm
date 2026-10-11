@@ -6,6 +6,7 @@ import TierFocusView, { TRACK_ROW_HEIGHT } from './TierFocusView';
 import { CanvasContext } from '../layout/canvas';
 import { makeStore, renderWithApp } from '../test/render';
 import { loadBoard } from '../tierActions';
+import { openFocus } from '../store/focusSlice';
 
 vi.mock('@mantine/notifications', () => ({ notifications: { show: vi.fn(), hide: vi.fn() } }));
 
@@ -134,5 +135,36 @@ describe('TierFocusView - loading rows are track rows', () => {
     expect(height).toBe(`${TRACK_ROW_HEIGHT}px`);
     // One chip placeholder per tier, like the real row's tier chips.
     expect(rows[0].children[3].children).toHaveLength(2);
+  });
+});
+
+describe('TierFocusView - filter keys', () => {
+  const filterBox = () => screen.getByPlaceholderText(/Filter/);
+
+  it('"/" focuses the filter box', () => {
+    renderPage(5);
+    fireEvent.keyDown(document.body, { key: '/', code: 'Slash' });
+    expect(document.activeElement).toBe(filterBox());
+  });
+
+  it('Escape in the filter box clears it and hands focus back', () => {
+    renderPage(5);
+    const box = filterBox();
+    box.focus();
+    fireEvent.change(box, { target: { value: 'S1' } });
+    expect(box.value).toBe('S1');
+    fireEvent.keyDown(box, { key: 'Escape', code: 'Escape' });
+    expect(box.value).toBe('');
+    expect(document.activeElement).not.toBe(box);
+  });
+
+  it('"/" stands down while the full-screen player covers the page', () => {
+    const store = renderPage(5);
+    act(() => {
+      const video = songs(1)[0];
+      store.dispatch(openFocus({ tier: 'S', videoId: video.videoId, queue: [video.videoId], entries: [{ tier: 'S', video }], category: 'Rock' }));
+    });
+    fireEvent.keyDown(document.body, { key: '/', code: 'Slash' });
+    expect(document.activeElement).not.toBe(filterBox());
   });
 });

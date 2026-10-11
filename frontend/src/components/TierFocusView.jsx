@@ -1,5 +1,7 @@
-import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { memo, useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { defaultRangeExtractor, useVirtualizer } from '@tanstack/react-virtual';
+import { useHotkeys } from 'react-hotkeys-hook';
+import { getHotkeyHandler } from '@mantine/hooks';
 import { tierName } from '../tierLabels';
 import { useDispatch, useSelector } from 'react-redux';
 import {
@@ -265,22 +267,8 @@ export default function TierFocusView({
   // Room under the list only while the floating "N changes staged" bar is up,
   // so it never covers the last rows - not a permanent empty band.
   const hasPendingBar = useSelector((s) => selectStagedChanges(s).length > 0 || ['done', 'partial', 'error'].includes(s.tiers.syncStatus));
-  useEffect(() => {
-    function onKeyDown(e) {
-      if (playerCoversPage) return;
-      const a = document.activeElement;
-      const isTyping = a?.tagName === 'INPUT' || a?.tagName === 'TEXTAREA' || a?.isContentEditable;
-      if (e.key === '/' && !isTyping) {
-        e.preventDefault();
-        filterRef.current?.focus();
-      } else if (e.key === 'Escape' && a === filterRef.current) {
-        setFilter('');
-        filterRef.current.blur();
-      }
-    }
-    window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
-  }, [playerCoversPage]);
+  // (react-hotkeys-hook, as on Home: it ignores "/" typed into a field.)
+  useHotkeys('slash', () => filterRef.current?.focus(), { preventDefault: true, enabled: !playerCoversPage });
 
   // Drop slot under the pointer, from the virtualizer's row offsets (no
   // per-row DOM reads - most rows aren't even rendered).
@@ -372,6 +360,17 @@ export default function TierFocusView({
           ref={filterRef}
           value={filter}
           onChange={(e) => setFilter(e.target.value)}
+          onKeyDown={getHotkeyHandler([
+            [
+              'Escape',
+              (e) => {
+                if (playerCoversPage) return;
+                setFilter('');
+                e.target.blur();
+              },
+              { preventDefault: false },
+            ],
+          ])}
           placeholder={`Filter ${tierName(tier)}…`}
           leftSection={<Search size={14} />}
           rightSection={filter ? <CloseButton size="sm" onClick={() => setFilter('')} aria-label="Clear filter" /> : <Kbd size="xs">/</Kbd>}
