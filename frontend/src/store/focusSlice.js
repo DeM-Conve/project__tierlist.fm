@@ -96,13 +96,16 @@ const focusSlice = createSlice({
     // 'expanded' (full-screen), 'mini' (bottom bar), or 'floating' (small
     // corner box) - see PlayerDock's j/k state machine.
     playerMode: 'expanded',
-    // Bumped to ask the dock to pause (another player - a duel clip - is
-    // about to play). A counter, so asking twice pauses twice.
-    pauseRequest: 0,
+    // A duel matchup holds the dock: hidden and paused while its own clips
+    // play, resumed on release if it was playing (PlayerDock).
+    playerHeld: false,
   }),
   reducers: {
-    requestPlayerPause: (state) => {
-      state.pauseRequest += 1;
+    holdPlayer: (state) => {
+      state.playerHeld = true;
+    },
+    releasePlayer: (state) => {
+      state.playerHeld = false;
     },
     openFocus: (state, action) => {
       if (!startContext(state, action.payload)) return;
@@ -246,7 +249,8 @@ const focusSlice = createSlice({
 });
 
 export const {
-  requestPlayerPause,
+  holdPlayer,
+  releasePlayer,
   openFocus,
   closeFocus,
   minimizePlayer,

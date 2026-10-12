@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  confidenceText, dropIndexByScore, leaningConfidence, leaningText, likelyTiers, moveKind, orderChanges, shortfallText, outcomeText, pct, reasonText, record, scoreDelta, verdictForKey, verdictHeadline,
+  confidenceText, dropIndexByScore, leaningConfidence, leaningText, likelyTiers, moveKind, orderChanges, shortfallText, outcomeText, pct, reasonText, record, scoreDelta, suggestionChanges, verdictForKey, verdictHeadline,
 } from './duelText';
 
 const name = (id) => ({ n1: 'Nayaab', m1: 'Melancholy' })[id] ?? id;
@@ -76,5 +76,28 @@ describe('leaning moves and tier orders', () => {
       { id: 'a', from: 1, to: 2, delta: -1 },
       { id: 'c', from: 3, to: 3, delta: 0 },
     ]);
+  });
+});
+
+describe('suggestionChanges', () => {
+  const s = (song) => ({ song, from: 'B', to: 'A', confidence: 0.9 });
+  const shown = { suggestions: [s('a'), s('b')] };
+
+  it('names songs a fresher analysis adds or drops', () => {
+    const latest = { suggestions: [s('b'), s('c')] };
+    const { added, gone } = suggestionChanges(shown, latest);
+    expect(added.map((x) => x.song)).toEqual(['c']);
+    expect(gone.map((x) => x.song)).toEqual(['a']);
+  });
+
+  it('leaves out songs already decided on the page', () => {
+    const latest = { suggestions: [s('b'), s('c')] };
+    expect(suggestionChanges(shown, latest, { a: {}, c: {} })).toEqual({ added: [], gone: [] });
+  });
+
+  it('is empty for the same analysis or before either loads', () => {
+    expect(suggestionChanges(shown, shown)).toEqual({ added: [], gone: [] });
+    expect(suggestionChanges(null, shown)).toEqual({ added: [], gone: [] });
+    expect(suggestionChanges(shown, undefined)).toEqual({ added: [], gone: [] });
   });
 });

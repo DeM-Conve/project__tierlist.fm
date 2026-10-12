@@ -9,7 +9,7 @@ import { notifications } from '@mantine/notifications';
 import { useTierName } from '../../tierLabels';
 import { TierChip } from '../TierBits';
 import EmbeddedPlayer from '../EmbeddedPlayer';
-import { requestPlayerPause } from '../../store/focusSlice';
+import { holdPlayer, releasePlayer } from '../../store/focusSlice';
 import {
   useDuelSessionQuery, useDuelSkipMutation, useDuelUndoMutation, useDuelVerdictMutation, useEndDuelMutation,
 } from '../../api/queries';
@@ -230,9 +230,11 @@ export default function DuelMatch({ category, sessionId, boardLoading, base }) {
   const m = s?.matchup;
   const busy = verdict.isPending || skip.isPending || undo.isPending || end.isPending;
 
-  // Duel audio replaces whatever the mini player was playing.
+  // The duel clips are the audio here: the dock steps aside (hidden, paused)
+  // until the matchup closes, then picks up again if it was playing.
   useEffect(() => {
-    dispatch(requestPlayerPause());
+    dispatch(holdPlayer());
+    return () => dispatch(releasePlayer());
   }, [dispatch]);
 
   // Every new pair (after a verdict or a skip) starts clean: on A, both clips

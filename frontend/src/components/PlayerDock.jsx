@@ -117,12 +117,24 @@ export default function PlayerDock({
 }) {
   const cardRef = useRef(null);
   const playerRef = useRef(null);
-  // Another player (a duel clip) asked for quiet - see focusSlice.requestPlayerPause.
-  const pauseRequest = useSelector((s) => s.focus.pauseRequest);
-  useEffect(() => {
-    if (pauseRequest) playerRef.current?.pauseVideo?.();
-  }, [pauseRequest]);
   const [isPlaying, setIsPlaying] = useState(true);
+  const isPlayingRef = useRef(isPlaying);
+  isPlayingRef.current = isPlaying;
+  // A duel matchup holds the dock (focusSlice.holdPlayer): its clips are the
+  // audio there, so the dock is hidden (CSS only - the player stays mounted)
+  // and paused, and picks up again on release if it was playing.
+  const held = useSelector((s) => s.focus.playerHeld);
+  const resumeOnRelease = useRef(false);
+  useEffect(() => {
+    const player = playerRef.current;
+    if (held) {
+      resumeOnRelease.current = isPlayingRef.current;
+      player?.pauseVideo?.();
+    } else if (resumeOnRelease.current) {
+      resumeOnRelease.current = false;
+      player?.playVideo?.();
+    }
+  }, [held]);
   // Playback position, polled (see below) for the edge progress line.
   // The volume and mute survive a reload (per device, settings.js
   // DEVICE_UI): saved on every change, applied to each new player instance.
@@ -168,11 +180,13 @@ export default function PlayerDock({
   // through PLAYER_MODE_TRANSITIONS - see the comment on that table for why
   // it's a state machine rather than a simple cycle. Skipped entirely while
   // the user is typing (filter box, command palette, ...) so it never
-  // hijacks normal input, and h/l/arrow keys are skipped on the duel
-  // screen, which already uses left/right arrow itself to pick a duel's
-  // winner.
+  // hijacks normal input. A page's own shortcut wins: a page key handler
+  // (react-hotkeys-hook, on document - it runs first) that took the key
+  // marks it defaultPrevented, e.g. Suggested moves' m = move, l = lock.
+  // While a matchup holds the dock, it takes no keys at all.
   useEffect(() => {
     function onKeyDown(e) {
+      if (held || e.defaultPrevented) return;
       if (isSequenceKey(e)) return;
       const active = document.activeElement;
       const isTyping =
@@ -200,9 +214,6 @@ export default function PlayerDock({
         return;
       }
 
-      const onDuelScreen = document.querySelector('.duel-view');
-      if (onDuelScreen) return;
-
       if (expanded && e.key === 'ArrowLeft') {
         // While expanded, the arrow keys match the on-screen ‹ › buttons
         // (scrub within the current video) instead of skipping tracks -
@@ -219,8 +230,6 @@ export default function PlayerDock({
         e.preventDefault();
         if (hasNext) onNext();
       } else if (e.key === ' ' || e.code === 'Space') {
-        // Duel owns Space for its own "skip" shortcut - the early return
-        // above for onDuelScreen already keeps this from firing there.
         e.preventDefault();
         togglePlay();
       } else if (e.key === 'Delete' && availableTiers.length > 0) {
@@ -279,6 +288,7 @@ export default function PlayerDock({
     // stale play/mute state.
     isPlaying,
     isMuted,
+    held,
   ]);
 
   function togglePlay() {
@@ -378,9 +388,11 @@ export default function PlayerDock({
 
   return (
     <>
-    {expanded && <div aria-hidden style={{ height: miniHeightRef.current, flexShrink: 0 }} />}
+    {expanded && !held && <div aria-hidden style={{ height: miniHeightRef.current, flexShrink: 0 }} />}
     <div
       ref={rootRef}
+      style={held ? { display: 'none' } : undefined}
+      data-held={held || undefined}
       className={`player-dock ${expanded ? 'player-dock-expanded' : 'player-dock-mini'}${
         floating ? ' player-dock-floating' : ''
       }`}
@@ -623,10 +635,6 @@ export default function PlayerDock({
                   />
                 </Group>
               )}
-              <Text fz="xs" c="dimmed" opacity={0.75}>
-                esc/j minimize · ← → seek 10s · h l navigate · space play/pause · m mute · f fullscreen · 0-9 seek %
-                {availableTiers.length > 0 && ` · shift+1-${availableTiers.length} set tier · del remove`}
-              </Text>
             </Stack>
           )}
         </div>

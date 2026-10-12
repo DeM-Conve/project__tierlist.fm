@@ -272,7 +272,7 @@ function NowAndUpNext({ current, upcomingCount }) {
       </Text>
       {upcomingCount === 0 && (
         <Text fz="xs" c="dimmed" px="3xs" py="xs">
-          End of the queue. Use Play next / Add to queue in any song's ⋯ menu, or drag a played song back down here.
+          Nothing queued - add songs from their ⋯ menu.
         </Text>
       )}
     </>

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { tierName } from './tierLabels';
-import { useDispatch, useSelector } from 'react-redux';
+import { useDispatch, useSelector, useStore } from 'react-redux';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   Routes,
@@ -33,7 +33,7 @@ import { CANVAS_TOP, CANVAS_X, PART_GAP, SHELL_Y } from './layout/spacing';
 import { CanvasContext } from './layout/canvas';
 import PendingChanges from './components/PendingChanges';
 import { landBoardRefresh, loadBoard, moveWithFeedback } from './tierActions';
-import { buildSyncPlan, succeeded, touchedPlaylists } from './syncPlan';
+import { buildSyncPlan, songMoves, succeeded, touchedPlaylists } from './syncPlan';
 import { dragEnded, transfersDiscarded, transfersPushed } from './store/transfersSlice';
 import TierBoardView from './components/TierBoardView';
 import PlayerDock from './components/PlayerDock';
@@ -223,10 +223,10 @@ export default function App() {
         <Route path="playlist/:id" element={<PlaylistRedirect />} />
         <Route path="tier/:category" element={<TierBoardPage />} />
         <Route path="tier/:category/t/:tier" element={<TierFocusPage />} />
-        <Route path="tier/:category/duel" element={<DuelPage view={DuelHub} />} />
+        <Route path="tier/:category/duel" element={<DuelPage view={DuelHub} staged />} />
         <Route path="tier/:category/duel/play/:sessionId" element={<DuelPage view={DuelMatch} />} />
-        <Route path="tier/:category/duel/moves" element={<DuelPage view={DuelMoves} />} />
-        <Route path="tier/:category/duel/done/:sessionId" element={<DuelPage view={DuelWrap} />} />
+        <Route path="tier/:category/duel/moves" element={<DuelPage view={DuelMoves} staged />} />
+        <Route path="tier/:category/duel/done/:sessionId" element={<DuelPage view={DuelWrap} staged />} />
         <Route path="add" element={<AddSongsPage />} />
         <Route path="settings" element={<SettingsPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
@@ -291,8 +291,6 @@ function Layout() {
 
   const tierGroups = useSelector(selectTierGroups);
   const tierCategories = useSelector(selectTierCategories);
-  const pendingMoves = useSelector(selectPendingMoves);
-  const transfers = useSelector(selectTransfers);
   const stagedCount = useSelector(selectStagedChanges).length;
   const focusSequence = useSelector(selectFocusSequence);
   // A song dragged to another board unmounts its own tile on the way (the
@@ -386,9 +384,28 @@ function Layout() {
   // VS Code's modifier keys: undo / redo, Ctrl+B, the panel views, Ctrl+,.
   useWorkbenchKeys({ narrow });
 
-  async function syncChanges(category) {
+  // Pushes run one at a time, each planned from the store as it is when it
+  // starts - so a second push (another Move on Suggested moves while one is
+  // in flight) never re-sends what the first already applied.
+  // `videoIds`: push only those songs' staged moves (Suggested moves' Move /
+  // its Undo) and leave every other staged edit staged.
+  const store = useStore();
+  const pushChain = useRef(Promise.resolve());
+  function syncChanges(category, { videoIds } = {}) {
+    pushChain.current = pushChain.current.then(() => runSync(category, videoIds));
+    return pushChain.current;
+  }
+  async function runSync(category, videoIds) {
+    const state = store.getState();
+    let moves = selectPendingMoves(state);
+    let staged = selectTransfers(state);
+    if (videoIds) {
+      moves = songMoves(moves, videoIds);
+      staged = [];
+    }
+    if (!moves.length && !staged.length) return;
     dispatch(setSyncStatus('syncing'));
-    const plan = buildSyncPlan(pendingMoves, transfers, tierGroups, category);
+    const plan = buildSyncPlan(moves, staged, selectTierGroups(state), category);
 
     try {
       const result = await tierSyncMutation.mutateAsync(plan.payload);
@@ -746,6 +763,7 @@ function Layout() {
                     <Outlet
                       context={{
                         syncChanges,
+                        pushSongs: (category, videoIds) => syncChanges(category, { videoIds }),
                         discardChanges,
                         moveVideoToTier,
                         openFocus,
@@ -1042,12 +1060,20 @@ function TierFocusPage() {
 
 // Every duel screen (hub, matchup, moves, summary): the board loaded the same
 // way the tier list loads it (deep links work), then the screen itself.
-function DuelPage({ view: View }) {
+// `staged`: the page shows the board's staged-changes bar (review / Push,
+// Shift+P) like a board page - a Move on Suggested moves is staged, so it has
+// to be visible and pushable right there. The matchup leaves it out.
+function DuelPage({ view: View, staged = false }) {
   const category = useCategoryParam();
   const { sessionId } = useParams();
   const { isLoading, error, retry } = useBoardPage(category);
   if (error) return <BoardLoadError error={error} onRetry={retry} />;
-  return <View category={category} sessionId={sessionId} boardLoading={isLoading} base={`/tier/${encodeURIComponent(category)}`} />;
+  return (
+    <>
+      <View category={category} sessionId={sessionId} boardLoading={isLoading} base={`/tier/${encodeURIComponent(category)}`} />
+      {staged && <PendingChanges />}
+    </>
+  );
 }
 
 function AddSongsPage() {

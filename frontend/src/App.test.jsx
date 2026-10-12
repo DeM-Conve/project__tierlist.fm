@@ -126,6 +126,29 @@ describe('a board shown from the board cache', () => {
   });
 });
 
+// A Move on Suggested moves is staged like any edit, so the staged-changes
+// bar (review / Push) is there on the duel pages too - it used to be only on
+// board pages, and a Move looked like it had done nothing.
+describe('staged changes on duel pages', () => {
+  const song = (videoId) => ({ videoId, id: `item-${videoId}`, title: `Song ${videoId}`, thumbnail: null });
+  const BOARD = { S: [song('stagedvid01')], A: [song('stagedvid02')] };
+  afterEach(() => { h.board = null; });
+
+  it.each([
+    ['/tier/Rap/duel/moves', true],
+    ['/tier/Rap/duel', true],
+    ['/tier/Rap/duel/play/s1', false],
+  ])('%s shows the bar: %s', async (path, shown) => {
+    store.dispatch(setLoadedCategory(null));
+    h.board = { data: BOARD, isLoading: false, error: null, retry: vi.fn(), presentTiers: ['S', 'A'], refreshError: null, dataUpdatedAt: 1000, isStale: false, isFetching: false };
+    renderApp(path);
+    await screen.findByRole('navigation', { name: 'Activity bar' });
+    act(() => { store.dispatch(moveWithFeedback([{ fromTier: 'S', toTier: 'A', videoId: 'stagedvid01', dropIndex: null }])); });
+    if (shown) expect(await screen.findByText('1 change staged · review')).toBeInTheDocument();
+    else expect(screen.queryByText(/staged · review/)).not.toBeInTheDocument();
+  });
+});
+
 // Duels are reachable from anywhere: the palette has a "Duel: <board>" for
 // every board, and the side panel's board rows a Duel action.
 describe('duel entry points', () => {

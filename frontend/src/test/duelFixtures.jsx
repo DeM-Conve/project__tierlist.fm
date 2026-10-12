@@ -1,5 +1,5 @@
 import { vi } from 'vitest';
-import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import { MemoryRouter, Outlet, Route, Routes } from 'react-router-dom';
 import { makeStore, renderWithApp } from './render';
 import { loadBoard } from '../tierActions';
 
@@ -42,13 +42,16 @@ export const analysis = (over = {}) => ({
 export const mutation = (fn = vi.fn()) => ({ mutate: fn, isPending: false, isError: false });
 
 // Renders `ui` at /tier/Rock/duel... with the board loaded; returns the store.
-export function renderDuel(ui, path = '/tier/Rock/duel') {
+// `context`: the Layout's outlet context (e.g. { pushSongs }).
+export function renderDuel(ui, path = '/tier/Rock/duel', { context } = {}) {
   const store = makeStore({ playlists: ['S', 'A', 'B', 'TODO'].map((t) => ({ id: `pl-${t}`, title: `Rock ${t}`, itemCount: 1 })), naming: NAMING });
   store.dispatch(loadBoard({ category: 'Rock', data: BOARD }));
   renderWithApp(
     <MemoryRouter initialEntries={[path]}>
       <Routes>
-        <Route path="*" element={ui} />
+        <Route element={<Outlet context={context} />}>
+          <Route path="*" element={ui} />
+        </Route>
       </Routes>
     </MemoryRouter>,
     { store }

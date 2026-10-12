@@ -1,24 +1,24 @@
 import { useMemo, useState } from 'react';
+import { useDispatch, useSelector } from 'react-redux';
 import { Link } from 'react-router-dom';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useElementSize, useHover } from '@mantine/hooks';
 import {
-  Accordion, Alert, Anchor, Badge, Box, Button, Checkbox, Chip, Container, Group, Kbd, Paper, Progress, ScrollArea, Skeleton, Stack,
+  Accordion, Alert, Anchor, Badge, Box, Button, Checkbox, Chip, Container, Group, Kbd, Paper, Progress, Skeleton, Stack,
   Table, Text, ThemeIcon, Title, UnstyledButton,
 } from '@mantine/core';
-import { ArrowDown, ArrowUp, Hourglass, Play, Square, Swords } from 'lucide-react';
+import { ArrowDown, ArrowUp, AudioLines, Hourglass, Play, RefreshCw, Swords } from 'lucide-react';
 import { useTierName } from '../../tierLabels';
 import { TIER_ORDER } from '../../tiers';
 import { TierChip } from '../TierBits';
-import EmbeddedPlayer from '../EmbeddedPlayer';
+import { playSongNow } from '../../queueActions';
 import { useDuelAnalysisQuery } from '../../api/queries';
 import { errorMessage } from '../../api/client';
 import { useDuelBoard } from '../../duel/useDuelBoard';
-import { leaningConfidence, leaningText, moveKind, orderChanges, pct, record, shortfallText } from '../../duel/duelText';
+import { leaningConfidence, leaningText, moveKind, orderChanges, pct, record, shortfallText, suggestionChanges } from '../../duel/duelText';
 import { ProbabilityBars, ScoreTrend, SectionLabel, SongArt } from './DuelBits';
 import PageHeader from '../PageHeader';
-import { SECTION_GAP, SHELL_Y, spacingPx } from '../../layout/spacing';
-import { useCanvas } from '../../layout/canvas';
+import { SECTION_GAP, spacingPx } from '../../layout/spacing';
 
 // The two columns' minimum widths (px) and the gap between them.
 const MAIN_MIN = 560;
@@ -258,11 +258,20 @@ export default function DuelMoves({ category, boardLoading, base }) {
   const [filter, setFilter] = useState('all');
   const [decided, setDecided] = useState({}); // song -> { s, kind, lean }
   const [selected, setSelected] = useState(null);
-  const [previewSong, setPreviewSong] = useState(null);
+  const dispatch = useDispatch();
+  const playingSong = useSelector((s) => s.focus.focusedVideo?.videoId);
   const { ref: pageRef, width: pageWidth } = useElementSize();
-  const { height: canvasHeight } = useCanvas();
 
-  const data = analysis.data;
+  // The list holds still while you work through it: it shows the analysis the
+  // page opened with. Every Move changes the layout, and the engine re-analyses
+  // it (tier borders shift, other songs can cross the bar) - that fresher
+  // analysis is offered with a notice instead of replacing the rows under you.
+  const latest = analysis.data;
+  const [pinned, setPinned] = useState(null); // { category, data }
+  if (latest && pinned?.category !== category) setPinned({ category, data: latest });
+  const data = pinned?.category === category ? pinned.data : latest;
+  const changes = suggestionChanges(data, latest, decided);
+  const updateList = () => setPinned({ category, data: latest });
   const muOf = (id) => data?.songs.find((x) => x.id === id)?.mu;
 
   // Decided rows stay listed (with Undo), in the list they came from, after the analysis drops them.
@@ -289,13 +298,20 @@ export default function DuelMoves({ category, boardLoading, base }) {
   const current = browsable.find((s) => s.song === selected) ?? browsable[0];
   const sure = rows.filter((s) => !decided[s.song] && s.confidence >= 0.9);
 
-  // The preview belongs to one song: selecting another stops it.
-  const previewing = !!current && previewSong === current.song;
-  const togglePreview = () => setPreviewSong((p) => (p === current?.song ? null : current?.song));
+  // Play hands the song to the player dock (plays now, the queue carries on
+  // after it) - one player, its shortcuts and tier chips, never a second
+  // player inside the card.
+  const playingHere = !!current && playingSong === current.song;
+  const play = () => current && !playingHere && dispatch(playSongNow(current.from, board.videoOf(current.song)));
 
-  const move = (s) => {
-    board.accept(s, muOf);
+  const move = (s, opts) => {
+    board.accept(s, muOf, opts);
     setDecided((d) => ({ ...d, [s.song]: { s, kind: 'move', lean: isLeaning(s) } }));
+  };
+  // Move all: every sure move, pushed to YouTube together.
+  const moveAll = () => {
+    sure.forEach((s) => move(s, { push: false }));
+    board.pushNow(sure.map((s) => s.song));
   };
   const keep = (s) => {
     board.keep(s);
@@ -319,12 +335,14 @@ export default function DuelMoves({ category, boardLoading, base }) {
   };
   useHotkeys('down', () => browse(1), { preventDefault: true }, [browsable, current]);
   useHotkeys('up', () => browse(-1), { preventDefault: true }, [browsable, current]);
-  useHotkeys('m', () => current && !decided[current.song] && move(current), [current, decided]);
-  useHotkeys('x', () => current && !decided[current.song] && keep(current), [current, decided]);
-  useHotkeys('l', () => current && toggleLock(current.song), [current, locked]);
-  useHotkeys('p', () => current && togglePreview(), [current, previewSong]);
+  // preventDefault marks these keys as the page's: the player dock skips
+  // them (here m = move, l = lock, not mute / next track).
+  useHotkeys('m', () => current && !decided[current.song] && move(current), { preventDefault: true }, [current, decided]);
+  useHotkeys('x', () => current && !decided[current.song] && keep(current), { preventDefault: true }, [current, decided]);
+  useHotkeys('l', () => current && toggleLock(current.song), { preventDefault: true }, [current, locked]);
+  useHotkeys('p', play, { preventDefault: true }, [current, playingHere]);
 
-  if (analysis.isError) {
+  if (analysis.isError && !data) {
     return (
       <Container className="duel-view" fluid px={0} py={0}>
         <Alert color="red" title="Couldn’t load the suggested moves">
@@ -342,85 +360,77 @@ export default function DuelMoves({ category, boardLoading, base }) {
   // Two columns when the page is wide enough for both (the list's 560 + the
   // panel's 380 + the gap); unmeasured (first paint, tests) counts as wide.
   const wide = pageWidth === 0 || pageWidth >= MAIN_MIN + PANEL_MIN + spacingPx(COLUMN_GAP);
-  // The evidence panel sticks to the top of the canvas and scrolls inside
-  // itself, so it never pushes anything below it out of view.
-  const panelMah = wide && canvasHeight > 0 ? canvasHeight - 2 * spacingPx(SHELL_Y) : undefined;
-  const panelProps = wide
-    ? { pos: 'sticky', top: spacingPx(SHELL_Y), style: { flex: `1 1 ${PANEL_MIN}px`, overflow: 'hidden' } }
-    : { style: { overflow: 'hidden' } };
+  // The evidence panel takes the height it needs - the page scrolls, never
+  // the panel (the user's call: no scroll box inside a card).
+  const panelProps = wide ? { style: { flex: `1 1 ${PANEL_MIN}px` } } : {};
 
   const evidence = current && (
     <Paper withBorder radius="lg" {...panelProps} data-testid="evidence-panel">
-      <ScrollArea.Autosize mah={panelMah} type="auto">
-        <Stack gap="lg" p="md">
-          <Group gap="md" wrap="nowrap">
-            <SongArt video={board.videoOf(current.song)} size={60} />
-            <Box style={{ flex: 1 }} miw={0}>
-              <Title order={3} fz="xl" truncate="end">{board.nameOf(current.song)}</Title>
-              <Text c="dimmed" fz="md" truncate="end">{board.artistOf(current.song)}</Text>
-            </Box>
-            <Button radius="xl" w={48} h={48} p={0} aria-label={previewing ? 'Stop' : `Play ${board.nameOf(current.song)}`}
-              onClick={togglePreview}>
-              {previewing ? <Square size={16} fill="currentColor" /> : <Play size={18} fill="currentColor" />}
+      <Stack gap="lg" p="md">
+        <Group gap="md" wrap="nowrap">
+          <SongArt video={board.videoOf(current.song)} size={60} />
+          <Box style={{ flex: 1 }} miw={0}>
+            <Title order={3} fz="xl" truncate="end">{board.nameOf(current.song)}</Title>
+            <Text c="dimmed" fz="md" truncate="end">{board.artistOf(current.song)}</Text>
+          </Box>
+          {playingHere ? (
+            <Button variant="default" radius="xl" w={48} h={48} p={0} aria-label="Playing in the player" title="Playing in the player">
+              <AudioLines size={18} />
             </Button>
-          </Group>
-          {previewing && (
-            <Box style={{ aspectRatio: '16 / 9', borderRadius: 10, overflow: 'hidden', background: 'var(--media-bg)' }}>
-              <EmbeddedPlayer videoId={current.song} autoplay />
-            </Box>
+          ) : (
+            <Button radius="xl" w={48} h={48} p={0} aria-label={`Play ${board.nameOf(current.song)}`} title="Play in the player" onClick={play}>
+              <Play size={18} fill="currentColor" />
+            </Button>
           )}
-          <Stack gap="xs">
-            <SectionLabel>Where it belongs</SectionLabel>
-            <ProbabilityBars song={currentSong} tiers={TIER_ORDER.filter((t) => currentSong?.probabilities[t] != null)} />
-          </Stack>
-          <Stack gap="2xs">
-            <Group justify="space-between">
-              <SectionLabel>Score over {current.wins + current.losses + current.draws} duels</SectionLabel>
-              <Text fz="sm" c="dimmed">dashed = tier border</Text>
-            </Group>
-            <ScoreTrend trend={current.trend} border={border?.score} />
-          </Stack>
-          <Stack gap="4xs">
-            <SectionLabel>Key results</SectionLabel>
-            {current.keyResults.map((k, i) => (
-              <Group key={i} justify="space-between" py="3xs" style={{ borderBottom: '1px solid var(--border-soft)' }} wrap="nowrap">
-                <Group gap="2xs" wrap="nowrap" miw={0}>
-                  <Text fw={800} w={40} c={k.result > 0 ? 'accent' : 'dimmed'}>
-                    {k.result > 0 ? 'Won' : k.result < 0 ? 'Lost' : 'Draw'}
-                  </Text>
-                  <Text fz="md" truncate="end">{board.nameOf(k.opponent)}</Text>
-                </Group>
-                {k.opponentTier && <TierChip tier={k.opponentTier} size={20} />}
-              </Group>
-            ))}
-          </Stack>
-          <Stack gap="xs">
-            {/* Deciding swaps the buttons for what was decided + Undo in a
-                row of the same height, so the lock below doesn't jump. */}
-            {decided[current.song] ? (
-              <Group gap="2xs" justify="space-between" wrap="nowrap" data-testid="evidence-decided">
-                <Text fz="md" fw={700} c={decided[current.song].kind === 'move' ? 'accent' : 'dimmed'}>
-                  {decided[current.song].kind === 'move' ? `Moved to ${tierName(current.to)}` : `Kept in ${tierName(current.from)}`}
-                </Text>
-                <Button variant="subtle" color="gray" onClick={() => undo(current)}>Undo</Button>
-              </Group>
-            ) : (
-              <Group gap="2xs" grow>
-                <Button variant="default" onClick={() => keep(current)}>Keep in {tierName(current.from)}</Button>
-                <Button onClick={() => move(current)}>Move to {tierName(current.to)}</Button>
-              </Group>
-            )}
-            <Checkbox
-              checked={!!locked[current.song]}
-              onChange={() => toggleLock(current.song)}
-              label={`Lock ${board.nameOf(current.song)} in its tier - never suggest a move again`}
-            />
-            <Text fz="md" c="dimmed">
-              Keeping it raises the bar: it won’t be suggested again until five fresh duels point the same way.
-            </Text>
-          </Stack>
+        </Group>
+        <Stack gap="xs">
+          <SectionLabel>Where it belongs</SectionLabel>
+          <ProbabilityBars song={currentSong} tiers={TIER_ORDER.filter((t) => currentSong?.probabilities[t] != null)} />
         </Stack>
-      </ScrollArea.Autosize>
+        <Stack gap="2xs">
+          <Group justify="space-between">
+            <SectionLabel>Score over {current.wins + current.losses + current.draws} duels</SectionLabel>
+            <Text fz="sm" c="dimmed">dashed = tier border</Text>
+          </Group>
+          <ScoreTrend trend={current.trend} border={border?.score} />
+        </Stack>
+        <Stack gap="4xs">
+          <SectionLabel>Key results</SectionLabel>
+          {current.keyResults.map((k, i) => (
+            <Group key={i} justify="space-between" py="3xs" style={{ borderBottom: '1px solid var(--border-soft)' }} wrap="nowrap">
+              <Group gap="2xs" wrap="nowrap" miw={0}>
+                <Text fw={800} w={40} c={k.result > 0 ? 'accent' : 'dimmed'}>
+                  {k.result > 0 ? 'Won' : k.result < 0 ? 'Lost' : 'Draw'}
+                </Text>
+                <Text fz="md" truncate="end">{board.nameOf(k.opponent)}</Text>
+              </Group>
+              {k.opponentTier && <TierChip tier={k.opponentTier} size={20} />}
+            </Group>
+          ))}
+        </Stack>
+        <Stack gap="xs">
+          {/* Deciding swaps the buttons for what was decided + Undo in a
+              row of the same height, so the lock below doesn't jump. */}
+          {decided[current.song] ? (
+            <Group gap="2xs" justify="space-between" wrap="nowrap" data-testid="evidence-decided">
+              <Text fz="md" fw={700} c={decided[current.song].kind === 'move' ? 'accent' : 'dimmed'}>
+                {decided[current.song].kind === 'move' ? `Moved to ${tierName(current.to)}` : `Kept in ${tierName(current.from)}`}
+              </Text>
+              <Button variant="subtle" color="gray" onClick={() => undo(current)}>Undo</Button>
+            </Group>
+          ) : (
+            <Group gap="2xs" grow>
+              <Button variant="default" onClick={() => keep(current)}>Keep in {tierName(current.from)}</Button>
+              <Button onClick={() => move(current)}>Move to {tierName(current.to)}</Button>
+            </Group>
+          )}
+          <Checkbox
+            checked={!!locked[current.song]}
+            onChange={() => toggleLock(current.song)}
+            label={`Lock ${board.nameOf(current.song)} in its tier - never suggest a move again`}
+          />
+        </Stack>
+      </Stack>
     </Paper>
   );
 
@@ -473,14 +483,16 @@ export default function DuelMoves({ category, boardLoading, base }) {
     </Paper>
   );
 
-  const tighten = data && Object.keys(data.tierOrders).length > 0 && (
+  // Tier orders always come from the live analysis: they're the current tiers'
+  // songs, and a pinned order would leave out a song just moved into the tier.
+  const tighten = latest && Object.keys(latest.tierOrders).length > 0 && (
     <Stack gap="sm" data-testid="tighten-section">
       <Title order={2}>Tighten tier order</Title>
       <Text c="dimmed" fz="md">Order within a tier is the songs sorted by score - positions are ranks on YouTube. Check the new order before you sort.</Text>
       <Paper withBorder radius="lg" style={{ overflow: 'hidden' }}>
         {/* The first tier starts open: the change is there to see before Sort. */}
         <Accordion multiple chevronPosition="left" variant="default">
-          {Object.entries(data.tierOrders).map(([tier, ids]) => (
+          {Object.entries(latest.tierOrders).map(([tier, ids]) => (
             <TierOrderItem key={tier} tier={tier} ids={ids} board={board} />
           ))}
         </Accordion>
@@ -489,7 +501,7 @@ export default function DuelMoves({ category, boardLoading, base }) {
   );
 
   // Wide: the list, Leaning and Tighten tier order stacked in the main
-  // column - all in view right away - beside the sticky evidence panel.
+  // column - all in view right away - beside the evidence panel.
   // Narrow (one column): the list, the selected song's evidence, then the rest.
   const mainColumn = (children) => (
     <Stack gap={SECTION_GAP} style={{ flex: `999 1 ${MAIN_MIN}px`, minWidth: 0 }} data-testid="moves-main">
@@ -537,9 +549,9 @@ export default function DuelMoves({ category, boardLoading, base }) {
       <Stack gap={SECTION_GAP}>
         <PageHeader
           title="Suggested moves"
-          meta="Your duels built the case. Nothing moves until you say so - then push to YouTube as usual."
+          meta="Your duels built the case. Nothing moves until you say so - Move moves the song on YouTube."
           actions={rows.length > 0 && (
-            <Button disabled={!sure.length} onClick={() => sure.forEach(move)}>
+            <Button disabled={!sure.length} onClick={moveAll}>
               Move all {sure.length} at ≥90%
             </Button>
           )}
@@ -554,6 +566,21 @@ export default function DuelMoves({ category, boardLoading, base }) {
             ))}
           </Group>
         </Chip.Group>
+
+        {(changes.added.length > 0 || changes.gone.length > 0) && (
+          <Alert color="gray" icon={<RefreshCw size={16} />} data-testid="moves-changed">
+            <Group justify="space-between" gap="sm" wrap="nowrap">
+              <Text fz="md">
+                Your moves changed the suggestions:{' '}
+                {[
+                  changes.added.length > 0 && `${changes.added.length} new`,
+                  changes.gone.length > 0 && `${changes.gone.length} no longer sure`,
+                ].filter(Boolean).join(' · ')}
+              </Text>
+              <Button variant="default" size="compact-sm" style={{ flexShrink: 0 }} onClick={updateList}>Update list</Button>
+            </Group>
+          </Alert>
+        )}
 
         <Box ref={pageRef}>{body}</Box>
       </Stack>

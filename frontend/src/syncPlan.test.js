@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildSyncPlan, succeeded, touchedPlaylists } from './syncPlan';
+import { buildSyncPlan, songMoves, succeeded, touchedPlaylists } from './syncPlan';
 
 const groups = {
   Rock: { S: { id: 'rock-s' }, A: { id: 'rock-a' }, TODO: { id: 'rock-todo' } },
@@ -70,5 +70,20 @@ describe('touchedPlaylists', () => {
   it('from an uninvolved board, just the transfer ends', () => {
     const plan = buildSyncPlan([], [transfer], groups, 'Jazz');
     expect(touchedPlaylists(plan, groups, 'Jazz').sort()).toEqual(['pop-b', 'rock-s']);
+  });
+});
+
+describe('songMoves', () => {
+  const v = (videoId) => ({ videoId, id: `item-${videoId}`, title: videoId });
+  const moves = [
+    { kind: 'move', video: v('a'), from: 'S', to: 'A' },
+    { kind: 'move', video: v('b'), from: 'A', to: 'B' },
+    { kind: 'dedupe', video: v('a'), tier: 'B', keptTier: 'S' },
+    { kind: 'remove', video: v('c'), from: 'B', to: 'REMOVED' },
+  ];
+  it('keeps just those songs\' tier moves - no other song, no removal or duplicate', () => {
+    expect(songMoves(moves, ['a'])).toEqual([moves[0]]);
+    expect(songMoves(moves, ['a', 'b']).map((m) => m.video.videoId)).toEqual(['a', 'b']);
+    expect(songMoves(moves, ['c'])).toEqual([]);
   });
 });

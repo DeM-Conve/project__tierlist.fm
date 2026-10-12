@@ -1,5 +1,5 @@
 import { notifications } from '@mantine/notifications';
-import { enqueue, openFocus } from './store/focusSlice';
+import { enqueue, openFocus, playNextInQueue } from './store/focusSlice';
 import { songLabel } from './tierUtils';
 
 const TOAST_ID = 'queue-feedback';
@@ -31,4 +31,16 @@ export const queueSong = (tier, video, position) => (dispatch, getState) => {
     withCloseButton: false,
     message: `${position === 'next' ? 'Playing next' : 'Added to queue'}: ${songLabel(video).song}`,
   });
+};
+
+// "Play now": the song starts in the player straight away (Play next, then
+// skip to it) and the queue carries on after it. With nothing playing it
+// starts a fresh queue in the mini bar, like queueSong.
+export const playSongNow = (tier, video) => (dispatch, getState) => {
+  if (!getState().focus.focusedVideo) {
+    dispatch(queueSong(tier, video, 'next'));
+    return;
+  }
+  dispatch(enqueue({ entry: { tier, video }, position: 'next' }));
+  dispatch(playNextInQueue());
 };

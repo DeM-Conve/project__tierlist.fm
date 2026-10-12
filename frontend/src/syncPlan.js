@@ -23,6 +23,12 @@ export function buildSyncPlan(pendingMoves, transfers, tierGroups, category) {
   };
 }
 
+// Just these songs' staged tier moves (a Move on Suggested moves pushes at
+// once): never their removals or duplicates, never another song's edit.
+export function songMoves(pendingMoves, videoIds) {
+  return pendingMoves.filter((m) => m.kind === 'move' && videoIds.includes(m.video.videoId));
+}
+
 // Which of the plan's changes the backend applied. `results` = its
 // per-item results, in payload order.
 export function succeeded(plan, results = []) {

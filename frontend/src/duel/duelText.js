@@ -123,3 +123,17 @@ export function dropIndexByScore(targetIds, mu, muOf) {
   const i = targetIds.findIndex((id) => (muOf(id) ?? -Infinity) < mu);
   return i < 0 ? targetIds.length : i;
 }
+
+// What a fresher analysis changes about the suggestions on screen: songs it
+// newly suggests and songs it no longer suggests. Songs already decided on
+// the page don't count - their rows stay as decided either way.
+export function suggestionChanges(shown, latest, decided = {}) {
+  if (!shown || !latest || shown === latest) return { added: [], gone: [] };
+  const songs = (a) => new Set(a.suggestions.map((s) => s.song));
+  const before = songs(shown);
+  const after = songs(latest);
+  return {
+    added: latest.suggestions.filter((s) => !before.has(s.song) && !decided[s.song]),
+    gone: shown.suggestions.filter((s) => !after.has(s.song) && !decided[s.song]),
+  };
+}

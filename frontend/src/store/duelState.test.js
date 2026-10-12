@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { makeStore } from '../test/render';
 import { loadBoard, moveWithFeedback } from '../tierActions';
 import { selectDuelLayout } from './selectors';
-import { requestPlayerPause } from './focusSlice';
+import { holdPlayer, releasePlayer } from './focusSlice';
 import { BOARD, IDS, NAMING } from '../test/duelFixtures';
 
 const board = () => {
@@ -30,12 +30,13 @@ describe('selectDuelLayout', () => {
   });
 });
 
-describe('requestPlayerPause', () => {
-  it('counts up, so every request reaches the dock', () => {
+describe('holdPlayer / releasePlayer', () => {
+  it('a matchup holds the dock and lets it go', () => {
     const store = board();
-    expect(store.getState().focus.pauseRequest).toBe(0);
-    store.dispatch(requestPlayerPause());
-    store.dispatch(requestPlayerPause());
-    expect(store.getState().focus.pauseRequest).toBe(2);
+    expect(store.getState().focus.playerHeld).toBe(false);
+    store.dispatch(holdPlayer());
+    expect(store.getState().focus.playerHeld).toBe(true);
+    store.dispatch(releasePlayer());
+    expect(store.getState().focus.playerHeld).toBe(false);
   });
 });

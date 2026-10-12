@@ -229,6 +229,12 @@ category.
   (`/api/duels/{board}/...`; reads are POSTs carrying the browser's board layout,
   staged edits included). The frontend's duel screens (`components/duel/`) only show
   what the API returns - add ranking logic to the engine, never to the frontend.
+  **A suggested Move pushes at once** (the user's call: "move should mean literal
+  move"): `useDuelBoard.accept` stages it through `tierActions` then calls the
+  Layout's `pushSongs(category, videoIds)` - App's `syncChanges` with `videoIds`,
+  which pushes only those songs' moves (`syncPlan.songMoves`) and leaves other
+  staged edits for the bar. Pushes are chained (one at a time, each planned from
+  the store when it starts), so overlapping pushes never re-send a move.
   Every duel/user datum lives in Postgres (the user's call), not localStorage.
   **To-do songs are never part of duels; the user places them** (the user's call:
   "for the entire duel concept the todo song will not be there"). `DuelEngine.analyze`
@@ -303,7 +309,13 @@ category.
   router `Layout` (above `<Outlet/>`), and no route/page effect ever dispatches
   `closeFocus` on mount - only its own "stop" control (and logout) does. Don't
   reintroduce a "close the player when navigating away" call; that defeats the whole
-  point of a background-playback mini bar. Also don't derive the *playing* video's
+  point of a background-playback mini bar. The one exception is a duel matchup, whose
+  own clips are the audio: it *holds* the dock (`focusSlice.holdPlayer` /
+  `releasePlayer`) - hidden by CSS (still mounted), paused, keys off, resumed on
+  release if it was playing. Every other page uses the dock as the only player: a
+  page "Play" hands the song to it (`queueActions.playSongNow`), never a second
+  embed. Dock keys work everywhere; a page key wins by `preventDefault` in its
+  (document-level) `useHotkeys` handler - the dock skips `e.defaultPrevented`. Also don't derive the *playing* video's
   data from `state.tiers.tierItems` (live, current-board-only) - `focusSlice.focusEntries`
   is a snapshot of `{tier, video}` taken when the dock opens/shuffle starts, and
   `selectActiveSequence` reads from that snapshot instead. This was a real bug, not

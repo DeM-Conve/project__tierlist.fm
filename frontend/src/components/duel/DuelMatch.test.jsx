@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, screen, within } from '@testing-library/react';
+import { cleanup, fireEvent, screen, within } from '@testing-library/react';
 import DuelMatch from './DuelMatch';
 import { CanvasContext } from '../../layout/canvas';
 import { IDS, renderDuel, song } from '../../test/duelFixtures';
@@ -389,8 +389,10 @@ describe('DuelMatch', () => {
     expect(screen.getByText('Back to the duel hub')).toBeInTheDocument();
   });
 
-  it('pauses the mini player when it opens', () => {
+  it('holds the player dock (hidden, paused) while open and lets it go on leaving', () => {
     const store = page();
-    expect(store.getState().focus.pauseRequest).toBe(1);
+    expect(store.getState().focus.playerHeld).toBe(true);
+    cleanup();
+    expect(store.getState().focus.playerHeld).toBe(false);
   });
 });

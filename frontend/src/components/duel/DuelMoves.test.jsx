@@ -4,16 +4,15 @@ import DuelMoves from './DuelMoves';
 import { IDS, analysis, renderDuel, suggestion } from '../../test/duelFixtures';
 
 vi.mock('@mantine/notifications', () => ({ notifications: { show: vi.fn(), hide: vi.fn() } }));
-vi.mock('../EmbeddedPlayer', () => ({ default: ({ videoId }) => <div data-testid="player">{videoId}</div> }));
 
-const h = vi.hoisted(() => ({ analysis: null, error: null, decision: null, lock: null }));
+const h = vi.hoisted(() => ({ analysis: null, error: null, decision: null, lock: null, push: null }));
 vi.mock('../../api/queries', () => ({
   useDuelAnalysisQuery: () => ({ data: h.analysis, isError: !!h.error, error: h.error, refetch: vi.fn() }),
   useDuelDecisionMutation: () => ({ mutate: h.decision }),
   useDuelLockMutation: () => ({ mutate: h.lock }),
 }));
 
-const page = () => renderDuel(<DuelMoves category="Rock" boardLoading={false} base="/tier/Rock" />, '/tier/Rock/duel/moves');
+const page = () => renderDuel(<DuelMoves category="Rock" boardLoading={false} base="/tier/Rock" />, '/tier/Rock/duel/moves', { context: { pushSongs: h.push } });
 const tierOf = (store, id) => Object.keys(store.getState().tiers.tierItems).find((t) => store.getState().tiers.tierItems[t].some((v) => v.videoId === id));
 
 // Two moves up: a sure one (B -> A, 92%) and a less sure one (A -> S, 87%).
@@ -23,6 +22,7 @@ beforeEach(() => {
   h.error = null;
   h.decision = vi.fn();
   h.lock = vi.fn();
+  h.push = vi.fn();
   h.analysis = analysis({ suggestions: [suggestion(), up] });
 });
 
@@ -67,6 +67,42 @@ describe('DuelMoves', () => {
     expect(h.decision.mock.calls[1][0]).toMatchObject({ videoId: IDS.low, decision: null });
   });
 
+  it('holds the list still after a Move; a fresher analysis is offered, not swapped in', () => {
+    h.analysis = analysis({ suggestions: [suggestion()] });
+    page();
+    expect(screen.getByText('All · 1')).toBeInTheDocument();
+    // The Move changes the layout; the engine's re-analysis now suggests another song.
+    h.analysis = analysis({ suggestions: [suggestion({ song: IDS.top, from: 'S', to: 'A', confidence: 0.9 })] });
+    fireEvent.click(screen.getByRole('button', { name: 'Move' }));
+    const main = screen.getByTestId('moves-main');
+    expect(within(main).getByText('Moved to A')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Show evidence for Top Song/ })).not.toBeInTheDocument();
+    expect(screen.getByText('All · 1')).toBeInTheDocument();
+    expect(screen.getByTestId('moves-changed')).toHaveTextContent('Your moves changed the suggestions: 1 new');
+    fireEvent.click(screen.getByRole('button', { name: 'Update list' }));
+    expect(screen.getByRole('button', { name: /Show evidence for Top Song/ })).toBeInTheDocument();
+    // The decided row stays, with its Undo.
+    expect(within(screen.getByTestId('moves-main')).getByText('Moved to A')).toBeInTheDocument();
+    expect(screen.getByText('All · 2')).toBeInTheDocument();
+    expect(screen.queryByTestId('moves-changed')).not.toBeInTheDocument();
+  });
+
+  it('a Move means it: that song goes to YouTube at once (only it), and Undo pushes it back', () => {
+    page();
+    fireEvent.click(screen.getAllByRole('button', { name: 'Move' })[0]);
+    expect(h.push).toHaveBeenCalledWith('Rock', [IDS.low]);
+    fireEvent.click(within(screen.getByTestId('moves-main')).getByText('Undo'));
+    expect(h.push).toHaveBeenLastCalledWith('Rock', [IDS.low]);
+    expect(h.push).toHaveBeenCalledTimes(2);
+  });
+
+  it('Move all pushes the sure moves together, once', () => {
+    page();
+    fireEvent.click(screen.getByRole('button', { name: 'Move all 1 at ≥90%' }));
+    expect(h.push).toHaveBeenCalledTimes(1);
+    expect(h.push).toHaveBeenCalledWith('Rock', [IDS.low]);
+  });
+
   it('Keep records the decision and leaves the board alone', () => {
     const store = page();
     fireEvent.click(screen.getAllByRole('button', { name: 'Keep' })[0]);
@@ -83,8 +119,8 @@ describe('DuelMoves', () => {
     expect(h.decision).toHaveBeenCalledTimes(1);
   });
 
-  it('the evidence panel follows the selected song; lock toggles; play opens a player', () => {
-    page();
+  it('the evidence panel follows the selected song; lock toggles; play hands the song to the player dock', () => {
+    const store = page();
     fireEvent.click(screen.getByRole('button', { name: /Show evidence for Other Song/ }));
     const panel = screen.getByRole('button', { name: 'Move to S' }).closest('.mantine-Paper-root');
     expect(within(panel).getByText('Won')).toBeInTheDocument();
@@ -94,7 +130,10 @@ describe('DuelMoves', () => {
     fireEvent.click(within(panel).getByRole('checkbox'));
     expect(h.lock.mock.calls[1][0]).toEqual({ videoId: IDS.mid2, locked: false });
     fireEvent.click(within(panel).getByRole('button', { name: /Play Other Song/ }));
-    expect(screen.getByTestId('player')).toHaveTextContent(IDS.mid2);
+    // No second player in the card: the dock plays it.
+    expect(store.getState().focus.focusedVideo.videoId).toBe(IDS.mid2);
+    expect(within(panel).queryByTestId('embed')).not.toBeInTheDocument();
+    expect(within(panel).getByRole('button', { name: 'Playing in the player' })).toBeInTheDocument();
   });
 
   it('the whole row is one click target: its empty middle selects it; its buttons act on their own', () => {
@@ -240,6 +279,14 @@ describe('DuelMoves', () => {
     fireEvent.click(within(panel).getByRole('button', { name: 'Undo' }));
     expect(within(panel).getByRole('button', { name: 'Move to A' })).toBeInTheDocument();
     expect(h.decision.mock.calls[1][0]).toMatchObject({ videoId: IDS.low, decision: null });
+  });
+
+  it('the evidence panel takes its full height: no scroll box inside it, not sticky - the page scrolls', () => {
+    page();
+    const panel = screen.getByTestId('evidence-panel');
+    expect(panel.querySelector('.mantine-ScrollArea-root')).toBeNull();
+    expect(panel).not.toHaveStyle({ position: 'sticky' });
+    expect(screen.queryByText(/raises the bar/)).not.toBeInTheDocument();
   });
 
   it('a failed load says why and offers Retry', () => {
