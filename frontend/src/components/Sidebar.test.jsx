@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
-import { fireEvent, screen } from '@testing-library/react';
+import { fireEvent, screen, waitFor } from '@testing-library/react';
+import { QueryClient } from '@tanstack/react-query';
 import { MemoryRouter, useLocation } from 'react-router-dom';
 import { ContextMenuProvider } from 'mantine-contextmenu';
 import Sidebar from './Sidebar';
@@ -36,14 +37,15 @@ function Where() {
 }
 const where = () => screen.getByTestId('where').textContent;
 
-const draw = (p, path = '/') =>
+const draw = (p, path = '/', options) =>
   renderWithApp(
     <MemoryRouter initialEntries={[path]}>
       <ContextMenuProvider>
         <Sidebar {...p} />
         <Where />
       </ContextMenuProvider>
-    </MemoryRouter>
+    </MemoryRouter>,
+    options
   );
 
 describe('Sidebar', () => {
@@ -169,5 +171,27 @@ describe('Sidebar', () => {
     fireEvent.contextMenu(screen.getByRole('link', { name: /^Rap/ }));
     fireEvent.click(await screen.findByText('Open board'));
     expect(where()).toBe('/tier/Rap');
+  });
+
+  // Opening a board waits on YouTube (one read per tier playlist): the pointer
+  // resting on its row starts those reads, so the click lands on cached data.
+  it('resting the pointer on a board (or focusing it) starts loading its playlists; passing over does not', async () => {
+    const queryClient = new QueryClient();
+    const prefetch = vi.spyOn(queryClient, 'prefetchQuery').mockResolvedValue();
+    draw(props(), '/', { queryClient });
+    const rap = screen.getByRole('link', { name: /^Rap/ });
+
+    fireEvent.mouseEnter(rap);
+    fireEvent.mouseLeave(rap);
+    await new Promise((r) => setTimeout(r, 250));
+    expect(prefetch).not.toHaveBeenCalled();
+
+    fireEvent.mouseEnter(rap);
+    await waitFor(() => expect(prefetch).toHaveBeenCalledTimes(2));
+    expect(prefetch.mock.calls.map(([q]) => q.queryKey)).toEqual([['playlist-items', 'p1'], ['playlist-items', 'p2']]);
+
+    prefetch.mockClear();
+    fireEvent.focus(screen.getByRole('link', { name: /^Rock/ }));
+    expect(prefetch.mock.calls.map(([q]) => q.queryKey)).toEqual([['playlist-items', 'p3'], ['playlist-items', 'p4']]);
   });
 });

@@ -20,6 +20,13 @@ export function useAuthStatusQuery() {
   });
 }
 
+// One playlist's items - the same query wherever it's read or prefetched,
+// so a prefetched copy is exactly what the board then finds in the cache.
+const playlistItemsQuery = (playlistId) => ({
+  queryKey: queryKeys.playlistItems(playlistId),
+  queryFn: async () => (await api.get(`/api/playlists/${playlistId}/items`)).data,
+});
+
 export function usePlaylistsQuery(enabled) {
   return useQuery({
     queryKey: queryKeys.playlists,
@@ -38,10 +45,7 @@ export function useTierBoardQueries(category, tiers) {
   const presentTiers = tiers ? BOARD_TIERS.filter((t) => tiers[t]) : [];
 
   const results = useQueries({
-    queries: presentTiers.map((t) => ({
-      queryKey: queryKeys.playlistItems(tiers[t].id),
-      queryFn: async () => (await api.get(`/api/playlists/${tiers[t].id}/items`)).data,
-    })),
+    queries: presentTiers.map((t) => playlistItemsQuery(tiers[t].id)),
   });
 
   // isPending, not isLoading: "no data yet" - also while the board cache is
@@ -66,6 +70,19 @@ export function useTierBoardQueries(category, tiers) {
   const refreshError = results.find((r) => r.isError && r.data !== undefined)?.error ?? null;
 
   return { data, isLoading, error, retry, presentTiers, dataUpdatedAt, isStale, isFetching, refreshError };
+}
+
+// Starts loading a board's playlists before it's opened (the sidebar calls
+// this when the pointer rests on a board), so the click lands on cached data.
+// Same rules as opening it: a playlist already fetched this session is fresh
+// (no refetch, no quota); one restored from the board cache is refreshed.
+// `tiers` = the board's { tierId: playlist } (selectTierGroups).
+export function usePrefetchBoard() {
+  const queryClient = useQueryClient();
+  return (tiers) =>
+    BOARD_TIERS.forEach((t) => {
+      if (tiers?.[t]) queryClient.prefetchQuery(playlistItemsQuery(tiers[t].id));
+    });
 }
 
 export function useTierSyncMutation() {
@@ -160,11 +177,7 @@ export function useSaveSettingsMutation() {
 // guess a board from the artist and to spot songs it knows are placed.
 export function useCachedTierItems(tierPlaylists) {
   const results = useQueries({
-    queries: (tierPlaylists ?? []).map((p) => ({
-      queryKey: queryKeys.playlistItems(p.id),
-      queryFn: async () => (await api.get(`/api/playlists/${p.id}/items`)).data,
-      enabled: false,
-    })),
+    queries: (tierPlaylists ?? []).map((p) => ({ ...playlistItemsQuery(p.id), enabled: false })),
   });
   return Object.fromEntries((tierPlaylists ?? []).map((p, i) => [p.id, results[i]?.data]));
 }

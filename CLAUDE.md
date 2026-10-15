@@ -278,6 +278,20 @@ category.
   transaction), and `scripts/deploy.sh` runs `backup.sh` before deploying when `db` is up.
   Use these instead of hand-made CSV/pg_dump copies before a schema reset.
 
+- **Speed rules** (the user asked for a fast end-to-end experience): nginx and
+  Spring (`server.compression`) both gzip - the browser calls the backend port
+  directly. Library code is split into long-cached chunks (`vite.config.js`
+  `codeSplitting.groups`); pages most visits don't open first (duels, Add songs,
+  Settings) are `lazy()` via `App.jsx` `PAGE_LOADERS`, preloaded in idle time -
+  a lazy view gets its *own* `Suspense` inside its page, so the page's data load
+  never waits on the chunk. Every YouTube read asks for only the fields it uses
+  (`fields=`). Batch writes (tier-sync, rename, create) run through
+  `YoutubeBatch` (4 at a time, one-at-a-time per target playlist, results in
+  input order) with `retryAborted` on YouTube's 409. The sidebar prefetches a
+  board when the pointer rests on it (`usePrefetchBoard`, same query as the
+  board). Entities with assigned ids that are inserted in bulk implement
+  `Persistable` (`DuelPrior`) so `save()` doesn't SELECT per row.
+
 ## Conventions / decisions worth knowing
 
 - **Default look: Tokyo Night theme + Blue accent + Vivid tiers**, user-switchable in

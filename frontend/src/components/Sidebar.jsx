@@ -24,6 +24,8 @@ import { selectActivityOrder, setActivityOrder } from '../store/appearanceSlice'
 import { selectNaming } from '../store/selectors';
 import { SHELL_Y, SIDEBAR_X } from '../layout/spacing';
 import { useBoardDropOpen } from '../layout/useBoardDropOpen';
+import { useTimeout } from '@mantine/hooks';
+import { usePrefetchBoard } from '../api/queries';
 
 const TOGGLE_KEYS = 'Ctrl+Shift+E · Ctrl+B';
 // A row's inline action sits over the end of the row, where its count is
@@ -40,6 +42,8 @@ const CHROME_ROW = {
   styles: { root: { borderRadius: 'var(--mantine-radius-sm)' } },
 };
 const MUTED = 'var(--chrome-fg-muted)';
+// How long the pointer rests on a board before its playlists start loading.
+const PREFETCH_DELAY_MS = 150;
 
 // Each board shows its song total straight from the playlists' own item
 // counts - no per-board fetch needed just to draw the sidebar.
@@ -57,6 +61,10 @@ function BoardLink({ category, tiers, active }) {
   const total = Object.values(counts).reduce((a, b) => a + b, 0);
   const { hovering, handlers } = useBoardDropOpen(category);
   const boardMenu = useBoardContextMenu();
+  // The pointer resting on the row (not just passing over it) or keyboard
+  // focus: start loading the board, so opening it is instant.
+  const prefetchBoard = usePrefetchBoard();
+  const prefetchSoon = useTimeout(() => prefetchBoard(tiers), PREFETCH_DELAY_MS);
   return (
     // The drag handlers sit on the whole row, so a song dragged over the
     // inline action still counts as over the board.
@@ -73,6 +81,9 @@ function BoardLink({ category, tiers, active }) {
         py="4xs"
         active={active || hovering}
         data-drop-target={hovering || undefined}
+        onMouseEnter={prefetchSoon.start}
+        onMouseLeave={prefetchSoon.clear}
+        onFocus={() => prefetchBoard(tiers)}
         label={
           <Group justify="space-between" wrap="nowrap" gap="3xs">
             <Text fz="lg" truncate="end">

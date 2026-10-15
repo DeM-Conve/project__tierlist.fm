@@ -19,6 +19,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestTemplate;
 
 import java.net.URI;
@@ -26,9 +27,14 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Supplier;
 
 @RestController
 public class PlaylistController {
+
+    // How many YouTube writes a batch (tier-sync, rename, create) runs at
+    // once - see YoutubeBatch. Inside the HTTP client's per-host pool (5).
+    static final int WRITE_PARALLELISM = 4;
 
     private final String apiBase;
     private final RestTemplate restTemplate;
@@ -56,7 +62,7 @@ public class PlaylistController {
     public List<Map<String, Object>> playlists(@RegisteredOAuth2AuthorizedClient("google") OAuth2AuthorizedClient client) {
         List<Map<String, Object>> allItems = fetchAllPages(
             client,
-            apiBase + "/playlists?part=snippet,contentDetails&mine=true&maxResults=50"
+            apiBase + "/playlists?part=snippet,contentDetails&mine=true&maxResults=50&fields=" + PLAYLIST_FIELDS
         );
 
         List<Map<String, Object>> result = new ArrayList<>();
@@ -74,6 +80,14 @@ public class PlaylistController {
         }
         return result;
     }
+
+    // Partial response: only what playlists() reads (no descriptions, no
+    // unused thumbnail sizes) - a smaller page for every account's list.
+    static final String PLAYLIST_FIELDS =
+        "nextPageToken,items(id,snippet(title,thumbnails(medium/url,default/url)),contentDetails/itemCount)";
+
+    // Partial response for a pasted link: only what video() reads.
+    static final String VIDEO_FIELDS = "items(id,snippet(title,channelTitle,thumbnails(medium/url,default/url)))";
 
     // YouTube's partial response: only what toVideo() reads. A big to-do list
     // is many pages fetched one after another (each needs the last one's
@@ -101,7 +115,7 @@ public class PlaylistController {
             @PathVariable String videoId,
             @RegisteredOAuth2AuthorizedClient("google") OAuth2AuthorizedClient client
     ) {
-        Map<String, Object> body = callYoutubeApi(client, apiBase + "/videos?part=snippet&id=" + videoId);
+        Map<String, Object> body = callYoutubeApi(client, apiBase + "/videos?part=snippet&id=" + videoId + "&fields=" + VIDEO_FIELDS);
         List<Map<String, Object>> items = (List<Map<String, Object>>) body.get("items");
         if (items == null || items.isEmpty()) return ResponseEntity.notFound().build();
         Map<String, Object> snippet = (Map<String, Object>) items.get(0).get("snippet");
@@ -176,10 +190,8 @@ public class PlaylistController {
             @RequestBody List<Map<String, Object>> moves,
             @RegisteredOAuth2AuthorizedClient("google") OAuth2AuthorizedClient client
     ) {
-        List<Map<String, Object>> results = new ArrayList<>();
-        int applied = 0;
-
-        for (Map<String, Object> move : moves) {
+        // Moves into the same playlist run one after another (keyed by it).
+        List<Map<String, Object>> results = YoutubeBatch.run(moves, WRITE_PARALLELISM, move -> move.get("toPlaylistId"), move -> {
             String videoId = (String) move.get("videoId");
             String fromItemId = (String) move.get("fromItemId");
             String toPlaylistId = (String) move.get("toPlaylistId");
@@ -194,17 +206,19 @@ public class PlaylistController {
                     deletePlaylistItem(client, fromItemId);
                 }
                 result.put("success", true);
-                applied++;
             } catch (Exception e) {
                 result.put("success", false);
                 result.put("error", e.getMessage());
             }
-            results.add(result);
-        }
+            return result;
+        });
+        return batchResponse(results);
+    }
 
+    private static Map<String, Object> batchResponse(List<Map<String, Object>> results) {
         Map<String, Object> response = new LinkedHashMap<>();
-        response.put("applied", applied);
-        response.put("total", moves.size());
+        response.put("applied", results.stream().filter(r -> Boolean.TRUE.equals(r.get("success"))).count());
+        response.put("total", results.size());
         response.put("results", results);
         return response;
     }
@@ -222,9 +236,7 @@ public class PlaylistController {
             @RequestBody List<Map<String, Object>> renames,
             @RegisteredOAuth2AuthorizedClient("google") OAuth2AuthorizedClient client
     ) {
-        List<Map<String, Object>> results = new ArrayList<>();
-        int applied = 0;
-        for (Map<String, Object> rename : renames) {
+        List<Map<String, Object>> results = YoutubeBatch.run(renames, WRITE_PARALLELISM, rename -> rename.get("id"), rename -> {
             String id = (String) rename.get("id");
             String title = (String) rename.get("title");
             Map<String, Object> result = new LinkedHashMap<>();
@@ -241,18 +253,13 @@ public class PlaylistController {
                 if (snippet.get("defaultLanguage") != null) newSnippet.put("defaultLanguage", snippet.get("defaultLanguage"));
                 sendJson(client, HttpMethod.PUT, apiBase + "/playlists?part=snippet", Map.of("id", id, "snippet", newSnippet));
                 result.put("success", true);
-                applied++;
             } catch (Exception e) {
                 result.put("success", false);
                 result.put("error", e.getMessage());
             }
-            results.add(result);
-        }
-        Map<String, Object> response = new LinkedHashMap<>();
-        response.put("applied", applied);
-        response.put("total", renames.size());
-        response.put("results", results);
-        return response;
+            return result;
+        });
+        return batchResponse(results);
     }
 
     /**
@@ -265,9 +272,8 @@ public class PlaylistController {
             @RequestBody List<Map<String, Object>> playlists,
             @RegisteredOAuth2AuthorizedClient("google") OAuth2AuthorizedClient client
     ) {
-        List<Map<String, Object>> results = new ArrayList<>();
-        int applied = 0;
-        for (Map<String, Object> playlist : playlists) {
+        // Each new playlist is its own key: nothing else writes to it yet.
+        List<Map<String, Object>> results = YoutubeBatch.run(playlists, WRITE_PARALLELISM, playlist -> new Object(), playlist -> {
             String title = (String) playlist.get("title");
             Object privacy = playlist.getOrDefault("privacyStatus", "private");
             Map<String, Object> result = new LinkedHashMap<>();
@@ -281,26 +287,20 @@ public class PlaylistController {
                 );
                 result.put("id", created != null ? created.get("id") : null);
                 result.put("success", true);
-                applied++;
             } catch (Exception e) {
                 result.put("success", false);
                 result.put("error", e.getMessage());
             }
-            results.add(result);
-        }
-        Map<String, Object> response = new LinkedHashMap<>();
-        response.put("applied", applied);
-        response.put("total", playlists.size());
-        response.put("results", results);
-        return response;
+            return result;
+        });
+        return batchResponse(results);
     }
 
     private Map<String, Object> sendJson(OAuth2AuthorizedClient client, HttpMethod method, String url, Map<String, Object> body) {
         HttpHeaders headers = new HttpHeaders();
         headers.setBearerAuth(client.getAccessToken().getTokenValue());
         headers.setContentType(MediaType.APPLICATION_JSON);
-        ResponseEntity<Map> response = restTemplate.exchange(url, method, new HttpEntity<>(body, headers), Map.class);
-        return response.getBody();
+        return retryAborted(() -> restTemplate.exchange(url, method, new HttpEntity<>(body, headers), Map.class).getBody());
     }
 
     private Map<String, Object> insertPlaylistItem(OAuth2AuthorizedClient client, String playlistId, String videoId) {
@@ -313,19 +313,40 @@ public class PlaylistController {
         Map<String, Object> body = Map.of("snippet", snippet);
 
         HttpEntity<Map<String, Object>> entity = new HttpEntity<>(body, headers);
-        return restTemplate.exchange(apiBase + "/playlistItems?part=snippet", HttpMethod.POST, entity, Map.class).getBody();
+        return retryAborted(() -> restTemplate.exchange(apiBase + "/playlistItems?part=snippet", HttpMethod.POST, entity, Map.class).getBody());
     }
 
     private void deletePlaylistItem(OAuth2AuthorizedClient client, String playlistItemId) {
         HttpHeaders headers = new HttpHeaders();
         headers.setBearerAuth(client.getAccessToken().getTokenValue());
         HttpEntity<Void> entity = new HttpEntity<>(headers);
-        restTemplate.exchange(
+        retryAborted(() -> restTemplate.exchange(
             apiBase + "/playlistItems?id=" + playlistItemId,
             HttpMethod.DELETE,
             entity,
             Void.class
-        );
+        ));
+    }
+
+    static final int WRITE_ATTEMPTS = 3;
+
+    // YouTube answers 409 ABORTED when two writes touch one playlist at once
+    // (batches run a few writes in parallel). Nothing was applied, so the
+    // write is simply tried again after a short wait; any other error is final.
+    static <T> T retryAborted(Supplier<T> write) {
+        for (int attempt = 1; ; attempt++) {
+            try {
+                return write.get();
+            } catch (HttpClientErrorException.Conflict e) {
+                if (attempt >= WRITE_ATTEMPTS) throw e;
+                try {
+                    Thread.sleep(250L * attempt);
+                } catch (InterruptedException ie) {
+                    Thread.currentThread().interrupt();
+                    throw e;
+                }
+            }
+        }
     }
 
     private List<Map<String, Object>> fetchAllPages(OAuth2AuthorizedClient client, String baseUrl) {

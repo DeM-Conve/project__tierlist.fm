@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react';
 import { tierName } from './tierLabels';
 import { useDispatch, useSelector, useStore } from 'react-redux';
 import { useQueryClient } from '@tanstack/react-query';
@@ -38,11 +38,36 @@ import { dragEnded, transfersDiscarded, transfersPushed } from './store/transfer
 import TierBoardView from './components/TierBoardView';
 import PlayerDock from './components/PlayerDock';
 import CommandPalette from './components/CommandPalette';
-import DuelHub from './components/duel/DuelHub';
-import DuelMatch from './components/duel/DuelMatch';
-import DuelMoves from './components/duel/DuelMoves';
-import DuelWrap from './components/duel/DuelWrap';
-import AddSongsView from './components/AddSongsView';
+// Pages most visits never open first load on demand, so the app's first
+// paint (home / a board) doesn't wait on their code - and are fetched in
+// idle time right after (usePreloadPages), so opening one later doesn't
+// wait either.
+const PAGE_LOADERS = {
+  DuelHub: () => import('./components/duel/DuelHub'),
+  DuelMatch: () => import('./components/duel/DuelMatch'),
+  DuelMoves: () => import('./components/duel/DuelMoves'),
+  DuelWrap: () => import('./components/duel/DuelWrap'),
+  AddSongsView: () => import('./components/AddSongsView'),
+  SettingsView: () => import('./components/SettingsView'),
+};
+const DuelHub = lazy(PAGE_LOADERS.DuelHub);
+const DuelMatch = lazy(PAGE_LOADERS.DuelMatch);
+const DuelMoves = lazy(PAGE_LOADERS.DuelMoves);
+const DuelWrap = lazy(PAGE_LOADERS.DuelWrap);
+const AddSongsView = lazy(PAGE_LOADERS.AddSongsView);
+const SettingsView = lazy(PAGE_LOADERS.SettingsView);
+
+function usePreloadPages() {
+  useEffect(() => {
+    const preload = () => Object.values(PAGE_LOADERS).forEach((load) => load().catch(() => {}));
+    if (typeof window.requestIdleCallback === 'function') {
+      const id = window.requestIdleCallback(preload, { timeout: 4000 });
+      return () => window.cancelIdleCallback(id);
+    }
+    const id = setTimeout(preload, 1500);
+    return () => clearTimeout(id);
+  }, []);
+}
 import { useAddSongs } from './addSongs/useAddSongs';
 import { useAddSongsActions } from './addSongs/useAddSongsActions';
 import { videoIdsFromText } from './addSongs/youtubeLink';
@@ -50,7 +75,6 @@ import { addVideos } from './store/addSongsSlice';
 import LinkHints from './keyboard/LinkHints';
 import { useVimKeys } from './keyboard/useVimKeys';
 import { useWorkbenchKeys } from './keyboard/useWorkbenchKeys';
-import SettingsView from './components/SettingsView';
 import ShortcutsModal from './components/ShortcutsModal';
 import LoginView from './components/LoginView';
 import { setLoggedIn, setPlaylists } from './store/authSlice';
@@ -241,6 +265,7 @@ export default function App() {
 // playing in the background regardless of what page you're on, so only an
 // explicit "stop" (the dock's own ✕, or logout) closes it.
 function Layout() {
+  usePreloadPages();
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -760,6 +785,9 @@ function Layout() {
               >
                 <Box pt={CANVAS_TOP} px={CANVAS_X} pb={SHELL_Y}>
                   <CanvasContext.Provider value={canvas}>
+                    {/* A lazy page's code loading: only the canvas waits - the
+                        shell and the player dock stay as they are. */}
+                    <Suspense fallback={<Center py="xl"><Loader size="sm" /></Center>}>
                     <Outlet
                       context={{
                         syncChanges,
@@ -774,6 +802,7 @@ function Layout() {
                         handleAddLinks,
                       }}
                     />
+                    </Suspense>
                   </CanvasContext.Provider>
                 </Box>
               </Box>
@@ -1070,7 +1099,11 @@ function DuelPage({ view: View, staged = false }) {
   if (error) return <BoardLoadError error={error} onRetry={retry} />;
   return (
     <>
-      <View category={category} sessionId={sessionId} boardLoading={isLoading} base={`/tier/${encodeURIComponent(category)}`} />
+      {/* Only the (lazy) view waits on its code: the page itself mounts at
+          once, so the board loads alongside the chunk, not after it. */}
+      <Suspense fallback={<Center py="xl"><Loader size="sm" /></Center>}>
+        <View category={category} sessionId={sessionId} boardLoading={isLoading} base={`/tier/${encodeURIComponent(category)}`} />
+      </Suspense>
       {staged && <PendingChanges />}
     </>
   );

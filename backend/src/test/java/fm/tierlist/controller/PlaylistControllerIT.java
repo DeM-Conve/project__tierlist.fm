@@ -43,8 +43,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 // The YouTube-facing API. YouTube itself is replaced by a MockRestServiceServer
 // bound to the controller's RestTemplate, so each test states exactly which
-// YouTube calls (URL, method, token, body) an endpoint makes, in order, and
-// what the app makes of the answers.
+// YouTube calls (URL, method, token, body) an endpoint makes, and what the app
+// makes of the answers. Expectations match in any order - batch writes run a
+// few at a time (YoutubeBatch) - so two calls to one URL are told apart by
+// their bodies; a test that pins down an order binds an ordered server.
 class PlaylistControllerIT extends PostgresIT {
 
     private static final String YT = "https://www.googleapis.com/youtube/v3";
@@ -63,7 +65,7 @@ class PlaylistControllerIT extends PostgresIT {
 
     @BeforeEach
     void bindYoutube() {
-        youtube = MockRestServiceServer.bindTo(youtubeRestTemplate).build();
+        youtube = MockRestServiceServer.bindTo(youtubeRestTemplate).ignoreExpectOrder(true).build();
     }
 
     @AfterEach
@@ -103,7 +105,7 @@ class PlaylistControllerIT extends PostgresIT {
 
     @Test
     void playlistsFollowEveryPageAndMapTitleThumbnailAndCount() throws Exception {
-        String url = YT + "/playlists?part=snippet,contentDetails&mine=true&maxResults=50";
+        String url = YT + "/playlists?part=snippet,contentDetails&mine=true&maxResults=50&fields=" + PlaylistController.PLAYLIST_FIELDS;
         expectGet(url, """
             {"nextPageToken": "PAGE2", "items": [
               {"id": "PL1", "snippet": {"title": "Rap S", "thumbnails": {
@@ -141,7 +143,7 @@ class PlaylistControllerIT extends PostgresIT {
 
     @Test
     void anAccountWithNoPlaylistsIsAnEmptyList() throws Exception {
-        expectGet(YT + "/playlists?part=snippet,contentDetails&mine=true&maxResults=50", "{\"kind\": \"youtube#playlistListResponse\"}");
+        expectGet(YT + "/playlists?part=snippet,contentDetails&mine=true&maxResults=50&fields=" + PlaylistController.PLAYLIST_FIELDS, "{\"kind\": \"youtube#playlistListResponse\"}");
 
         mvc.perform(get("/api/playlists").with(signedIn()))
             .andExpect(status().isOk())
@@ -150,7 +152,7 @@ class PlaylistControllerIT extends PostgresIT {
 
     @Test
     void aYoutubeFailureWhileListingIsAProblemDetail() throws Exception {
-        youtube.expect(requestTo(YT + "/playlists?part=snippet,contentDetails&mine=true&maxResults=50"))
+        youtube.expect(requestTo(YT + "/playlists?part=snippet,contentDetails&mine=true&maxResults=50&fields=" + PlaylistController.PLAYLIST_FIELDS))
             .andRespond(withStatus(HttpStatus.FORBIDDEN).contentType(MediaType.APPLICATION_JSON)
                 .body(youtubeError(403, "quotaExceeded", "The request cannot be completed because you have exceeded your quota.")));
 
@@ -165,7 +167,7 @@ class PlaylistControllerIT extends PostgresIT {
 
     @Test
     void aFailureOnALaterPageFailsTheWholeList() throws Exception {
-        String url = YT + "/playlists?part=snippet,contentDetails&mine=true&maxResults=50";
+        String url = YT + "/playlists?part=snippet,contentDetails&mine=true&maxResults=50&fields=" + PlaylistController.PLAYLIST_FIELDS;
         expectGet(url, "{\"nextPageToken\": \"P2\", \"items\": [{\"id\": \"PL1\", \"snippet\": {\"title\": \"Rap S\"}}]}");
         youtube.expect(requestTo(url + "&pageToken=P2"))
             .andRespond(withStatus(HttpStatus.UNAUTHORIZED).contentType(MediaType.APPLICATION_JSON)
@@ -249,7 +251,7 @@ class PlaylistControllerIT extends PostgresIT {
 
     @Test
     void aVideoIsLookedUpByIdForAPastedLink() throws Exception {
-        expectGet(YT + "/videos?part=snippet&id=dQw4w9WgXcQ", """
+        expectGet(YT + "/videos?part=snippet&id=dQw4w9WgXcQ&fields=" + PlaylistController.VIDEO_FIELDS, """
             {"items": [{"id": "dQw4w9WgXcQ", "snippet": {"title": "A Song", "channelTitle": "A Channel",
                "thumbnails": {"default": {"url": "https://i.ytimg.com/d/default.jpg"}}}}]}""");
 
@@ -263,8 +265,8 @@ class PlaylistControllerIT extends PostgresIT {
 
     @Test
     void anUnknownOrPrivateVideoIs404() throws Exception {
-        expectGet(YT + "/videos?part=snippet&id=nope", "{\"items\": []}");
-        expectGet(YT + "/videos?part=snippet&id=nope2", "{}");
+        expectGet(YT + "/videos?part=snippet&id=nope&fields=" + PlaylistController.VIDEO_FIELDS, "{\"items\": []}");
+        expectGet(YT + "/videos?part=snippet&id=nope2&fields=" + PlaylistController.VIDEO_FIELDS, "{}");
 
         mvc.perform(get("/api/videos/nope").with(signedIn())).andExpect(status().isNotFound());
         mvc.perform(get("/api/videos/nope2").with(signedIn())).andExpect(status().isNotFound());
@@ -349,14 +351,16 @@ class PlaylistControllerIT extends PostgresIT {
 
     @Test
     void aMoveInsertsIntoTheTargetBeforeDeletingTheOriginal() throws Exception {
+        // Ordered: moves into one playlist run one after another, insert first.
+        youtube = MockRestServiceServer.bindTo(youtubeRestTemplate).build();
         expectInsert("PLrapS", "vid1");
         expectDelete("OLD1");
-        expectInsert("PLrapB", "vid2");
+        expectInsert("PLrapS", "vid2");
         expectDelete("OLD2");
 
         mvc.perform(json(post("/api/tier-sync"), """
                 [{"videoId": "vid1", "fromItemId": "OLD1", "toPlaylistId": "PLrapS"},
-                 {"videoId": "vid2", "fromItemId": "OLD2", "toPlaylistId": "PLrapB"}]"""))
+                 {"videoId": "vid2", "fromItemId": "OLD2", "toPlaylistId": "PLrapS"}]"""))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.applied").value(2))
             .andExpect(jsonPath("$.total").value(2))
@@ -384,6 +388,7 @@ class PlaylistControllerIT extends PostgresIT {
     void aFailedInsertKeepsTheOriginalAndTheRestOfTheBatchStillRuns() throws Exception {
         youtube.expect(requestTo(YT + "/playlistItems?part=snippet"))
             .andExpect(method(HttpMethod.POST))
+            .andExpect(content().json("{\"snippet\": {\"playlistId\": \"PLrapS\"}}"))
             .andRespond(withStatus(HttpStatus.FORBIDDEN).contentType(MediaType.APPLICATION_JSON)
                 .body(youtubeError(403, "quotaExceeded", "quota")));
         // no DELETE for OLD1 - the video must never be lost
@@ -475,6 +480,7 @@ class PlaylistControllerIT extends PostgresIT {
         expectGet(YT + "/playlists?part=snippet&id=PL2", "{\"items\": [{\"id\": \"PL2\", \"snippet\": {\"title\": \"Old\"}}]}");
         youtube.expect(requestTo(YT + "/playlists?part=snippet"))
             .andExpect(method(HttpMethod.PUT))
+            .andExpect(content().json("{\"id\": \"PL2\"}"))
             .andRespond(withStatus(HttpStatus.FORBIDDEN).contentType(MediaType.APPLICATION_JSON)
                 .body(youtubeError(403, "playlistForbidden", "forbidden")));
         // 3: read refused
@@ -532,9 +538,11 @@ class PlaylistControllerIT extends PostgresIT {
     @Test
     void aFailedCreateIsReportedPerPlaylist() throws Exception {
         youtube.expect(requestTo(YT + "/playlists?part=snippet,status"))
+            .andExpect(content().json("{\"snippet\": {\"title\": \"Rap S\"}}"))
             .andRespond(withStatus(HttpStatus.FORBIDDEN).contentType(MediaType.APPLICATION_JSON)
                 .body(youtubeError(403, "quotaExceeded", "quota")));
         youtube.expect(requestTo(YT + "/playlists?part=snippet,status"))
+            .andExpect(content().json("{\"snippet\": {\"title\": \"Rap A\"}}"))
             .andRespond(withSuccess("{\"id\": \"PLok\"}", MediaType.APPLICATION_JSON));
 
         mvc.perform(json(post("/api/playlists/create"), "[{\"title\": \"Rap S\"}, {\"title\": \"Rap A\"}]"))
@@ -584,7 +592,7 @@ class PlaylistControllerIT extends PostgresIT {
         + "ServletException -> a bare 500 from Boot's error page with no plain-language `detail`, against the "
         + "'a failed load must say why' rule. Expected: 502 ProblemDetail saying YouTube couldn't be reached.")
     void youtubeBeingUnreachableIsA502SayingSo() throws Exception {
-        youtube.expect(requestTo(YT + "/playlists?part=snippet,contentDetails&mine=true&maxResults=50"))
+        youtube.expect(requestTo(YT + "/playlists?part=snippet,contentDetails&mine=true&maxResults=50&fields=" + PlaylistController.PLAYLIST_FIELDS))
             .andRespond(withException(new IOException("Connection refused")));
 
         mvc.perform(get("/api/playlists").with(signedIn()))

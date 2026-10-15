@@ -8,6 +8,22 @@ const defaultTheme = THEMES[DEFAULT_APPEARANCE.theme]
 
 // https://vite.dev/config/
 export default defineConfig({
+  build: {
+    rolldownOptions: {
+      output: {
+        // Libraries in their own long-cached chunks: a deploy that only
+        // changes app code leaves these hashes alone, so returning visitors
+        // re-download just the (much smaller) app chunk.
+        codeSplitting: {
+          groups: [
+            { name: 'react', test: /node_modules[\\/](react|react-dom|scheduler|react-router|react-router-dom|react-redux|@reduxjs|redux|immer|reselect)[\\/]/, priority: 30 },
+            { name: 'mantine', test: /node_modules[\\/](@mantine|mantine-contextmenu|@floating-ui|react-remove-scroll|react-textarea-autosize)/, priority: 20 },
+            { name: 'vendor', test: /node_modules[\\/](@tanstack|axios|idb-keyval|lucide-react|colord|react-resizable-panels|react-hotkeys-hook|@bprogress)[\\/]/, priority: 10 },
+          ],
+        },
+      },
+    },
+  },
   plugins: [
     react(),
     // Installable app ("Install Tierlist.fm" in Chrome/Edge): its own window,

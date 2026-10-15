@@ -1,5 +1,11 @@
 server:
   port: ${SERVER_PORT:48123}
+  # gzip API responses: a big board's items are hundreds of KB of JSON that
+  # shrink ~8x. The browser calls this port directly, so it's done here, not
+  # only in nginx. (Default threshold: responses over 2 KB.)
+  compression:
+    enabled: true
+    mime-types: application/json,application/problem+json,text/plain
 
 app:
   frontend-url: ${FRONTEND_URL:http://localhost:5173}
@@ -29,3 +35,10 @@ spring:
     hibernate:
       # Flyway owns the schema (src/main/resources/db/migration); Hibernate only checks it.
       ddl-auto: validate
+    properties:
+      hibernate:
+        # A board's first duel analysis inserts a starting score per song:
+        # one round trip per batch, not per row.
+        jdbc.batch_size: 50
+        order_inserts: true
+        order_updates: true

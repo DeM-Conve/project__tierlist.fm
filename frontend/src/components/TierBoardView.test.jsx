@@ -79,6 +79,17 @@ const tileWidth = () => {
 const hiddenCount = () => screen.getAllByText(/^\+\d+$/).map((n) => n.textContent);
 
 describe('TierBoardView - the staged-changes bar never resizes the board', () => {
+  // The board isn't virtualized: a big one is hundreds of covers at once.
+  it('cover art loads lazily, only near the screen, and decodes off the main thread', () => {
+    renderBoard();
+    const covers = document.querySelectorAll('.tile img');
+    expect(covers.length).toBeGreaterThan(0);
+    covers.forEach((img) => {
+      expect(img).toHaveAttribute('loading', 'lazy');
+      expect(img).toHaveAttribute('decoding', 'async');
+    });
+  });
+
   it('tile size and "+N" stay the same when a change is staged', () => {
     const store = renderBoard();
     const before = { width: tileWidth(), hidden: hiddenCount() };

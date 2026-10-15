@@ -1,7 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderHook, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { useTierBoardQueries } from './queries';
+import { usePrefetchBoard, useTierBoardQueries } from './queries';
+import { createQueryClient } from './queryClient';
 
 const api = vi.hoisted(() => ({ get: vi.fn() }));
 vi.mock('./client', () => ({ api }));
@@ -42,5 +43,31 @@ describe('useTierBoardQueries', () => {
     result.current.retry();
     await waitFor(() => expect(result.current.data?.B).toEqual([{ videoId: 'bbbbbbbbbbb' }]));
     expect(result.current.error).toBeNull();
+  });
+});
+
+describe('usePrefetchBoard', () => {
+  // The app's own rules (createQueryClient): data fetched this session never
+  // goes stale, so a prefetched board opens from cache without a second read.
+  it('loads every tier playlist once, and opening the board then reads none again', async () => {
+    client = createQueryClient();
+    api.get.mockImplementation(async (url) => ({ data: [{ videoId: url.includes('PLs') ? 'sssssssssss' : 'bbbbbbbbbbb' }] }));
+    const { result: prefetch } = renderHook(() => usePrefetchBoard(), { wrapper });
+
+    prefetch.current(tiers);
+    prefetch.current(tiers); // resting on it again: nothing new
+    await waitFor(() => expect(api.get).toHaveBeenCalledTimes(2));
+    expect(api.get.mock.calls.map(([url]) => url).sort()).toEqual(['/api/playlists/PLb/items', '/api/playlists/PLs/items']);
+
+    const { result } = renderHook(() => useTierBoardQueries('Indie', tiers), { wrapper });
+    expect(result.current.data).toEqual({ S: [{ videoId: 'sssssssssss' }], B: [{ videoId: 'bbbbbbbbbbb' }] });
+    expect(api.get).toHaveBeenCalledTimes(2);
+  });
+
+  it('a board with no playlists yet loads nothing', () => {
+    const { result } = renderHook(() => usePrefetchBoard(), { wrapper });
+    result.current(undefined);
+    result.current({});
+    expect(api.get).not.toHaveBeenCalled();
   });
 });

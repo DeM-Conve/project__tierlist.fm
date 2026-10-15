@@ -238,6 +238,10 @@ export function TierTile({
           fit="cover"
           bg="var(--surface-2)"
           draggable={false}
+          // A big board is hundreds of covers in one unvirtualized page:
+          // only the ones scrolled near load, decoded off the main thread.
+          loading="lazy"
+          decoding="async"
           style={{ pointerEvents: 'none', filter: isPendingRemoval ? 'grayscale(1)' : undefined }}
         />
         {/* The scrim hugs the label: it starts a little above the first line
