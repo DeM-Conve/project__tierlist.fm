@@ -107,14 +107,26 @@ You need Docker and a Google Cloud project (free) for the YouTube API.
    the scopes `openid`, `profile` and `.../auth/youtube.force-ssl` (read/write - needed to move
    songs between playlists).
 4. **Clients -> Create client**: type *Web application*, authorized redirect URI
-   `http://localhost:48123/login/oauth2/code/google`.
+   `<TIERLIST_URL>/login/oauth2/code/google` - for the default local install that's
+   `http://localhost/login/oauth2/code/google`.
 5. Copy the **Client ID** and **Client Secret**.
 
 ### 2. Configure
 
 ```bash
-cp .env.example .env   # then paste GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET into .env
+cp .env.example .env
 ```
+
+`.env.example` is the whole configuration, commented. The ones to set:
+
+- `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` - from step 1.
+- `TIERLIST_URL` - the address you'll open it at, e.g. `http://localhost:8080` or
+  `https://tierlist.example.com` (no trailing slash). Google's redirect URI must be
+  this plus `/login/oauth2/code/google`.
+- `TIERLIST_PORT` - the host port (default `80`). It's the only port the app opens:
+  the backend and Postgres stay inside Compose's network.
+- `DB_PASSWORD` - before the first start (it's fixed when the database is created).
+- `PUID` / `PGID` - your `id -u` / `id -g`, so backup files are yours.
 
 ### 3. Run
 
@@ -122,7 +134,7 @@ cp .env.example .env   # then paste GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET in
 docker compose up -d --build
 ```
 
-Open **http://localhost** and continue with Google. That's it - Postgres (for your settings)
+Open your `TIERLIST_URL` (**http://localhost** by default) and continue with Google. That's it - Postgres (for your settings)
 comes up alongside, and the schema is created on first start.
 
 On Google's consent screen, **tick the YouTube permission** - if it's left unticked, the app
@@ -131,11 +143,47 @@ can't read your playlists and tells you to log in again.
 Want it as a desktop app? In Chrome or Edge, click the install icon in the address bar
 (or menu -> *Install Tierlist.fm*) - it opens in its own window with its own icon.
 
+### Where your data lives
+
+- **Database** - the `pgdata` Docker volume (`tierlistfm_pgdata`). Set `DB_DATA_LOCATION`
+  to a path (e.g. `./pgdata`) to keep it in a host folder instead; a bare name stays a
+  named volume. Changing it later doesn't move existing data - restore a backup into it.
+- **Backups** - `./backups/`, or the folder in `BACKUP_LOCATION`.
+- Your playlists themselves live on YouTube; the database holds settings and duel history.
+
+### Updating
+
+```bash
+git pull && docker compose up -d --build
+```
+
+Migrations run on start. Restarting the backend logs everyone out (sessions are in memory).
+
+### Behind a reverse proxy
+
+Point the proxy (Caddy, Traefik, nginx, ...) at the `frontend` container's port 80 (or
+`TIERLIST_PORT` on the host) and set `TIERLIST_URL` to the public `https://` address. The
+proxy must pass the original `Host` header and `X-Forwarded-Proto` (all common ones do) -
+the backend builds Google's redirect URI from them. Everything (the app, `/api/`, Google
+login) is on that one origin, so nothing else needs routing.
+
+### Upgrading from an older `.env`
+
+Old setting names still work when the new one isn't set, so an existing `.env` and
+database keep working after a `git pull`: `FRONTEND_URL` -> `TIERLIST_URL`,
+`FRONTEND_PORT` -> `TIERLIST_PORT`, `POSTGRES_DB` / `POSTGRES_USER` / `POSTGRES_PASSWORD`
+-> `DB_DATABASE_NAME` / `DB_USERNAME` / `DB_PASSWORD`, `BACKUP_UID` / `BACKUP_GID` ->
+`PUID` / `PGID`. One change needs action: Google login now goes through the app's own
+address instead of the backend's port `48123` (which is no longer published), so add
+`<TIERLIST_URL>/login/oauth2/code/google` (e.g. `http://localhost/login/oauth2/code/google`)
+to your Google client's redirect URIs. `SERVER_PORT` and `VITE_API_BASE` are no longer
+needed in `.env` (`VITE_API_BASE` is ignored by the Docker build).
+
 ### Backups and restore
 
-The `backup` service dumps the database every night into `./backups/` (kept: 7 daily,
-4 weekly, 6 monthly). Set `BACKUP_UID` / `BACKUP_GID` in `.env` to your `id -u` / `id -g`
-so the files are yours. Copy that folder somewhere else now and then.
+The `backup` service dumps the database every night into `./backups/` (or
+`BACKUP_LOCATION`; kept: 7 daily, 4 weekly, 6 monthly). Set `PUID` / `PGID` in `.env` to
+your `id -u` / `id -g` so the files are yours. Copy that folder somewhere else now and then.
 
 ```bash
 scripts/backup.sh                                  # take one now -> backups/manual/
@@ -149,10 +197,11 @@ dump changes nothing. `scripts/deploy.sh` takes a backup before every deploy.
 <details>
 <summary>Development setup, tests, running without Docker</summary>
 
-Live-reload dev stack (source mounted into the containers):
+Live-reload dev stack (source mounted into the containers; same `.env`, app at
+`TIERLIST_URL`, the backend also on `localhost:48123`):
 
 ```bash
-docker compose -f docker-compose.local.yml up
+docker compose -f docker-compose.dev.yml up
 ```
 
 Backend tests - unit + integration against a throwaway Postgres (needs Docker):
@@ -165,9 +214,13 @@ Without Docker - the backend needs a Postgres at `localhost:5432` (db/user/passw
 override with `DB_URL`, `DB_USER`, `DB_PASSWORD`):
 
 ```bash
-cd backend && export $(grep -v '^#' ../.env | xargs) && mvn spring-boot:run
+cd backend && export $(grep -v '^#' ../.env | xargs) && FRONTEND_URL=http://localhost:5173 mvn spring-boot:run
 cd frontend && npm install && npm run dev
 ```
+
+The Vite dev server proxies `/api/` and the Google login paths to `localhost:48123`
+(`BACKEND_ORIGIN` to change it), so add `http://localhost:5173/login/oauth2/code/google`
+as a redirect URI for this setup.
 
 </details>
 

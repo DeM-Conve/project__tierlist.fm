@@ -40,7 +40,14 @@ fi
 
 sleep 2
 built=$(ls frontend/dist/assets | grep -o 'index-[^"]*\.js' | head -1)
-served=$(curl -s http://localhost:80 | grep -o 'index-[^"]*\.js' | head -1 || true)
+# A setting from the environment, else .env, else the default (like Compose).
+env_value() {
+  local v="${!1:-}"
+  [ -n "$v" ] || v="$(sed -n "s/^$1=//p" .env 2>/dev/null | tail -1 | sed 's/^["'\'']//; s/["'\'']$//')"
+  echo "${v:-$2}"
+}
+port="$(env_value TIERLIST_PORT "$(env_value FRONTEND_PORT 80)")"
+served=$(curl -s "http://localhost:$port" | grep -o 'index-[^"]*\.js' | head -1 || true)
 echo "==> Built $built, serving ${served:-nothing}"
 [ "$built" = "$served" ] || { echo "!! The served bundle is not the one just built"; exit 1; }
 echo "==> Deployed"

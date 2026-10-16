@@ -151,4 +151,4 @@ Source of truth is `frontend/src/shortcuts.js` (rendered by the `?` modal and Se
 
 ## Architecture
 - React (Vite) frontend + Spring Boot (Java 21, Maven) backend, fully separated.
-- Dockerized: `docker-compose.yml` (prod-style multi-stage builds) and `docker-compose.local.yml` (dev, volume-mounted for live editing).
+- Dockerized: `docker-compose.yml` (prod-style multi-stage builds) and `docker-compose.dev.yml` (dev, volume-mounted for live editing).

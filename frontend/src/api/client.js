@@ -1,6 +1,10 @@
 import axios from 'axios';
 
-const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:48123';
+// Same origin by default: in Docker nginx proxies /api/ and the login paths to
+// the backend, under `npm run dev` Vite does (vite.config.js `server.proxy`).
+// VITE_API_BASE (e.g. http://localhost:48123) only for calling a backend
+// directly from a dev build.
+const API_BASE = import.meta.env.VITE_API_BASE || '';
 
 // The one axios instance the whole app talks through. TanStack Query is the
 // primary data-fetching layer (caching, retries, loading/error state);

@@ -1,62 +1,81 @@
 # Fixed project name, so containers/volumes are "tierlistfm-*" whatever the folder is called.
+# Every setting comes from .env (see .env.example); the defaults below are for
+# a local install at http://localhost. Old variable names (FRONTEND_URL,
+# FRONTEND_PORT, POSTGRES_*, BACKUP_UID/GID) still work as fallbacks.
 name: tierlistfm
 
 services:
-  # Per-user app state (settings). Data lives in the pgdata volume, so it
-  # survives rebuilds; schema is created by the backend's Flyway migrations.
+  # Per-user app state (settings). Schema is created by the backend's Flyway
+  # migrations. DB_DATA_LOCATION: a bare name (default `pgdata`) is the named
+  # volume declared at the bottom; a path (./pgdata, /srv/tierlist/db) is a
+  # bind mount there instead.
   db:
     image: postgres:17-alpine
+    restart: unless-stopped
     environment:
-      POSTGRES_DB: ${POSTGRES_DB:-yt}
-      POSTGRES_USER: ${POSTGRES_USER:-yt}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-yt}
+      POSTGRES_DB: ${DB_DATABASE_NAME:-${POSTGRES_DB:-yt}}
+      POSTGRES_USER: ${DB_USERNAME:-${POSTGRES_USER:-yt}}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-${POSTGRES_PASSWORD:-yt}}
     volumes:
-      - pgdata:/var/lib/postgresql/data
+      - ${DB_DATA_LOCATION:-pgdata}:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 3s
       timeout: 3s
       retries: 20
 
+  # Internal only: the browser reaches it through the frontend's nginx
+  # (/api/, /oauth2/, /login/oauth2/), so it publishes no host port.
   backend:
     build: ./backend
-    ports:
-      - "${SERVER_PORT:-48123}:${SERVER_PORT:-48123}"
-    env_file:
-      - .env
+    restart: unless-stopped
     environment:
-      DB_URL: jdbc:postgresql://db:5432/${POSTGRES_DB:-yt}
-      DB_USER: ${POSTGRES_USER:-yt}
-      DB_PASSWORD: ${POSTGRES_PASSWORD:-yt}
+      SERVER_PORT: ${SERVER_PORT:-48123}
+      # Where Google login lands afterwards, and the allowed CORS origin.
+      FRONTEND_URL: ${TIERLIST_URL:-${FRONTEND_URL:-http://localhost}}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      DB_URL: jdbc:postgresql://db:5432/${DB_DATABASE_NAME:-${POSTGRES_DB:-yt}}
+      DB_USER: ${DB_USERNAME:-${POSTGRES_USER:-yt}}
+      DB_PASSWORD: ${DB_PASSWORD:-${POSTGRES_PASSWORD:-yt}}
+    # /api/auth/status is public and cheap; busybox wget is in the alpine JRE image.
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO /dev/null http://localhost:$${SERVER_PORT}/api/auth/status || exit 1"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 60s
     depends_on:
       db:
         condition: service_healthy
 
+  # The only service with a host port. The built image has no URL baked in -
+  # the browser calls this same origin, nginx proxies to the backend.
   frontend:
-    build:
-      context: ./frontend
-      args:
-        VITE_API_BASE: ${VITE_API_BASE:-http://localhost:48123}
+    build: ./frontend
+    restart: unless-stopped
     environment:
       BACKEND_ORIGIN: http://backend:${SERVER_PORT:-48123}
     ports:
-      - "${FRONTEND_PORT:-80}:80"
+      - "${TIERLIST_PORT:-${FRONTEND_PORT:-80}}:80"
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
 
   # Scheduled dumps of the db (prodrigestivill/postgres-backup-local): a
-  # gzipped plain-SQL pg_dump every night into ./backups (gitignored), keeping
-  # the last 7 daily, 4 weekly and 6 monthly dumps. Restore one with
-  # scripts/restore.sh; take one now with scripts/backup.sh.
+  # gzipped plain-SQL pg_dump every night into BACKUP_LOCATION (default
+  # ./backups, gitignored), keeping the last 7 daily, 4 weekly and 6 monthly
+  # dumps. Restore one with scripts/restore.sh; take one now with scripts/backup.sh.
   backup:
     image: prodrigestivill/postgres-backup-local:17
-    # Runs as you, so the dumps in ./backups are yours (set BACKUP_UID/GID in .env).
-    user: "${BACKUP_UID:-1000}:${BACKUP_GID:-1000}"
+    restart: unless-stopped
+    # Runs as you, so the dumps are yours (set PUID/PGID in .env to `id -u` / `id -g`).
+    user: "${PUID:-${BACKUP_UID:-1000}}:${PGID:-${BACKUP_GID:-1000}}"
     environment:
       POSTGRES_HOST: db
-      POSTGRES_DB: ${POSTGRES_DB:-yt}
-      POSTGRES_USER: ${POSTGRES_USER:-yt}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-yt}
+      POSTGRES_DB: ${DB_DATABASE_NAME:-${POSTGRES_DB:-yt}}
+      POSTGRES_USER: ${DB_USERNAME:-${POSTGRES_USER:-yt}}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-${POSTGRES_PASSWORD:-yt}}
       POSTGRES_EXTRA_OPTS: -Z6 --no-owner --no-privileges
       SCHEDULE: ${BACKUP_SCHEDULE:-@daily}
       BACKUP_KEEP_DAYS: 7
@@ -64,7 +83,7 @@ services:
       BACKUP_KEEP_MONTHS: 6
       TZ: ${TZ:-UTC}
     volumes:
-      - ./backups:/backups
+      - ${BACKUP_LOCATION:-./backups}:/backups
     healthcheck:
       test: ["CMD-SHELL", "curl -fs http://localhost:8080/ || exit 1"]
       interval: 30s

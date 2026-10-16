@@ -1,0 +1,66 @@
+# Fixed project name, so containers/volumes are "tierlistfm-*" whatever the folder is called.
+# Development only - self-hosters run docker-compose.yml. Source is mounted for
+# live reload (Vite dev server, mvn spring-boot:run), and the backend's port is
+# published for poking at the API. Same .env as docker-compose.yml:
+#   docker compose -f docker-compose.dev.yml up
+name: tierlistfm
+
+services:
+  # Per-user app state (settings). Data lives in the pgdata volume, so it
+  # survives rebuilds; schema is created by the backend's Flyway migrations.
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: ${DB_DATABASE_NAME:-${POSTGRES_DB:-yt}}
+      POSTGRES_USER: ${DB_USERNAME:-${POSTGRES_USER:-yt}}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-${POSTGRES_PASSWORD:-yt}}
+    volumes:
+      - ${DB_DATA_LOCATION:-pgdata}:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  backend:
+    image: maven:3.9-eclipse-temurin-21
+    working_dir: /app
+    command: mvn spring-boot:run
+    volumes:
+      - ./backend:/app
+      - maven-repo:/root/.m2
+    # Published for dev only (curl the API, or a dev build with VITE_API_BASE
+    # pointing here); the browser normally goes through the Vite proxy.
+    ports:
+      - "${SERVER_PORT:-48123}:${SERVER_PORT:-48123}"
+    environment:
+      SERVER_PORT: ${SERVER_PORT:-48123}
+      FRONTEND_URL: ${TIERLIST_URL:-${FRONTEND_URL:-http://localhost}}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      DB_URL: jdbc:postgresql://db:5432/${DB_DATABASE_NAME:-${POSTGRES_DB:-yt}}
+      DB_USER: ${DB_USERNAME:-${POSTGRES_USER:-yt}}
+      DB_PASSWORD: ${DB_PASSWORD:-${POSTGRES_PASSWORD:-yt}}
+    depends_on:
+      db:
+        condition: service_healthy
+
+  frontend:
+    image: node:22-alpine
+    working_dir: /app
+    command: sh -c "npm install && npm run dev -- --host 0.0.0.0"
+    volumes:
+      - ./frontend:/app
+      - frontend-node-modules:/app/node_modules
+    ports:
+      - "${TIERLIST_PORT:-${FRONTEND_PORT:-80}}:5173"
+    environment:
+      # Vite's dev proxy (vite.config.js) sends /api/ and Google login here.
+      BACKEND_ORIGIN: http://backend:${SERVER_PORT:-48123}
+    depends_on:
+      - backend
+
+volumes:
+  pgdata:
+  maven-repo:
+  frontend-node-modules:

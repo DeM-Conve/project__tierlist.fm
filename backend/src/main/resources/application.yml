@@ -1,8 +1,13 @@
 server:
   port: ${SERVER_PORT:48123}
+  # Behind nginx (and maybe a TLS proxy): trust X-Forwarded-Proto/Host so
+  # Google's redirect_uri is the public URL (https://host/login/oauth2/...),
+  # not this container's http://backend:48123. The backend has no host port,
+  # so only the frontend's nginx can reach it.
+  forward-headers-strategy: framework
   # gzip API responses: a big board's items are hundreds of KB of JSON that
-  # shrink ~8x. The browser calls this port directly, so it's done here, not
-  # only in nginx. (Default threshold: responses over 2 KB.)
+  # shrink ~8x. Done here too, not only in nginx, for a dev setup that calls
+  # this port directly. (Default threshold: responses over 2 KB.)
   compression:
     enabled: true
     mime-types: application/json,application/problem+json,text/plain

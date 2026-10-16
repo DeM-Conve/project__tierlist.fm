@@ -267,20 +267,30 @@ category.
   never report a fix as live if the script failed. No CI pipeline (the user's
   call) - the tests run locally. The backend must keep >= 80% line coverage
   (JaCoCo, enforced by `mvn verify`).
-- **Deploy**: Docker Compose. `docker-compose.yml` (prod-style multi-stage builds) and
-  `docker-compose.local.yml` (dev, volume-mounted). Rebuilding either container clears
+- **Deploy**: Docker Compose. `docker-compose.yml` (prod-style multi-stage builds, what
+  self-hosters run) and `docker-compose.dev.yml` (dev only, volume-mounted, backend port
+  published). **Self-hosting native**: `.env.example` is the one documented config
+  surface and every compose value is `${VAR:-default}` (`TIERLIST_URL`, `TIERLIST_PORT`,
+  `DB_*`, `DB_DATA_LOCATION`, `BACKUP_LOCATION`, `PUID`/`PGID`, `TZ`); old names
+  (`FRONTEND_URL`, `FRONTEND_PORT`, `POSTGRES_*`, `BACKUP_UID/GID`) stay as fallbacks.
+  Same origin: only the frontend publishes a port; its nginx proxies `/api/`, `/oauth2/`
+  and `/login/oauth2/` to the backend (Vite's `server.proxy` does the same under `npm run
+  dev`), so the image has no URL baked in and Google's redirect URI is
+  `<TIERLIST_URL>/login/oauth2/code/google`. The backend trusts forwarded headers
+  (`server.forward-headers-strategy: framework`) to build it behind proxies/HTTPS.
+  Never add homelab/proxy-specific config (Traefik labels, external networks) here. Rebuilding either container clears
   the backend's in-memory session, so you'll need to log in again after a redeploy.
 - **Backups**: the `backup` Compose service (`prodrigestivill/postgres-backup-local:17`)
   dumps `db` nightly into the gitignored `./backups/` (`daily/`, `weekly/`, `monthly/`,
-  `last/`; 7/4/6 kept; runs as `BACKUP_UID`/`BACKUP_GID` from `.env`). `scripts/backup.sh`
+  `last/`; 7/4/6 kept; runs as `PUID`/`PGID` from `.env`; folder = `BACKUP_LOCATION`). `scripts/backup.sh`
   takes one now (`backups/manual/`, gzipped plain SQL), `scripts/restore.sh <dump>` restores
   one (type-the-project-name confirmation, fresh backup first, backend stopped, single
   transaction), and `scripts/deploy.sh` runs `backup.sh` before deploying when `db` is up.
   Use these instead of hand-made CSV/pg_dump copies before a schema reset.
 
 - **Speed rules** (the user asked for a fast end-to-end experience): nginx and
-  Spring (`server.compression`) both gzip - the browser calls the backend port
-  directly. Library code is split into long-cached chunks (`vite.config.js`
+  Spring (`server.compression`) both gzip (the browser goes through nginx; Spring's
+  covers dev setups that call the backend port directly). Library code is split into long-cached chunks (`vite.config.js`
   `codeSplitting.groups`); pages most visits don't open first (duels, Add songs,
   Settings) are `lazy()` via `App.jsx` `PAGE_LOADERS`, preloaded in idle time -
   a lazy view gets its *own* `Suspense` inside its page, so the page's data load

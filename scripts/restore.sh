@@ -12,11 +12,19 @@ cd "$(dirname "$0")/.."
 project="${TIERLISTFM_PROJECT:-tierlistfm}"
 compose=(docker compose -p "$project" -f docker-compose.yml)
 
+# A setting from the environment, else .env, else the default (like Compose).
+env_value() {
+  local v="${!1:-}"
+  [ -n "$v" ] || v="$(sed -n "s/^$1=//p" .env 2>/dev/null | tail -1 | sed 's/^["'\'']//; s/["'\'']$//')"
+  echo "${v:-$2}"
+}
+backups="$(env_value BACKUP_LOCATION ./backups)"
+
 dump="${1:-}"
 if [ -z "$dump" ]; then
   echo "Usage: scripts/restore.sh <dump>   (.sql.gz, .sql or .dump)" >&2
   echo "Recent dumps:" >&2
-  find backups -type f \( -name '*.sql.gz' -o -name '*.sql' -o -name '*.dump' \) \
+  find "$backups" -type f \( -name '*.sql.gz' -o -name '*.sql' -o -name '*.dump' \) \
     -printf '%T@ %p\n' 2>/dev/null | sort -rn | head -10 | cut -d' ' -f2- | sed 's/^/  /' >&2
   exit 2
 fi

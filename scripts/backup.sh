@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Take a backup of the app's Postgres data now: a gzipped plain-SQL pg_dump of
-# the running `db` service into backups/manual/ (the same format the nightly
-# `backup` service writes to backups/daily|weekly|monthly). Read-only for the db.
+# the running `db` service into <BACKUP_LOCATION>/manual/ (default ./backups; the
+# same format the nightly `backup` service writes to daily|weekly|monthly).
+# Read-only for the db.
 #   scripts/backup.sh            prints the path of the new dump on the last line
 # Restore one with scripts/restore.sh <dump>.
 set -euo pipefail
@@ -9,13 +10,21 @@ cd "$(dirname "$0")/.."
 project="${TIERLISTFM_PROJECT:-tierlistfm}"
 compose=(docker compose -p "$project" -f docker-compose.yml)
 
+# A setting from the environment, else .env, else the default (like Compose).
+env_value() {
+  local v="${!1:-}"
+  [ -n "$v" ] || v="$(sed -n "s/^$1=//p" .env 2>/dev/null | tail -1 | sed 's/^["'\'']//; s/["'\'']$//')"
+  echo "${v:-$2}"
+}
+backups="$(env_value BACKUP_LOCATION ./backups)"
+
 if [ -z "$("${compose[@]}" ps --status running -q db 2>/dev/null)" ]; then
   echo "!! The db container of project '$project' is not running - nothing to back up" >&2
   exit 1
 fi
 
-mkdir -p backups/manual
-out="backups/manual/${project}-$(date +%Y%m%d-%H%M%S).sql.gz"
+mkdir -p "$backups/manual"
+out="$backups/manual/${project}-$(date +%Y%m%d-%H%M%S).sql.gz"
 tmp="$out.partial"
 trap 'rm -f "$tmp"' EXIT
 

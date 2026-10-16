@@ -6,8 +6,20 @@ import { DEFAULT_APPEARANCE, THEMES } from './src/themes.js'
 // The window chrome before the app paints = the default theme's colors.
 const defaultTheme = THEMES[DEFAULT_APPEARANCE.theme]
 
+// Where `npm run dev` forwards the API and Google login (same paths nginx
+// proxies in Docker). docker-compose.dev.yml sets it to the backend service.
+const backend = process.env.BACKEND_ORIGIN || 'http://localhost:48123'
+const toBackend = { target: backend }
+
 // https://vite.dev/config/
 export default defineConfig({
+  server: {
+    proxy: {
+      '/api': toBackend,
+      '/oauth2': toBackend,
+      '/login/oauth2': toBackend,
+    },
+  },
   build: {
     rolldownOptions: {
       output: {
