@@ -594,3 +594,10 @@ The user asked for these on top of the Mantine/Redux migration above. Tracked he
   deploy on a failure, then verifies the served bundle hash is the one just built
   (this repo has a history of "fixes" that were actually just a stale cached
   bundle).
+
+## Commits
+
+- Author and committer are always `DeM-Conve <154665057+DeM-Conve@users.noreply.github.com>`
+  (this repo's local git config). Never commit under any other name or email.
+- No `Co-Authored-By:` trailer (no Claude co-author line) and no "Generated with Claude" line in
+  commit messages or PR descriptions.
