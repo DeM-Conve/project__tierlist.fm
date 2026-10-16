@@ -117,13 +117,23 @@ export default function TierRail({ category, activeTier }) {
             // The playing song's art on its tier's left edge, vertically
             // centred, its own centre exactly on that edge (the user's call -
             // the old fixed offset sat it off-centre to the left).
+            // Draggable like a board tile: drop it on another tier, the
+            // TODO slot or Remove (or a row of the board).
             <Box
               pos="absolute"
               left={0}
               top="50%"
-              style={{ transform: 'translate(-50%, -50%)', borderRadius: 5, boxShadow: '0 4px 12px var(--shadow)' }}
+              draggable
+              onDragStart={(e) => {
+                e.stopPropagation();
+                dnd.onDragStart(e, playingVideo, playingHere.tier);
+              }}
+              onDragEnd={dnd.onDragEnd}
+              aria-label={`Drag "${playingVideo.title}" to another tier`}
+              data-playing-art
+              style={{ transform: 'translate(-50%, -50%)', borderRadius: 5, boxShadow: '0 4px 12px var(--shadow)', cursor: 'grab' }}
             >
-              <Image src={playingVideo.thumbnail} w={24} h={24} radius={5} fit="cover" alt="" />
+              <Image src={playingVideo.thumbnail} w={24} h={24} radius={5} fit="cover" alt="" draggable={false} />
               <Box pos="absolute" bottom={2} left={2} bg="accent" px="5xs" py={1} style={{ borderRadius: 2 }}>
                 <EqualizerMark height={6} />
               </Box>

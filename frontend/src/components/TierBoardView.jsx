@@ -86,7 +86,15 @@ function TierRow({
   // While searching, show every match (wrapping) so n/N can always reach it.
   const overflows = !searchActive && total > fit;
   const truncated = overflows && !expanded;
-  const visible = truncated ? shown.slice(0, fit - 1) : shown || [];
+  // The playing song is never folded away behind "+N": if it's past the
+  // fold it takes the last visible slot, so it can be seen and dragged (to
+  // another tier, or the rail's Remove) from the board too.
+  const playingAt = truncated ? shown.findIndex((v) => v.videoId === playingVideoId) : -1;
+  const visible = !truncated
+    ? shown || []
+    : playingAt >= fit - 1 && fit >= 2
+      ? [...shown.slice(0, fit - 2), shown[playingAt]]
+      : shown.slice(0, fit - 1);
   const hiddenCount = total - visible.length;
 
   function dropIndexFor(e) {

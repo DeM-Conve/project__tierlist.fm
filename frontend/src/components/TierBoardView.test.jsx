@@ -24,7 +24,7 @@ const playlists = TIERS.map((t) => ({ id: `pl-${t}`, title: `Rock ${t}`, itemCou
 const songs = (tier, n) => Array.from({ length: n }, (_, i) => ({ videoId: `${tier}${i}`, id: `item-${tier}${i}`, title: `Band - Song ${tier}${i}` }));
 const data = Object.fromEntries(TIERS.map((t) => [t, songs(t, 30)]));
 
-function Board({ boardLoading = false, handlers = {} }) {
+function Board({ boardLoading = false, handlers = {}, playingVideoId = null }) {
   const tierGroups = useSelector(selectTierGroups);
   const tierItems = useSelector((s) => s.tiers.tierItems);
   const tierLoading = useSelector((s) => s.tiers.tierLoading);
@@ -37,7 +37,7 @@ function Board({ boardLoading = false, handlers = {} }) {
       tierItems={tierItems}
       tierLoading={tierLoading}
       boardLoading={boardLoading}
-      playingVideoId={null}
+      playingVideoId={playingVideoId}
       pendingMoves={pendingMoves}
       onPlay={noop}
       onPlayFrom={noop}
@@ -53,7 +53,7 @@ function Board({ boardLoading = false, handlers = {} }) {
 
 // A 700px canvas: six rows only just fit at the full 88px tile size - the
 // case where taking the bar's 80px out of the room shrank every tile.
-function renderBoard(height = 700, { loading = false, handlers, boardData = data } = {}) {
+function renderBoard(height = 700, { loading = false, handlers, boardData = data, playingVideoId = null } = {}) {
   // Loading: the playlists list hasn't arrived, so not even the tiers are known.
   const store = makeStore({ playlists: loading ? [] : playlists, naming: NAMING });
   if (!loading) store.dispatch(loadBoard({ category: 'Rock', data: boardData }));
@@ -62,7 +62,7 @@ function renderBoard(height = 700, { loading = false, handlers, boardData = data
     <MemoryRouter>
       <ContextMenuProvider>
         <CanvasContext.Provider value={canvas}>
-          <Board boardLoading={loading} handlers={handlers} />
+          <Board boardLoading={loading} handlers={handlers} playingVideoId={playingVideoId} />
         </CanvasContext.Provider>
       </ContextMenuProvider>
     </MemoryRouter>,
@@ -110,6 +110,32 @@ describe('TierBoardView - the staged-changes bar never resizes the board', () =>
     expect(tileWidth()).toBe(full.size);
     // D's own "+N" is gone with its songs; every other row shows the same.
     expect(hiddenCount()).toEqual(full.more.slice(0, -2).concat(full.more.slice(-1)));
+  });
+
+  // The playing song past a row's "+N" fold used to be out of sight on the
+  // board - nothing to see or drag. It takes the row's last visible slot.
+  const rowTiles = (tier) => [...document.querySelectorAll(`.tile[data-tier="${tier}"]`)].map((t) => t.dataset.videoId);
+  it('the playing song is never folded behind "+N": it takes the last visible slot', () => {
+    renderBoard(700);
+    const before = rowTiles('TODO');
+    expect(before).not.toContain('TODO25');
+    cleanup();
+
+    renderBoard(700, { playingVideoId: 'TODO25' });
+    const after = rowTiles('TODO');
+    expect(after).toHaveLength(before.length);
+    expect(after.slice(0, -1)).toEqual(before.slice(0, -1));
+    expect(after.at(-1)).toBe('TODO25');
+    // "+N" still counts what isn't shown.
+    expect(hiddenCount().at(-1)).toBe(`+${30 - after.length}`);
+  });
+
+  it('a playing song already in view stays where it is', () => {
+    renderBoard(700);
+    const before = rowTiles('TODO');
+    cleanup();
+    renderBoard(700, { playingVideoId: before[1] });
+    expect(rowTiles('TODO')).toEqual(before);
   });
 
   // The board isn't virtualized: a big one is hundreds of covers at once.
