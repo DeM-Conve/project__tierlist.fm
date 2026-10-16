@@ -6,26 +6,33 @@ import { DEFAULT_APPEARANCE, THEMES } from './src/themes.js'
 // The window chrome before the app paints = the default theme's colors.
 const defaultTheme = THEMES[DEFAULT_APPEARANCE.theme]
 
-// Where `npm run dev` forwards the API and Google login (same paths nginx
-// proxies in Docker). docker-compose.dev.yml sets it to the backend service.
-const backend = process.env.BACKEND_ORIGIN || 'http://localhost:48123'
-const toBackend = { target: backend }
+// Sub-path hosting: BASE_PATH (/tierlist.fm, the TIERLIST_BASE_PATH Docker
+// build arg) is baked into every URL the bundle emits; src/basePath.js reads
+// it back. A proxy in front strips it. Unset = the site root.
+const basePath = (process.env.BASE_PATH || '').replace(/^\/+|\/+$/g, '')
+const base = basePath ? `/${basePath}/` : '/'
 
-// Optional sub-path the app is served under (BASE_PATH=/tierlist.fm, from
-// TIERLIST_BASE_PATH via the Docker build arg), baked into every URL the
-// bundle emits. Unset = the root, as before; `npm run dev` leaves it unset.
-const basePath = (process.env.BASE_PATH || '').replace(/\/+$/, '')
-const base = `${basePath}/`
+// The paths the backend serves (the API and Google login); everything else is
+// the app. nginx proxies the same ones in Docker, the dev server below.
+const backendPaths = ['api', 'oauth2', 'login/oauth2'].map((p) => base + p)
+
+// Where `npm run dev` forwards them. docker-compose.dev.yml sets it to the
+// backend service. Like the proxy in front in Docker, the prefix is stripped
+// and sent as X-Forwarded-Prefix.
+const backend = process.env.BACKEND_ORIGIN || 'http://localhost:48123'
+const toBackend = {
+  target: backend,
+  rewrite: (path) => path.slice(base.length - 1),
+  headers: basePath ? { 'X-Forwarded-Prefix': `/${basePath}` } : {},
+}
+
+const escapeRegExp = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 
 // https://vite.dev/config/
 export default defineConfig({
   base,
   server: {
-    proxy: {
-      '/api': toBackend,
-      '/oauth2': toBackend,
-      '/login/oauth2': toBackend,
-    },
+    proxy: Object.fromEntries(backendPaths.map((p) => [p, toBackend])),
   },
   build: {
     rolldownOptions: {
@@ -67,6 +74,9 @@ export default defineConfig({
         clientsClaim: true,
         skipWaiting: true,
         globPatterns: ['**/*.{js,css,html,svg,png,ico,woff2}'],
+        // Page loads of the backend's paths (Google login and its callback)
+        // go to the network, not to the cached app shell.
+        navigateFallbackDenylist: backendPaths.map((p) => new RegExp(`^${escapeRegExp(p)}(/|$)`)),
       },
     }),
   ],
