@@ -67,6 +67,9 @@ export default defineConfig({
         clientsClaim: true,
         skipWaiting: true,
         globPatterns: ['**/*.{js,css,html,svg,png,ico,woff2}'],
+        // Page loads of the backend's paths (Google login, its callback, the
+        // API) must reach nginx, not get the cached app shell.
+        navigateFallbackDenylist: [new RegExp(`^${basePath}/(api|oauth2|login/oauth2)/`)],
       },
     }),
   ],
