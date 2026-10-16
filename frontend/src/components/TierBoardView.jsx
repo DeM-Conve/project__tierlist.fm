@@ -282,8 +282,11 @@ function TierRow({
             background: overflows && expanded ? `color-mix(in srgb, ${color} 10%, var(--surface))` : undefined,
           }}
         >
+          {/* As tall as the row's first line - a collapsed row's drop zone
+              when it's empty, or this column alone held every empty row
+              open at a full tile and the board overflowed (boardFit). */}
           <Box
-            h={size}
+            h={collapsed ? EMPTY_ROW : size}
             mt={GAP_KEY}
             style={{ position: 'sticky', top: 0, display: 'grid', placeItems: 'center', opacity: overflows ? 1 : 0.3 }}
           >

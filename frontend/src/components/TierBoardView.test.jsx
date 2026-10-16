@@ -9,6 +9,7 @@ import { makeStore, renderWithApp } from '../test/render';
 import { loadBoard, moveWithFeedback } from '../tierActions';
 import { discardTierChanges } from '../store/tiersSlice';
 import { selectPendingMoves, selectTierGroups } from '../store/selectors';
+import { EMPTY_ROW } from '../layout/boardFit';
 
 vi.mock('@mantine/notifications', () => ({ notifications: { show: vi.fn(), hide: vi.fn() } }));
 // jsdom has no layout: every row reports 1300px wide and the header/footer
@@ -53,10 +54,10 @@ function Board({ boardLoading = false, handlers = {} }) {
 
 // A 700px canvas: six rows only just fit at the full 88px tile size - the
 // case where taking the bar's 80px out of the room shrank every tile.
-function renderBoard(height = 700, { loading = false, handlers } = {}) {
+function renderBoard(height = 700, { loading = false, handlers, boardData = data } = {}) {
   // Loading: the playlists list hasn't arrived, so not even the tiers are known.
   const store = makeStore({ playlists: loading ? [] : playlists, naming: NAMING });
-  if (!loading) store.dispatch(loadBoard({ category: 'Rock', data }));
+  if (!loading) store.dispatch(loadBoard({ category: 'Rock', data: boardData }));
   const canvas = { ref: { current: document.createElement('div') }, height };
   renderWithApp(
     <MemoryRouter>
@@ -79,6 +80,23 @@ const tileWidth = () => {
 const hiddenCount = () => screen.getAllByText(/^\+\d+$/).map((n) => n.textContent);
 
 describe('TierBoardView - the staged-changes bar never resizes the board', () => {
+  // An empty tier collapses to a slim drop zone, and fitBoard counts it as
+  // EMPTY_ROW tall. The expand column on the right used to stay one tile tall
+  // (+ gap) in every row, so each empty tier was ~120px instead of ~57px and
+  // a board with empty tiers overflowed the screen into a scroll bar.
+  it('nothing in an empty tier is taller than the collapsed height the fit counts it as', () => {
+    renderBoard(900, { boardData: { ...data, S: [], D: [] } });
+    ['S', 'D'].forEach((tier) => {
+      const row = screen.getByRole('button', { name: `Open ${tier}` }).parentElement;
+      const heights = [...row.querySelectorAll('[style*="height"]')]
+        .map((el) => /(?:^|;)\s*height:\s*calc\(([\d.]+)rem/.exec(el.getAttribute('style')))
+        .filter(Boolean)
+        .map((m) => Math.round(Number(m[1]) * 16));
+      expect(heights.length).toBeGreaterThan(0);
+      heights.forEach((h) => expect(h).toBeLessThanOrEqual(EMPTY_ROW));
+    });
+  });
+
   // The board isn't virtualized: a big one is hundreds of covers at once.
   it('cover art loads lazily, only near the screen, and decodes off the main thread', () => {
     renderBoard();
