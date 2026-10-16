@@ -11,6 +11,7 @@ import App from './App.jsx'
 import AppearanceRoot from './components/AppearanceRoot.jsx'
 import QueryProvider from './api/QueryProvider.jsx'
 import { createQueryClient } from './api/queryClient.js'
+import { BASE_PATH } from './api/client.js'
 
 // TanStack Query, with the board cache restored into it (api/boardCache.js).
 const queryClient = createQueryClient()
@@ -23,7 +24,8 @@ createRoot(document.getElementById('root')).render(
   <StrictMode>
     <QueryProvider client={queryClient}>
       <Provider store={store}>
-        <BrowserRouter>
+        {/* Routes live under the sub-path the app is served at, if any. */}
+        <BrowserRouter basename={BASE_PATH || '/'}>
           <AppearanceRoot>
             <Notifications position="top-center" limit={3} zIndex={400} />
             <ProgressProvider color="var(--accent)" height="3px" options={{ showSpinner: false }}>

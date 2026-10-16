@@ -33,6 +33,8 @@ services:
       SERVER_PORT: ${SERVER_PORT:-48123}
       # Where Google login lands afterwards, and the allowed CORS origin.
       FRONTEND_URL: ${TIERLIST_URL:-${FRONTEND_URL:-http://localhost}}
+      # Scopes the session cookie to the sub-path, if the app is served under one.
+      TIERLIST_BASE_PATH: ${TIERLIST_BASE_PATH:-}
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
       DB_URL: jdbc:postgresql://db:5432/${DB_DATABASE_NAME:-${POSTGRES_DB:-yt}}
@@ -50,9 +52,13 @@ services:
         condition: service_healthy
 
   # The only service with a host port. The built image has no URL baked in -
-  # the browser calls this same origin, nginx proxies to the backend.
+  # the browser calls this same origin, nginx proxies to the backend - except
+  # the optional sub-path (TIERLIST_BASE_PATH), a build arg.
   frontend:
-    build: ./frontend
+    build:
+      context: ./frontend
+      args:
+        BASE_PATH: ${TIERLIST_BASE_PATH:-}
     restart: unless-stopped
     environment:
       BACKEND_ORIGIN: http://backend:${SERVER_PORT:-48123}

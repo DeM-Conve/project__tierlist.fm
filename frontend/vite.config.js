@@ -11,8 +11,15 @@ const defaultTheme = THEMES[DEFAULT_APPEARANCE.theme]
 const backend = process.env.BACKEND_ORIGIN || 'http://localhost:48123'
 const toBackend = { target: backend }
 
+// Optional sub-path the app is served under (BASE_PATH=/tierlist.fm, from
+// TIERLIST_BASE_PATH via the Docker build arg), baked into every URL the
+// bundle emits. Unset = the root, as before; `npm run dev` leaves it unset.
+const basePath = (process.env.BASE_PATH || '').replace(/\/+$/, '')
+const base = `${basePath}/`
+
 // https://vite.dev/config/
 export default defineConfig({
+  base,
   server: {
     proxy: {
       '/api': toBackend,
@@ -50,8 +57,8 @@ export default defineConfig({
         short_name: 'Tierlist.fm',
         description: 'Rank your YouTube playlists into tier lists.',
         display: 'standalone',
-        start_url: '/',
-        scope: '/',
+        start_url: base,
+        scope: base,
         theme_color: defaultTheme.surface,
         background_color: defaultTheme.bg,
       },

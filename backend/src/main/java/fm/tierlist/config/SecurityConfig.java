@@ -46,7 +46,10 @@ public class SecurityConfig {
             .exceptionHandling(ex -> ex
                 .defaultAuthenticationEntryPointFor(
                     SecurityConfig::notLoggedIn,
-                    request -> request.getRequestURI().startsWith("/api/")
+                    // The path inside the app: behind a sub-path the request URI
+                    // carries the proxy's X-Forwarded-Prefix (/tierlist.fm/api/...)
+                    // as its context path.
+                    request -> request.getRequestURI().substring(request.getContextPath().length()).startsWith("/api/")
                 )
             )
             .oauth2Login(oauth2 -> oauth2
@@ -79,7 +82,7 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOrigins(List.of(frontendUrl));
+        configuration.setAllowedOrigins(List.of(originOf(frontendUrl)));
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(List.of("*"));
         // The settings API's version travels as an ETag the frontend must read.
@@ -89,5 +92,12 @@ public class SecurityConfig {
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", configuration);
         return source;
+    }
+
+    // An Origin is scheme://host[:port] only, so a frontend URL with a sub-path
+    // (http://localhost/tierlist.fm) is allowed as http://localhost.
+    static String originOf(String url) {
+        URI uri = URI.create(url);
+        return uri.getScheme() + "://" + uri.getRawAuthority();
     }
 }

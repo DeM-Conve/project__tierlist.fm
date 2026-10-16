@@ -121,7 +121,8 @@ cp .env.example .env
 
 - `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` - from step 1.
 - `TIERLIST_URL` - the address you'll open it at, e.g. `http://localhost:8080` or
-  `https://tierlist.example.com` (no trailing slash). Google's redirect URI must be
+  `https://tierlist.example.com` (no trailing slash; with a sub-path if you set
+  `TIERLIST_BASE_PATH` - see "Behind a reverse proxy"). Google's redirect URI must be
   this plus `/login/oauth2/code/google`.
 - `TIERLIST_PORT` - the host port (default `80`). It's the only port the app opens:
   the backend and Postgres stay inside Compose's network.
@@ -166,6 +167,15 @@ Point the proxy (Caddy, Traefik, nginx, ...) at the `frontend` container's port 
 proxy must pass the original `Host` header and `X-Forwarded-Proto` (all common ones do) -
 the backend builds Google's redirect URI from them. Everything (the app, `/api/`, Google
 login) is on that one origin, so nothing else needs routing.
+
+To serve it under a sub-path (e.g. `https://example.com/tierlist.fm/`), set
+`TIERLIST_BASE_PATH=/tierlist.fm` and include it in `TIERLIST_URL`
+(`https://example.com/tierlist.fm`); Google's redirect URI is then
+`https://example.com/tierlist.fm/login/oauth2/code/google`. The reverse proxy in front
+must strip this prefix before forwarding and send `X-Forwarded-Prefix: <prefix>`
+(Traefik's StripPrefix middleware does both). Rebuild the frontend after changing it
+(`docker compose up -d --build`). The login cookie is scoped to the sub-path, so other
+apps on the same host don't clash with it.
 
 ### Upgrading from an older `.env`
 

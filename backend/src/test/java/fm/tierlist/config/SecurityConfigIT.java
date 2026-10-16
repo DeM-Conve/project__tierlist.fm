@@ -80,6 +80,35 @@ class SecurityConfigIT extends PostgresIT {
             .andExpect(r -> assertThat(r.getResponse().getRedirectedUrl()).contains("youtube.force-ssl").contains("openid"));
     }
 
+    // Served under a sub-path, the proxy strips it and says so in
+    // X-Forwarded-Prefix: Google's redirect_uri and the login failure page
+    // keep it, and a signed-out API call is still the 401 ProblemDetail.
+    @Test
+    void behindASubPathTheRedirectsKeepTheProxysPrefix() throws Exception {
+        mvc.perform(get("/oauth2/authorization/google")
+                .header("X-Forwarded-Proto", "http").header("X-Forwarded-Host", "localhost")
+                .header("X-Forwarded-Prefix", "/tierlist.fm"))
+            .andExpect(status().isFound())
+            .andExpect(r -> assertThat(r.getResponse().getRedirectedUrl())
+                .contains("redirect_uri=http://localhost/tierlist.fm/login/oauth2/code/google"));
+
+        mvc.perform(get("/login/oauth2/code/google").param("code", "x").param("state", "unknown")
+                .header("X-Forwarded-Prefix", "/tierlist.fm"))
+            .andExpect(status().isFound())
+            .andExpect(r -> assertThat(r.getResponse().getRedirectedUrl()).isEqualTo("http://localhost/tierlist.fm/login?error"));
+
+        mvc.perform(get("/api/playlists").header("X-Forwarded-Prefix", "/tierlist.fm"))
+            .andExpect(status().isUnauthorized())
+            .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON));
+    }
+
+    @Test
+    void aFrontendUrlWithASubPathIsAllowedAsItsOrigin() {
+        assertThat(SecurityConfig.originOf("http://localhost/tierlist.fm")).isEqualTo("http://localhost");
+        assertThat(SecurityConfig.originOf("https://example.com:8443/a/b")).isEqualTo("https://example.com:8443");
+        assertThat(SecurityConfig.originOf(FRONTEND)).isEqualTo(FRONTEND);
+    }
+
     @Test
     void apiCallsWithoutLoginAre401NotARedirect() throws Exception {
         mvc.perform(get("/api/settings")).andExpect(status().isUnauthorized());

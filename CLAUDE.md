@@ -276,7 +276,15 @@ category.
   Same origin: only the frontend publishes a port; its nginx proxies `/api/`, `/oauth2/`
   and `/login/oauth2/` to the backend (Vite's `server.proxy` does the same under `npm run
   dev`), so the image has no URL baked in and Google's redirect URI is
-  `<TIERLIST_URL>/login/oauth2/code/google`. The backend trusts forwarded headers
+  `<TIERLIST_URL>/login/oauth2/code/google`. **Optional sub-path** (`TIERLIST_BASE_PATH`,
+  e.g. `/tierlist.fm`, empty by default): the one thing baked into the frontend image
+  (build arg `BASE_PATH` -> Vite `base`), so every browser URL goes through
+  `import.meta.env.BASE_URL` (`api/client.js` `BASE_PATH`/`API_BASE`, the router's
+  `basename`, the PWA manifest) - never a bare `/api`-style URL outside the axios
+  instance. The proxy in front strips the prefix and sends `X-Forwarded-Prefix`, which
+  the backend's forwarded-header handling puts back on its redirects; the backend
+  also gets the variable to scope the session cookie to it, and allows only
+  `TIERLIST_URL`'s origin for CORS. The backend trusts forwarded headers
   (`server.forward-headers-strategy: framework`) to build it behind proxies/HTTPS.
   Never add homelab/proxy-specific config (Traefik labels, external networks) here. Rebuilding either container clears
   the backend's in-memory session, so you'll need to log in again after a redeploy.

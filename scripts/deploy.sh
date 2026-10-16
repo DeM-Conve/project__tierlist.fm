@@ -9,8 +9,17 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 target="${1:-all}"
 
+# A setting from the environment, else .env, else the default (like Compose).
+env_value() {
+  local v="${!1:-}"
+  [ -n "$v" ] || v="$(sed -n "s/^$1=//p" .env 2>/dev/null | tail -1 | sed 's/^["'\'']//; s/["'\'']$//')"
+  echo "${v:-$2}"
+}
+
 echo "==> Frontend: lint, tests, build"
-(cd frontend && npx oxlint && npm test && npx vite build)
+# Built with the same sub-path as the image, so the bundle hashes compare below.
+base_path="$(env_value TIERLIST_BASE_PATH '')"
+(cd frontend && npx oxlint && npm test && BASE_PATH="$base_path" npx vite build)
 
 if [ "$target" != "frontend" ]; then
   echo "==> Backend: unit + integration tests with coverage gate (needs Docker)"
@@ -40,12 +49,6 @@ fi
 
 sleep 2
 built=$(ls frontend/dist/assets | grep -o 'index-[^"]*\.js' | head -1)
-# A setting from the environment, else .env, else the default (like Compose).
-env_value() {
-  local v="${!1:-}"
-  [ -n "$v" ] || v="$(sed -n "s/^$1=//p" .env 2>/dev/null | tail -1 | sed 's/^["'\'']//; s/["'\'']$//')"
-  echo "${v:-$2}"
-}
 port="$(env_value TIERLIST_PORT "$(env_value FRONTEND_PORT 80)")"
 served=$(curl -s "http://localhost:$port" | grep -o 'index-[^"]*\.js' | head -1 || true)
 echo "==> Built $built, serving ${served:-nothing}"

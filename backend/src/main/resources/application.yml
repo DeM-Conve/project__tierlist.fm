@@ -4,7 +4,16 @@ server:
   # Google's redirect_uri is the public URL (https://host/login/oauth2/...),
   # not this container's http://backend:48123. The backend has no host port,
   # so only the frontend's nginx can reach it.
+  # A proxy serving the app under a sub-path (TIERLIST_BASE_PATH) strips it
+  # and sends X-Forwarded-Prefix, which this also honours - so redirects and
+  # the redirect_uri keep it.
   forward-headers-strategy: framework
+  servlet:
+    session:
+      cookie:
+        # Under a sub-path the session cookie is scoped to it, so apps sharing
+        # one host don't overwrite each other's JSESSIONID. Empty = "/".
+        path: ${TIERLIST_BASE_PATH:}
   # gzip API responses: a big board's items are hundreds of KB of JSON that
   # shrink ~8x. Done here too, not only in nginx, for a dev setup that calls
   # this port directly. (Default threshold: responses over 2 KB.)
