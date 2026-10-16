@@ -19,6 +19,7 @@ import {
   Text,
   TextInput,
   Title,
+  Tooltip,
 } from '@mantine/core';
 import { ListTodo, MoreHorizontal, Play, Search, Shuffle } from 'lucide-react';
 import { TIER_COLORS, TODO_TIER } from '../tiers';
@@ -30,6 +31,11 @@ import { TIER_INK, dropIndexAtOffset, songLabel, videoMatches } from '../tierUti
 import { useCanvas } from '../layout/canvas';
 import PageHeader from './PageHeader';
 import { SECTION_GAP } from '../layout/spacing';
+import { isSequenceKey } from '../keyboard/sequence';
+import { shortcutKey } from '../shortcuts';
+
+const KEY_PLAY = shortcutKey('tier-play');
+const KEY_SHUFFLE = shortcutKey('tier-shuffle');
 
 const NO_ITEMS = [];
 // Every row is the same height (6px padding + a 44px cover + 6px), so the
@@ -267,6 +273,16 @@ export default function TierFocusView({
   const hasPendingBar = useSelector((s) => selectStagedChanges(s).length > 0 || ['done', 'partial', 'error'].includes(s.tiers.syncStatus));
   // (react-hotkeys-hook, as on Home: it ignores "/" typed into a field.)
   useHotkeys('slash', () => filterRef.current?.focus(), { preventDefault: true, enabled: !playerCoversPage });
+  // The header buttons' keys, as on the board (TierBoardView): ignored in
+  // text fields, never the second key of a Vim sequence (gp, gs).
+  const headerKey = (run) => (e) => {
+    if (isSequenceKey(e) || e.repeat) return;
+    e.preventDefault();
+    run();
+  };
+  const headerKeyOptions = { enabled: items.length > 0 && !playerCoversPage };
+  useHotkeys(KEY_PLAY, headerKey(() => onPlayFrom(tier)), headerKeyOptions, [onPlayFrom, tier]);
+  useHotkeys(KEY_SHUFFLE, headerKey(() => onShuffle(tier)), headerKeyOptions, [onShuffle, tier]);
 
   // Drop slot under the pointer, from the virtualizer's row offsets (no
   // per-row DOM reads - most rows aren't even rendered).
@@ -308,17 +324,32 @@ export default function TierFocusView({
         }
         meta={loading ? 'Loading…' : `${items.length} video${items.length === 1 ? '' : 's'} · ${isTodo ? 'waiting for a tier' : 'ranked top to bottom'}`}
         actions={<>
-          <Button variant="default" leftSection={<Shuffle size={15} />} onClick={() => onShuffle(tier)} disabled={!items.length}>
-            Shuffle
-          </Button>
-          <Button
-            leftSection={isTodo ? <ListTodo size={15} /> : <Play size={15} fill="currentColor" />}
-            onClick={() => onPlayFrom(tier)}
-            disabled={!items.length}
-            title={isTodo ? 'Play each song and give it a tier - rating one moves on to the next' : undefined}
-          >
-            {isTodo ? 'Triage' : `Play ${tierName(tier)}`}
-          </Button>
+          {/* Play + shuffle as one control with their keys, like the board's. */}
+          <Button.Group>
+            <Button
+              leftSection={isTodo ? <ListTodo size={15} /> : <Play size={15} fill="currentColor" />}
+              rightSection={<Kbd size="xs">{KEY_PLAY}</Kbd>}
+              aria-keyshortcuts={KEY_PLAY}
+              onClick={() => onPlayFrom(tier)}
+              disabled={!items.length}
+              title={isTodo ? 'Play each song and give it a tier - rating one moves on to the next' : undefined}
+            >
+              {isTodo ? 'Triage' : `Play ${tierName(tier)}`}
+            </Button>
+            <Tooltip label={`Shuffle ${tierName(tier)}`} withArrow>
+              <Button
+                px="sm"
+                rightSection={<Kbd size="xs">{KEY_SHUFFLE}</Kbd>}
+                aria-keyshortcuts={KEY_SHUFFLE}
+                onClick={() => onShuffle(tier)}
+                disabled={!items.length}
+                aria-label={`Shuffle ${tierName(tier)}`}
+                style={{ borderLeft: '1px solid color-mix(in srgb, var(--accent-on) 25%, transparent)' }}
+              >
+                <Shuffle size={15} />
+              </Button>
+            </Tooltip>
+          </Button.Group>
         </>}
       />
       </Box>

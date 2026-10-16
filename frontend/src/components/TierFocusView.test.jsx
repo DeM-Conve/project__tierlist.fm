@@ -21,7 +21,7 @@ const playlists = ['S', 'A'].map((t) => ({ id: `pl-${t}`, title: `Rock ${t}`, it
 const songs = (n) => Array.from({ length: n }, (_, i) => ({ videoId: `S${i}`, id: `item-S${i}`, title: `Band - Song S${i}` }));
 const CANVAS_HEIGHT = 600;
 
-function Page({ loading = false }) {
+function Page({ loading = false, onPlayFrom = () => {}, onShuffle = () => {} }) {
   const tierItems = useSelector((s) => s.tiers.tierItems);
   const noop = () => {};
   return (
@@ -34,15 +34,15 @@ function Page({ loading = false }) {
       playingVideoId={null}
       pendingRemovalKeys={new Set()}
       onPlay={noop}
-      onPlayFrom={noop}
-      onShuffle={noop}
+      onPlayFrom={onPlayFrom}
+      onShuffle={onShuffle}
       onSwitchTier={noop}
     />
   );
 }
 
 // A 600px canvas (the scroll container) over a 500-song tier.
-function renderPage(n = 500, { loading = false } = {}) {
+function renderPage(n = 500, { loading = false, handlers = {} } = {}) {
   const store = makeStore({ playlists, naming: NAMING });
   store.dispatch(loadBoard({ category: 'Rock', data: { S: songs(n), A: [] } }));
   const canvasEl = document.createElement('div');
@@ -52,7 +52,7 @@ function renderPage(n = 500, { loading = false } = {}) {
   renderWithApp(
     <ContextMenuProvider>
       <CanvasContext.Provider value={{ ref: { current: canvasEl }, height: CANVAS_HEIGHT }}>
-        <Page loading={loading} />
+        <Page loading={loading} {...handlers} />
       </CanvasContext.Provider>
     </ContextMenuProvider>,
     { store }
@@ -165,5 +165,39 @@ describe('TierFocusView - filter keys', () => {
     });
     fireEvent.keyDown(document.body, { key: '/', code: 'Slash' });
     expect(document.activeElement).not.toBe(filterBox());
+  });
+});
+
+// The header's Play / Shuffle have the board's keys, printed on the buttons.
+describe('TierFocusView - p plays and s shuffles this tier', () => {
+  it('p plays the tier and s shuffles it; both keys are shown on the buttons', () => {
+    const onPlayFrom = vi.fn();
+    const onShuffle = vi.fn();
+    renderPage(5, { handlers: { onPlayFrom, onShuffle } });
+    expect(screen.getByRole('button', { name: /Play S/ })).toHaveAttribute('aria-keyshortcuts', 'p');
+    expect(screen.getByRole('button', { name: 'Shuffle S' })).toHaveAttribute('aria-keyshortcuts', 's');
+
+    fireEvent.keyDown(document, { key: 'p', code: 'KeyP' });
+    expect(onPlayFrom).toHaveBeenCalledWith('S');
+    fireEvent.keyDown(document, { key: 's', code: 'KeyS' });
+    expect(onShuffle).toHaveBeenCalledWith('S');
+  });
+
+  it('typing p or s in the filter box is just text', () => {
+    const onPlayFrom = vi.fn();
+    const onShuffle = vi.fn();
+    renderPage(5, { handlers: { onPlayFrom, onShuffle } });
+    const filter = screen.getByPlaceholderText(/Filter/);
+    fireEvent.keyDown(filter, { key: 'p', code: 'KeyP' });
+    fireEvent.keyDown(filter, { key: 's', code: 'KeyS' });
+    expect(onPlayFrom).not.toHaveBeenCalled();
+    expect(onShuffle).not.toHaveBeenCalled();
+  });
+
+  it('an empty tier has nothing to play: the keys do nothing', () => {
+    const onPlayFrom = vi.fn();
+    renderPage(0, { handlers: { onPlayFrom } });
+    fireEvent.keyDown(document, { key: 'p', code: 'KeyP' });
+    expect(onPlayFrom).not.toHaveBeenCalled();
   });
 });

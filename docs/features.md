@@ -59,6 +59,7 @@
 - On the board it's its own card **under the tiers** (below the last tier; neutral grey, "N to do" in the header); it's excluded from the tier-mix bar, the "N videos" total and duels (it isn't ranked). Every move menu, row chip set, tier tab and the Tier Rail (a small TODO slot at the bottom) include it, so a song can be sent back to TODO too.
 - **Triage** (the TODO row's play button on the board, the TODO page's Triage button, or the palette's "Triage the <board> TODO list"; the board header has no Triage button - the TODO row sits right there): plays the TODO songs in order; giving the playing song a tier - player chips / `Shift+1-5`, the rail, a menu, a drag - moves it and starts the next to-do song (songs already rated some other way are skipped). The player shows a "Triage" badge.
 - The TODO tier page (`/tier/<board>/t/TODO`) is the list view of the same thing: click a row's tier chip to rate it.
+- Every tier page's header has **Play** (`p`; Triage on the TODO page) and **Shuffle** (`s`) as one button pair, with the same keys as the board's Play / Shuffle, printed on the buttons.
 - If a song is both in TODO and a real tier, the rated copy wins and the TODO copy is staged as a duplicate removal.
 - A board without one shows **Add a TODO list**: pick an existing playlist with the to-do name that isn't in use (it gets assigned to this board), or create a new one (named by the template with the to-do name in the tier's place, e.g. `Rap TODO`); New tier list can create it too.
 

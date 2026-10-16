@@ -63,6 +63,10 @@ export const SHORTCUTS = [
   { id: 'board-play', keys: ['p'], description: 'Play the whole board from the top tier', category: 'Tier board' },
   { id: 'board-shuffle', keys: ['s'], description: 'Shuffle play the whole board', category: 'Tier board' },
 
+  // The tier page's header buttons - same keys as the board's, bound and
+  // printed by TierFocusView.
+  { id: 'tier-play', keys: ['p'], description: 'Play this tier from the top (the to-do list: play each song and give it a tier)', category: 'Tier (full list)' },
+  { id: 'tier-shuffle', keys: ['s'], description: 'Shuffle play this tier', category: 'Tier (full list)' },
   { id: 'focus-filter', keys: ['/'], description: 'Filter this tier', category: 'Tier (full list)' },
   { id: 'focus-clear', keys: ['Esc'], description: 'Clear the filter', category: 'Tier (full list)' },
   {
