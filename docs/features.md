@@ -49,7 +49,7 @@
 - **Right-click any song** (board tile or tier-page row) for the same song menu at the cursor, like a native context menu: Play next, Add to queue, **Move to ›** (submenu of tiers), Top / Bottom of the tier, Remove from playlist, Open on YouTube.
 - Tiles: click plays, drag moves, hover/focus reveals a play affordance and a `⋯` menu (**Move to** any tier, **Top / Bottom of** this tier, **Open on YouTube**). Full title on hover tooltip.
 - The playing video is marked (accent ring + animated equalizer) - only on the board it was opened from.
-- Loading rows show Mantine `Skeleton`s; empty rows collapse to a slim drop target (the rows with songs get the room it frees for bigger tiles).
+- Loading rows show Mantine `Skeleton`s; an empty row keeps a full tile line - its drop target is a tile tall - so dropping the first song into a tier (or dragging the last one out) never resizes the tiles or moves the other rows.
 - While the playlists list itself is still loading (right after login / a refresh), the sidebar and the board show skeleton placeholders instead of "0 tier lists" / "0 videos · 0 tiers".
 - Vim-style `/` search (also the Find button): `/` opens a find box at the top of the screen (the `/` is part of the box's text - deleting it cancels), each row filters to its matches (and wraps to show all of them), `Enter`/`n` next match, `Shift+Enter`/`N` previous, `Enter` on a single match plays it, `Esc` closes. The active match is scrolled into view and highlighted. Matches song title, channel **and artist name**; every word must match, in any order, ignoring case and accents (`krsna makasam`, `beyonce`).
 

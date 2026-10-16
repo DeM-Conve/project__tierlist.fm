@@ -15,10 +15,6 @@ export const GAP = spacingPx(GAP_KEY);
 export const INSET = spacingPx(INSET_KEY);
 // The TODO card's top margin (TierBoardView: mt="md").
 export const TODO_GAP_KEY = 'md';
-// An empty row doesn't hold a line of tiles open: it collapses to this
-// height (its drop zone + the tier label), and the tiles share what it frees.
-export const EMPTY_ROW_KEY = '3xl';
-export const EMPTY_ROW = spacingPx(EMPTY_ROW_KEY);
 // Smallest tile the board shrinks to when fitting every row on screen.
 export const MIN_TILE = 60;
 // A row's fixed vertical chrome around its tile lines: 2 x (box padding
@@ -58,13 +54,14 @@ export function allocateLines(counts, perLine, budget) {
 //   viewportHeight: the canvas; rowsTop: where the rows start in it;
 //   footerHeight, bottomPad: below the rows (the canvas's own padding);
 //   hasTodo: the TODO row is a separate card (TODO_GAP_KEY margin + 2px borders).
-//   rowCount: the rows that hold songs; emptyRows: the collapsed empty ones.
+//   rowCount: every row - an empty one holds a full line (its drop zone is a
+//   tile tall), so a song dropped into it or dragged out of it never moves
+//   anything else on the board (the user's call).
 // When even one line per row at the full tile size doesn't fit, the tiles
 // shrink until it does - down to MIN_TILE, below which song names stop
 // being legible and the board scrolls instead.
-export function fitBoard({ viewportHeight, rowsTop, footerHeight, bottomPad, hasTodo, rowCount, emptyRows = 0, rowWidth, baseTileSize }) {
-  const available = viewportHeight - rowsTop - footerHeight - bottomPad - (hasTodo ? spacingPx(TODO_GAP_KEY) + 2 : 0) - 1
-    - emptyRows * (EMPTY_ROW + ROW_CHROME);
+export function fitBoard({ viewportHeight, rowsTop, footerHeight, bottomPad, hasTodo, rowCount, rowWidth, baseTileSize }) {
+  const available = viewportHeight - rowsTop - footerHeight - bottomPad - (hasTodo ? spacingPx(TODO_GAP_KEY) + 2 : 0) - 1;
   const measured = rowWidth > 0 && viewportHeight > 0 && rowCount > 0;
   const fitSize = Math.floor((available - rowCount * (ROW_CHROME - GAP)) / rowCount - GAP);
   const tileSize = measured ? Math.max(Math.min(baseTileSize, MIN_TILE), Math.min(baseTileSize, fitSize)) : baseTileSize;

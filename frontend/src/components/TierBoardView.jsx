@@ -29,7 +29,7 @@ import { isSequenceKey } from '../keyboard/sequence';
 import { shortcutKey } from '../shortcuts';
 import { useCanvas } from '../layout/canvas';
 import { SECTION_GAP, SHELL_Y, spacingPx } from '../layout/spacing';
-import { EMPTY_ROW, GAP_KEY, INSET_KEY, TODO_GAP_KEY, allocateLines, fitBoard, tilesPerLine } from '../layout/boardFit';
+import { GAP_KEY, INSET_KEY, TODO_GAP_KEY, allocateLines, fitBoard, tilesPerLine } from '../layout/boardFit';
 import PageHeader from './PageHeader';
 
 // The header buttons' keys, from shortcuts.js (the "?" list reads the same).
@@ -77,8 +77,6 @@ function TierRow({
   const isOver = dnd.dragOverTier === tier;
   const color = TIER_COLORS[tier];
   const isTodo = tier === TODO_TIER;
-  // An empty row collapses to a slim drop zone (layout/boardFit.js EMPTY_ROW).
-  const collapsed = !loading && !items?.length;
   const playLabel = isTodo ? 'Triage: play and rate one by one' : `Play ${tierName(tier)}`;
 
   const shown = searchActive ? items?.filter((v) => matchedKeys.has(`${tier}:${v.videoId}`)) : items;
@@ -180,12 +178,15 @@ function TierRow({
       </UnstyledButton>
 
       <Box ref={sizeRef} style={{ flex: 1, minWidth: 0 }} p={INSET_KEY}>
-        <Group ref={contentRef} gap={GAP_KEY} wrap={searchActive || expanded || lines > 1 ? 'wrap' : 'nowrap'} mih={collapsed ? EMPTY_ROW : size} p={INSET_KEY} style={{ overflow: 'hidden' }}>
+        <Group ref={contentRef} gap={GAP_KEY} wrap={searchActive || expanded || lines > 1 ? 'wrap' : 'nowrap'} mih={size} p={INSET_KEY} style={{ overflow: 'hidden' }}>
           {loading &&
             Array.from({ length: perLine }).map((_, i) => <Skeleton key={i} w={size} h={size} radius={6} style={{ flexShrink: 0 }} />)}
           {!loading && total === 0 && (
+            // A tile's size, so the row is as tall empty as with songs: the
+            // first song dropped in (or the last dragged out) moves nothing.
             <Box
-              h={collapsed ? EMPTY_ROW : size}
+              h={size}
+              miw={size}
               px="md"
               style={{
                 border: `1px dashed ${isOver ? color : 'var(--border)'}`,
@@ -282,11 +283,8 @@ function TierRow({
             background: overflows && expanded ? `color-mix(in srgb, ${color} 10%, var(--surface))` : undefined,
           }}
         >
-          {/* As tall as the row's first line - a collapsed row's drop zone
-              when it's empty, or this column alone held every empty row
-              open at a full tile and the board overflowed (boardFit). */}
           <Box
-            h={collapsed ? EMPTY_ROW : size}
+            h={size}
             mt={GAP_KEY}
             style={{ position: 'sticky', top: 0, display: 'grid', placeItems: 'center', opacity: overflows ? 1 : 0.3 }}
           >
@@ -366,15 +364,13 @@ export default function TierBoardView({
   // Room to scroll the last row clear of the floating staged-changes bar -
   // padding only; it never changes the tile size (layout/boardFit.js).
   const pendingPad = stagedCount > 0 ? '5xl' : 0;
-  const emptyRows = unknownTiers ? 0 : rowTiers.filter((t) => !tierLoading[t] && !tierItems[t]?.length).length;
   const { tileSize, perLine, lineBudget } = fitBoard({
     viewportHeight,
     rowsTop,
     footerHeight,
     bottomPad: spacingPx(SHELL_Y),
     hasTodo,
-    rowCount: unknownTiers ? shownTiers.length : rowTiers.length - emptyRows,
-    emptyRows,
+    rowCount: unknownTiers ? shownTiers.length : rowTiers.length,
     rowWidth,
     baseTileSize,
   });
@@ -382,12 +378,11 @@ export default function TierBoardView({
     const allocated = allocateLines(
       rowTiers.map((t) => tierItems[t]?.length ?? 0),
       perLine,
-      // allocateLines gives every row a line; the empty ones don't use theirs.
-      lineBudget + emptyRows
+      lineBudget
     );
     return Object.fromEntries(rowTiers.map((t, i) => [t, allocated[i]]));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [rowTiers.join(), tierItems, perLine, lineBudget, emptyRows, rowWidth, viewportHeight]);
+  }, [rowTiers.join(), tierItems, perLine, lineBudget, rowWidth, viewportHeight]);
 
   function move(fromTier, toTier, videoId, dropIndex) {
     dispatch(moveWithFeedback([{ fromTier, toTier, videoId, dropIndex }]));

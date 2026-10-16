@@ -37,12 +37,11 @@ describe('fitBoard', () => {
     expect(tall).toBeGreaterThan(short);
   });
 
-  it('empty rows collapse, so the rows that hold songs get the room they free', () => {
-    const allFull = fitBoard({ ...screen, viewportHeight: 800, rowCount: 6 });
-    const twoEmpty = fitBoard({ ...screen, viewportHeight: 800, rowCount: 4, emptyRows: 2 });
-    expect(twoEmpty.tileSize).toBeGreaterThan(allFull.tileSize);
-    // ...but an empty row still costs its collapsed height.
-    expect(twoEmpty.tileSize).toBeLessThan(fitBoard({ ...screen, viewportHeight: 800, rowCount: 4 }).tileSize);
+  // An empty row holds a full line, so emptying or filling a tier never
+  // resizes the board: there's no input for how many rows are empty.
+  it('an empty row costs a line like any other - no input for empty rows', () => {
+    const a = fitBoard({ ...screen, viewportHeight: 800, rowCount: 6 });
+    expect(fitBoard({ ...screen, viewportHeight: 800, rowCount: 6, emptyRows: 2 })).toEqual(a);
   });
 
   it('the TODO card takes its margin out of the room', () => {

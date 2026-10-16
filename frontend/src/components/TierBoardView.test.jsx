@@ -9,7 +9,6 @@ import { makeStore, renderWithApp } from '../test/render';
 import { loadBoard, moveWithFeedback } from '../tierActions';
 import { discardTierChanges } from '../store/tiersSlice';
 import { selectPendingMoves, selectTierGroups } from '../store/selectors';
-import { EMPTY_ROW } from '../layout/boardFit';
 
 vi.mock('@mantine/notifications', () => ({ notifications: { show: vi.fn(), hide: vi.fn() } }));
 // jsdom has no layout: every row reports 1300px wide and the header/footer
@@ -80,21 +79,37 @@ const tileWidth = () => {
 const hiddenCount = () => screen.getAllByText(/^\+\d+$/).map((n) => n.textContent);
 
 describe('TierBoardView - the staged-changes bar never resizes the board', () => {
-  // An empty tier collapses to a slim drop zone, and fitBoard counts it as
-  // EMPTY_ROW tall. The expand column on the right used to stay one tile tall
-  // (+ gap) in every row, so each empty tier was ~120px instead of ~57px and
-  // a board with empty tiers overflowed the screen into a scroll bar.
-  it('nothing in an empty tier is taller than the collapsed height the fit counts it as', () => {
-    renderBoard(900, { boardData: { ...data, S: [], D: [] } });
-    ['S', 'D'].forEach((tier) => {
-      const row = screen.getByRole('button', { name: `Open ${tier}` }).parentElement;
-      const heights = [...row.querySelectorAll('[style*="height"]')]
-        .map((el) => /(?:^|;)\s*height:\s*calc\(([\d.]+)rem/.exec(el.getAttribute('style')))
-        .filter(Boolean)
-        .map((m) => Math.round(Number(m[1]) * 16));
-      expect(heights.length).toBeGreaterThan(0);
-      heights.forEach((h) => expect(h).toBeLessThanOrEqual(EMPTY_ROW));
-    });
+  // An empty tier holds a full tile line (the user's call): dropping the
+  // first song in, or dragging the last one out, must not move anything.
+  // Empty tiers used to collapse to a slim drop zone - every drop into one
+  // changed the tile size and every row's height - and the expand column
+  // still held them a tile tall, so the board overflowed into a scroll bar.
+  const rowHeights = (tier) => {
+    const row = screen.getByRole('button', { name: `Open ${tier}` }).parentElement;
+    return [...row.querySelectorAll('[style*="height"]')]
+      .map((el) => /(?:^|;)\s*height:\s*calc\(([\d.]+)rem/.exec(el.getAttribute('style')))
+      .filter(Boolean)
+      .map((m) => Math.round(Number(m[1]) * 16));
+  };
+
+  it('an empty tier is a full tile line: its drop zone and expand column are a tile tall', () => {
+    renderBoard(700, { boardData: { ...data, D: [] } });
+    const size = tileWidth();
+    expect(screen.getByText('Empty - drop videos here').parentElement).toHaveStyle({ height: `calc(${size / 16}rem * var(--mantine-scale))` });
+    expect(rowHeights('D').length).toBeGreaterThan(0);
+    rowHeights('D').forEach((h) => expect(h).toBe(size));
+  });
+
+  it('emptying a tier changes neither the tile size nor how many songs each row shows', () => {
+    // A short screen, where the tiles shrink to fit: freeing a row's room
+    // used to grow every tile.
+    renderBoard(600);
+    const full = { size: tileWidth(), more: hiddenCount() };
+    cleanup();
+    renderBoard(600, { boardData: { ...data, D: [] } });
+    expect(tileWidth()).toBe(full.size);
+    // D's own "+N" is gone with its songs; every other row shows the same.
+    expect(hiddenCount()).toEqual(full.more.slice(0, -2).concat(full.more.slice(-1)));
   });
 
   // The board isn't virtualized: a big one is hundreds of covers at once.
