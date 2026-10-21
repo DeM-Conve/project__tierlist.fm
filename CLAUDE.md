@@ -288,12 +288,20 @@ category.
   (`server.forward-headers-strategy: framework`) to build it behind proxies/HTTPS.
   Never add homelab/proxy-specific config (Traefik labels, external networks) here. Rebuilding either container clears
   the backend's in-memory session, so you'll need to log in again after a redeploy.
-- **Backups**: the `backup` Compose service (`prodrigestivill/postgres-backup-local:17`)
-  dumps `db` nightly into the gitignored `./backups/` (`daily/`, `weekly/`, `monthly/`,
-  `last/`; 7/4/6 kept; runs as `PUID`/`PGID` from `.env`; folder = `BACKUP_LOCATION`). `scripts/backup.sh`
-  takes one now (`backups/manual/`, gzipped plain SQL), `scripts/restore.sh <dump>` restores
-  one (type-the-project-name confirmation, fresh backup first, backend stopped, single
-  transaction), and `scripts/deploy.sh` runs `backup.sh` before deploying when `db` is up.
+- **Backups**: the database is the whole state (no user files), so a backup is one
+  gzipped plain-SQL `pg_dump` (`--no-owner --no-privileges`). The `backup` Compose service
+  (`prodrigestivill/postgres-backup-local:17`) dumps `db` on `BACKUP_SCHEDULE` (`@daily`)
+  into the gitignored `./backups/` (`daily/`, `weekly/`, `monthly/`, `last/`, file names
+  `yt-*`; `BACKUP_KEEP_DAYS/WEEKS/MONTHS` 7/4/6; runs as `PUID`/`PGID`; folder =
+  `BACKUP_LOCATION`). `scripts/backup.sh` takes one now
+  (`<BACKUP_LOCATION>/tierlistfm-YYYYmmdd-HHMMSS.sql.gz`, path on the last stdout line),
+  `scripts/restore.sh [file|latest] [--yes]` restores one (load into `<db>_restoring`
+  first, stop backend + backup, `tierlistfm-pre-restore-*` safety backup, drop + rename,
+  restart, per-table row check against the file's COPY blocks; `latest` skips
+  pre-restore files). Shared bits in `scripts/common.sh`: both honour
+  `COMPOSE_PROJECT_NAME` (old: `TIERLISTFM_PROJECT`), `COMPOSE_FILE`,
+  `COMPOSE_ENV_FILES`, so hl can drive them. `scripts/deploy.sh` runs `backup.sh` before
+  deploying when `db` is up. `.env` is never in a backup.
   Use these instead of hand-made CSV/pg_dump copies before a schema reset.
 
 - **Speed rules** (the user asked for a fast end-to-end experience): nginx and

@@ -191,18 +191,44 @@ needed in `.env` (`VITE_API_BASE` is ignored by the Docker build).
 
 ### Backups and restore
 
-The `backup` service dumps the database every night into `./backups/` (or
-`BACKUP_LOCATION`; kept: 7 daily, 4 weekly, 6 monthly). Set `PUID` / `PGID` in `.env` to
-your `id -u` / `id -g` so the files are yours. Copy that folder somewhere else now and then.
+The database is Tierlist.fm's whole state (there are no uploaded files), so a backup is
+one file: a gzipped plain-SQL `pg_dump`, `tierlistfm-YYYYmmdd-HHMMSS.sql.gz`. The `backup`
+service takes one every night into `./backups/` (or `BACKUP_LOCATION`; `BACKUP_SCHEDULE`,
+`TZ`) under `last/`, `daily/`, `weekly/` and `monthly/`, keeping 7 daily, 4 weekly and 6
+monthly (`BACKUP_KEEP_DAYS` / `_WEEKS` / `_MONTHS`). Create the folder yourself before the
+first start (`mkdir -p backups` - one Docker creates is root's) and set `PUID` / `PGID` so
+the files are yours. Copy that folder to another disk or machine now and then.
 
 ```bash
-scripts/backup.sh                                  # take one now -> backups/manual/
-scripts/restore.sh backups/daily/yt-latest.sql.gz  # replace the data with a dump
+scripts/backup.sh                     # take one now, while it runs; prints the file's path
+scripts/restore.sh                    # restore the newest backup (asks first)
+scripts/restore.sh --list             # every backup, newest first
+scripts/restore.sh backups/daily/yt-20261011.sql.gz --yes   # an older one, without asking
 ```
 
-`restore.sh` asks you to type the project name, takes a fresh backup first (so a restore
-can be undone), stops the backend while it loads, and loads in one transaction - a broken
-dump changes nothing. `scripts/deploy.sh` takes a backup before every deploy.
+`restore.sh` shows what's in the file and asks (`--yes` skips that), loads it into a fresh
+database next to the live one - a broken file changes nothing - then stops the backend
+and the backup service, takes a safety backup of the current data
+(`tierlistfm-pre-restore-<time>.sql.gz`, which `latest` never picks; restore it to undo),
+swaps the new database in, starts them again and checks every table has the rows the file
+has. Restarting the backend logs everyone out. `scripts/deploy.sh` takes a backup before
+every deploy.
+
+**Not in a backup: `.env`** - your Google client secret and database password. Keep a copy
+of it somewhere safe (a password manager) yourself.
+
+**On a new machine:** clone the repo, put your `.env` back, copy the backup into
+`./backups/`, then:
+
+```bash
+scripts/restore.sh latest --yes   # starts just the db, restores into it
+docker compose up -d --build      # then the app; migrations bring an older backup up to date
+```
+
+The scripts act on the same project `docker compose` would: they honour
+`COMPOSE_PROJECT_NAME`, `COMPOSE_FILE` and `COMPOSE_ENV_FILES`, and read `BACKUP_LOCATION`
+from the environment before `.env` - so a tool that runs the app under its own project name
+or with an extra compose file can call them with the same variables.
 
 <details>
 <summary>Development setup, tests, running without Docker</summary>
