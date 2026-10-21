@@ -1,39 +1,46 @@
 #!/usr/bin/env bash
-# Take a backup of the app's Postgres data now: a gzipped plain-SQL pg_dump of
-# the running `db` service into <BACKUP_LOCATION>/manual/ (default ./backups; the
-# same format the nightly `backup` service writes to daily|weekly|monthly).
-# Read-only for the db.
-#   scripts/backup.sh            prints the path of the new dump on the last line
-# Restore one with scripts/restore.sh <dump>.
+# Take a backup of everything Tierlist.fm keeps, now, while it runs: one
+# gzipped plain-SQL pg_dump of the `db` service (the database is the app's
+# whole state - there are no uploaded files) written to
+#   <BACKUP_LOCATION>/tierlistfm-YYYYmmdd-HHMMSS.sql.gz    (default ./backups)
+# The same format the nightly `backup` service writes to daily|weekly|monthly/.
+# Read-only for the db; pg_dump reads one consistent snapshot, so no downtime.
+#   scripts/backup.sh                   prints the new file's path on the last line
+#   scripts/backup.sh --tag pre-restore -> tierlistfm-pre-restore-<time>.sql.gz
+# Restore one with scripts/restore.sh [file|latest]. Not in it: .env (secrets).
 set -euo pipefail
-cd "$(dirname "$0")/.."
-project="${TIERLISTFM_PROJECT:-tierlistfm}"
-compose=(docker compose -p "$project" -f docker-compose.yml)
+source "$(dirname "$0")/common.sh"
 
-# A setting from the environment, else .env, else the default (like Compose).
-env_value() {
-  local v="${!1:-}"
-  [ -n "$v" ] || v="$(sed -n "s/^$1=//p" .env 2>/dev/null | tail -1 | sed 's/^["'\'']//; s/["'\'']$//')"
-  echo "${v:-$2}"
-}
-backups="$(env_value BACKUP_LOCATION ./backups)"
+tag=""
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --tag) tag="${2:?--tag needs a name}"; shift 2 ;;
+    -h|--help) sed -n '2,10p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    *) die "Unknown argument: $1 (see scripts/backup.sh --help)" ;;
+  esac
+done
 
-if [ -z "$("${compose[@]}" ps --status running -q db 2>/dev/null)" ]; then
-  echo "!! The db container of project '$project' is not running - nothing to back up" >&2
-  exit 1
+if [ -z "$(running db)" ]; then
+  die "The db of project '$project' is not running - nothing to back up.
+   Start it first: docker compose up -d db"
 fi
 
-mkdir -p "$backups/manual"
-out="$backups/manual/${project}-$(date +%Y%m%d-%H%M%S).sql.gz"
+# File names in the app's time zone (TZ, as the backup service uses), else the host's.
+tz="$(env_value TZ "")"
+[ -z "$tz" ] || export TZ="$tz"
+
+mkdir -p "$backups"
+out="$backups/$APP${tag:+-$tag}-$(date +%Y%m%d-%H%M%S).sql.gz"
+[ -e "$out" ] && die "$out already exists - try again in a second"
 tmp="$out.partial"
 trap 'rm -f "$tmp"' EXIT
 
-echo "==> Backing up the db to $out"
+log "==> Backing up project '$project' to $out"
 "${compose[@]}" exec -T db sh -c \
   'pg_dump --no-owner --no-privileges -U "$POSTGRES_USER" -d "$POSTGRES_DB"' | gzip -6 > "$tmp"
 gzip -t "$tmp"
-grep -q 'PostgreSQL database dump complete' < <(gzip -dc "$tmp") \
-  || { echo "!! The dump looks incomplete - not keeping it" >&2; exit 1; }
+gzip -dc "$tmp" | tail -n 5 | grep -q 'PostgreSQL database dump complete' \
+  || die "The dump looks incomplete - not keeping it"
 mv "$tmp" "$out"
-echo "==> Backup done ($(du -h "$out" | cut -f1))"
+log "==> Backup done ($(du -h "$out" | cut -f1))"
 echo "$out"
