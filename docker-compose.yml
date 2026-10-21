@@ -68,10 +68,12 @@ services:
       backend:
         condition: service_healthy
 
-  # Scheduled dumps of the db (prodrigestivill/postgres-backup-local): a
-  # gzipped plain-SQL pg_dump every night into BACKUP_LOCATION (default
-  # ./backups, gitignored), keeping the last 7 daily, 4 weekly and 6 monthly
-  # dumps. Restore one with scripts/restore.sh; take one now with scripts/backup.sh.
+  # Scheduled backups of the db (prodrigestivill/postgres-backup-local): a
+  # gzipped plain-SQL pg_dump on BACKUP_SCHEDULE (default every night) into
+  # BACKUP_LOCATION (default ./backups, gitignored) - last/, daily/, weekly/,
+  # monthly/ - keeping 7 daily, 4 weekly and 6 monthly. The database is the
+  # app's whole state, so one dump is a full backup. Take one now with
+  # scripts/backup.sh; restore with scripts/restore.sh [file|latest].
   backup:
     image: prodrigestivill/postgres-backup-local:17
     restart: unless-stopped
@@ -84,9 +86,9 @@ services:
       POSTGRES_PASSWORD: ${DB_PASSWORD:-${POSTGRES_PASSWORD:-yt}}
       POSTGRES_EXTRA_OPTS: -Z6 --no-owner --no-privileges
       SCHEDULE: ${BACKUP_SCHEDULE:-@daily}
-      BACKUP_KEEP_DAYS: 7
-      BACKUP_KEEP_WEEKS: 4
-      BACKUP_KEEP_MONTHS: 6
+      BACKUP_KEEP_DAYS: ${BACKUP_KEEP_DAYS:-7}
+      BACKUP_KEEP_WEEKS: ${BACKUP_KEEP_WEEKS:-4}
+      BACKUP_KEEP_MONTHS: ${BACKUP_KEEP_MONTHS:-6}
       TZ: ${TZ:-UTC}
     volumes:
       - ${BACKUP_LOCATION:-./backups}:/backups
