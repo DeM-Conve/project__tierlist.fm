@@ -80,7 +80,7 @@
 
 ## Drag-and-drop tier editing
 - Drag a video from one tier row to another, reorder within a row, drop onto the "+N" tile (appends), onto the Tier Rail, onto a tier tab, or reorder within a tier page's list. Rows tint in their tier color while hovered.
-- Drop position is cursor-aware (shown by an accent insertion bar).
+- Drop position is cursor-aware (shown by an accent insertion bar in the gap between tiles - it never shifts the tiles under the pointer; over the right half of a line's last tile it shows after that tile). While the board's Find (or a tier page's filter) shows only some songs, a drop lands next to the song it was dropped beside in the whole tier. Dragging stays smooth on big boards: a drag only redraws the tiles it changes.
 - Changes are staged locally first; nothing touches real YouTube data until you sync.
 
 - **Move a song to another board**: drag it and hold it over another board in the sidebar - the entry lights up and after a moment that board opens, still dragging - then drop it on any tier there (same drop targets as a normal drag, drop position kept). It's a staged change like any move: "N changes staged" lists it as `Rock [T2] → Pop [T3]`, and Push adds it to the new playlist and removes it from the old one. The song disappears from its old board and sits in its new tier until then; drag it on to another tier (or board) to re-aim it, `Ctrl+Z` / binning it / "Keep in <board>" takes it back, Discard drops it. Dropping it on the board name alone does nothing. While the open board still has staged moves of its own, the other board doesn't open (a message says to push or discard first - opening a board replaces its draft).
