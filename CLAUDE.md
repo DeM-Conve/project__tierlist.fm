@@ -273,6 +273,12 @@ category.
   lives in plain modules so it can be tested without React - e.g. the board rename
   plan is `src/boardRename.js`, the component only calls it. A bug fix comes with a
   test that fails without it.
+  **Sync changes get an end-to-end test**: `src/sync.e2e.test.jsx` (scenarios) and
+  `src/sync.fuzz.test.jsx` (seeded random sessions, `SYNC_FUZZ_RUNS`/`SYNC_FUZZ_OPS`
+  to scale up) run the real App over a fake YouTube (`src/test/fakeYoutube.js`,
+  installed as the `api` axios adapter; tier-sync mirrors `PlaylistController`)
+  and check after every push that YouTube holds what the boards showed
+  (`src/test/syncInvariants.js`). Drive edits through `src/test/syncHarness.jsx`.
 - **Tests gate every deploy (the user's explicit call).** Deploy only via
   `scripts/deploy.sh` (all tests + build, then Compose, then checks the served
   bundle) - `scripts/deploy.sh frontend` for a frontend-only redeploy that keeps
