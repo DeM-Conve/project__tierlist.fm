@@ -71,4 +71,36 @@ describe('useTierDnd', () => {
     act(() => dnd().onDrop(dragEvent({ 'application/json': '{not json' }), 'A'));
     expect(selectPendingMoves(store.getState())).toEqual([]);
   });
+
+  // The source tile unmounts when the sidebar opens another board mid-drag;
+  // React then never sees its dragend.
+  it('a drag whose source tile is gone still ends when the browser ends it', () => {
+    const { store, dnd } = setup();
+    const source = document.createElement('div');
+    const e = { ...dragEvent(), currentTarget: source };
+    act(() => dnd().onDragStart(e, v('a'), 'S'));
+    expect(store.getState().tiers.draggedVideoId).toBe('a');
+    act(() => {
+      source.dispatchEvent(new Event('dragend'));
+    });
+    expect(store.getState().tiers.draggedVideoId).toBeNull();
+    expect(store.getState().transfers.drag).toBeNull();
+  });
+
+  it('a drop of something else (a link from outside) never acts on a drag left over from another board', () => {
+    const { store, dnd } = setup();
+    act(() => dnd().onDragStart(dragEvent(), v('a'), 'S'));
+    act(() => {
+      store.dispatch(loadBoard({ category: 'Pop', data: { B: [v('x')] } }));
+    });
+    act(() => dnd().onDrop(dragEvent({ 'text/uri-list': 'https://example.com' }), 'B'));
+    expect(selectTransfers(store.getState())).toEqual([]);
+    expect(store.getState().tiers.tierItems.B.map((x) => x.videoId)).toEqual(['x']);
+  });
+
+  it('a drop of a song that isn\'t on this board adds no undo step', () => {
+    const { store, dnd } = setup();
+    act(() => dnd().onDrop(dragEvent({ 'application/json': JSON.stringify({ videoId: 'zzz', fromTier: 'S' }) }), 'A'));
+    expect(store.getState().tiers.undoStack).toHaveLength(0);
+  });
 });

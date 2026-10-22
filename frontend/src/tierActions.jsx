@@ -123,7 +123,12 @@ function describe(moves, tierItems) {
 
 // moves: [{ fromTier, toTier, videoId, dropIndex? }] - applied as ONE undo step.
 export const moveWithFeedback = (moves, { quiet = false } = {}) => (dispatch, getState) => {
-  const real = moves.filter((m) => m.fromTier !== m.toTier || m.dropIndex != null);
+  // A move of a song that isn't (any more) where it says - a stale drag, the
+  // player's snapshot after a reload - changes nothing: no undo step, no toast.
+  const { tierItems } = getState().tiers;
+  const real = moves.filter(
+    (m) => (m.fromTier !== m.toTier || m.dropIndex != null) && tierItems[m.fromTier]?.some((v) => v.videoId === m.videoId)
+  );
   if (real.length === 0) return;
   const message = describe(real, getState().tiers.tierItems);
   dispatch(moveVideos({ moves: real }));
@@ -267,6 +272,12 @@ export function useTierDnd() {
   const loadedCategory = useSelector((s) => s.tiers.loadedCategory);
   const drag = useSelector((s) => s.transfers.drag);
 
+  function endDrag() {
+    dispatch(setDraggedVideoId(null));
+    dispatch(setDragOverTier(null));
+    dispatch(dragEnded());
+  }
+
   return {
     dragOverTier,
     draggedVideoId,
@@ -274,6 +285,12 @@ export function useTierDnd() {
       e.dataTransfer.setData('application/json', JSON.stringify({ videoId: video.videoId, fromTier }));
       e.dataTransfer.effectAllowed = 'move';
       dispatch(setDraggedVideoId(video.videoId));
+      // A drag carried to another board (its sidebar entry opens it) loses
+      // its source tile, and React only hears events on mounted elements: a
+      // drag cancelled there never reached onDragEnd, so the song stayed
+      // "being dragged" (rail dimmed). The browser still fires dragend on
+      // the detached source - listen on the element itself.
+      e.currentTarget?.addEventListener?.('dragend', endDrag, { once: true });
       // The board's own copy, not the caller's: the Tier Rail drags the
       // player's snapshot of the song, whose item id can be from before a
       // push - a transfer must delete the item that exists now.
@@ -283,9 +300,7 @@ export function useTierDnd() {
       });
     },
     onDragEnd() {
-      dispatch(setDraggedVideoId(null));
-      dispatch(setDragOverTier(null));
-      dispatch(dragEnded());
+      endDrag();
     },
     onDragOver(e, tier) {
       e.preventDefault();
@@ -306,7 +321,10 @@ export function useTierDnd() {
       }
       dispatch(setDragOverTier(null));
       dispatch(setDraggedVideoId(null));
-      const crossBoard = drag && drag.fromCategory && drag.fromCategory !== loadedCategory;
+      // Only the song this drag carries: a drop of anything else (a link or
+      // file from outside) never acts on a drag left over from before.
+      const crossBoard =
+        drag && drag.fromCategory && drag.fromCategory !== loadedCategory && data.videoId === drag.video.videoId;
       dispatch(dragEnded());
       if (crossBoard) {
         dispatch(transferWithFeedback(drag, toTier, dropIndex));
