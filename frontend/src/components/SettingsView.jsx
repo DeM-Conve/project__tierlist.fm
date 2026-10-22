@@ -2,6 +2,7 @@ import { Box, Tabs } from '@mantine/core';
 import { ShortcutsList } from './ShortcutsModal';
 import AppearanceSettings from './AppearanceSettings';
 import PlaylistNamingSettings from './PlaylistNamingSettings';
+import DuelSettings from './DuelSettings';
 import { useSearchParams } from 'react-router-dom';
 import PageHeader from './PageHeader';
 import { SECTION_GAP } from '../layout/spacing';
@@ -9,6 +10,7 @@ import { SECTION_GAP } from '../layout/spacing';
 const CATEGORIES = [
   { key: 'appearance', label: 'Appearance' },
   { key: 'naming', label: 'Playlist naming' },
+  { key: 'duels', label: 'Duels' },
   { key: 'keyboard', label: 'Keyboard shortcuts' },
 ];
 
@@ -20,7 +22,7 @@ export default function SettingsView() {
   return (
     <Box component="section">
       <Box mb={SECTION_GAP}>
-        <PageHeader title="Settings" meta="Look, playlist naming and shortcuts - saved to your account." />
+        <PageHeader title="Settings" meta="Look, playlist naming, duels and shortcuts - saved to your account." />
       </Box>
 
       <Tabs value={tab} onChange={(v) => v && setSearchParams({ tab: v }, { replace: true })} orientation="vertical">
@@ -39,6 +41,10 @@ export default function SettingsView() {
 
         <Tabs.Panel value="naming" pl="xl" maw={980}>
           <PlaylistNamingSettings />
+        </Tabs.Panel>
+
+        <Tabs.Panel value="duels" pl="xl" maw={980}>
+          <DuelSettings />
         </Tabs.Panel>
 
         <Tabs.Panel value="keyboard" pl="xl" maw={680}>

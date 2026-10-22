@@ -67,6 +67,18 @@ public final class DuelEngine {
         return ratings;
     }
 
+    public TierModel tierModel() {
+        return tiers;
+    }
+
+    // The same engine with another TierModel - chosen per request (the user's
+    // own tier borders vs learned ones, see FixedCutpointsTierModel).
+    public DuelEngine withTierModel(TierModel model) {
+        return builder().config(config).ratingModel(ratings).priorPolicy(priors).refitter(refitter)
+            .tierModel(Objects.requireNonNull(model)).suggestionPolicy(suggestions).pairing(pairing)
+            .tierOrderPolicy(tierOrder).build();
+    }
+
     // Starting scores for songs on the board that don't have one yet - the
     // caller stores them, so later replays start from the same place.
     public Map<String, Rating> newPriors(BoardLayout layout, Map<String, Rating> existing) {
@@ -98,7 +110,7 @@ public final class DuelEngine {
         int k = layout.rankedTiers().size();
         List<TierModel.Placed> placed = new ArrayList<>();
         for (String id : layout.ranked()) placed.add(new TierModel.Placed(layout.rankOf(tierOf.get(id)).orElseThrow(), rating.apply(id)));
-        TierModel.Fit fit = tiers.fit(placed, k, priors.cutpointPriors(k));
+        TierModel.Fit fit = tiers.fit(placed, layout.rankedTiers(), priors.cutpointPriors(k));
 
         Map<String, List<Duel>> duelsOf = new HashMap<>();
         for (Duel d : log) {

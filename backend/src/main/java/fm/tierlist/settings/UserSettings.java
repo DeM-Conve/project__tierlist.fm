@@ -42,6 +42,10 @@ public class UserSettings {
     @Embedded
     private Naming naming;
 
+    // Settings -> Duels (tier borders).
+    @Embedded
+    private DuelSettings duels = DuelSettings.DEFAULT;
+
     // Settings -> Playlist naming -> To-do lists: playlist id -> board
     // (category) for to-do lists assigned by hand (`todo_list_link`). Shares
     // the row's version/ETag: SettingsService bumps it when these change
@@ -108,6 +112,15 @@ public class UserSettings {
 
     public Naming getNaming() {
         return naming;
+    }
+
+    public DuelSettings getDuels() {
+        return duels == null ? DuelSettings.DEFAULT : duels;
+    }
+
+    // null = keep what the row has (an older tab that doesn't send `duels`).
+    void replaceDuels(DuelSettings duels) {
+        if (duels != null) this.duels = duels;
     }
 
     public Map<String, String> getTodoLinks() {

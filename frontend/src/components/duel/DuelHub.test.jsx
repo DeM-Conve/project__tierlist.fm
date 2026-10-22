@@ -48,6 +48,16 @@ describe('DuelHub', () => {
     expect(screen.getByText('A · 2')).toBeInTheDocument();
   });
 
+  it('says where the borders come from: learned, or your own ranges with a link to Settings', () => {
+    page();
+    expect(screen.getByText(/borders are learned from where you already put songs/)).toBeInTheDocument();
+    cleanup();
+    h.analysis = analysis({ customBorders: true });
+    page();
+    expect(screen.getByText(/borders are your own ranges/)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Settings → Duels' })).toHaveAttribute('href', '/settings?tab=duels');
+  });
+
   it('starts a Smart mix session for the chosen length and opens it', () => {
     page();
     fireEvent.click(screen.getByText('Deep · 15 min'));

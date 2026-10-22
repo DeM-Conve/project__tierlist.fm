@@ -75,9 +75,10 @@ export function useSettingsSync(enabled) {
 
   const appearance = useSelector((s) => s.appearance);
   const naming = useSelector((s) => s.naming);
+  const duels = useSelector((s) => s.duels);
   useEffect(() => {
     flush();
-  }, [appearance, naming, flush]);
+  }, [appearance, naming, duels, flush]);
 
   return { ready: isSuccess || isError };
 }

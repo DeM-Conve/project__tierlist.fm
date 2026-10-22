@@ -7,6 +7,7 @@ import appearanceReducer from './appearanceSlice';
 import namingReducer from './namingSlice';
 import addSongsReducer from './addSongsSlice';
 import transfersReducer from './transfersSlice';
+import duelsReducer from './duelSettingsSlice';
 import { SETTINGS, cleanStorage, setSetting, writeDevicePref } from '../settings';
 import { syncTierLabels } from '../tierLabels';
 
@@ -20,12 +21,13 @@ export const store = configureStore({
     naming: namingReducer,
     addSongs: addSongsReducer,
     transfers: transfersReducer,
+    duels: duelsReducer,
   },
 });
 
 // Cache user preferences held in Redux in localStorage whenever they change
 // (the account's copy in Postgres is synced by api/useSettingsSync.js).
-const PERSISTED = { appearance: SETTINGS.appearance, naming: SETTINGS.naming };
+const PERSISTED = { appearance: SETTINGS.appearance, naming: SETTINGS.naming, duels: SETTINGS.duels };
 const last = {};
 Object.keys(PERSISTED).forEach((k) => (last[k] = store.getState()[k]));
 // Per-device preferences held in Redux (settings.js DEVICE_UI): saved when

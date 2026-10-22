@@ -11,6 +11,7 @@ import appearanceReducer from '../store/appearanceSlice';
 import namingReducer from '../store/namingSlice';
 import addSongsReducer from '../store/addSongsSlice';
 import transfersReducer from '../store/transfersSlice';
+import duelsReducer from '../store/duelSettingsSlice';
 import { SPACING } from '../themes';
 
 const reducer = {
@@ -22,6 +23,7 @@ const reducer = {
   naming: namingReducer,
   addSongs: addSongsReducer,
   transfers: transfersReducer,
+  duels: duelsReducer,
 };
 
 // A real store (the app's reducers) with `playlists` loaded and `naming`

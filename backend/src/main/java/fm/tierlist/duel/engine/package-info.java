@@ -11,7 +11,10 @@
  *       model), plus a {@link Refitter} that re-estimates every score from the
  *       whole log at once ({@link DavidsonBradleyTerryRefit}).</li>
  *   <li>{@link TierModel} - from score to tier: cutpoints learned from where
- *       the user already put songs ({@link OrdinalProbitTierModel}).</li>
+ *       the user already put songs ({@link OrdinalProbitTierModel}, the
+ *       default), or the user's own borders ({@link FixedCutpointsTierModel},
+ *       chosen per request via {@link DuelEngine#withTierModel}). The shown
+ *       score is {@link ScoreScale}.</li>
  *   <li>{@link fm.tierlist.duel.engine.pairing.PairingStrategy} - which duel
  *       next, one strategy per {@link fm.tierlist.duel.engine.pairing.Focus}.</li>
  *   <li>{@link fm.tierlist.duel.engine.policy.SuggestionPolicy} - when a move

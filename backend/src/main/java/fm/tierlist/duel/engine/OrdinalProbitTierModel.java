@@ -30,11 +30,13 @@ public final class OrdinalProbitTierModel implements TierModel {
     private static final double MIN_NOISE = 1.0;
     private static final double MAX_NOISE = 8.0;
     private static final int SWEEPS = 6;
+    static final double DEFAULT_NOISE = 2.0;
 
     @Override
-    public Fit fit(List<Placed> placed, int tiers, double[] priors) {
+    public Fit fit(List<Placed> placed, List<String> tierIds, double[] priors) {
+        int tiers = tierIds.size();
         double[] theta = priors.clone();
-        double[] noise = {2.0};
+        double[] noise = {DEFAULT_NOISE};
         if (tiers > 1 && !placed.isEmpty()) {
             double lo = placed.stream().mapToDouble(p -> p.rating().mu()).min().orElse(0) - 20;
             double hi = placed.stream().mapToDouble(p -> p.rating().mu()).max().orElse(0) + 20;
@@ -86,6 +88,11 @@ public final class OrdinalProbitTierModel implements TierModel {
         double above = k == 0 ? 1 : PHI.cumulativeProbability((theta[k - 1] - r.mu()) / s);
         double below = k == theta.length ? 0 : PHI.cumulativeProbability((theta[k] - r.mu()) / s);
         return Math.max(0, above - below);
+    }
+
+    // A fit with these borders and this noise (FixedCutpointsTierModel reuses it).
+    static Fit withBorders(double[] theta, double noise) {
+        return new ProbitFit(theta.clone(), noise);
     }
 
     private record ProbitFit(double[] theta, double noise) implements Fit {

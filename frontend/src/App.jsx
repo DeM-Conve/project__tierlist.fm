@@ -657,6 +657,7 @@ function Layout() {
       { id: 'page-settings', label: 'Settings', to: '/settings', keywords: ['settings', 'preferences', 'options', 'config'] },
       { id: 'page-settings-appearance', label: 'Settings → Appearance', to: '/settings?tab=appearance', keywords: ['settings', 'theme', 'dark mode', 'light mode', 'accent', 'color', 'tier colors', 'palette'] },
       { id: 'page-settings-naming', label: 'Settings → Playlist naming', to: '/settings?tab=naming', keywords: ['settings', 'template', 'rename', 'naming', 'todo', 'to-do', 'keyword', 'tag'] },
+      { id: 'page-settings-duels', label: 'Settings → Duels', to: '/settings?tab=duels', keywords: ['settings', 'duel', 'tier borders', 'ranges', 'score', 'criteria'] },
       { id: 'page-settings-keyboard', label: 'Settings → Keyboard shortcuts', to: '/settings?tab=keyboard', keywords: ['settings', 'keys', 'hotkeys', 'shortcuts'] },
     ];
     for (const page of pages) {

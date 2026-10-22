@@ -25,6 +25,12 @@ public class SettingsService {
         return settings.findById(userId);
     }
 
+    // The user's duel settings (the default for an account that never saved).
+    @Transactional(readOnly = true)
+    public DuelSettings duels(String userId) {
+        return settings.findById(userId).map(UserSettings::getDuels).orElse(DuelSettings.DEFAULT);
+    }
+
     // Creates or replaces the user's settings if `precondition` holds, else
     // SettingsConflictException. Two writes racing past the check still can't
     // both win: @Version (update) / the primary key (insert) rejects the
@@ -33,6 +39,14 @@ public class SettingsService {
     public UserSettings save(String userId, WritePrecondition precondition,
                              Appearance appearance, Naming naming, Map<String, String> todoLinks,
                              List<ActivityItem> activityOrder) {
+        return save(userId, precondition, appearance, naming, todoLinks, activityOrder, null);
+    }
+
+    // `duels` null = keep the row's (or the default, for a new row).
+    @Transactional
+    public UserSettings save(String userId, WritePrecondition precondition,
+                             Appearance appearance, Naming naming, Map<String, String> todoLinks,
+                             List<ActivityItem> activityOrder, DuelSettings duels) {
         Optional<UserSettings> existing = settings.findById(userId);
         if (!precondition.isSatisfiedBy(existing.map(UserSettings::getVersion))) {
             throw new SettingsConflictException();
@@ -47,6 +61,7 @@ public class SettingsService {
             entityManager.lock(row, LockModeType.PESSIMISTIC_FORCE_INCREMENT);
         }
         row.replace(appearance, naming, todoLinks, activityOrder);
+        row.replaceDuels(duels);
         return settings.saveAndFlush(row); // flush now so the new version is the ETag we return
     }
 }
