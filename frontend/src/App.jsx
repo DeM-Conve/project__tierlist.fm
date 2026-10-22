@@ -34,8 +34,8 @@ import { CanvasContext } from './layout/canvas';
 import PendingChanges from './components/PendingChanges';
 import { applySyncOutcome, landBoardRefresh, loadBoard, moveWithFeedback, syncRequestFailed } from './tierActions';
 import { buildSyncPlan, resolveItemIds, songMoves } from './syncPlan';
-import { checkItemIds, heldItems, recordPush } from './syncCache';
-import { itemIdsRebased } from './store/itemIds';
+import { preparePush, recordPush } from './syncCache';
+import { preparedStatus, syncStatusRun } from './syncStatus';
 import { dragEnded, transfersDiscarded } from './store/transfersSlice';
 import TierBoardView from './components/TierBoardView';
 import PlayerDock from './components/PlayerDock';
@@ -421,10 +421,12 @@ function Layout() {
     pushChain.current = pushChain.current.then(() => runSync(category, videoIds));
     return pushChain.current;
   }
+  // Each push's own token: a status reset timer only resets the status its
+  // own push set (a later push may have set the same value).
+  const syncRun = useRef(0);
   async function runSync(category, videoIds) {
-    // The changes to push, as the store has them now; `gone` (item ids
-    // YouTube no longer has - see syncCache.js) are left out, staged.
-    const planNow = (gone = new Set()) => {
+    // The changes to push, as the store has them now.
+    const planNow = () => {
       const state = store.getState();
       let moves = selectPendingMoves(state);
       let staged = selectTransfers(state);
@@ -432,30 +434,30 @@ function Layout() {
         moves = songMoves(moves, videoIds);
         staged = [];
       }
-      const all = moves.length + staged.length;
-      moves = moves.filter((m) => !gone.has(m.video.id));
-      staged = staged.filter((t) => !gone.has(t.video.id));
-      if (!moves.length && !staged.length) return { plan: null, skipped: all };
-      return { plan: buildSyncPlan(moves, staged, selectTierGroups(state), category), skipped: all - moves.length - staged.length };
+      if (!moves.length && !staged.length) return null;
+      return buildSyncPlan(moves, staged, selectTierGroups(state), category);
     };
-    if (!planNow().plan) return;
-    dispatch(setSyncStatus('syncing'));
+    if (!planNow()) return;
+    const finish = syncStatusRun(dispatch, syncRun);
+    finish('syncing');
     const groups = selectTierGroups(store.getState());
     let plan = null;
 
     try {
       // Never push an item id older than the last push to its playlist:
-      // re-read whatever playlist the board may hold a stale copy of and
-      // re-point the ids first (syncCache.js checkItemIds).
-      const { renamed, gone } = await checkItemIds(queryClient, heldItems(store.getState(), groups, category));
-      if (Object.keys(renamed).length) dispatch(itemIdsRebased(renamed));
-      const next = planNow(gone);
+      // re-read whatever playlist the board may hold a stale copy of,
+      // re-point the ids and settle changes whose item is gone first
+      // (syncCache.js preparePush).
+      const next = await preparePush(queryClient, {
+        dispatch,
+        getState: store.getState,
+        tierGroups: groups,
+        category,
+        planNow,
+      });
       plan = next.plan;
       if (!plan) {
-        dispatch(setSyncStatus('partial'));
-        setTimeout(() => {
-          if (store.getState().tiers.syncStatus === 'partial') dispatch(setSyncStatus('idle'));
-        }, 2500);
+        finish(preparedStatus(next));
         return;
       }
 
@@ -479,11 +481,7 @@ function Layout() {
       await recordPush(queryClient, { state: store.getState(), plan, results: result.results, tierGroups: groups, category });
       if (plan.transfers.length) queryClient.invalidateQueries({ queryKey: ['playlists'] });
 
-      dispatch(setSyncStatus(finishedStatus));
-      setTimeout(() => {
-        // Only if no later push has started since.
-        if (store.getState().tiers.syncStatus === finishedStatus) dispatch(setSyncStatus('idle'));
-      }, 2500);
+      finish(finishedStatus);
 
       // Inserts YouTube returned no id for: find them in a fresh copy of
       // the playlist, so the next push deletes the right item.
@@ -498,9 +496,9 @@ function Layout() {
       // re-read before the next push.
       if (plan) await recordPush(queryClient, { state: store.getState(), plan, results: null, tierGroups: groups, category }).catch(() => {});
       // A failed id check has no plan yet: blame the changes it was for.
-      const failedPlan = plan ?? planNow().plan;
+      const failedPlan = plan ?? planNow();
       if (failedPlan) dispatch(syncRequestFailed(failedPlan, errorMessage(e, 'The app couldn’t reach the server - nothing was changed.')));
-      dispatch(setSyncStatus('error'));
+      finish('error');
     }
   }
 

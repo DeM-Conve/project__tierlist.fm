@@ -54,9 +54,12 @@ const transfersSlice = createSlice({
     // A transfer's id is its song's playlist item id: both follow a rebase
     // (the card on the target board carries the same new id - tiersSlice).
     builder.addCase(itemIdsRebased, (state, action) => {
-      const renamed = action.payload;
-      state.list = state.list.map((t) => ({ ...t, id: renamed[t.id] ?? t.id, video: rebaseVideo(t.video, renamed) }));
-      if (state.drag) state.drag = { ...state.drag, video: rebaseVideo(state.drag.video, renamed) };
+      const { renamed, transferPlaylist = {}, dragPlaylist = null } = action.payload;
+      state.list = state.list.map((t) => {
+        const map = renamed[transferPlaylist[t.id]];
+        return map ? { ...t, id: map[t.id] ?? t.id, video: rebaseVideo(t.video, map) } : t;
+      });
+      if (state.drag) state.drag = { ...state.drag, video: rebaseVideo(state.drag.video, renamed[dragPlaylist]) };
     });
   },
 });

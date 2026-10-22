@@ -1,6 +1,7 @@
 import { createStore, del, get, set } from 'idb-keyval';
 import { createAsyncStoragePersister } from '@tanstack/query-async-storage-persister';
 import { queryKeys } from './queryKeys';
+import { resetPushLedger } from './pushLedger';
 
 // The board cache: a copy of the playlists list and each playlist's items,
 // kept in this browser's IndexedDB by TanStack Query's persister, so a big
@@ -110,5 +111,6 @@ export function boardCachePersistOptions(persister = boardCachePersister) {
 
 // Logout: forget this account's copy on this device.
 export async function clearBoardCache(persister = boardCachePersister) {
+  resetPushLedger();
   await persister?.removeClient();
 }

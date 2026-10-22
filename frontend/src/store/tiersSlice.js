@@ -399,12 +399,29 @@ const tiersSlice = createSlice({
     // the hidden duplicate copies and every undo / redo snapshot - so no
     // later push, undo or redo brings back an id that no longer exists.
     builder.addCase(itemIdsRebased, (state, action) => {
-      const renamed = action.payload;
-      state.tierItems = rebaseTiers(original(state.tierItems), renamed);
-      state.originalTierItems = rebaseTiers(original(state.originalTierItems), renamed);
-      state.duplicateCopies = rebaseTiers(original(state.duplicateCopies), renamed);
-      state.undoStack = original(state.undoStack).map((snap) => rebaseTiers(snap, renamed));
-      state.redoStack = original(state.redoStack).map((snap) => rebaseTiers(snap, renamed));
+      const { renamed, tierPlaylist = {}, transferPlaylist = {}, failureRenames = {} } = action.payload;
+      const base = original(state.originalTierItems);
+      const holds = (tier, id) => (base[tier] || []).some((x) => x.id === id);
+      // The playlist a shown song's id belongs to: a card from another
+      // board, its transfer's source; else the baseline tier holding that id
+      // (its own tier first - a half-done move's id is held in two).
+      const ownerOf = (v, tier) => {
+        if (v.transfer != null) return transferPlaylist[v.transfer];
+        const t = holds(tier, v.id) ? tier : Object.keys(base).find((k) => holds(k, v.id));
+        return t && tierPlaylist[t];
+      };
+      const shown = (v, tier) => renamed[ownerOf(v, tier)];
+      const own = (_, tier) => renamed[tierPlaylist[tier]];
+      state.tierItems = rebaseTiers(original(state.tierItems), shown);
+      state.originalTierItems = rebaseTiers(base, own);
+      state.duplicateCopies = rebaseTiers(original(state.duplicateCopies), own);
+      state.undoStack = original(state.undoStack).map((snap) => rebaseTiers(snap, shown));
+      state.redoStack = original(state.redoStack).map((snap) => rebaseTiers(snap, shown));
+      for (const [old, next] of Object.entries(failureRenames)) {
+        if (!(old in state.syncFailures)) continue;
+        state.syncFailures[next] = state.syncFailures[old];
+        delete state.syncFailures[old];
+      }
     });
   },
 });
