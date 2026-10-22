@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useDeferredValue, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { tierName } from '../tierLabels';
 import { useDispatch, useSelector } from 'react-redux';
 import {
@@ -471,7 +471,9 @@ export default function TierBoardView({
     return list;
   }, [tierGroups, category, tierItems]);
 
-  const queryText = searchQuery.slice(1);
+  // Deferred: on a big board a short query (the first letter) matches and
+  // wraps hundreds of tiles - the box keeps up with typing, the rows follow.
+  const queryText = useDeferredValue(searchQuery.slice(1));
   const matches = useMemo(() => {
     if (!queryText.trim()) return [];
     return searchableEntries.filter((e) => videoMatches(e.video, queryText));
