@@ -90,9 +90,10 @@ list. Anything else in `{braces}` is a token of your own - kept as-is when renam
 | `[{my_label}] {category} {tier}` | `1 2 3 4 5` | `[Chill] Rap 1` |
 
 Each board also gets an unranked to-do list (`Rap TODO`, or whatever you call it). The
-app auto-detects the naming that fits your existing playlists, and can rename them all on
-YouTube if you change it (with a preview and a quota estimate first). Create a new board
-from Home -> **New tier list**.
+app auto-detects the naming that fits your existing playlists; changing it only changes
+which playlists the app picks up (with a live preview) - it never renames anything.
+Rename a board by clicking its name: that renames its playlists on YouTube, after showing
+every new name and the quota cost. Create a new board from Home -> **New tier list**.
 
 ## Self-host it
 

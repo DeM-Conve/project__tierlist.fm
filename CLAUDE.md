@@ -1,13 +1,46 @@
 # Tierlist.fm
 
-A personal tool to log into your own YouTube account, browse playlists, and manage a
-custom tier-list system. Playlists whose names follow the user's naming template
-(`{category} {tier}` by default, e.g. `Rap S`) are auto-grouped into a tier board per
-category.
+A self-hosted web app that turns a user's own YouTube playlists into tier lists. You log
+in with Google; playlists whose names follow your naming template (`{category} {tier}`
+by default, e.g. `Rap S` ... `Rap D`, plus an unranked `Rap TODO`) are grouped into one
+tier board per category. You rank by dragging songs between tiers or by head-to-head
+**duels** (a backend ranking engine suggests tier moves you approve), listen with a
+global YouTube-Music-style player, and push the changes back to the real playlists -
+YouTube stays the source of truth. Built first for its maintainer (the user), open
+source for anyone who self-hosts it; every Google account on an instance sees only its
+own data.
+
+## Read this first
+
+This file is the entry point: stack, rules and conventions for changing the code. The
+rest lives in linked docs - read the one that matches the task before starting.
+
+| Doc | What's in it | Read it when |
+|---|---|---|
+| [`PRODUCT.md`](PRODUCT.md) | Positioning ("the tier list is the moat"), users, principles, brand | Any product/UX/design decision; it's also the design skill's product brief |
+| [`docs/requirements.md`](docs/requirements.md) | Every business requirement with its why, the user's explicit product calls, removed features, **open questions** | Before adding/changing behaviour, or when unsure whether something was decided |
+| [`docs/features.md`](docs/features.md) | Every user-facing feature and shortcut, page by page - the no-regression checklist | Before touching any page; update it with every user-facing change |
+| [`docs/architecture.md`](docs/architecture.md) | System diagram, repo map, main flows (login, board load, push, duels, settings), HTTP API + quota costs, data model | Before backend/API/schema work or anything crossing frontend and backend |
+| [`docs/status.md`](docs/status.md) | Current state, engineering backlog (library swaps, CSS), recently done | Picking up work, or when something lands (tick it there) |
+| [`README.md`](README.md) | Public pitch, self-host steps, reverse proxy / sub-path, backups, dev setup, troubleshooting | Deploy/self-host/config questions; keep it in step with features |
+| [`CONTRIBUTING.md`](CONTRIBUTING.md) | Branching, commit style, releases (for outside contributors) | Git questions (the maintainer's exact flow is under Housekeeping below) |
+
+## Everyday commands
+
+```bash
+cd frontend && npm test && npx oxlint     # frontend tests + lint
+cd frontend && npm run dev                # Vite dev server (proxies /api to localhost:48123)
+cd backend && mvn verify                  # backend unit + Testcontainers ITs + 80% coverage gate (needs Docker)
+docker compose -f docker-compose.dev.yml up   # live-reload stack
+scripts/deploy.sh [frontend]              # the only way to ship: all tests, build, Compose, served-bundle check
+scripts/backup.sh / scripts/restore.sh    # database backup / restore
+```
 
 ## Stack
 
-- **Frontend**: React 19 + Vite, in `frontend/`.
+- **Frontend**: React 19 + Vite 8, in `frontend/` - plain JavaScript/JSX (no
+  TypeScript), linted with oxlint. Major versions: Mantine 9, React Router 7, Redux
+  Toolkit 2, TanStack Query 5.
   - **Mantine** (`@mantine/core`, `@mantine/hooks`, `@mantine/spotlight`) is the UI
     component library - this is the final choice after trying MUI (rejected up front,
     too Material-flavored), then Tailwind+shadcn/ui (rejected, shadcn is copied-in
@@ -137,7 +170,7 @@ category.
     is `useLoadTierBoard`'s own loading state, not raw route navigation - wire new pages'
     async loads into it the same way rather than adding a second, differently-styled
     loading indicator.
-- **Backend**: Spring Boot 3 (Java 21, Maven), in `backend/`. Session-based Google OAuth2
+- **Backend**: Spring Boot 3.3 (Java 21, Maven), in `backend/`. Session-based Google OAuth2
   login; talks to the YouTube Data API v3 directly (no separate token DB).
 - **Database**: **Postgres 17** (the `db` compose service, data in the `pgdata`
   volume), accessed via **Spring Data JPA**, schema owned by **Flyway**
@@ -148,23 +181,13 @@ category.
   edit an applied migration (Flyway's checksum check fails the boot) and never
   reset the volume - a schema change is a new `V<n>__*.sql`. Back up first
   (`scripts/backup.sh`).
-  Tables: `app_user` (Google `sub` as id, recorded on every login by the success
-  handler in `SecurityConfig`) and `user_settings` (one row per user: `theme_option`,
-  `accent_option`, `tier_palette_option` enums, the naming
-  template and the six tier names `naming_tier_s..d/todo` - plus the same seven
-  nullable `naming_migrating_from*` columns for an unfinished rename, all or none -
-  (+ CHECK constraints via the `tier_label_valid` / `tier_labels_distinct` SQL
-  functions) and a `version`), `todo_list_link`
-  (playlist id -> board, part of the settings row: an `@ElementCollection` excluded
-  from Hibernate's auto-versioning - it bumped the version on insert - so
-  `SettingsService` force-increments when links change), and `activity_bar_item`
-  (the activity bar's icon order: `position` SMALLINT -> `item`, the `activity_item`
-  enum, `UNIQUE (user_id, item)` deferred so in-place reorders pass; also part of the
-  settings row, an `@ElementCollection` `List<ActivityItem>` + `@OrderColumn`, versioned
-  the same way as `todo_list_link`; on the wire `appearance.activityOrder`, frontend
-  ids, missing/partial -> completed in default order, duplicates/unknown -> 400;
-  frontend `activityOrder.js` + `appearanceSlice` `setActivityOrder` /
-  `selectActivityOrder`). Backend package
+  Every table and what it holds: `docs/architecture.md` "Data model". Gotchas:
+  `todo_list_link` and `activity_bar_item` are `@ElementCollection`s of the settings
+  row, excluded from Hibernate's auto-versioning (it bumped the version on insert), so
+  `SettingsService` force-increments the version when they change; the activity order
+  is `appearance.activityOrder` on the wire (frontend ids; missing/partial -> completed
+  in default order, duplicates/unknown -> 400; frontend `activityOrder.js` +
+  `appearanceSlice` `setActivityOrder` / `selectActivityOrder`). Backend package
   `fm.tierlist.settings`, layered and SOLID:
   - enums `Theme`/`Accent`/`TierPalette`: constant name = Postgres
     enum label (Hibernate `@JdbcTypeCode(SqlTypes.NAMED_ENUM)` + `columnDefinition`
@@ -348,10 +371,11 @@ category.
   page "Play" hands the song to it (`queueActions.playSongNow`), never a second
   embed. Dock keys work everywhere; a page key wins by `preventDefault` in its
   (document-level) `useHotkeys` handler - the dock skips `e.defaultPrevented`. Also don't derive the *playing* video's
-  data from `state.tiers.tierItems` (live, current-board-only) - `focusSlice.focusEntries`
-  is a snapshot of `{tier, video}` taken when the dock opens/shuffle starts, and
-  `selectActiveSequence` reads from that snapshot instead. This was a real bug, not
-  just theoretical: navigating to a different tier board replaces `tierItems`, so a
+  data from `state.tiers.tierItems` (live, current-board-only) - every `focusSlice`
+  queue entry (`history` / `current` / `upcoming`) carries a `{tier, video}` snapshot
+  taken when it was queued, and the dock reads the playing song from
+  `focus.current` (`selectFocusedVideoData`). This was a real bug, not just
+  theoretical: navigating to a different tier board replaces `tierItems`, so a
   selector chain rooted in it loses the still-playing video and the dock silently
   unmounts mid-navigation - the snapshot is what actually makes the dock global.
 - **The dock takes real layout space - never overlay it and offset things.** `Layout`
@@ -435,78 +459,13 @@ category.
   before redesigning/rewriting any page, check every item listed for it (and the
   "Keyboard shortcuts" section) still works afterwards, and update the entries.
 
-## Pending work (frontend stack migration, in progress)
+## Pending work
 
-The user asked for these on top of the Mantine/Redux migration above. Tracked here
-(no task-tracking tool is available in this environment) - update as items land:
-
-- [x] **React Router** - done. Real `Routes`/`Route`s (`/`, `/playlist/:id` - now only a redirect to
-  that playlist's tier page `/tier/:category/t/:tier`, there's no separate playlist view -
-  `/tier/:category`, `/tier/:category/duel`, `/settings`) replace the hand-rolled
-  History-API routing. Also fixed a latent bug found while doing this: navigation
-  used to unconditionally close the player dock, defeating the "plays in the
-  background" point of the mini bar - navigation no longer touches it at all.
-- [x] **TanStack Query + axios** - done. `frontend/src/api/` (`client.js`'s axios
-  instance, `queries.js`'s hooks) is now the only place API calls happen; no
-  component does a raw `fetch`. `itemsSlice` was removed entirely (and the old playlist
-  page with it - a playlist opens its tier page); `tiersSlice.loadedCategory` mediates
-  between TanStack Query's cache (pristine server data) and the local editable draft
-  (drags, duel results) - see `useLoadTierBoard` in `App.jsx`. Don't refetch
-  tier-board data on mount without checking `loadedCategory` first, and don't
-  reintroduce a raw `fetch`/inline `axios` call in a component - add a hook in
-  `api/queries.js` instead.
-- [ ] **Replace hand-rolled UI code with Mantine / proven libraries** (the user,
-  2026-10-10: "use the Mantine and other built-in things only, don't create your
-  own when we have already tested solutions and libraries"). Audit the frontend
-  for custom pointer/drag handlers, measuring code, keyboard listeners and CSS
-  that Mantine (`@mantine/core`/`hooks`), `react-resizable-panels` (the sidebar
-  split), `@tanstack/react-virtual`, `@hello-pangea/dnd` or another popular,
-  maintained library already covers, and swap them over one at a time with
-  tests. Done so far: the sidebar's resize edge (now `react-resizable-panels`);
-  `PendingChanges` Shift+P (Mantine `useHotkeys`); the tier page's `/` and
-  filter Escape (`react-hotkeys-hook` + Mantine `getHotkeyHandler`); the
-  dock's progress polling (Mantine `useInterval`, `usePlayerTime.js`); the
-  sidebar's spring-loaded board open (Mantine `useTimeout`); dead App.css
-  rules (`appCss.test.js` now fails on any App.css class nothing uses).
-  Left, each riskier than a one-for-one swap: the big page keydown handlers
-  (`PlayerDock`, `TierBoardView` search, `AddSongsView` - capture phase,
-  ordering with `keyboard/sequence.js` and `LinkHints` matters); `LinkHints`'
-  while-open window listeners (could be `useWindowEvent`, same ordering
-  caveat); `sequence.js`'s module-level listener (react-hotkeys-hook doesn't
-  expose its pending-sequence state); native HTML5 drag-and-drop in
-  `tierActions` `useTierDnd` / board / tier page / queue (`@hello-pangea/dnd`
-  is installed, but the sidebar cross-board drop and the virtualizer drop
-  slot depend on native drag events); `tierUtils.indexForPointInFlow` and the
-  canvas-offset `getBoundingClientRect` reads in `TierBoardView` /
-  `TierFocusView` (board fit maths, virtualizer `scrollMargin`); the dock's
-  click-to-seek line (could be a Mantine `Slider`, but it's the dock's
-  mini/floating CSS).
-- [ ] **React Hook Form** - installed, still nothing to use it on (see Stack section
-  above). Not a gap to close proactively.
-- [~] **Stop hand-writing CSS, use Mantine components instead** - in progress, real
-  ground covered but not finished. Done so far: every plain `<button className="btn
-  ...">` across the app converted to Mantine `Button`/`ActionIcon`
-  (`App.css`'s now-dead `.btn`/`.btn-primary`/`.btn-ghost`/`.sidebar-search`/
-  `.duel-strategy-select` rules removed as each one emptied out), the sidebar filter
-  input converted to Mantine `TextInput`, the duel-strategy dropdown to Mantine
-  `Select`, the Settings duel-strategy picker to Mantine `Radio.Group` +
-  `Radio.Card`, the tier board's thumbnail cards to Mantine `Card`/`Card.Section` +
-  `Text` (truncated title) + `ActionIcon`/`Badge` (link/duplicate tag), the header/
-  button-row layout on the tier board to Mantine `Group`/`Stack`/`Title`/`Paper`/
-  `Badge`, and all of `Sidebar`'s structure to Mantine `NavLink` (active state via
-  `useLocation()`, not a hand-rolled `isActive` className), `ScrollArea`, `Kbd`,
-  `Divider`, `Group`/`Stack`/`Text`/`UnstyledButton` (`App.css`'s `.settings-option*`,
-  `.sync-*`, `.tier-board-*`, and every `.sidebar-*` rule except the structural
-  `.sidebar`/`.sidebar-scrim` positioning removed as each emptied out), and the
-  duel view to Mantine `Container`/`Group`/`Stack`/`Progress`/`Card`/`Card.Section`/
-  `Badge`/`Text`/`Title` (only card-hover-lift and absolute-overlay positioning for
-  the tier badge/preview button stayed as CSS - Mantine has no prop for either).
-  The tier board, tier page, rail, home, sidebar, playlist page and duel are all Mantine now (only hover states / keyframes stay as CSS).
-  Still hand-rolled CSS in `App.css`: `PlayerDock`'s expanded/mini/floating layouts
-  (plus its queue-column grid) and the duel card hover. Convert opportunistically whenever one of those is
-  next touched, rather than in one big-bang rewrite - and when a hand-rolled class's
-  last usage is removed, delete its now-dead CSS rule in the same pass (don't leave
-  it orphaned "just in case").
+Tracked in [`docs/status.md`](docs/status.md) (no issue tracker is in use): the
+remaining swaps of hand-rolled UI code for Mantine / proven libraries (the user,
+2026-10-10), the hand-written CSS still in `App.css`, and smaller items. Product-level
+open questions are in [`docs/requirements.md`](docs/requirements.md#open-questions) -
+ask the user rather than guess. Tick items there as they land.
 
 ## Housekeeping
 
@@ -535,7 +494,7 @@ The user asked for these on top of the Mantine/Redux migration above. Tracked he
   `https://github.com/DeM-Conve/project__tierlist.fm` (the user's explicit
   call: "use proper git strategy from now on for oss repo"). The product is
   **Tierlist.fm** everywhere - `project__yt` was a temporary name and is gone
-  from the code (only the local folder is still called that); the Compose
+  from the code; the Compose
   project is pinned to `name: tierlistfm` (containers `tierlistfm-*`, volume
   `tierlistfm_pgdata`). Never commit secrets - `.env` is gitignored, only
   `.env.example` (placeholders) is tracked.
@@ -585,6 +544,11 @@ The user asked for these on top of the Mantine/Redux migration above. Tracked he
   screens need the user's own login, so ask them for those. Keep README's
   feature list in step with `docs/features.md` when a headline feature lands.
 - Commit incrementally as you go (the user asked for this explicitly, more than once).
+- **Keep the docs true.** A user-facing change updates `docs/features.md` (and README's
+  feature list if it's a headline feature); a new user decision goes into
+  `docs/requirements.md` (and, if it's a coding rule, here); an API or schema change
+  updates `docs/architecture.md`; finished or new backlog items update
+  `docs/status.md`. One fact lives in one place - link instead of copying.
 - **Never add a `Co-Authored-By: Claude` (or any Claude/Anthropic attribution) line to
   commit messages or PR descriptions.** The user had these stripped from all existing
   history with `git filter-repo` and does not want Claude credited as an author

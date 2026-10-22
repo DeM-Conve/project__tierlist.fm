@@ -16,10 +16,13 @@ this is an existing codebase, not a greenfield stack choice.
 
 ## Users
 
-Each user logs in with their own Google account and manages their own YouTube playlists
-and tier lists - this is a shared multi-user tool, not a single-account personal tool.
-There is no cross-user viewing/sharing built in; each account's playlists, tier boards,
-and duel rankings are its own.
+Built first for its maintainer - someone who listens on YouTube Music and already keeps
+playlists split by category and quality - and for anyone with the same habit who
+self-hosts it. One instance serves every Google account its owner admits (each logs in
+with their own account and sees only their own playlists, settings and duel history);
+there is no cross-user viewing or sharing, and it is not offered as a hosted service.
+Users are tech-comfortable and keyboard-heavy (VS Code / Vim conventions). Who it's for
+in more detail: `docs/requirements.md`.
 
 ## Product Purpose
 
@@ -46,16 +49,21 @@ reading structure straight out of playlist names they already maintain.
 
 ## Operating Context
 
-Runs as a self-hosted Docker Compose stack (frontend + backend containers). Session-based
-OAuth2 means rebuilding either container clears the in-memory session and requires
-logging in again. Tier-board edits are staged as pending changes and synced back to the
-real YouTube playlists explicitly, not saved to a separate database - YouTube playlists
-are the source of truth.
+Runs as a self-hosted Docker Compose stack (nginx frontend, Spring Boot backend,
+Postgres, a nightly backup job) behind one origin. Session-based OAuth2 keeps sessions
+in memory, so restarting the backend logs everyone out. YouTube playlists are the source
+of truth for what's in each tier: board edits are staged in the browser and pushed to
+the real playlists explicitly. Postgres holds only per-account settings and duel
+history. Every account on an instance shares one Google Cloud project's YouTube API
+quota (10,000 units/day by default), which shapes many features.
 
 ## Capabilities and Constraints
 
-- Duplicate videos across a board's tier playlists are auto-resolved (highest tier kept,
-  others staged as pending removal) - no manual dedupe UI.
+The full requirements (with the maintainer's explicit decisions and open questions) are
+in `docs/requirements.md`; the feature list is `docs/features.md`. The ones that shape
+design most:
+
+- Duplicate videos are auto-resolved - no manual dedupe UI.
 - Duel ranking is the backend engine: OpenSkill ratings per duel, a Bradley-Terry refit
   of the whole duel log, ordinal tier probabilities, and suggested tier moves that you
   approve - a single duel never moves a song.
@@ -92,4 +100,5 @@ against its own running code and the user's own YouTube data, not marketing mate
 
 ## Accessibility & Inclusion
 
-No specific accessibility requirement recorded.
+No specific accessibility requirement recorded (an open question in
+`docs/requirements.md`).

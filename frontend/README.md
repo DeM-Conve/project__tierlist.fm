@@ -1,16 +1,16 @@
-# React + Vite
+# Tierlist.fm frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+React 19 + Vite single-page app. See the repository root for everything else:
 
-Currently, two official plugins are available:
+- [README](../README.md) - what Tierlist.fm is, self-hosting, dev setup
+- [CLAUDE.md](../CLAUDE.md) - stack, conventions and rules for changing this code
+- [docs/architecture.md](../docs/architecture.md) - how the pieces fit, the API, the data model
+- [docs/features.md](../docs/features.md) - every feature and keyboard shortcut
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
-
-## React Compiler
-
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the Oxlint configuration
-
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and Oxlint's TypeScript related rules in your project.
+```bash
+npm install
+npm run dev     # Vite dev server; proxies /api/ and Google login to the backend (BACKEND_ORIGIN)
+npm test        # Vitest + Testing Library
+npm run lint    # oxlint
+npm run build   # production bundle in dist/ (BASE_PATH for a sub-path)
+```
