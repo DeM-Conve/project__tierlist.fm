@@ -345,3 +345,84 @@ describe('a partial failure, then retry', () => {
     expectInSync(await h.push());
   });
 });
+
+describe('probe: more', () => {
+  it('P1 bin a song after a push', async () => {
+    await start();
+    h.move('a', 'A');
+    await h.push();
+    h.remove('a');
+    expectInSync(await h.push(), { removed: ['a'] });
+  });
+  it('P2 board switch keeps staged moves', async () => {
+    await start();
+    h.move('a', 'A');
+    await h.open('Pop');
+    await h.open('Rap');
+    expect(h.tierOf('a')).toBe('A');
+  });
+  it('P3 transfer there and back to another tier', async () => {
+    await start();
+    await h.transfer('a', 'Pop', 'A');
+    await h.transfer('a', 'Rap', 'B');
+    expect(h.tierOf('a')).toBe('B');
+    expectInSync(await h.push(), { others: { Pop: ACCOUNT_BOARD('Pop') } });
+  });
+  it('P4 transfer then bin on target', async () => {
+    await start();
+    await h.transfer('a', 'Pop', 'A');
+    h.remove('a');
+    expect(h.staged()).toEqual([]);
+    await h.open('Rap');
+    expect(h.tierOf('a')).toBe('S');
+  });
+  it('P5 add a song already in that tier', async () => {
+    await start();
+    await h.fileSong('a', 'Rap', 'S');
+    expectInSync(await h.push());
+  });
+  it('P6 dup in S and B, drag the S copy to C', async () => {
+    await start({ ...ACCOUNT, 'Rap B': ['f', 'a'] });
+    h.move('a', 'C');
+    expectInSync(await h.push());
+    expect(youtubeBoards(yt).Rap.C).toEqual(['a']);
+  });
+  it('P7 dup in S and B, drag the B copy to S', async () => {
+    await start({ ...ACCOUNT, 'Rap B': ['f', 'a'] });
+    const v = h.tierItems().B.find((x) => x.videoId === 'a');
+    h.dispatch((await import('./tierActions')).moveWithFeedback([{ fromTier: 'B', toTier: 'S', videoId: 'a' }], { quiet: true }));
+    void v;
+    expectInSync(await h.push());
+  });
+  it('P8 dup in S and B, drag the B copy to A', async () => {
+    await start({ ...ACCOUNT, 'Rap B': ['f', 'a'] });
+    h.dispatch((await import('./tierActions')).moveWithFeedback([{ fromTier: 'B', toTier: 'A', videoId: 'a' }], { quiet: true }));
+    expectInSync(await h.push());
+  });
+  it('P9 transfer out of a board with an auto-dedupe', async () => {
+    await start({ ...ACCOUNT, 'Rap B': ['f', 'a'] });
+    await h.transfer('c', 'Pop', 'A');
+    expectInSync(await h.push());
+  });
+  it('P10 edit during an in-flight push', async () => {
+    await start();
+    h.move('a', 'A');
+    const { boardProbe } = await import('./test/boardProbe');
+    const p = boardProbe.current.ctx.syncChanges('Rap');
+    h.move('d', 'B');
+    await p;
+    await h.settle();
+    expectInSync(await h.push());
+  });
+  it('P11 two pushes queued back to back', async () => {
+    await start();
+    h.move('a', 'A');
+    const { boardProbe } = await import('./test/boardProbe');
+    const p1 = boardProbe.current.ctx.syncChanges('Rap');
+    const p2 = boardProbe.current.ctx.syncChanges('Rap');
+    await p1; await p2;
+    await h.settle();
+    expect(yt.syncCalls).toHaveLength(1);
+    expectInSync(yt.syncCalls[0]);
+  });
+});
