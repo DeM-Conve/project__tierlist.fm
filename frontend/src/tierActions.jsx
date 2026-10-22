@@ -16,9 +16,21 @@ import {
   setLoadedCategory,
   setAwaitingRefresh,
   transfersOverlaid,
+  applySyncedMoves,
+  transfersApplied,
+  syncFailuresRecorded,
 } from './store/tiersSlice';
 import { selectHasLocalEdits } from './store/selectors';
-import { dragEnded, dragStarted, transferCancelled, transferStaged, transfersCommitted } from './store/transfersSlice';
+import {
+  dragEnded,
+  dragStarted,
+  transferCancelled,
+  transferStaged,
+  transfersCommitted,
+  transfersInserted,
+  transfersPushed,
+} from './store/transfersSlice';
+import { syncOutcome } from './syncPlan';
 import { effectiveTransfers } from './transfers';
 import { transferId } from './transfers';
 import { songLabel } from './tierUtils';
@@ -210,6 +222,27 @@ export const landBoardRefresh = ({ category, data, dataUpdatedAt }) => (dispatch
   dispatch(loadBoard({ category, data }));
 };
 
+// A push came back (`results`: the backend's per-item results for
+// `plan`, syncPlan.buildSyncPlan). What it did becomes the new baseline,
+// under the songs' new item ids; a half-done change keeps only its delete
+// staged; every failure's reason is kept for the review list. -> the outcome.
+export const applySyncOutcome = (plan, results) => (dispatch) => {
+  const o = syncOutcome(plan, results);
+  dispatch(applySyncedMoves({ moves: o.moves, newIds: o.newIds, inserted: o.insertedMoves }));
+  dispatch(transfersApplied({ transfers: o.transfers, newIds: o.newIds, inserted: o.insertedTransfers }));
+  dispatch(transfersPushed(o.transfers.map((t) => t.id)));
+  dispatch(transfersInserted(o.insertedTransfers.map((t) => ({ id: t.id, newItemId: o.newIds[t.video.id] }))));
+  dispatch(syncFailuresRecorded({ attempted: plan.payload.map((r) => r.fromItemId), failures: o.failures }));
+  return o;
+};
+
+// The whole push failed (no per-item results): every change it sent gets
+// that one reason.
+export const syncRequestFailed = (plan, error) => (dispatch) => {
+  const failures = Object.fromEntries(plan.payload.map((r) => [r.fromItemId, { step: null, error }]));
+  dispatch(syncFailuresRecorded({ attempted: [], failures }));
+};
+
 // "Put back" on a staged transfer (the review list).
 export const cancelTransfer = (transfer) => (dispatch) => {
   dispatch(transferCancelled(transfer.id));
@@ -234,7 +267,13 @@ export function useTierDnd() {
       e.dataTransfer.setData('application/json', JSON.stringify({ videoId: video.videoId, fromTier }));
       e.dataTransfer.effectAllowed = 'move';
       dispatch(setDraggedVideoId(video.videoId));
-      dispatch(dragStarted({ video, fromCategory: loadedCategory, fromTier }));
+      // The board's own copy, not the caller's: the Tier Rail drags the
+      // player's snapshot of the song, whose item id can be from before a
+      // push - a transfer must delete the item that exists now.
+      dispatch((d, getState) => {
+        const live = getState().tiers.tierItems[fromTier]?.find((v) => v.videoId === video.videoId);
+        d(dragStarted({ video: live ?? video, fromCategory: loadedCategory, fromTier }));
+      });
     },
     onDragEnd() {
       dispatch(setDraggedVideoId(null));

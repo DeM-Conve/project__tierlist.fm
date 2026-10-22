@@ -91,6 +91,13 @@ export function useTierSyncMutation() {
   });
 }
 
+// Fetches one playlist's items fresh from YouTube (cache updated too) - used
+// to look up item ids a push couldn't report (syncPlan.resolveItemIds).
+export function useFetchPlaylistItems() {
+  const queryClient = useQueryClient();
+  return (playlistId) => queryClient.fetchQuery({ ...playlistItemsQuery(playlistId), staleTime: 0 });
+}
+
 // Invalidates every playlist-items query for a board's underlying
 // playlists, so the next mount/refetch pulls fresh data after a sync
 // actually changed what's on YouTube.

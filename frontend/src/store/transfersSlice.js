@@ -35,8 +35,18 @@ const transfersSlice = createSlice({
       const done = new Set(action.payload);
       state.list = state.list.filter((t) => !done.has(t.id));
     },
+    // Pushed half-way: the song is in its new playlist (`newItemId`), the
+    // old copy is still there - only its delete is left (transfers.js).
+    transfersInserted: (state, action) => {
+      for (const { id, newItemId } of action.payload) {
+        const t = state.list.find((x) => x.id === id);
+        if (t) Object.assign(t, { inserted: true, newItemId: newItemId ?? null });
+      }
+    },
+    // A half-pushed transfer stays: its song is on YouTube twice already, so
+    // the leftover delete is kept like an auto-resolved duplicate.
     transfersDiscarded: (state) => {
-      state.list = [];
+      state.list = state.list.filter((t) => t.inserted);
     },
   },
 });
@@ -49,5 +59,6 @@ export const {
   transfersCommitted,
   transfersPushed,
   transfersDiscarded,
+  transfersInserted,
 } = transfersSlice.actions;
 export default transfersSlice.reducer;

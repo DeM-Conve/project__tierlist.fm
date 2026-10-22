@@ -2,10 +2,10 @@ import { useCallback, useEffect, useState } from 'react';
 import { tierName } from '../tierLabels';
 import { useDispatch, useSelector } from 'react-redux';
 import { useOutletContext } from 'react-router-dom';
-import { ActionIcon, Badge, Box, Button, Group, Image, Kbd, Modal, Paper, ScrollArea, Stack, Text, Tooltip } from '@mantine/core';
+import { ActionIcon, Box, Button, Group, Image, Kbd, Modal, Paper, ScrollArea, Stack, Text, Tooltip } from '@mantine/core';
 import { useHotkeys, useMediaQuery } from '@mantine/hooks';
-import { ArrowRight, Trash2, Undo2 } from 'lucide-react';
-import { selectStagedChanges } from '../store/selectors';
+import { AlertTriangle, ArrowRight, Trash2, Undo2 } from 'lucide-react';
+import { selectStagedChanges, selectStagedFailures } from '../store/selectors';
 import { cancelTransfer, moveWithFeedback } from '../tierActions';
 import { songLabel } from '../tierUtils';
 import { TierChip } from './TierBits';
@@ -14,13 +14,37 @@ const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
 const putBackLabel = (move) =>
   move.kind === 'transfer' ? `Keep in ${move.fromCategory} · ${tierName(move.fromTier)}` : `Put back in ${tierName(move.from)}`;
 
+// A change's identity (the playlist item it acts on) - also what a push's
+// failure reason is keyed by.
+const changeKey = (m) => `${m.kind}-${m.id ?? m.video.id ?? m.video.videoId}-${m.tier ?? m.to ?? m.toTier}`;
+
+// A change only the old copy's delete is left of: an auto-resolved
+// duplicate, or a transfer a push already added to its new board.
+const deleteOnly = (m) => m.kind === 'dedupe' || (m.kind === 'transfer' && m.inserted);
+
+// Why the last push of a change failed, in words: which step, then the
+// backend's own reason.
+function failureText(move, { step, error }) {
+  const where =
+    move.kind === 'transfer'
+      ? step === 'insert'
+        ? `add it to ${move.toCategory} · ${tierName(move.toTier)}`
+        : `remove it from ${move.fromCategory} · ${tierName(move.fromTier)}`
+      : step === 'insert'
+        ? `add it to ${tierName(move.to)}`
+        : `remove it from ${tierName(move.kind === 'dedupe' ? move.tier : move.from)}`;
+  const what = step ? `Couldn’t ${where}` : 'Push failed';
+  return error ? `${what}: ${error}` : `${what}.`;
+}
+
 // One staged change: cover, song, and "from -> to" in tier chips. Moves can
 // (and removals) can be put back individually; auto-resolved duplicates
-// can't (by design).
-function ChangeRow({ move, first, onRevert }) {
+// can't (by design). `failure`: why its last push failed, shown under it.
+function ChangeRow({ move, first, onRevert, failure }) {
   const { song, artist } = songLabel(move.video);
   return (
-    <Group gap="sm" wrap="nowrap" py="2xs" style={first ? undefined : { borderTop: '1px solid var(--border-soft)' }}>
+    <Box py="2xs" style={first ? undefined : { borderTop: '1px solid var(--border-soft)' }}>
+    <Group gap="sm" wrap="nowrap">
       <Image src={move.video.thumbnail || undefined} w={40} h={40} radius={4} fit="cover" alt="" />
       <Box miw={0} flex={1}>
         <Text fz="sm" fw={600} truncate="end" title={move.video.title}>
@@ -30,7 +54,23 @@ function ChangeRow({ move, first, onRevert }) {
           {move.kind === 'dedupe' ? `${artist} · duplicate copy` : artist}
         </Text>
       </Box>
-      {move.kind === 'transfer' ? (
+      {move.kind === 'transfer' && move.inserted ? (
+        // Already added to the other board; only the old copy's delete is left.
+        <Tooltip
+          label={`Already in ${move.toCategory} · ${tierName(move.toTier)} on YouTube. Pushing removes the old copy from ${move.fromCategory} · ${tierName(move.fromTier)}.`}
+          withArrow
+          multiline
+          maw={260}
+        >
+          <Group gap="3xs" wrap="nowrap" flex="none" maw="55%">
+            <Trash2 size={13} color="var(--mantine-color-red-filled)" />
+            <Text fz="xs" c="red" fw={600} truncate="end" maw={150}>
+              Remove from {move.fromCategory}
+            </Text>
+            <TierChip tier={move.fromTier} size={20} active={false} />
+          </Group>
+        </Tooltip>
+      ) : move.kind === 'transfer' ? (
         // To another board: "Rock [T2] -> Nippo Normal [T3]".
         <Group gap="3xs" wrap="nowrap" flex="none" maw="55%">
           <Text fz="xs" c="dimmed" truncate="end" maw={110}>
@@ -81,7 +121,7 @@ function ChangeRow({ move, first, onRevert }) {
         </Tooltip>
       )}
       <Box w={28} flex="none">
-        {move.kind !== 'dedupe' && (
+        {!deleteOnly(move) && (
           <Tooltip label={putBackLabel(move)} withArrow>
             <ActionIcon variant="subtle" color="gray" onClick={onRevert} aria-label={putBackLabel(move)}>
               <Undo2 size={15} />
@@ -90,11 +130,22 @@ function ChangeRow({ move, first, onRevert }) {
         )}
       </Box>
     </Group>
+      {failure && (
+        <Group gap="3xs" wrap="nowrap" align="flex-start" pl={52} pt="4xs">
+          <AlertTriangle size={13} color="var(--mantine-color-red-filled)" style={{ flexShrink: 0, marginTop: 2 }} />
+          <Text fz="xs" c="red" role="note">
+            {failureText(move, failure)}
+          </Text>
+        </Group>
+      )}
+    </Box>
   );
 }
 
 function ReviewChangesModal({ opened, onClose, moves, syncStatus, onPush, onDiscard }) {
   const dispatch = useDispatch();
+  const failures = useSelector(selectStagedFailures);
+  const failureOf = new Map(failures.map((f) => [changeKey(f), f.failure]));
   const syncing = syncStatus === 'syncing';
 
   useEffect(() => {
@@ -119,7 +170,7 @@ function ReviewChangesModal({ opened, onClose, moves, syncStatus, onPush, onDisc
         <ScrollArea.Autosize mah="min(55vh, 480px)" offsetScrollbars="present" type="auto">
           <Stack gap={0}>
             {moves.map((m, i) => (
-              <ChangeRow key={`${m.kind}-${m.id ?? m.video.id ?? m.video.videoId}-${m.tier ?? m.to ?? m.toTier}`} move={m} first={i === 0} onRevert={() => revert(m)} />
+              <ChangeRow key={changeKey(m)} move={m} first={i === 0} onRevert={() => revert(m)} failure={failureOf.get(changeKey(m))} />
             ))}
           </Stack>
         </ScrollArea.Autosize>
@@ -150,6 +201,7 @@ export default function PendingChanges() {
   const closeReview = useCallback(() => setReviewOpen(false), []);
   const compact = useMediaQuery('(max-width: 62em)');
   const count = moves.length;
+  const failedCount = useSelector(selectStagedFailures).length;
 
   // Shift+P pushes (Mantine useHotkeys: exact modifiers, and it ignores
   // keys typed into inputs). Shift is required - a bare "p" was too easy to
@@ -215,15 +267,12 @@ export default function PendingChanges() {
                 {syncStatus === 'done' ? 'Synced to YouTube' : syncStatus === 'partial' ? 'Some changes failed' : 'Sync failed'}
               </Text>
             )}
-            {syncStatus === 'partial' && count > 0 && (
-              <Badge color="red" variant="light">
-                Some failed
-              </Badge>
-            )}
-            {syncStatus === 'error' && count > 0 && (
-              <Badge color="red" variant="light">
-                Sync failed
-              </Badge>
+            {failedCount > 0 && (
+              // Stays until those changes are pushed, put back or discarded;
+              // opens the review list, where each one says why.
+              <Button variant="light" color="red" size="compact-sm" onClick={() => setReviewOpen(true)}>
+                {failedCount} failed · why?
+              </Button>
             )}
             {count > 0 && (
               <>

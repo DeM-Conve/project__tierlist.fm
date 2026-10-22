@@ -1,4 +1,4 @@
-import { createSlice, original } from '@reduxjs/toolkit';
+import { createSlice, current, isDraft, original } from '@reduxjs/toolkit';
 import { REMOVED_TIER } from '../tiers';
 import { overlayTransfers, transferId } from '../transfers';
 
@@ -38,6 +38,41 @@ function pushUndo(state) {
   state.redoStack = [];
 }
 
+// `fn(video)` -> the video to keep in its place (the same object when
+// unchanged). Returns `board` itself when nothing changed.
+function mapBoard(board, fn) {
+  if (!board) return board;
+  let changed = false;
+  const out = {};
+  for (const [tier, list] of Object.entries(board)) {
+    out[tier] = (list || []).map((v) => {
+      const next = fn(v);
+      if (next !== v) changed = true;
+      return next;
+    });
+  }
+  return changed ? out : board;
+}
+
+// Rewrites videos in the draft *and* every undo/redo snapshot - so after a
+// push no copy anywhere still carries an item id YouTube has since deleted
+// (an undo would otherwise bring that stale id back into the next push).
+function mapEveryBoard(state, fn) {
+  const plain = (x) => (isDraft(x) ? current(x) : x);
+  const draft = plain(state.tierItems);
+  const nextDraft = mapBoard(draft, fn);
+  if (nextDraft !== draft) state.tierItems = nextDraft;
+  for (const key of ['undoStack', 'redoStack']) {
+    const stack = plain(state[key]);
+    const next = stack.map((b) => mapBoard(b, fn));
+    if (next.some((b, i) => b !== stack[i])) state[key] = next;
+  }
+}
+
+// A pushed move's song now lives in its new playlist under a new item id
+// (`newIds`: old item id -> new one, see syncPlan.syncOutcome).
+const withNewId = (video, newIds) => (newIds[video.id] ? { ...video, id: newIds[video.id] } : video);
+
 const tiersSlice = createSlice({
   name: 'tiers',
   initialState: {
@@ -56,6 +91,12 @@ const tiersSlice = createSlice({
     // (selectPendingMoves), like a copy in a lower tier.
     duplicateCopies: {},
     syncStatus: 'idle', // idle | syncing | done | partial | error
+    // Why the last push of each change failed: `{ [item id]: { step, error } }`
+    // (step 'insert' | 'delete', error the backend's plain-language reason).
+    // Keyed by the item id the push sent, so it shows next to that change in
+    // the review list for as long as it's still staged - see
+    // selectStagedFailures. Not tied to the open board: transfers fail too.
+    syncFailures: {},
     draggedVideoId: null,
     dragOverTier: null,
     // Which category's data tierItems currently holds. Lets a routed page
@@ -139,9 +180,32 @@ const tiersSlice = createSlice({
     // baseline (dropping it from `originalTierOf`/`originalTierItems`, and
     // for a dedupe, actually removing the now-deleted duplicate) rather
     // than re-deriving it from a server round trip.
+    //
+    // `newIds` (old item id -> new one): a moved song now has a new playlist
+    // item, so every copy of it in the draft, the baseline and the undo/redo
+    // snapshots takes that id - a later move must delete *that* item, never
+    // the one this push already deleted (that re-inserted the song and then
+    // failed on the delete, leaving a duplicate).
+    // `inserted`: moves that were only half done - the song is in its new
+    // playlist (so that copy joins the baseline) but its old copy is still
+    // there. The old copy becomes a hidden duplicate (`duplicateCopies`,
+    // auto-staged as a delete-only dedupe), so the next push only deletes
+    // it and never inserts the song again. The undo history is dropped: it
+    // can't describe a board that YouTube only half matches.
     applySyncedMoves: (state, action) => {
       state.redoStack = [];
-      const { moves } = action.payload;
+      const { moves, newIds = {}, inserted = [] } = action.payload;
+      if (Object.keys(newIds).length) mapEveryBoard(state, (v) => withNewId(v, newIds));
+      const toBaseline = (m) => {
+        state.originalTierItems[m.from] = (state.originalTierItems[m.from] || []).filter(
+          (v) => v.videoId !== m.video.videoId
+        );
+        const target = state.originalTierItems[m.to] || [];
+        if (!target.some((v) => v.videoId === m.video.videoId)) {
+          state.originalTierItems[m.to] = [...target, withNewId(m.video, newIds)];
+        }
+        state.originalTierOf[m.video.videoId] = [m.to];
+      };
       moves.forEach((m) => {
         if (m.kind === 'remove') {
           const drop = (list) => (list || []).filter((v) => v.videoId !== m.video.videoId);
@@ -151,9 +215,10 @@ const tiersSlice = createSlice({
             (t) => t !== m.from
           );
           if (!state.originalTierOf[m.video.videoId].length) delete state.originalTierOf[m.video.videoId];
-        } else if (m.kind === 'dedupe' && m.tier === m.keptTier) {
-          // A same-playlist copy: only that playlist item is gone, the
-          // copy on the board stays.
+        } else if (m.kind === 'dedupe' && (state.duplicateCopies[m.tier] || []).some((v) => v.id === m.video.id)) {
+          // A hidden copy (same playlist twice, or left behind by a half
+          // done move): only that playlist item is gone, the board's copy
+          // stays.
           state.duplicateCopies[m.tier] = (state.duplicateCopies[m.tier] || []).filter((v) => v.id !== m.video.id);
         } else if (m.kind === 'dedupe') {
           state.tierItems[m.tier] = (state.tierItems[m.tier] || []).filter(
@@ -166,16 +231,27 @@ const tiersSlice = createSlice({
             (t) => t !== m.tier
           );
         } else {
-          state.originalTierItems[m.from] = (state.originalTierItems[m.from] || []).filter(
-            (v) => v.videoId !== m.video.videoId
-          );
-          const target = state.originalTierItems[m.to] || [];
-          if (!target.some((v) => v.videoId === m.video.videoId)) {
-            state.originalTierItems[m.to] = [...target, m.video];
-          }
-          state.originalTierOf[m.video.videoId] = [m.to];
+          toBaseline(m);
         }
       });
+      inserted.forEach((m) => {
+        toBaseline(m);
+        state.duplicateCopies[m.from] = [...(state.duplicateCopies[m.from] || []), m.video];
+      });
+      if (inserted.length) state.undoStack = [];
+    },
+    // Item ids a push couldn't report (YouTube returned none), found by
+    // refetching the target playlist: { [old item id]: new item id }. Same
+    // rewrite as applySyncedMoves' newIds, baseline included. Hidden copies
+    // (`duplicateCopies`) keep theirs - a half-done move's old copy really
+    // is the old item.
+    itemIdsResolved: (state, action) => {
+      const newIds = action.payload;
+      if (!Object.keys(newIds).length) return;
+      mapEveryBoard(state, (v) => withNewId(v, newIds));
+      const base = current(state.originalTierItems);
+      const next = mapBoard(base, (v) => withNewId(v, newIds));
+      if (next !== base) state.originalTierItems = next;
     },
     // A song filed from Add songs is already on YouTube, so it joins the
     // loaded board's draft *and* its baseline - it's not a pending change.
@@ -199,10 +275,18 @@ const tiersSlice = createSlice({
       state.redoStack = [];
       state.tierItems = JSON.parse(JSON.stringify(state.originalTierItems));
       state.syncStatus = 'idle';
+      state.syncFailures = {};
       state.undoStack = [];
     },
     setSyncStatus: (state, action) => {
       state.syncStatus = action.payload;
+    },
+    // A push finished: `attempted` = the item ids it sent (their old reasons
+    // go), `failures` = why some of them failed this time.
+    syncFailuresRecorded: (state, action) => {
+      const { attempted, failures } = action.payload;
+      attempted.forEach((id) => delete state.syncFailures[id]);
+      Object.assign(state.syncFailures, failures);
     },
     setDraggedVideoId: (state, action) => {
       state.draggedVideoId = action.payload;
@@ -254,29 +338,43 @@ const tiersSlice = createSlice({
       }
     },
     // Pushed transfers become the open board's new baseline: an arrived song
-    // is simply in its tier now; a song that left is gone from the baseline.
+    // is simply in its tier now, under its new item id (`newIds`, like
+    // applySyncedMoves); a song that left is gone from the baseline.
+    // `inserted`: transfers only half done (added to the target, the old copy
+    // still there) - their target side is applied the same way now, the
+    // source side stays staged in the transfer list (transfersInserted).
+    // Payload: { transfers, newIds, inserted }, or just the transfers.
     transfersApplied: (state, action) => {
       state.redoStack = [];
-      for (const t of action.payload) {
+      const { transfers, newIds = {}, inserted = [] } = Array.isArray(action.payload)
+        ? { transfers: action.payload }
+        : action.payload;
+      const arrived = (t) => {
+        if (state.loadedCategory !== t.toCategory || t.inserted) return;
+        const fix = (v) => {
+          if (v.transfer !== t.id) return v;
+          const { transfer: _, ...video } = v;
+          return withNewId(video, newIds);
+        };
+        mapEveryBoard(state, fix);
+        const was = state.originalTierItems[t.toTier] || [];
+        if (!was.some((v) => v.videoId === t.video.videoId)) {
+          state.originalTierItems[t.toTier] = [...was, withNewId(t.video, newIds)];
+        }
+        const tiersOf = state.originalTierOf[t.video.videoId] || [];
+        if (!tiersOf.includes(t.toTier)) state.originalTierOf[t.video.videoId] = [...tiersOf, t.toTier];
+      };
+      for (const t of transfers) {
         if (state.loadedCategory === t.fromCategory) {
           state.originalTierItems[t.fromTier] = (state.originalTierItems[t.fromTier] || []).filter((v) => transferId(v) !== t.id);
           const left = (state.originalTierOf[t.video.videoId] || []).filter((x) => x !== t.fromTier);
           if (left.length) state.originalTierOf[t.video.videoId] = left;
           else delete state.originalTierOf[t.video.videoId];
         }
-        if (state.loadedCategory === t.toCategory) {
-          for (const tier of Object.keys(state.tierItems)) {
-            state.tierItems[tier] = state.tierItems[tier].map((v) => {
-              if (v.transfer !== t.id) return v;
-              const { transfer: _, ...video } = v;
-              return video;
-            });
-          }
-          state.originalTierItems[t.toTier] = [...(state.originalTierItems[t.toTier] || []), t.video];
-          const was = state.originalTierOf[t.video.videoId] || [];
-          if (!was.includes(t.toTier)) state.originalTierOf[t.video.videoId] = [...was, t.toTier];
-        }
+        arrived(t);
       }
+      inserted.forEach(arrived);
+      if (inserted.length) state.undoStack = [];
     },
     undoLastEdit: (state) => {
       const previous = state.undoStack.pop();
@@ -303,10 +401,12 @@ export const {
   setTierForCategory,
   setTierItems,
   applySyncedMoves,
+  itemIdsResolved,
   addSyncedVideo,
   removeSyncedVideo,
   discardTierChanges,
   setSyncStatus,
+  syncFailuresRecorded,
   setDraggedVideoId,
   setDragOverTier,
   moveVideoToTier,

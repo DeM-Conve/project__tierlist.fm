@@ -100,8 +100,19 @@ describe('transferSyncRows', () => {
     const a = v('a');
     const staged = t(a, ['Rock', 'A'], ['Pop', 'S']);
     expect(transferSyncRows([staged], groups)).toEqual([
-      { transfer: staged, row: { videoId: 'a', title: 'Song a', fromItemId: 'item-a', toPlaylistId: 'pl-pop-s' } },
+      { transfer: staged, row: { videoId: 'a', title: 'Song a', fromItemId: 'item-a', fromPlaylistId: 'pl-rock-a', toPlaylistId: 'pl-pop-s' } },
     ]);
+  });
+
+  it('a transfer a push already inserted only deletes the old copy (never inserts again)', () => {
+    const staged = { ...t(v('a'), ['Rock', 'A'], ['Pop', 'S']), inserted: true, newItemId: 'new-a' };
+    expect(transferSyncRows([staged], groups)[0].row).toEqual({
+      videoId: 'a',
+      title: 'Song a',
+      fromItemId: 'item-a',
+      fromPlaylistId: 'pl-rock-a',
+      toPlaylistId: null,
+    });
   });
 
   it('leaves out a transfer whose target playlist is gone', () => {

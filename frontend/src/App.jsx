@@ -32,9 +32,9 @@ import TierRail from './components/TierRail';
 import { CANVAS_TOP, CANVAS_X, PART_GAP, SHELL_Y } from './layout/spacing';
 import { CanvasContext } from './layout/canvas';
 import PendingChanges from './components/PendingChanges';
-import { landBoardRefresh, loadBoard, moveWithFeedback } from './tierActions';
-import { buildSyncPlan, songMoves, succeeded, touchedPlaylists } from './syncPlan';
-import { dragEnded, transfersDiscarded, transfersPushed } from './store/transfersSlice';
+import { applySyncOutcome, landBoardRefresh, loadBoard, moveWithFeedback, syncRequestFailed } from './tierActions';
+import { buildSyncPlan, resolveItemIds, songMoves, touchedPlaylists } from './syncPlan';
+import { dragEnded, transfersDiscarded } from './store/transfersSlice';
 import TierBoardView from './components/TierBoardView';
 import PlayerDock from './components/PlayerDock';
 import CommandPalette from './components/CommandPalette';
@@ -85,8 +85,7 @@ import { detectNaming } from './naming';
 import { setCurrentCategory, setHomeQuery, setSidebarQuery, setMobileSidebarOpen, showSidebarView, setSidebarCollapsed } from './store/viewSlice';
 import {
   setTierItems,
-  applySyncedMoves,
-  transfersApplied,
+  itemIdsResolved,
   discardTierChanges,
   setSyncStatus,
   setAwaitingRefresh,
@@ -128,6 +127,7 @@ import {
   useTierBoardQueries,
   useTierSyncMutation,
   useInvalidatePlaylistItems,
+  useFetchPlaylistItems,
   useFetchVideo,
 } from './api/queries';
 
@@ -385,6 +385,7 @@ function Layout() {
 
   const tierSyncMutation = useTierSyncMutation();
   const invalidatePlaylistItems = useInvalidatePlaylistItems();
+  const fetchPlaylistItems = useFetchPlaylistItems();
 
   const [shortcutsOpened, shortcutsHandlers] = useDisclosure(false);
   const hintsRef = useRef(null);
@@ -434,30 +435,41 @@ function Layout() {
 
     try {
       const result = await tierSyncMutation.mutateAsync(plan.payload);
-      const finishedStatus = result.applied < result.total ? 'partial' : 'done';
 
-      // Apply whichever changes actually succeeded (per-item, from the
-      // backend's own results) straight to the local draft, rather than
-      // clearing it and waiting on a refetch of YouTube's playlist API to
-      // reflect the change - that refetch can lag behind the write that
-      // just happened, which used to leave the just-synced duplicate/moved
-      // video sitting on screen looking unsynced. See the comment on
-      // `tiersSlice.applySyncedMoves`.
-      const done = succeeded(plan, result.results);
-      dispatch(applySyncedMoves({ moves: done.moves }));
-      dispatch(transfersApplied(done.transfers));
-      dispatch(transfersPushed(done.transfers.map((t) => t.id)));
+      // Apply what actually happened (per-item, from the backend's own
+      // results) straight to the local draft, rather than clearing it and
+      // waiting on a refetch of YouTube's playlist API to reflect the
+      // change - that refetch can lag behind the write that just happened,
+      // which used to leave the just-synced duplicate/moved video sitting on
+      // screen looking unsynced. Moved songs take their new item ids, a
+      // half-done move keeps only its delete staged, failures keep their
+      // reason - see tierActions' applySyncOutcome.
+      const outcome = dispatch(applySyncOutcome(plan, result.results));
+      const finishedStatus = Object.keys(outcome.failures).length ? 'partial' : 'done';
 
       // Still invalidate the underlying query cache in the background so a
       // stale copy isn't served if the user leaves and comes back later -
       // this no longer needs to be awaited before updating the UI. A
       // transfer also touched another board's playlists.
       invalidatePlaylistItems(touchedPlaylists(plan, tierGroups, category));
-      if (done.transfers.length) queryClient.invalidateQueries({ queryKey: ['playlists'] });
+      if (plan.transfers.length) queryClient.invalidateQueries({ queryKey: ['playlists'] });
 
       dispatch(setSyncStatus(finishedStatus));
-      setTimeout(() => dispatch(setSyncStatus('idle')), 2500);
-    } catch {
+      setTimeout(() => {
+        // Only if no later push has started since.
+        if (store.getState().tiers.syncStatus === finishedStatus) dispatch(setSyncStatus('idle'));
+      }, 2500);
+
+      // Inserts YouTube returned no id for: find them in a fresh copy of
+      // the playlist, so the next push deletes the right item.
+      if (outcome.unknownIds.length) {
+        const playlistIds = [...new Set(outcome.unknownIds.map((u) => u.playlistId))];
+        const lists = await Promise.allSettled(playlistIds.map((id) => fetchPlaylistItems(id)));
+        const itemsOf = Object.fromEntries(playlistIds.map((id, i) => [id, lists[i].value ?? []]));
+        dispatch(itemIdsResolved(resolveItemIds(outcome.unknownIds, itemsOf)));
+      }
+    } catch (e) {
+      dispatch(syncRequestFailed(plan, errorMessage(e, 'The app couldn’t reach the server - nothing was changed.')));
       dispatch(setSyncStatus('error'));
     }
   }

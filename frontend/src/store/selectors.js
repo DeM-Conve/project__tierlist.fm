@@ -98,12 +98,15 @@ export const selectPendingMoves = createSelector(
   [selectTierItems, selectOriginalTierOf, selectDuplicateCopies],
   (tierItems, originalTierOf, duplicateCopies) => {
     const moves = [];
+    const stillIn = (t, videoId) => (tierItems[t] || []).some((v) => v.videoId === videoId);
+    // A hidden copy (the same playlist listing it twice, or the old copy a
+    // half-done push left behind) is kept wherever the board has the song.
     for (const tier of BOARD_TIERS) {
       for (const video of duplicateCopies?.[tier] || []) {
-        moves.push({ kind: 'dedupe', video, tier, keptTier: tier });
+        const keptTier = stillIn(tier, video.videoId) ? tier : BOARD_TIERS.find((t) => stillIn(t, video.videoId)) ?? tier;
+        moves.push({ kind: 'dedupe', video, tier, keptTier });
       }
     }
-    const stillIn = (t, videoId) => (tierItems[t] || []).some((v) => v.videoId === videoId);
     for (const tier of BOARD_TIERS) {
       for (const video of tierItems[tier] || []) {
         // A song from another board is a transfer (selectStagedChanges).
@@ -241,3 +244,12 @@ export const selectDuelLayout = createSelector([selectTierItems], (tierItems) =>
   }
   return { layout: { tiers }, key: (hash >>> 0).toString(36) };
 });
+
+// Staged changes whose last push failed, each with `failure` = { step,
+// error } (see tiersSlice.syncFailures). A change that was pushed since,
+// put back or discarded drops out on its own.
+export const selectStagedFailures = createSelector(
+  [selectStagedChanges, (s) => s.tiers.syncFailures],
+  (changes, failures) =>
+    changes.flatMap((c) => (failures?.[c.video.id] ? [{ ...c, failure: failures[c.video.id] }] : []))
+);
