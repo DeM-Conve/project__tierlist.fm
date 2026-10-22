@@ -483,6 +483,7 @@ category.
 - **Duel ranking is the backend engine** (`fm.tierlist.duel.engine`, see the Duels
   bullet in the Stack section) - no ranking algorithm and no strategy setting on the
   frontend (the old Settings -> Duels "default strategy" was removed).
+- Ongoing QA pass over every existing feature (task list, status, open questions): `docs/qa-pass.md`.
 - Full feature list: `docs/features.md`. Keep it updated when you add a user-facing
   feature. It doubles as the no-regression checklist (the user asked for this) -
   before redesigning/rewriting any page, check every item listed for it (and the
