@@ -35,7 +35,27 @@ export const FUZZ_ACCOUNT = {
   'Pop A': ['p3'],
   'Pop TODO': ['p4', 'p5'],
 };
+// The same, with duplicates on the board it starts on: a song in two tiers,
+// a song twice in one tier, a song in a tier and the to-do list.
+export const FUZZ_ACCOUNT_DUPES = {
+  ...FUZZ_ACCOUNT,
+  'Rap S': ['a1', 'a2', 'a3', 'a2'],
+  'Rap B': ['a6', 'a1'],
+  'Rap TODO': ['a8', 'a9', 'a4'],
+};
 const BOARDS = ['Rap', 'Pop'];
+
+// What a board will show once pushed: a song in several tiers stays only in
+// the highest (the auto-dedupe rule), so that's what YouTube must hold.
+function keepHighest(board) {
+  const seen = new Set();
+  const out = {};
+  for (const t of BOARD_TIERS) {
+    if (!board[t]) continue;
+    out[t] = board[t].filter((v) => !seen.has(v) && seen.add(v));
+  }
+  return out;
+}
 
 // The board's view adjusted for staged transfers: what every board shows
 // (the open one from the draft, the others from YouTube +- transfers).
@@ -45,7 +65,7 @@ function expectedBoards(h) {
   const transfers = selectTransfers(h.state);
   for (const board of BOARDS) {
     if (board === h.board) {
-      out[board] = h.shown();
+      out[board] = keepHighest(h.shown());
       continue;
     }
     const tiers = Object.fromEntries(Object.entries(yt[board]).map(([t, ids]) => [t, [...ids]]));
@@ -60,18 +80,22 @@ function expectedBoards(h) {
 
 const sets = (board) => Object.fromEntries(Object.entries(board).map(([t, ids]) => [t, [...new Set(ids)].sort()]));
 
-// avoidKnownBugs: never touch a card whose playlistItem id a push already
-// deleted, and never undo/redo across a push (bug (a): stale ids after a
-// push) - so the run still finds every *other* bug.
-export async function fuzzRun(seed, { ops = 30, avoidKnownBugs = false } = {}) {
+// undoAcrossPush: false keeps Ctrl+Z from reaching back past the last push
+// (an open bug: a pushed removal or transfer undone leaves the board out of
+// step with YouTube - see sync.e2e.test.jsx), so a run still finds every
+// *other* bug. faults: inject refused YouTube writes (pushed again until
+// clean at the end). duplicates: start from a board with duplicate songs.
+export async function fuzzRun(seed, { ops = 30, undoAcrossPush = false, faults = false, duplicates = false } = {}) {
   const r = rng(seed);
-  const yt = new FakeYoutube(FUZZ_ACCOUNT);
+  const account = duplicates ? FUZZ_ACCOUNT_DUPES : FUZZ_ACCOUNT;
+  const yt = new FakeYoutube(account);
+  let lastDuel = null;
   const log = [];
   const problems = [];
-  const universe = new Set(Object.values(FUZZ_ACCOUNT).flat());
+  const universe = new Set(Object.values(account).flat());
   let nextNew = 1;
-  // Undo steps older than this predate the last push (their cards carry
-  // pre-push playlistItem ids) - avoidKnownBugs keeps undo above it.
+  // Undo steps below this predate the last push - unless undoAcrossPush,
+  // undo stays above it.
   let undoFloor = 0;
   const markPushed = () => (undoFloor = h.state.tiers.undoStack.length);
   const h = await mountApp(yt);
@@ -80,24 +104,18 @@ export async function fuzzRun(seed, { ops = 30, avoidKnownBugs = false } = {}) {
   const fail = (where, list) => {
     if (list.length) problems.push(`${where}: ${list.join(' | ')}`);
   };
-  const liveIds = () => new Set([...yt.playlists.values()].flatMap((p) => p.items.map((i) => i.id)));
   const cards = (tiers) =>
     tiers.flatMap((t) => (h.tierItems()[t] || []).map((v) => ({ v, t })));
-  const usable = (tiers) => {
-    const live = liveIds();
-    return cards(tiers).filter(({ v }) => !avoidKnownBugs || v.transfer || live.has(v.id));
-  };
+  const usable = cards;
   const boardTiers = () => BOARD_TIERS.filter((t) => h.tierItems()[t]);
   const pending = () => selectPendingMoves(h.state).length;
 
   async function checkOpen() {
     // A board just opened must show what YouTube has (+- staged transfers).
-    const want = sets(expectedBoards(h)[h.board]);
     const shown = sets(h.shown());
-    const yt = sets(youtubeBoards(h.yt)[h.board]);
+    const onYt = sets(youtubeBoards(h.yt)[h.board]);
     const transfers = selectTransfers(h.state);
-    const expectNow = {};
-    for (const [t, ids] of Object.entries(yt)) expectNow[t] = ids;
+    const expectNow = { ...onYt };
     for (const t of transfers) {
       if (t.fromCategory === h.board && expectNow[t.fromTier]) expectNow[t.fromTier] = expectNow[t.fromTier].filter((v) => v !== t.video.videoId);
     }
@@ -105,30 +123,42 @@ export async function fuzzRun(seed, { ops = 30, avoidKnownBugs = false } = {}) {
     if (JSON.stringify(shown) !== JSON.stringify(expectNow)) {
       problems.push(`opened ${h.board}: shows ${JSON.stringify(shown)} but YouTube +- transfers is ${JSON.stringify(expectNow)}`);
     }
-    void want;
   }
 
+  // Returns true when the push came back clean (or there was nothing to push).
   async function push() {
     const expected = expectedBoards(h);
     const removed = (h.tierItems()[REMOVED_TIER] || []).map((v) => v.videoId);
     const stillShown = new Set(Object.values(expected).flatMap((b) => Object.values(b).flat()));
-    removed.forEach((v) => !stillShown.has(v) && universe.delete(v));
     const sync = await h.push();
-    if (!sync) return;
+    if (!sync) return true;
     markPushed();
-    fail('push', invariantViolations(yt, { expected, universe, sync }));
-    if (sync.response.results.every((x) => x.success)) {
-      const left = h.staged();
-      if (left.length) problems.push(`push: still staged after a clean push: ${left.map((m) => `${m.kind} ${m.video.videoId}`).join(', ')}`);
-      const now = sets(h.shown());
-      const onYt = sets(youtubeBoards(yt)[h.board]);
-      if (JSON.stringify(now) !== JSON.stringify(onYt)) problems.push(`push: board shows ${JSON.stringify(now)}, YouTube has ${JSON.stringify(onYt)}`);
+    const clean = sync.response.results.every((x) => x.success);
+    // A binned song is meant to go (once its removal goes through).
+    removed.forEach((v) => !stillShown.has(v) && universe.delete(v));
+    if (!clean) {
+      // A refused write (injected fault): nothing may be lost, and the
+      // failed change must still be staged for the retry.
+      fail('partial push', invariantViolations(yt, { universe, duplicates: false }));
+      if (!h.staged().length) problems.push('partial push: nothing left staged to retry');
+      return false;
     }
+    fail('push', invariantViolations(yt, { expected, universe, sync }));
+    const left = h.staged();
+    if (left.length) problems.push(`push: still staged after a clean push: ${left.map((m) => `${m.kind} ${m.video.videoId}`).join(', ')}`);
+    const now = sets(h.shown());
+    const onYt = sets(youtubeBoards(yt)[h.board]);
+    if (JSON.stringify(now) !== JSON.stringify(onYt)) problems.push(`push: board shows ${JSON.stringify(now)}, YouTube has ${JSON.stringify(onYt)}`);
+    return true;
   }
 
   const OPS = [
-    ['move', 8], ['reorder', 2], ['remove', 2], ['putBack', 2], ['undo', 2], ['redo', 1], ['discard', 1],
-    ['transfer', 3], ['switch', 2], ['push', 5], ['duelMove', 2], ['addSong', 1],
+    // Undoing across pushes is what that mode is for: undo (and binning,
+    // whose undo after a push is the interesting case) come up more often.
+    ['move', 8], ['reorder', 2], ['remove', undoAcrossPush ? 4 : 2], ['putBack', 2], ['undo', undoAcrossPush ? 6 : 2], ['redo', 1], ['discard', 1],
+    ['transfer', 3], ['switch', 2], ['push', 5], ['duelMove', 2], ['duelUndo', 1], ['addSong', 1],
+    ...(duplicates ? [['addExisting', 1]] : []),
+    ...(faults ? [['fault', 2]] : []),
   ];
   const total = OPS.reduce((s, [, w]) => s + w, 0);
   const pickOp = () => {
@@ -163,7 +193,7 @@ export async function fuzzRun(seed, { ops = 30, avoidKnownBugs = false } = {}) {
         log.push(`putBack ${v.videoId}->${to}`);
         h.move(v.videoId, to);
       } else if (op === 'undo' || op === 'redo') {
-        if (avoidKnownBugs && op === 'undo' && h.state.tiers.undoStack.length <= undoFloor) continue;
+        if (!undoAcrossPush && op === 'undo' && h.state.tiers.undoStack.length <= undoFloor) continue;
         log.push(op);
         if (op === 'undo') h.undo();
         else h.redo();
@@ -195,20 +225,58 @@ export async function fuzzRun(seed, { ops = 30, avoidKnownBugs = false } = {}) {
         log.push('push');
         await push();
       } else if (op === 'duelMove') {
-        const c = usable(tiers.filter((t) => t !== 'TODO' && t !== REMOVED_TIER)).filter(({ v }) => !v.transfer);
+        const once = (id) => cards(tiers).filter(({ v }) => v.videoId === id).length === 1;
+        const c = usable(tiers.filter((t) => t !== 'TODO' && t !== REMOVED_TIER)).filter(({ v }) => !v.transfer && once(v.videoId));
         if (!c.length) continue;
         const { v, t } = r.pick(c);
         const to = r.pick(tiers.filter((x) => x !== t && x !== 'TODO'));
         if (!to) continue;
         log.push(`duelMove ${v.videoId} ${t}->${to}`);
         const before = yt.syncCalls.length;
-        await h.duelMove(v.videoId, to);
+        const dm = await h.duelMove(v.videoId, to);
+        lastDuel = { board: h.board, s: dm };
         markPushed();
         const sync = yt.syncCalls.length > before ? yt.syncCalls.at(-1) : null;
-        const on = youtubeBoards(yt)[h.board];
-        const where = Object.keys(on).filter((x) => on[x].includes(v.videoId));
-        if (where.length !== 1 || where[0] !== to) problems.push(`duelMove ${v.videoId} -> ${to}: on YouTube in [${where}]`);
-        fail('duelMove', invariantViolations(yt, { universe, sync }));
+        if (sync?.response.results.every((x) => x.success)) {
+          const on = youtubeBoards(yt)[h.board];
+          const where = Object.keys(on).filter((x) => on[x].includes(v.videoId));
+          // Other copies may stay until the bar's push (their dedupes stay staged).
+          if (!where.includes(to)) problems.push(`duelMove ${v.videoId} -> ${to}: on YouTube in [${where}]`);
+        }
+        fail('duelMove', invariantViolations(yt, { universe, duplicates: false }));
+      } else if (op === 'duelUndo') {
+        if (!lastDuel || lastDuel.board !== h.board || h.tierOf(lastDuel.s.song) !== lastDuel.s.to) continue;
+        const { s: d } = lastDuel;
+        lastDuel = null;
+        log.push(`duelUndo ${d.song} ${d.to}->${d.from}`);
+        const before = yt.syncCalls.length;
+        await h.duelUndo(d);
+        markPushed();
+        const sync = yt.syncCalls.length > before ? yt.syncCalls.at(-1) : null;
+        if (sync?.response.results.every((x) => x.success)) {
+          const on = youtubeBoards(yt)[h.board];
+          const where = Object.keys(on).filter((x) => on[x].includes(d.song));
+          if (!where.includes(d.from)) problems.push(`duelUndo ${d.song} -> ${d.from}: on YouTube in [${where}]`);
+        }
+        fail('duelUndo', invariantViolations(yt, { universe, duplicates: false }));
+      } else if (op === 'fault') {
+        const c = cards(tiers);
+        if (!c.length) continue;
+        const { v } = r.pick(c);
+        const f = r.pick([
+          { op: 'insert', status: 403, reason: 'quotaExceeded' },
+          { op: 'delete', status: 403, reason: 'forbidden' },
+          { op: 'insert', status: 500, reason: 'backendError' },
+        ]);
+        log.push(`fault ${f.op} ${v.videoId} ${f.status}`);
+        yt.inject({ ...f, videoId: v.videoId });
+      } else if (op === 'addExisting') {
+        const c = cards(tiers);
+        if (!c.length) continue;
+        const { v } = r.pick(c);
+        const tier = r.pick(Object.keys(youtubeBoards(yt)[h.board]));
+        log.push(`addExisting ${v.videoId} ${h.board} ${tier}`);
+        await h.fileSong(v.videoId, h.board, tier);
       } else if (op === 'addSong') {
         const board = r.pick(BOARDS);
         const tier = r.pick(Object.keys(youtubeBoards(yt)[board]));
@@ -223,9 +291,11 @@ export async function fuzzRun(seed, { ops = 30, avoidKnownBugs = false } = {}) {
   }
 
   // Push whatever is left, then a fresh app (a reload) must show YouTube.
-  if (!problems.length) {
+  // Faults are one-shot, so a few pushes always get everything through.
+  yt.faults = [];
+  for (let k = 0; k < 3 && !problems.length; k++) {
     log.push('final push');
-    await push();
+    if (await push()) break;
   }
   if (!problems.length) {
     cleanup();

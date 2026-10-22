@@ -206,6 +206,25 @@ export function useAddToPlaylistMutation() {
   });
 }
 
+// Where a song's playlist item is now, from the cached playlist items (which
+// every push patches - see syncCache.js): `playlistIds` to look in, the
+// item id it had (`itemId`, preferred) -> { playlistId, itemId } or null.
+// A song moved and pushed since has a new item in another playlist; it's
+// found by its video id when exactly one of those playlists has it.
+export function useFindCachedItem() {
+  const queryClient = useQueryClient();
+  return (playlistIds, videoId, itemId) => {
+    const lists = playlistIds.map((id) => [id, queryClient.getQueryData(queryKeys.playlistItems(id)) ?? []]);
+    for (const [playlistId, items] of lists) {
+      if (items.some((v) => v.id === itemId)) return { playlistId, itemId };
+    }
+    const matches = lists.flatMap(([playlistId, items]) =>
+      items.filter((v) => v.videoId === videoId).map((v) => ({ playlistId, itemId: v.id }))
+    );
+    return matches.length === 1 ? matches[0] : null;
+  };
+}
+
 export function useRemovePlaylistItemMutation() {
   const queryClient = useQueryClient();
   return useMutation({

@@ -153,6 +153,18 @@ export class FakeYoutube {
     return { applied: results.filter((r) => r.success).length, total: results.length, results };
   }
 
+  // PlaylistController.retry: up to 4 attempts. Deletes (safe to repeat) retry
+  // 409/5xx (retryTransient); inserts only 409 (a 500'd insert may have landed).
+  retry(write, retryable) {
+    for (let attempt = 1; ; attempt++) {
+      try {
+        return write();
+      } catch (e) {
+        if (attempt >= 4 || !(e instanceof YoutubeError) || !retryable(e)) throw e;
+      }
+    }
+  }
+
   moveOne(row, text) {
     const finish = (success, inserted, removed, newItemId, step, error) => {
       const r = { videoId: row.videoId, success, inserted, removed };
@@ -164,7 +176,7 @@ export class FakeYoutube {
     let newItemId = null;
     if (text(row.toPlaylistId)) {
       try {
-        newItemId = this.insert(row.toPlaylistId, row.videoId).id;
+        newItemId = this.retry(() => this.insert(row.toPlaylistId, row.videoId), (e) => e.status === 409).id;
         inserted = true;
       } catch (e) {
         return finish(false, false, false, null, 'insert', e.message);
@@ -173,7 +185,7 @@ export class FakeYoutube {
     let removed = false;
     if (text(row.fromItemId)) {
       try {
-        this.delete(row.fromItemId);
+        this.retry(() => this.delete(row.fromItemId), (e) => e.status === 409 || e.status >= 500);
         removed = true;
       } catch (e) {
         if (e.status === 404) removed = true;

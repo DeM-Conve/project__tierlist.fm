@@ -1,3 +1,4 @@
+/* oxlint-disable react/immutability, react/only-export-components -- test plumbing: probes hand hook values to the test */
 // Test-only stand-in for components/PendingChanges (vi.mock it with
 // `() => import('./test/boardProbe')`): renders the real bar, and hands the
 // test the Layout's outlet context (syncChanges / pushSongs) and the duel

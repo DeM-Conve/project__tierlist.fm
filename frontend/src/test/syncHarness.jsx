@@ -1,3 +1,4 @@
+/* oxlint-disable react/immutability, react/only-export-components -- test plumbing: probes hand hook values to the test */
 // End-to-end sync harness: the real App (router, Layout's push chain, the
 // board pages, React Query, the store, tierActions, syncPlan) over the fake
 // YouTube (fakeYoutube.js), wired in at the one axios instance. Edits go
@@ -204,6 +205,12 @@ export class Harness {
   async fileSong(videoId, board, tier) {
     const video = { videoId, title: this.yt.title(videoId), channelTitle: `Artist ${videoId}`, thumbnail: null };
     await act(async () => addSongs.current.file(video, board, tier));
+    await this.settle();
+  }
+
+  // Add songs' Undo (its toast button / `u`) of the newest filed song.
+  async undoFileSong() {
+    await act(async () => addSongs.current.undo());
     await this.settle();
   }
 

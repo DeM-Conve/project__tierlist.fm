@@ -6,12 +6,13 @@
 // user when they pushed (compared as sets: order isn't synced).
 // removed: video ids the user deliberately removed (Remove bin / dedupe-gone).
 // universe: every video id that should still exist somewhere on the account.
+// duplicates: false skips the no-duplicates check (mid-way states).
 // sync: the tier-sync call ({ payload, response }) the push made, if any.
 import { youtubeBoards } from './syncHarness';
 
 const sorted = (xs) => [...xs].sort();
 
-export function invariantViolations(yt, { expected = {}, universe = null, sync = null } = {}) {
+export function invariantViolations(yt, { expected = {}, universe = null, sync = null, duplicates = true } = {}) {
   const out = [];
   const actual = youtubeBoards(yt);
 
@@ -26,7 +27,7 @@ export function invariantViolations(yt, { expected = {}, universe = null, sync =
   }
 
   // No video twice within one board (two tiers, or one tier twice).
-  for (const [board, tiers] of Object.entries(actual)) {
+  for (const [board, tiers] of duplicates ? Object.entries(actual) : []) {
     const seen = new Map();
     for (const [tier, videos] of Object.entries(tiers)) {
       for (const v of videos) {

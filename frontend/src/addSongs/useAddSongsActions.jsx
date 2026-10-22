@@ -2,7 +2,7 @@ import { useDispatch, useSelector, useStore } from 'react-redux';
 import { tierName } from '../tierLabels';
 import { Button, Group, Kbd, Text } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
-import { useAddToPlaylistMutation, useRemovePlaylistItemMutation } from '../api/queries';
+import { useAddToPlaylistMutation, useFindCachedItem, useRemovePlaylistItemMutation } from '../api/queries';
 import { errorMessage } from '../api/client';
 import { selectTierGroups } from '../store/selectors';
 import { recordAction, revertAction } from '../store/addSongsSlice';
@@ -59,6 +59,7 @@ export function useAddSongsActions(addSongs) {
   const tierGroups = useSelector(selectTierGroups);
   const addMutation = useAddToPlaylistMutation();
   const removeMutation = useRemovePlaylistItemMutation();
+  const findCachedItem = useFindCachedItem();
 
   // Plays `video` and the songs waiting after it in the dock (mini, so the
   // card stays in view). Filing the playing song rolls on to the next.
@@ -134,10 +135,18 @@ export function useAddSongsActions(addSongs) {
     }
     try {
       const item = await pendingAdds.get(entry.video.videoId);
-      await removeMutation.mutateAsync({ playlistId: entry.playlistId, itemId: item.id });
+      // The song may have been moved (and pushed: a new item in another
+      // playlist) since it was filed - delete the copy it has *now*.
+      const board = selectTierGroups(store.getState())[entry.category] ?? {};
+      const now = findCachedItem(Object.values(board).map((p) => p.id), entry.video.videoId, item.id) ?? {
+        playlistId: entry.playlistId,
+        itemId: item.id,
+      };
+      await removeMutation.mutateAsync(now);
       pendingAdds.delete(entry.video.videoId);
       if (store.getState().tiers.loadedCategory === entry.category) {
-        dispatch(removeSyncedVideo({ tier: entry.tier, videoId: entry.video.videoId }));
+        const tier = Object.keys(board).find((t) => board[t].id === now.playlistId) ?? entry.tier;
+        dispatch(removeSyncedVideo({ tier, videoId: entry.video.videoId, itemId: now.itemId }));
       }
       dispatch(revertAction(entry));
     } catch {
