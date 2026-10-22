@@ -80,16 +80,23 @@ category.
     **A push never sends an item id older than the last push to its playlist**
     (`src/syncCache.js`): after a push, `recordPush` cancels in-flight reads of
     the touched playlists and *patches* their cached items (deleted ids out,
-    inserted items in) - never an invalidate-and-refetch, whose lagging answer
-    used to put deleted ids back in the cache (and IndexedDB) as fresh data,
-    so a later drag inserted a copy and failed to delete: "some failed" plus a
-    duplicate. A failed row or an inserted item with no new id known marks the
-    playlist invalidated (`refetchType: 'none'`). Before a push, `checkItemIds`
-    re-reads every playlist whose ids it would send that isn't known good
-    (restored and not yet refreshed, invalidated, mid-fetch) and re-points stale
-    ids by videoId (`store/itemIds.js` `itemIdsRebased`: draft, baseline,
-    undo/redo, staged transfers); an id with no copy left is `gone` and its
-    change stays staged, unsent. A read that fails stops the push.
+    inserted items in, under the backend's `newItemId` - never a placeholder)
+    - never an invalidate-and-refetch, whose lagging answer used to put deleted
+    ids back in the cache (and IndexedDB) as fresh data, so a later drag
+    inserted a copy and failed to delete: "some failed" plus a duplicate. The
+    same is written to a session ledger (`api/pushLedger.js`) that **every**
+    playlist read is reconciled with (`playlistItemsQuery`'s queryFn): deleted
+    ids dropped, inserts the read hasn't caught up with kept. A failed row or
+    an insert with no id known marks only that row's playlists invalidated
+    (`refetchType: 'none'`). Before a push, `preparePush` re-reads every
+    playlist whose ids it would send that isn't known good (restored and not
+    yet refreshed, invalidated, mid-fetch), re-points stale ids by videoId
+    **per playlist** (`store/itemIds.js` `itemIdsRebased`: draft, baseline,
+    undo/redo, staged transfers, sync failures), and settles changes whose item
+    is gone: delete-only ones and moves already in their target are applied as
+    done, the rest stay staged with "This song is no longer in that playlist on
+    YouTube". A read that fails stops the push. Push status resets per run
+    (`syncStatus.js`).
     `useTierBoardQueries` waits on `isPending` (not `isLoading`): during restore
     nothing fetches, and `isLoading` "loaded" empty tiers.
   - **React Hook Form** (`react-hook-form`) - used where a real form with cross-field
