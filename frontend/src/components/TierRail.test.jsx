@@ -1,9 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
-import { fireEvent, screen } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { act, fireEvent, screen } from '@testing-library/react';
+import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import TierRail from './TierRail';
 import { makeStore, renderWithApp } from '../test/render';
-import { loadBoard } from '../tierActions';
+import { loadBoard, moveWithFeedback } from '../tierActions';
 import { openFocus } from '../store/focusSlice';
 import { REMOVED_TIER } from '../tiers';
 
@@ -58,5 +58,76 @@ describe('TierRail - the playing song can be dragged from it', () => {
     fireEvent.dragStart(screen.getByLabelText(/^Drag "Band - todosong001"/), { dataTransfer: dt });
     fireEvent.drop(screen.getByRole('button', { name: /→ S$/ }), { dataTransfer: dt });
     expect(store.getState().tiers.tierItems.S.map((v) => v.videoId)).toEqual(['ssssssss001', 'todosong001']);
+  });
+});
+
+function Where() {
+  return <div data-testid="where">{useLocation().pathname}</div>;
+}
+// Rock loaded, nothing playing (or `other` loaded instead of Rock).
+function renderIdleRail({ other = false } = {}) {
+  const store = makeStore({ playlists: [...playlists, { id: 'pl-pop', title: 'Pop S', itemCount: 4 }], naming: NAMING });
+  if (other) store.dispatch(loadBoard({ category: 'Pop', data: { S: [song('popsong0001')] } }));
+  else store.dispatch(loadBoard({ category: 'Rock', data: { S: [song('ssssssss001'), song('ssssssss002')], A: [], TODO: [song('todosong001')] } }));
+  renderWithApp(
+    <MemoryRouter initialEntries={['/tier/Rock']}>
+      <Routes>
+        <Route path="*" element={<><TierRail category="Rock" /><Where /></>} />
+      </Routes>
+    </MemoryRouter>,
+    { store }
+  );
+  return store;
+}
+const railCount = (name) => screen.getByRole('button', { name }).textContent;
+
+describe('TierRail - tiers, counts and clicks', () => {
+  it('nothing playing: "Tiers", each tier with its live count; a click opens that tier', () => {
+    const store = renderIdleRail();
+    expect(screen.getByText('Tiers')).toBeInTheDocument();
+    expect(railCount('Open S')).toBe('S2');
+    expect(railCount('Open TODO')).toBe('TODO1');
+    act(() => {
+      store.dispatch(moveWithFeedback([{ fromTier: 'S', toTier: 'A', videoId: 'ssssssss001' }], { quiet: true }));
+    });
+    expect(railCount('Open S')).toBe('S1');
+    expect(railCount('Open A')).toBe('A1');
+    fireEvent.click(screen.getByRole('button', { name: 'Open A' }));
+    expect(screen.getByTestId('where')).toHaveTextContent('/tier/Rock/t/A');
+  });
+
+  it('a song from this board playing: "Rate", a click re-rates it, its own tier does nothing', () => {
+    const store = renderRail();
+    expect(screen.getByText('Rate')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /is in TODO$/ })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /→ A$/ }));
+    expect(store.getState().tiers.tierItems.A.map((v) => v.videoId)).toEqual(['todosong001']);
+    expect(store.getState().focus.focusedVideo.tier).toBe('A');
+  });
+
+  it('Remove: a click stages the playing song, and the slot counts what is staged', () => {
+    const store = renderRail();
+    const remove = screen.getByRole('button', { name: 'Remove from playlist' });
+    expect(remove).toHaveTextContent('Del');
+    fireEvent.click(remove);
+    expect(store.getState().tiers.tierItems[REMOVED_TIER].map((v) => v.videoId)).toEqual(['todosong001']);
+    expect(remove).toHaveTextContent('1 staged');
+  });
+
+  it('any dragged tile dropped on a rail tier lands at the end of it', () => {
+    const store = renderIdleRail();
+    const dt = dataTransfer();
+    dt.setData('application/json', JSON.stringify({ videoId: 'todosong001', fromTier: 'TODO' }));
+    fireEvent.dragOver(screen.getByRole('button', { name: 'Open S' }), { dataTransfer: dt });
+    expect(store.getState().tiers.dragOverTier).toBe('rail:S');
+    fireEvent.drop(screen.getByRole('button', { name: 'Open S' }), { dataTransfer: dt });
+    expect(store.getState().tiers.tierItems.S.map((v) => v.videoId)).toEqual(['ssssssss001', 'ssssssss002', 'todosong001']);
+    expect(store.getState().tiers.dragOverTier).toBeNull();
+  });
+
+  it('another board loaded: counts come from the playlists, and there is no Remove slot', () => {
+    renderIdleRail({ other: true });
+    expect(railCount('Open S')).toBe('S1');
+    expect(screen.queryByRole('button', { name: 'Remove from playlist' })).toBeNull();
   });
 });

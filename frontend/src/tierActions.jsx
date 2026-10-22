@@ -51,10 +51,14 @@ function findTierOf(tierItems, videoId) {
 // The dock tracks the playing video's tier separately (focusedVideo.tier) -
 // after any edit that moved it, point that back at wherever it now lives,
 // so the player's tier pills / the Tier Rail marker never go stale.
+// The edit was made to the loaded board's tierItems - which stays loaded on
+// Home / Settings, where the rail and the player still rate the playing
+// song - so that's the board to check, not the page being viewed (on Home
+// the playing song used to move while the player still showed its old tier).
 function resyncFocusedTier(dispatch, getState) {
-  const { focus, tiers, view } = getState();
+  const { focus, tiers } = getState();
   const fv = focus.focusedVideo;
-  if (!fv || focus.focusedCategory !== view.currentCategory) return;
+  if (!fv || focus.focusedCategory !== tiers.loadedCategory) return;
   const tier = findTierOf(tiers.tierItems, fv.videoId);
   if (tier && tier !== fv.tier) dispatch(setFocusedVideo({ tier, videoId: fv.videoId }));
 }
