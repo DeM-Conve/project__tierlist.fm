@@ -6,7 +6,10 @@ import { REMOVED_TIER } from './tiers';
 // YouTube until Push, which adds it to the target playlist and deletes it
 // from the old one.
 //
-// A transfer is { id, video, fromCategory, fromTier, toCategory, toTier }.
+// A transfer is { id, video, fromCategory, fromTier, toCategory, toTier }, plus
+// `inserted: true` (and `newItemId`) once a push has added the song to the
+// target playlist but couldn't delete the old copy: then the target copy is
+// simply part of that board, and only the delete is left to push.
 // `id` is the video's playlist item id (unique per copy), so a song that's in
 // a playlist twice moves one copy. While the target board is open, the card
 // sitting there carries `transfer: id` and *it* says where the song goes
@@ -20,7 +23,7 @@ export const transferId = (video) => video.id ?? video.videoId;
 // discarded) or sits in the Remove bin means the transfer is off.
 export function effectiveTransfers(transfers, loadedCategory, tierItems) {
   return transfers.flatMap((t) => {
-    if (t.toCategory !== loadedCategory) return [t];
+    if (t.toCategory !== loadedCategory || t.inserted) return [t];
     const tier = Object.keys(tierItems).find((k) => (tierItems[k] || []).some((v) => v.transfer === t.id));
     if (!tier || tier === REMOVED_TIER) return [];
     return [tier === t.toTier ? t : { ...t, toTier: tier }];
@@ -37,7 +40,7 @@ export function overlayTransfers(tierItems, transfers, category) {
     }
   }
   for (const t of transfers) {
-    if (t.toCategory === category && out[t.toTier] && !out[t.toTier].some((v) => v.transfer === t.id)) {
+    if (t.toCategory === category && !t.inserted && out[t.toTier] && !out[t.toTier].some((v) => v.transfer === t.id)) {
       out[t.toTier] = [...out[t.toTier], { ...t.video, transfer: t.id }];
     }
   }
@@ -46,11 +49,18 @@ export function overlayTransfers(tierItems, transfers, category) {
 
 // Push payload rows (the backend's tier-sync: insert into toPlaylistId, then
 // delete fromItemId). `tierGroups` = selectTierGroups. A transfer whose
-// target playlist is gone is left out.
+// target playlist is gone is left out; one already inserted only deletes.
 export function transferSyncRows(transfers, tierGroups) {
   return transfers.flatMap((t) => {
+    const row = {
+      videoId: t.video.videoId,
+      title: t.video.title,
+      fromItemId: t.video.id,
+      fromPlaylistId: tierGroups[t.fromCategory]?.[t.fromTier]?.id ?? null,
+    };
+    if (t.inserted) return [{ transfer: t, row: { ...row, toPlaylistId: null } }];
     const toPlaylistId = tierGroups[t.toCategory]?.[t.toTier]?.id;
     if (!toPlaylistId) return [];
-    return [{ transfer: t, row: { videoId: t.video.videoId, title: t.video.title, fromItemId: t.video.id, toPlaylistId } }];
+    return [{ transfer: t, row: { ...row, toPlaylistId } }];
   });
 }

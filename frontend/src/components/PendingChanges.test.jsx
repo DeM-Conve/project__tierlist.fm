@@ -4,7 +4,8 @@ import { MemoryRouter, Outlet, Route, Routes } from 'react-router-dom';
 import PendingChanges from './PendingChanges';
 import { makeStore, renderWithApp } from '../test/render';
 import { dragStarted } from '../store/transfersSlice';
-import { loadBoard, transferWithFeedback } from '../tierActions';
+import { loadBoard, moveWithFeedback, transferWithFeedback } from '../tierActions';
+import { setSyncStatus, syncFailuresRecorded } from '../store/tiersSlice';
 import { setCurrentCategory } from '../store/viewSlice';
 
 vi.mock('@mantine/notifications', () => ({ notifications: { show: vi.fn(), hide: vi.fn() } }));
@@ -82,5 +83,46 @@ describe('PendingChanges with a song moved to another board', () => {
     fireEvent.keyDown(document.body, { key: 'p', code: 'KeyP' });
     fireEvent.keyDown(document.body, { key: 'P', code: 'KeyP', shiftKey: true, ctrlKey: true });
     expect(syncChanges).not.toHaveBeenCalled();
+  });
+});
+
+describe('PendingChanges after a push that failed', () => {
+  function setupFailed() {
+    const store = makeStore();
+    store.dispatch(loadBoard({ category: 'Rock', data: { S: [v('a'), v('b')], A: [] } }));
+    store.dispatch(setCurrentCategory('Rock'));
+    store.dispatch(moveWithFeedback([{ fromTier: 'S', toTier: 'A', videoId: 'a' }]));
+    store.dispatch(moveWithFeedback([{ fromTier: 'S', toTier: 'A', videoId: 'b' }]));
+    store.dispatch(
+      syncFailuresRecorded({
+        attempted: ['item-a', 'item-b'],
+        failures: { 'item-a': { step: 'insert', error: 'Your YouTube quota for today is used up.' } },
+      })
+    );
+    store.dispatch(setSyncStatus('partial'));
+    renderWithApp(
+      <MemoryRouter>
+        <Routes>
+          <Route element={<Outlet context={{ syncChanges: vi.fn(), discardChanges: vi.fn() }} />}>
+            <Route path="*" element={<PendingChanges />} />
+          </Route>
+        </Routes>
+      </MemoryRouter>,
+      { store }
+    );
+    return store;
+  }
+
+  it('the bar says how many failed and the review list says why, next to that song', async () => {
+    setupFailed();
+    fireEvent.click(screen.getByRole('button', { name: /1 failed/ }));
+    expect(await screen.findByText(/Couldn’t add it to A: Your YouTube quota for today is used up\./)).toBeInTheDocument();
+    expect(screen.getAllByRole('note')).toHaveLength(1);
+  });
+
+  it('putting the failed change back clears it', async () => {
+    const store = setupFailed();
+    act(() => store.dispatch(moveWithFeedback([{ fromTier: 'A', toTier: 'S', videoId: 'a' }])));
+    await waitFor(() => expect(screen.queryByRole('button', { name: /failed/ })).not.toBeInTheDocument());
   });
 });
