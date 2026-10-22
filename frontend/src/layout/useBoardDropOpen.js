@@ -17,7 +17,10 @@ export function useBoardDropOpen(category) {
   const navigate = useNavigate();
   const drag = useSelector((s) => s.transfers.drag);
   const loadedCategory = useSelector((s) => s.tiers.loadedCategory);
-  const pendingCount = useSelector(selectPendingMoves).length;
+  // Only the user's own staged changes: auto-staged duplicate removals are
+  // derived from the board's data and come back with it, so they never
+  // block (a board with a duplicate used to refuse every cross-board drag).
+  const pendingCount = useSelector(selectPendingMoves).filter((m) => m.kind !== 'dedupe').length;
   const [hovering, setHovering] = useState(false);
   // Mantine useTimeout: start() is a no-op while one is pending (dragenter
   // fires again for every child), and it's cleared on unmount.
