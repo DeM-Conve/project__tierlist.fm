@@ -159,13 +159,17 @@ export function useSettingsQuery(enabled) {
 // Conditional save: `If-Match: <etag>` updates the version we last saw,
 // `If-None-Match: *` creates the account's first row. Fails with 412 when
 // someone else saved in between - the caller merges and retries.
+// A saved change to the duel settings (tier borders) changes every board's
+// analysis, so cached analyses are refetched after any save.
 export function useSaveSettingsMutation() {
+  const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async ({ settings, etag }) => {
       const headers = etag ? { 'If-Match': etag } : { 'If-None-Match': '*' };
       const res = await api.put('/api/settings', settings, { headers });
       return { settings: res.data, etag: res.headers.etag ?? null };
     },
+    onSuccess: () => queryClient.invalidateQueries({ predicate: (q) => q.queryKey[0] === 'duels' && q.queryKey[2] === 'analysis' }),
   });
 }
 

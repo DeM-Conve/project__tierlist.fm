@@ -4,6 +4,7 @@ import { rebase, sameSettings, toServer } from './settingsMapping';
 import appearanceReducer, { setAccent, setActivityOrder, setTheme, setTierPalette } from '../store/appearanceSlice';
 import { DEFAULT_ACTIVITY_ORDER } from '../activityOrder';
 import namingReducer, { linkTodoList } from '../store/namingSlice';
+import duelsReducer, { setLearnedBorders, setOwnRanges } from '../store/duelSettingsSlice';
 import { settingsLoaded } from '../store/settingsActions';
 import { DEFAULT_TIER_LABELS } from '../tiers';
 import { NO_DISPLAY_NAMES } from '../naming';
@@ -21,9 +22,10 @@ const dto = (over = {}) => ({
     todoLinks: {},
     ...over.naming,
   },
+  duels: { tierBorders: 'learned', tierMinimums: null, ...over.duels },
 });
 
-const makeStore = () => configureStore({ reducer: { appearance: appearanceReducer, naming: namingReducer } });
+const makeStore = () => configureStore({ reducer: { appearance: appearanceReducer, naming: namingReducer, duels: duelsReducer } });
 
 describe('toServer', () => {
   it('maps the default Redux state to the full DTO shape', () => {
@@ -33,7 +35,7 @@ describe('toServer', () => {
   it('drops client-only fields (needsDetection)', () => {
     const body = toServer(makeStore().getState());
     expect(body.naming).not.toHaveProperty('needsDetection');
-    expect(Object.keys(body)).toEqual(['appearance', 'naming']);
+    expect(Object.keys(body)).toEqual(['appearance', 'naming', 'duels']);
   });
 
   it('undefined / missing fields become null', () => {
@@ -80,6 +82,19 @@ describe('toServer', () => {
     const s = makeStore();
     s.dispatch(settingsLoaded(account));
     expect(toServer(s.getState())).toEqual(account);
+  });
+
+  it('sends and round-trips the duel tier borders', () => {
+    const s = makeStore();
+    s.dispatch(setOwnRanges({ S: 400, A: 300, B: 200, C: 100 }));
+    expect(toServer(s.getState()).duels).toEqual({ tierBorders: 'custom', tierMinimums: { S: 400, A: 300, B: 200, C: 100 } });
+    s.dispatch(setLearnedBorders());
+    expect(toServer(s.getState()).duels).toEqual({ tierBorders: 'learned', tierMinimums: { S: 400, A: 300, B: 200, C: 100 } });
+
+    const account = dto({ duels: { tierBorders: 'custom', tierMinimums: { S: 500, A: 300, B: 250, C: 120 } } });
+    const t = makeStore();
+    t.dispatch(settingsLoaded(account));
+    expect(toServer(t.getState())).toEqual(account);
   });
 
   it('normalises an unknown option on load (so the next save fixes the row)', () => {
@@ -199,9 +214,18 @@ describe('rebase (three-way merge after a 412)', () => {
     expect(rebase(dto({ appearance: { theme: 'paper' } }), dto(), dto({ appearance: { activityOrder: mine } })).appearance.activityOrder).toEqual(mine);
   });
 
+  it('the duel tier borders merge like any field (ranges compared by value)', () => {
+    const mine = { S: 400, A: 300, B: 200, C: 100 };
+    const merged = rebase(dto({ duels: { tierBorders: 'custom', tierMinimums: mine } }), dto(), dto({ appearance: { theme: 'sand' } }));
+    expect(merged.duels).toEqual({ tierBorders: 'custom', tierMinimums: mine });
+    expect(merged.appearance.theme).toBe('sand');
+    expect(sameSettings(dto({ duels: { tierMinimums: { ...mine } } }), dto({ duels: { tierMinimums: mine } }))).toBe(true);
+    expect(sameSettings(dto({ duels: { tierMinimums: { ...mine, C: 99 } } }), dto({ duels: { tierMinimums: mine } }))).toBe(false);
+  });
+
   it('only schema fields appear in the result', () => {
     const merged = rebase({ ...dto(), junk: 1 }, dto(), dto());
-    expect(Object.keys(merged)).toEqual(['appearance', 'naming']);
+    expect(Object.keys(merged)).toEqual(['appearance', 'naming', 'duels']);
   });
 
   // BUG (merge granularity): rebase merges per *field*, so the object-valued

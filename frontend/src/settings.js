@@ -29,6 +29,8 @@ export const SETTINGS = {
   appearance: `${PREFIX}appearance`,
   // { template, tierLabels, migratingFrom, migratingFromTierLabels, todoLinks } - see naming.js / namingSlice
   naming: `${PREFIX}naming`,
+  // { tierBorders, tierMinimums } - see duel/tierRanges.js / duelSettingsSlice
+  duels: `${PREFIX}duels`,
 };
 
 export function getSetting(key, fallback) {

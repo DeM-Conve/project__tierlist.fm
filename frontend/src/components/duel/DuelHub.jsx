@@ -118,7 +118,12 @@ export default function DuelHub({ category, boardLoading, base }) {
               </Stack>
             </Group>
             {data ? <ScoreMap analysis={data} nameOf={board.nameOf} /> : <Skeleton h={150} radius={10} data-testid="score-map-skeleton" />}
-            <Text fz="md" c="dimmed" mt="2xs">Lower score ← → Higher score · borders are learned from where you already put songs</Text>
+            <Text fz="md" c="dimmed" mt="2xs">
+              Lower score ← → Higher score ·{' '}
+              {data?.customBorders
+                ? <>borders are your own ranges (<Anchor component={Link} to="/settings?tab=duels" fz="md">Settings → Duels</Anchor>)</>
+                : 'borders are learned from where you already put songs'}
+            </Text>
           </Stack>
         </Paper>
 

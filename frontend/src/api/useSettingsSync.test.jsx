@@ -19,8 +19,9 @@ import { toServer } from './settingsMapping';
 import appearanceReducer, { setActivityOrder, setTheme } from '../store/appearanceSlice';
 import { DEFAULT_ACTIVITY_ORDER } from '../activityOrder';
 import namingReducer from '../store/namingSlice';
+import duelsReducer, { setOwnRanges } from '../store/duelSettingsSlice';
 
-const makeStore = () => configureStore({ reducer: { appearance: appearanceReducer, naming: namingReducer } });
+const makeStore = () => configureStore({ reducer: { appearance: appearanceReducer, naming: namingReducer, duels: duelsReducer } });
 
 function mount(store) {
   const wrapper = ({ children }) => <Provider store={store}>{children}</Provider>;
@@ -82,6 +83,20 @@ describe('useSettingsSync', () => {
     expect(mutateAsync).toHaveBeenCalledTimes(1);
     expect(mutateAsync.mock.calls[0][0].etag).toBe('"1"');
     expect(mutateAsync.mock.calls[0][0].settings.appearance.theme).toBe('paper');
+  });
+
+  it('your own duel tier ranges are saved to the account', async () => {
+    const store = makeStore();
+    Object.assign(query, { data: { settings: toServer(store.getState()), etag: '"1"' }, isSuccess: true });
+    mutateAsync.mockImplementation(async ({ settings }) => ({ settings, etag: '"2"' }));
+    mount(store);
+    await settle();
+    act(() => {
+      store.dispatch(setOwnRanges({ S: 400, A: 300, B: 200, C: 100 }));
+    });
+    await settle();
+    expect(mutateAsync).toHaveBeenCalledTimes(1);
+    expect(mutateAsync.mock.calls[0][0].settings.duels).toEqual({ tierBorders: 'custom', tierMinimums: { S: 400, A: 300, B: 200, C: 100 } });
   });
 
   it('on 412 refetches, rebases this browser’s edit on the newer row and saves again', async () => {

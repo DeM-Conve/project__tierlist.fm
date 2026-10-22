@@ -79,10 +79,11 @@ category.
     quiet notice (`refreshError`). No IndexedDB -> plain `QueryClientProvider`.
     `useTierBoardQueries` waits on `isPending` (not `isLoading`): during restore
     nothing fetches, and `isLoading` "loaded" empty tiers.
-  - **React Hook Form** (`react-hook-form`, installed) - there is currently no real form
-    in this app for it to manage (login is a plain OAuth redirect; filter/search/settings
-    inputs are simple controlled inputs with no validation need). Don't force it in
-    somewhere it doesn't fit; use it if/when a real form with validation appears.
+  - **React Hook Form** (`react-hook-form`) - used where a real form with cross-field
+    validation exists: Settings -> Duels' tier ranges (`DuelSettings.jsx`, a resolver over
+    `duel/tierRanges.js` `validateMinimums`, Mantine `NumberInput` via `Controller`,
+    `useWatch` - not `watch()`, which the React Compiler lint flags). Elsewhere
+    (filter/search/simple settings) plain controlled inputs; don't force it in.
   - **Shell spacing is one standard: `src/layout/spacing.js`** (Mantine spacing
     keys - `SHELL_Y` top/bottom of every shell column, `SIDEBAR_X`/`CANVAS_X`/
     `RAIL_X` sides, `PART_GAP` the 8px gap around the page card). Resizable
@@ -164,7 +165,13 @@ category.
   the same way as `todo_list_link`; on the wire `appearance.activityOrder`, frontend
   ids, missing/partial -> completed in default order, duplicates/unknown -> 400;
   frontend `activityOrder.js` + `appearanceSlice` `setActivityOrder` /
-  `selectActivityOrder`). Backend package
+  `selectActivityOrder`). Settings -> Duels (V3, on `user_settings`): `duel_tier_borders`
+  (enum `LEARNED`/`CUSTOM`) + nullable INTEGER `duel_tier_s/a/b/c_min` (each ranked tier's
+  lowest *shown* score; D = below C's; all four or none, required for CUSTOM, strictly
+  descending, 0-1000 - CHECKs mirrored by `DuelSettings` and `SettingsDto.DuelsDto`);
+  embeddable `DuelSettings`, wire `duels: { tierBorders: 'learned'|'custom', tierMinimums:
+  {S,A,B,C} }` (optional: missing = keep the row's), frontend `duelSettingsSlice` (`state.duels`).
+  Global per account, not per board. Backend package
   `fm.tierlist.settings`, layered and SOLID:
   - enums `Theme`/`Accent`/`TierPalette`: constant name = Postgres
     enum label (Hibernate `@JdbcTypeCode(SqlTypes.NAMED_ENUM)` + `columnDefinition`
@@ -216,12 +223,18 @@ category.
   (`WengLinBradleyTerry`, OpenSkill's model implemented from the paper - no
   third-party rating lib), `Refitter` (`DavidsonBradleyTerryRefit`, run over the
   whole log on every analysis), `PriorPolicy` (`TierPriorPolicy`: a song starts from
-  the tier it's in), `TierModel` (`OrdinalProbitTierModel`, Commons Math),
+  the tier it's in), `TierModel` (`OrdinalProbitTierModel`, Commons Math - learned
+  borders; or `FixedCutpointsTierModel` - the user's own ranges from Settings -> Duels as
+  fixed cutpoints, only the noise term still learned; `DuelService.engineFor(user)` picks
+  it per request via `DuelEngine.withTierModel`),
   `pairing.PairingStrategy` per `Focus` (registry `PairingStrategies`; the focuses
   are `SMART_MIX`, `BORDERLINES` - the "One song" and "Place TODO" modes were
   removed, the user's calls), and
   `policy.SuggestionPolicy`, a composite of `SuggestionRule`s (the 85% / 4 duels /
-  2 border opponents gate, Keep hysteresis, locks). Tunables: `EngineConfig`. The duel
+  2 border opponents gate, Keep hysteresis, locks). Tunables: `EngineConfig`. **The score users see is the
+  engine's mu x 10** (`ScoreScale` backend, `duelText.score()` frontend - keep in step);
+  user-typed ranges are on that scale, `ScoreScale.borderBelow(min)` = (min - 0.5) / 10 so
+  "shown score >= min" is exactly "above the border". The duel
   log is the source of truth (event sourcing): scores are always rebuilt from priors +
   log, never stored. `fm.tierlist.duel` is the layered rest: entities/repositories on
   the `duel_session`, `duel`, `duel_skip`, `duel_prior`, `duel_decision`, `duel_lock`
@@ -492,8 +505,8 @@ The user asked for these on top of the Mantine/Redux migration above. Tracked he
   `TierFocusView` (board fit maths, virtualizer `scrollMargin`); the dock's
   click-to-seek line (could be a Mantine `Slider`, but it's the dock's
   mini/floating CSS).
-- [ ] **React Hook Form** - installed, still nothing to use it on (see Stack section
-  above). Not a gap to close proactively.
+- [x] **React Hook Form** - first used by Settings -> Duels' tier ranges (see Stack section
+  above). Not a gap to close proactively elsewhere.
 - [~] **Stop hand-writing CSS, use Mantine components instead** - in progress, real
   ground covered but not finished. Done so far: every plain `<button className="btn
   ...">` across the app converted to Mantine `Button`/`ActionIcon`

@@ -6,7 +6,9 @@ import { TIER_ORDER } from '../tiers';
 
 export const pct = (p) => `${Math.round((p ?? 0) * 100)}%`;
 
-// Score as shown: the engine's mu x 10, so a duel moves it by whole numbers.
+// Score as shown: the engine's mu x 10, so a duel moves it by whole numbers
+// (backend fm.tierlist.duel.engine.ScoreScale - keep the two in step; the
+// user's own tier ranges in Settings -> Duels are typed on this scale).
 export const score = (mu) => Math.round(mu * 10);
 export const scoreDelta = (before, after) => {
   const d = score(after) - score(before);

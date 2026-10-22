@@ -4,9 +4,11 @@
 const SCHEMA = {
   appearance: ['theme', 'accent', 'tierPalette', 'activityOrder'],
   naming: ['template', 'tierLabels', 'tierDisplayNames', 'migratingFrom', 'migratingFromTierLabels', 'todoLinks'],
+  duels: ['tierBorders', 'tierMinimums'],
 };
 
-// Fields are primitives except activityOrder ([id]), tierLabels / tierDisplayNames ({ slot: name }) and todoLinks
+// Fields are primitives except activityOrder ([id]), tierLabels / tierDisplayNames ({ slot: name }), tierMinimums
+// ({ slot: score }) and todoLinks
 // ({ playlistId: category }), so
 // compare by value: a copy that came back from the server is still "same".
 function sameValue(a, b) {
@@ -24,7 +26,7 @@ function mapFields(fn) {
 
 // Redux state -> the API body.
 export function toServer(state) {
-  return mapFields((group, field) => state[group][field] ?? null);
+  return mapFields((group, field) => state[group]?.[field] ?? null);
 }
 
 export function sameSettings(a, b) {
@@ -39,6 +41,6 @@ export function sameSettings(a, b) {
 export function rebase(local, base, fresh) {
   if (!base || !fresh) return fresh ?? local;
   return mapFields((group, field) =>
-    !sameValue(local[group][field], base[group][field]) ? local[group][field] : fresh[group][field]
+    !sameValue(local[group]?.[field], base[group]?.[field]) ? local[group]?.[field] ?? null : fresh[group]?.[field] ?? null
   );
 }
