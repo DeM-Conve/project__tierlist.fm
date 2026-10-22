@@ -19,6 +19,41 @@ export function indexForPointInFlow(container, clientX, clientY) {
   return tiles.length;
 }
 
+// Where to draw the insertion bar for slot `index` of a tile flow, relative
+// to `container`'s box -> { left, top, height } or null (no tiles). The bar
+// sits in the gap `gap` px wide beside a tile: after the tile before the
+// slot when the pointer is on that tile's line (the right half of a line's
+// last tile reads "after it", not "first on the next line"), else before
+// the tile at the slot. Drawn absolutely, so showing it never shifts the
+// tiles under the pointer (an inline bar did, and the slot flickered).
+export function flowDropBar(container, index, clientY, gap) {
+  if (!container) return null;
+  const tiles = container.querySelectorAll('[data-video-id]');
+  if (!tiles.length) return null;
+  const box = container.getBoundingClientRect();
+  const prev = index > 0 ? tiles[index - 1].getBoundingClientRect() : null;
+  const next = index < tiles.length ? tiles[index].getBoundingClientRect() : null;
+  const onPrevLine = prev && clientY >= prev.top && clientY <= prev.bottom;
+  if (prev && (onPrevLine || !next)) {
+    return { left: prev.right + gap / 2 - box.left, top: prev.top - box.top, height: prev.height };
+  }
+  return { left: next.left - gap / 2 - box.left, top: next.top - box.top, height: next.height };
+}
+
+// A drop slot among the tiles a row *shows* -> the index in the whole tier
+// (tiersSlice applyMove's dropIndex). They differ while searching (only the
+// matches show) and when the playing song is pulled forward past "+N": a
+// drop before a shown song lands before it in the tier, one after the last
+// shown song lands right after it. null (the "+N" tile) stays null: append.
+export function tierDropIndex(items, shown, slot) {
+  if (slot == null) return null;
+  if (shown === items) return slot;
+  if (!shown.length) return items.length;
+  const at = (v) => items.findIndex((x) => x.videoId === v.videoId);
+  if (slot < shown.length) return at(shown[slot]);
+  return at(shown[shown.length - 1]) + 1;
+}
+
 // Vertical virtualized list: the slot a drop at `offset` (in the
 // virtualizer's coordinates, scrollMargin included) lands in - before the
 // row under the pointer if it's in that row's top half, else after it.

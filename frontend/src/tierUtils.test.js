@@ -4,6 +4,8 @@ import {
   artistKey,
   indexForPointInFlow,
   dropIndexAtOffset,
+  flowDropBar,
+  tierDropIndex,
   playlistThumbnail,
   songLabel,
   videoMatches,
@@ -239,5 +241,69 @@ describe('dropIndexAtOffset', () => {
 
   it('below the last midpoint -> length', () => {
     expect(dropIndexAtOffset(virtualizer(rows), 999)).toBe(3);
+  });
+});
+
+describe('flowDropBar', () => {
+  // Two lines of two 100x100 tiles, 10px apart, in a box at (5, 5).
+  const grid = () => {
+    const el = container([
+      { left: 5, top: 5, width: 100, height: 100 },
+      { left: 115, top: 5, width: 100, height: 100 },
+      { left: 5, top: 115, width: 100, height: 100 },
+      { left: 115, top: 115, width: 100, height: 100 },
+    ]);
+    el.getBoundingClientRect = () => ({ left: 5, top: 5 });
+    return el;
+  };
+
+  it('no container or no tiles -> no bar', () => {
+    expect(flowDropBar(null, 0, 0, 10)).toBeNull();
+    expect(flowDropBar(container([]), 0, 0, 10)).toBeNull();
+  });
+
+  it('before the tile at the slot, in the middle of the gap', () => {
+    expect(flowDropBar(grid(), 0, 50, 10)).toEqual({ left: -5, top: 0, height: 100 });
+    expect(flowDropBar(grid(), 1, 50, 10)).toEqual({ left: 105, top: 0, height: 100 });
+  });
+
+  it('the right half of a line\'s last tile reads "after it", on that line', () => {
+    // Slot 2 is the next line's first tile, but the pointer is on line one.
+    expect(flowDropBar(grid(), 2, 50, 10)).toEqual({ left: 215, top: 0, height: 100 });
+    // On line two it's before that tile.
+    expect(flowDropBar(grid(), 2, 150, 10)).toEqual({ left: -5, top: 110, height: 100 });
+  });
+
+  it('past the end: after the last tile', () => {
+    expect(flowDropBar(grid(), 4, 999, 10)).toEqual({ left: 215, top: 110, height: 100 });
+  });
+});
+
+describe('tierDropIndex', () => {
+  const items = ['a', 'b', 'c', 'd', 'e'].map((videoId) => ({ videoId }));
+
+  it('the whole tier shown: the slot is the index', () => {
+    expect(tierDropIndex(items, items, 3)).toBe(3);
+    expect(tierDropIndex(items, items, 5)).toBe(5);
+  });
+
+  it('"+N" (no slot) appends', () => {
+    expect(tierDropIndex(items, items.slice(0, 2), null)).toBeNull();
+  });
+
+  it('a prefix shown (folded behind "+N"): same index', () => {
+    expect(tierDropIndex(items, items.slice(0, 3), 1)).toBe(1);
+    expect(tierDropIndex(items, items.slice(0, 3), 3)).toBe(3);
+  });
+
+  it('only some shown (search, the playing song pulled forward): before / after the shown song', () => {
+    const shown = [items[1], items[3]];
+    expect(tierDropIndex(items, shown, 0)).toBe(1);
+    expect(tierDropIndex(items, shown, 1)).toBe(3);
+    expect(tierDropIndex(items, shown, 2)).toBe(4);
+  });
+
+  it('nothing shown (no matches): appends', () => {
+    expect(tierDropIndex(items, [], 0)).toBe(5);
   });
 });

@@ -1,4 +1,4 @@
-import { Fragment } from 'react';
+import { Fragment, memo } from 'react';
 import { useTierName } from '../tierLabels';
 import { ActionIcon, Box, Group, Image, Menu, Progress, Text, Tooltip, UnstyledButton } from '@mantine/core';
 import { MoreHorizontal, Play, Trash2 } from 'lucide-react';
@@ -144,41 +144,49 @@ export function TierMixBar({ tiers, counts, size = 8, onSegmentClick, labels = f
   );
 }
 
-// "..." button menu.
+// "..." button menu. The items are built only while it's open (Mantine
+// mounts a closed Menu's dropdown children lazily) - a board has hundreds.
 export function MoveMenu({ video, tier, tiers, onMove, target }) {
-  const dispatch = useDispatch();
-  const groups = songMenuGroups({ video, tier, tiers, onMove, dispatch });
   return (
     <Menu position="bottom-end" withinPortal shadow="md" width={210}>
       <Menu.Target>{target}</Menu.Target>
       <Menu.Dropdown onClick={(e) => e.stopPropagation()}>
-        {groups.map((g, i) => (
-          <Fragment key={g.key}>
-            {i > 0 && <Menu.Divider />}
-            {g.label && <Menu.Label>{g.label}</Menu.Label>}
-            {g.items.map((item) =>
-              item.href ? (
-                <Menu.Item key={item.key} component="a" href={item.href} target="_blank" rel="noopener noreferrer" leftSection={item.icon}>
-                  {item.title}
-                </Menu.Item>
-              ) : (
-                <Menu.Item key={item.key} color={item.color} leftSection={item.icon} onClick={item.onClick}>
-                  {item.title}
-                </Menu.Item>
-              )
-            )}
-          </Fragment>
-        ))}
+        <MoveMenuItems video={video} tier={tier} tiers={tiers} onMove={onMove} />
       </Menu.Dropdown>
     </Menu>
   );
+}
+
+function MoveMenuItems({ video, tier, tiers, onMove }) {
+  const dispatch = useDispatch();
+  const groups = songMenuGroups({ video, tier, tiers, onMove, dispatch });
+  return groups.map((g, i) => (
+    <Fragment key={g.key}>
+      {i > 0 && <Menu.Divider />}
+      {g.label && <Menu.Label>{g.label}</Menu.Label>}
+      {g.items.map((item) =>
+        item.href ? (
+          <Menu.Item key={item.key} component="a" href={item.href} target="_blank" rel="noopener noreferrer" leftSection={item.icon}>
+            {item.title}
+          </Menu.Item>
+        ) : (
+          <Menu.Item key={item.key} color={item.color} leftSection={item.icon} onClick={item.onClick}>
+            {item.title}
+          </Menu.Item>
+        )
+      )}
+    </Fragment>
+  ));
 }
 
 // Square album-art tile used on the tier list. Click plays, drag moves,
 // right-click or the hover "..." opens the song menu. The song name (+ artist, when there's
 // room) is always printed over the bottom of the art, so an album cover
 // shared by many songs is still tellable apart without hovering.
-export function TierTile({
+// Memoized: a big board draws hundreds of tiles, and a drag (start, the
+// hovered row or slot changing) must only redraw the tiles it changes - the
+// board passes stable handlers for that.
+export const TierTile = memo(function TierTile({
   video,
   tier,
   tiers,
@@ -346,4 +354,4 @@ export function TierTile({
       </Box>
     </Tooltip>
   );
-}
+});

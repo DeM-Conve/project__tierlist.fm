@@ -1,5 +1,5 @@
-import { describe, expect, it, vi } from 'vitest';
-import { act, cleanup, fireEvent, screen } from '@testing-library/react';
+import { beforeAll, describe, expect, it, vi } from 'vitest';
+import { act, cleanup, fireEvent, screen, within } from '@testing-library/react';
 import { useSelector } from 'react-redux';
 import { MemoryRouter } from 'react-router-dom';
 import { ContextMenuProvider } from 'mantine-contextmenu';
@@ -9,8 +9,18 @@ import { makeStore, renderWithApp } from '../test/render';
 import { loadBoard, moveWithFeedback } from '../tierActions';
 import { discardTierChanges } from '../store/tiersSlice';
 import { selectPendingMoves, selectTierGroups } from '../store/selectors';
+import { songLabel } from '../tierUtils';
 
 vi.mock('@mantine/notifications', () => ({ notifications: { show: vi.fn(), hide: vi.fn() } }));
+// songLabel runs once per tile render: counting its calls counts tile renders.
+vi.mock('../tierUtils', async (importOriginal) => {
+  const mod = await importOriginal();
+  return { ...mod, songLabel: vi.fn(mod.songLabel) };
+});
+// jsdom has no DragEvent; a MouseEvent subclass carries clientX/Y.
+beforeAll(() => {
+  if (!window.DragEvent) window.DragEvent = class DragEvent extends MouseEvent {};
+});
 // jsdom has no layout: every row reports 1300px wide and the header/footer
 // 0px tall, so the board's fit maths runs against a known screen.
 vi.mock('@mantine/hooks', async (importOriginal) => ({
@@ -282,5 +292,109 @@ describe('TierBoardView - header buttons and their keys', () => {
     expect(h.onStartDuel).not.toHaveBeenCalled();
     expect(h.onPlayFrom).not.toHaveBeenCalled();
     expect(h.onShufflePlay).not.toHaveBeenCalled();
+  });
+});
+
+// A drag on the board: every tile row is a drop target, the drop slot is the
+// one under the pointer among the tiles shown. jsdom has no layout (every
+// rect is 0x0 at 0,0): clientY -1 is "above every tile" -> slot 0.
+function dataTransfer() {
+  const data = {};
+  return { setData: (k, val) => (data[k] = val), getData: (k) => data[k] ?? '', effectAllowed: '', types: [] };
+}
+const rowOf = (tier) => screen.getByRole('button', { name: `Open ${tier}` }).parentElement;
+const tile = (videoId) => document.querySelector(`.tile[data-video-id="${videoId}"]`);
+const order = (store, tier) => store.getState().tiers.tierItems[tier].map((v) => v.videoId);
+
+describe('TierBoardView - drag and drop', () => {
+  it('a drop lands at the slot under the pointer', () => {
+    const store = renderBoard();
+    const dt = dataTransfer();
+    fireEvent.dragStart(tile('A0'), { dataTransfer: dt });
+    fireEvent.dragOver(rowOf('S'), { dataTransfer: dt, clientX: 0, clientY: -1 });
+    fireEvent.drop(rowOf('S'), { dataTransfer: dt, clientX: 0, clientY: -1 });
+    expect(order(store, 'S').slice(0, 2)).toEqual(['A0', 'S0']);
+  });
+
+  // While searching a row shows only its matches: the slot used to be taken
+  // as a position in the whole tier - a drop before the match S5 put the song
+  // at the top of S instead.
+  it('while searching, a drop before a match lands before that song in the tier', () => {
+    const store = renderBoard();
+    fireEvent.keyDown(window, { key: '/' });
+    fireEvent.change(screen.getByPlaceholderText('/search titles...'), { target: { value: '/Song S5' } });
+    expect([...rowOf('S').querySelectorAll('.tile')].map((t) => t.dataset.videoId)).toEqual(['S5']);
+    const dt = dataTransfer();
+    dt.setData('application/json', JSON.stringify({ videoId: 'A0', fromTier: 'A' }));
+    fireEvent.drop(rowOf('S'), { dataTransfer: dt, clientX: 0, clientY: -1 });
+    expect(order(store, 'S').indexOf('A0')).toBe(5);
+    expect(order(store, 'S')[6]).toBe('S5');
+  });
+
+  it('...and one after the last match lands right after it', () => {
+    const store = renderBoard();
+    fireEvent.keyDown(window, { key: '/' });
+    fireEvent.change(screen.getByPlaceholderText('/search titles...'), { target: { value: '/Song S5' } });
+    const dt = dataTransfer();
+    dt.setData('application/json', JSON.stringify({ videoId: 'A0', fromTier: 'A' }));
+    // Below every tile -> after the last one shown.
+    fireEvent.drop(rowOf('S'), { dataTransfer: dt, clientX: 0, clientY: 5 });
+    expect(order(store, 'S').indexOf('A0')).toBe(6);
+  });
+
+  it('a drop on "+N" appends to the tier', () => {
+    const store = renderBoard();
+    const dt = dataTransfer();
+    dt.setData('application/json', JSON.stringify({ videoId: 'A0', fromTier: 'A' }));
+    const more = within(rowOf('S')).getByRole('button', { name: /^Show all/ });
+    fireEvent.drop(more, { dataTransfer: dt, clientX: 0, clientY: -1 });
+    expect(order(store, 'S').at(-1)).toBe('A0');
+  });
+
+  it('the insertion bar floats over the gap: it adds nothing to the row\'s flow', () => {
+    renderBoard();
+    const row = rowOf('S');
+    const before = [...row.querySelectorAll('.tile')].map((t) => t.dataset.videoId);
+    const dt = dataTransfer();
+    fireEvent.dragStart(tile('A0'), { dataTransfer: dt });
+    fireEvent.dragOver(row, { dataTransfer: dt, clientX: 0, clientY: -1 });
+    const bar = screen.getByTestId('drop-indicator');
+    expect(bar.style.position).toBe('absolute');
+    expect([...row.querySelectorAll('.tile')].map((t) => t.dataset.videoId)).toEqual(before);
+    fireEvent.dragLeave(row, { dataTransfer: dt, relatedTarget: document.body });
+    expect(screen.queryByTestId('drop-indicator')).toBeNull();
+  });
+});
+
+// A board of 333 / 142 / 87 songs (the user's biggest) must drag smoothly:
+// a drag start, a hover over a row and every new slot under the pointer
+// used to redraw every tile on the board (TierTile wasn't memoized and got
+// new handlers every render).
+describe('TierBoardView - a drag redraws only the tiles it changes', () => {
+  const big = { ...data, S: songs('S', 333), A: songs('A', 142), B: songs('B', 87) };
+  const tileRenders = () => songLabel.mock.calls.length;
+
+  it('drag start redraws only the dragged tile; hovering rows and slots redraws none', () => {
+    const store = renderBoard(700, { boardData: big });
+    // Expand the 333-song tier: every one of its tiles is on the page.
+    fireEvent.click(screen.getByRole('button', { name: 'Expand S' }));
+    expect(rowOf('S').querySelectorAll('.tile')).toHaveLength(333);
+    const dt = dataTransfer();
+
+    songLabel.mockClear();
+    fireEvent.dragStart(tile('S10'), { dataTransfer: dt });
+    expect(store.getState().tiers.draggedVideoId).toBe('S10');
+    expect(tileRenders()).toBeLessThanOrEqual(1);
+
+    songLabel.mockClear();
+    fireEvent.dragOver(rowOf('A'), { dataTransfer: dt, clientX: 0, clientY: -1 });
+    fireEvent.dragOver(rowOf('S'), { dataTransfer: dt, clientX: 0, clientY: -1 });
+    fireEvent.dragOver(rowOf('S'), { dataTransfer: dt, clientX: 0, clientY: 5 });
+    fireEvent.dragOver(rowOf('S'), { dataTransfer: dt, clientX: 0, clientY: 5 });
+    expect(tileRenders()).toBe(0);
+
+    songLabel.mockClear();
+    fireEvent.dragEnd(tile('S10'), { dataTransfer: dt });
+    expect(tileRenders()).toBeLessThanOrEqual(1);
   });
 });

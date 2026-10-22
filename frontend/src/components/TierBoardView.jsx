@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { tierName } from '../tierLabels';
 import { useDispatch, useSelector } from 'react-redux';
 import {
@@ -24,12 +24,12 @@ import { moveWithFeedback, useTierDnd } from '../tierActions';
 import { selectPlayerCoversPage, selectStagedChanges } from '../store/selectors';
 import { TierMixBar, TierTile } from './TierBits';
 import BoardNameEditor from './BoardNameEditor';
-import { TIER_INK, indexForPointInFlow, videoMatches } from '../tierUtils';
+import { TIER_INK, flowDropBar, indexForPointInFlow, tierDropIndex, videoMatches } from '../tierUtils';
 import { isSequenceKey } from '../keyboard/sequence';
 import { shortcutKey } from '../shortcuts';
 import { useCanvas } from '../layout/canvas';
 import { SECTION_GAP, SHELL_Y, spacingPx } from '../layout/spacing';
-import { GAP_KEY, INSET_KEY, TODO_GAP_KEY, allocateLines, fitBoard, tilesPerLine } from '../layout/boardFit';
+import { GAP, GAP_KEY, INSET_KEY, TODO_GAP_KEY, allocateLines, fitBoard, tilesPerLine } from '../layout/boardFit';
 import PageHeader from './PageHeader';
 
 // The header buttons' keys, from shortcuts.js (the "?" list reads the same).
@@ -38,8 +38,18 @@ const KEY_DUEL = shortcutKey('board-duel');
 const KEY_PLAY = shortcutKey('board-play');
 const KEY_SHUFFLE = shortcutKey('board-shuffle');
 
-function DropIndicator({ size }) {
-  return <Box w={3} h={size} bg="accent" style={{ borderRadius: 2, flexShrink: 0 }} />;
+// The insertion bar of a drag over a row: absolutely placed in the gap
+// beside a tile (tierUtils.flowDropBar), so it never shifts the tiles.
+function DropIndicator({ bar }) {
+  return (
+    <Box
+      data-testid="drop-indicator"
+      pos="absolute"
+      w={3}
+      bg="accent"
+      style={{ left: bar.left - 1.5, top: bar.top, height: bar.height, borderRadius: 2, pointerEvents: 'none' }}
+    />
+  );
 }
 
 // One tier row. Shows `lines` lines of tiles (the board sizes that so every
@@ -72,12 +82,24 @@ function TierRow({
     if (width > 0) onMeasure?.(width);
   }, [width, onMeasure]);
   const contentRef = useRef(null);
-  const [overIndex, setOverIndex] = useState(null);
+  // { index, bar } of the slot under a drag, or null. Kept in a ref too:
+  // dragover fires every few ms, and only a new slot may re-render the row.
+  const [over, setOver] = useState(null);
+  const overRef = useRef(null);
   const [expanded, setExpanded] = useState(false);
   const isOver = dnd.dragOverTier === tier;
   const color = TIER_COLORS[tier];
   const isTodo = tier === TODO_TIER;
   const playLabel = isTodo ? 'Triage: play and rate one by one' : `Play ${tierName(tier)}`;
+
+  // Stable drag handlers for the memoized tiles (TierTile): a drag start or
+  // a hover over another row must not redraw every tile on the board.
+  const latestDnd = useRef(dnd);
+  useLayoutEffect(() => {
+    latestDnd.current = dnd;
+  });
+  const handleDragStart = useCallback((e, video, fromTier) => latestDnd.current.onDragStart(e, video, fromTier), []);
+  const handleDragEnd = useCallback((e) => latestDnd.current.onDragEnd(e), []);
 
   const shown = searchActive ? items?.filter((v) => matchedKeys.has(`${tier}:${v.videoId}`)) : items;
   const total = shown?.length ?? 0;
@@ -97,24 +119,42 @@ function TierRow({
       : shown.slice(0, fit - 1);
   const hiddenCount = total - visible.length;
 
-  function dropIndexFor(e) {
+  // The slot under the pointer among the tiles shown (null on "+N": append).
+  function slotAt(e) {
     if (e.target.closest?.('[data-more]')) return null;
     return indexForPointInFlow(contentRef.current, e.clientX, e.clientY);
+  }
+  function showSlot(e) {
+    // dragover repeats every few ms while the pointer rests: same point,
+    // same slot - skip re-reading every tile's position.
+    const prev = overRef.current;
+    if (prev && prev.x === e.clientX && prev.y === e.clientY) return;
+    const index = slotAt(e);
+    const bar = index == null ? null : flowDropBar(contentRef.current, index, e.clientY, GAP);
+    const same = prev && prev.index === index && prev.bar?.left === bar?.left && prev.bar?.top === bar?.top;
+    overRef.current = { index, bar, x: e.clientX, y: e.clientY };
+    if (!same) setOver(overRef.current);
+  }
+  function clearSlot() {
+    overRef.current = null;
+    setOver(null);
   }
 
   return (
     <Box
       onDragOver={(e) => {
         dnd.onDragOver(e, tier);
-        setOverIndex(dropIndexFor(e));
+        showSlot(e);
       }}
       onDragLeave={(e) => {
         dnd.onDragLeave(e, tier);
-        if (!e.currentTarget.contains(e.relatedTarget)) setOverIndex(null);
+        if (!e.currentTarget.contains(e.relatedTarget)) clearSlot();
       }}
       onDrop={(e) => {
-        const idx = dropIndexFor(e);
-        setOverIndex(null);
+        // The slot among the shown tiles, as a position in the whole tier
+        // (only matches show while searching; see tierDropIndex).
+        const idx = tierDropIndex(items || [], visible, slotAt(e));
+        clearSlot();
         dnd.onDrop(e, tier, idx);
       }}
       style={{
@@ -186,7 +226,7 @@ function TierRow({
       </UnstyledButton>
 
       <Box ref={sizeRef} style={{ flex: 1, minWidth: 0 }} p={INSET_KEY}>
-        <Group ref={contentRef} gap={GAP_KEY} wrap={searchActive || expanded || lines > 1 ? 'wrap' : 'nowrap'} mih={size} p={INSET_KEY} style={{ overflow: 'hidden' }}>
+        <Group ref={contentRef} pos="relative" gap={GAP_KEY} wrap={searchActive || expanded || lines > 1 ? 'wrap' : 'nowrap'} mih={size} p={INSET_KEY} style={{ overflow: 'hidden' }}>
           {loading &&
             Array.from({ length: perLine }).map((_, i) => <Skeleton key={i} w={size} h={size} radius={6} style={{ flexShrink: 0 }} />)}
           {!loading && total === 0 && (
@@ -213,29 +253,27 @@ function TierRow({
             </Box>
           )}
           {!loading &&
-            visible.map((v, i) => {
+            visible.map((v) => {
               const key = `${tier}:${v.videoId}`;
               return (
-                <Group key={v.videoId} gap={GAP_KEY} wrap="nowrap" style={{ flexShrink: 0 }}>
-                  {isOver && overIndex === i && <DropIndicator size={size} />}
-                  <TierTile
-                    video={v}
-                    tier={tier}
-                    tiers={tiers}
-                    size={size}
-                    isDragging={dnd.draggedVideoId === v.videoId}
-                    isPlaying={playingVideoId === v.videoId}
-                    isPendingRemoval={pendingRemovalKeys.has(key)}
-                    searchState={activeMatchKey === key ? 'active' : searchActive ? 'match' : null}
-                    onDragStart={dnd.onDragStart}
-                    onDragEnd={dnd.onDragEnd}
-                    onPlay={onPlay}
-                    onMove={onMove}
-                  />
-                </Group>
+                <TierTile
+                  key={v.videoId}
+                  video={v}
+                  tier={tier}
+                  tiers={tiers}
+                  size={size}
+                  isDragging={dnd.draggedVideoId === v.videoId}
+                  isPlaying={playingVideoId === v.videoId}
+                  isPendingRemoval={pendingRemovalKeys.has(key)}
+                  searchState={activeMatchKey === key ? 'active' : searchActive ? 'match' : null}
+                  onDragStart={handleDragStart}
+                  onDragEnd={handleDragEnd}
+                  onPlay={onPlay}
+                  onMove={onMove}
+                />
               );
             })}
-          {!loading && isOver && overIndex === visible.length && visible.length > 0 && <DropIndicator size={size} />}
+          {!loading && isOver && over?.bar && <DropIndicator bar={over.bar} />}
           {!loading && hiddenCount > 0 && (
             <UnstyledButton
               data-more
@@ -332,7 +370,9 @@ export default function TierBoardView({
   // board has one (it's a move target everywhere, but not ranked/counted).
   const tiers = TIER_ORDER.filter((t) => tierGroups[category]?.[t]);
   const hasTodo = !!tierGroups[category]?.[TODO_TIER];
-  const boardTiers = BOARD_TIERS.filter((t) => tierGroups[category]?.[t]);
+  // Keyed by content (a fresh array every render would defeat the tiles' memo).
+  const boardTiersKey = BOARD_TIERS.filter((t) => tierGroups[category]?.[t]).join(',');
+  const boardTiers = useMemo(() => (boardTiersKey ? boardTiersKey.split(',') : []), [boardTiersKey]);
   const anyLoading = boardLoading || boardTiers.some((t) => tierLoading[t]);
   // Before the playlists list itself has loaded we don't even know which
   // tiers this board has - show a neutral placeholder board, not "0 tiers".
@@ -392,9 +432,16 @@ export default function TierBoardView({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rowTiers.join(), tierItems, perLine, lineBudget, rowWidth, viewportHeight]);
 
-  function move(fromTier, toTier, videoId, dropIndex) {
-    dispatch(moveWithFeedback([{ fromTier, toTier, videoId, dropIndex }]));
-  }
+  // Stable for the memoized tiles: the page hands a new onPlay every render.
+  const move = useCallback(
+    (fromTier, toTier, videoId, dropIndex) => dispatch(moveWithFeedback([{ fromTier, toTier, videoId, dropIndex }])),
+    [dispatch]
+  );
+  const latestPlay = useRef(onPlay);
+  useLayoutEffect(() => {
+    latestPlay.current = onPlay;
+  });
+  const playTile = useCallback((tier, videoId) => latestPlay.current(tier, videoId), []);
 
   // Vim-style "/" find: "/" opens it and is typed straight into the box as
   // the literal command-line prefix, the way vim's own "/" shows up in its
@@ -611,7 +658,7 @@ export default function TierBoardView({
             activeMatchKey={activeMatchKey}
             playingVideoId={playingVideoId}
             pendingRemovalKeys={pendingRemovalKeys}
-            onPlay={onPlay}
+            onPlay={playTile}
             onPlayFrom={onPlayFrom}
             onShuffle={onShufflePlay}
             onOpenTier={onOpenTier}
@@ -637,7 +684,7 @@ export default function TierBoardView({
             activeMatchKey={activeMatchKey}
             playingVideoId={playingVideoId}
             pendingRemovalKeys={pendingRemovalKeys}
-            onPlay={onPlay}
+            onPlay={playTile}
             onPlayFrom={onPlayFrom}
             onShuffle={onShufflePlay}
             onOpenTier={onOpenTier}
