@@ -130,9 +130,15 @@ export const moveWithFeedback = (moves, { quiet = false } = {}) => (dispatch, ge
   // A move of a song that isn't (any more) where it says - a stale drag, the
   // player's snapshot after a reload - changes nothing: no undo step, no toast.
   const { tierItems } = getState().tiers;
-  const real = moves.filter(
-    (m) => (m.fromTier !== m.toTier || m.dropIndex != null) && tierItems[m.fromTier]?.some((v) => v.videoId === m.videoId)
-  );
+  // A song dropped back on its own slot doesn't move either ("Reordered"
+  // toast and undo step for nothing).
+  const changes = (m) => {
+    const at = tierItems[m.fromTier]?.findIndex((v) => v.videoId === m.videoId) ?? -1;
+    if (at < 0) return false;
+    if (m.fromTier !== m.toTier) return true;
+    return m.dropIndex != null && m.dropIndex !== at && m.dropIndex !== at + 1;
+  };
+  const real = moves.filter(changes);
   if (real.length === 0) return;
   const message = describe(real, getState().tiers.tierItems);
   dispatch(moveVideos({ moves: real }));

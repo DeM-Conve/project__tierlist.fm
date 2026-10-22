@@ -103,4 +103,19 @@ describe('useTierDnd', () => {
     act(() => dnd().onDrop(dragEvent({ 'application/json': JSON.stringify({ videoId: 'zzz', fromTier: 'S' }) }), 'A'));
     expect(store.getState().tiers.undoStack).toHaveLength(0);
   });
+
+  it('a song dropped back on its own slot is no edit (no "Reordered" step)', () => {
+    const { store, dnd } = setup();
+    const drop = (dropIndex) => {
+      const e = dragEvent();
+      act(() => dnd().onDragStart(e, v('a'), 'S'));
+      act(() => dnd().onDrop(e, 'S', dropIndex));
+    };
+    drop(0);
+    drop(1);
+    expect(store.getState().tiers.undoStack).toHaveLength(0);
+    drop(2);
+    expect(store.getState().tiers.tierItems.S.map((x) => x.videoId)).toEqual(['b', 'a']);
+    expect(store.getState().tiers.undoStack).toHaveLength(1);
+  });
 });
