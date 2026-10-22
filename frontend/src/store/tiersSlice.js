@@ -50,6 +50,11 @@ const tiersSlice = createSlice({
     // a video whose current tier isn't in this list has genuinely moved.
     originalTierItems: {},
     originalTierOf: {},
+    // `{ [tier]: video[] }`: extra copies of a video already in that same
+    // playlist (YouTube lets a playlist hold one video twice). The board
+    // shows one copy; these stay off it and are auto-staged for removal
+    // (selectPendingMoves), like a copy in a lower tier.
+    duplicateCopies: {},
     syncStatus: 'idle', // idle | syncing | done | partial | error
     draggedVideoId: null,
     dragOverTier: null,
@@ -83,6 +88,7 @@ const tiersSlice = createSlice({
       state.tierLoading = Object.fromEntries(presentTiers.map((t) => [t, true]));
       state.originalTierItems = {};
       state.originalTierOf = {};
+      state.duplicateCopies = {};
       state.undoStack = [];
     },
     // Deliberately separate from resetTierBoard: this marks "the mirror
@@ -97,7 +103,18 @@ const tiersSlice = createSlice({
     },
     setTierForCategory: (state, action) => {
       state.redoStack = [];
-      const { tier, videos } = action.payload;
+      const { tier, videos: all } = action.payload;
+      const seen = new Set();
+      const videos = [];
+      const copies = [];
+      all.forEach((v) => {
+        if (seen.has(v.videoId)) copies.push(v);
+        else {
+          seen.add(v.videoId);
+          videos.push(v);
+        }
+      });
+      state.duplicateCopies[tier] = copies;
       state.tierItems[tier] = videos;
       state.tierLoading[tier] = false;
       state.originalTierItems[tier] = videos;
@@ -134,6 +151,10 @@ const tiersSlice = createSlice({
             (t) => t !== m.from
           );
           if (!state.originalTierOf[m.video.videoId].length) delete state.originalTierOf[m.video.videoId];
+        } else if (m.kind === 'dedupe' && m.tier === m.keptTier) {
+          // A same-playlist copy: only that playlist item is gone, the
+          // copy on the board stays.
+          state.duplicateCopies[m.tier] = (state.duplicateCopies[m.tier] || []).filter((v) => v.id !== m.video.id);
         } else if (m.kind === 'dedupe') {
           state.tierItems[m.tier] = (state.tierItems[m.tier] || []).filter(
             (v) => v.videoId !== m.video.videoId

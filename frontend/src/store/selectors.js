@@ -8,6 +8,7 @@ import { TODO_TIER } from '../tiers';
 const selectPlaylists = (state) => state.auth.playlists;
 const selectTierItems = (state) => state.tiers.tierItems;
 const selectOriginalTierOf = (state) => state.tiers.originalTierOf;
+const selectDuplicateCopies = (state) => state.tiers.duplicateCopies;
 const selectCurrentCategory = (state) => state.view.currentCategory;
 const selectFocusedVideo = (state) => state.focus.focusedVideo;
 const selectFocusedCategory = (state) => state.focus.focusedCategory;
@@ -91,11 +92,17 @@ export const selectTierCategories = createSelector([selectTierGroups], (groups) 
 // in is kept and every other occurrence is auto-staged for removal - no
 // bogus "move" is reported for either. Songs dropped in the Remove bin are
 // `remove` changes (`to` is REMOVED_TIER, so putting one back is an
-// ordinary reverse move).
+// ordinary reverse move). A video listed twice in the *same* playlist is
+// shown once; its extra copies are dedupes kept in that same tier.
 export const selectPendingMoves = createSelector(
-  [selectTierItems, selectOriginalTierOf],
-  (tierItems, originalTierOf) => {
+  [selectTierItems, selectOriginalTierOf, selectDuplicateCopies],
+  (tierItems, originalTierOf, duplicateCopies) => {
     const moves = [];
+    for (const tier of BOARD_TIERS) {
+      for (const video of duplicateCopies?.[tier] || []) {
+        moves.push({ kind: 'dedupe', video, tier, keptTier: tier });
+      }
+    }
     const stillIn = (t, videoId) => (tierItems[t] || []).some((v) => v.videoId === videoId);
     for (const tier of BOARD_TIERS) {
       for (const video of tierItems[tier] || []) {

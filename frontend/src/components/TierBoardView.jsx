@@ -345,7 +345,7 @@ export default function TierBoardView({
   const todoCount = tierItems[TODO_TIER]?.length ?? 0;
   const hasVideos = total + todoCount > 0;
   const pendingRemovalKeys = useMemo(
-    () => new Set(pendingMoves.filter((m) => m.kind === 'dedupe').map((m) => `${m.tier}:${m.video.videoId}`)),
+    () => new Set(pendingMoves.filter((m) => m.kind === 'dedupe' && m.tier !== m.keptTier).map((m) => `${m.tier}:${m.video.videoId}`)),
     [pendingMoves]
   );
 

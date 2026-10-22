@@ -119,7 +119,7 @@ function ReviewChangesModal({ opened, onClose, moves, syncStatus, onPush, onDisc
         <ScrollArea.Autosize mah="min(55vh, 480px)" offsetScrollbars="present" type="auto">
           <Stack gap={0}>
             {moves.map((m, i) => (
-              <ChangeRow key={`${m.kind}-${m.id ?? m.video.videoId}-${m.tier ?? m.to ?? m.toTier}`} move={m} first={i === 0} onRevert={() => revert(m)} />
+              <ChangeRow key={`${m.kind}-${m.id ?? m.video.id ?? m.video.videoId}-${m.tier ?? m.to ?? m.toTier}`} move={m} first={i === 0} onRevert={() => revert(m)} />
             ))}
           </Stack>
         </ScrollArea.Autosize>

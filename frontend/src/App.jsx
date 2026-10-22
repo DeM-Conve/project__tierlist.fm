@@ -934,7 +934,7 @@ function BoardLoadError({ error, onRetry }) {
 function usePendingRemovalKeys() {
   const pendingMoves = useSelector(selectPendingMoves);
   return useMemo(
-    () => new Set(pendingMoves.filter((m) => m.kind === 'dedupe').map((m) => `${m.tier}:${m.video.videoId}`)),
+    () => new Set(pendingMoves.filter((m) => m.kind === 'dedupe' && m.tier !== m.keptTier).map((m) => `${m.tier}:${m.video.videoId}`)),
     [pendingMoves]
   );
 }

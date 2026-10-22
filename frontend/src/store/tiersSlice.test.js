@@ -106,10 +106,12 @@ describe('setTierForCategory', () => {
     expect(s.originalTierOf.a).toEqual(['S', 'B']);
   });
 
-  it('records a video twice in one playlist only once for that tier', () => {
-    const s = loaded({ S: ['a', 'a'] });
+  it('a video twice in one playlist: one copy on the board, the rest set aside as duplicates', () => {
+    const s = loaded({ S: ['a', 'b', 'a'] });
     expect(s.originalTierOf.a).toEqual(['S']);
-    expect(ids(s.tierItems.S)).toEqual(['a', 'a']);
+    expect(ids(s.tierItems.S)).toEqual(['a', 'b']);
+    expect(ids(s.originalTierItems.S)).toEqual(['a', 'b']);
+    expect(ids(s.duplicateCopies.S)).toEqual(['a']);
   });
 
   it('handles an empty tier', () => {
@@ -538,6 +540,18 @@ describe('addSyncedVideo / removeSyncedVideo', () => {
 });
 
 describe('applySyncedMoves', () => {
+  it('a pushed same-playlist dedupe drops only that copy - the board keeps its one copy', () => {
+    let s = reducer(init(), resetTierBoard({ presentTiers: ['C'] }));
+    const keep = { ...v('a'), id: 'i1' };
+    const extra = { ...v('a'), id: 'i2' };
+    s = reducer(s, setTierForCategory({ tier: 'C', videos: [keep, extra] }));
+    expect(s.duplicateCopies.C).toEqual([extra]);
+    s = reducer(s, applySyncedMoves({ moves: [{ kind: 'dedupe', video: extra, tier: 'C', keptTier: 'C' }] }));
+    expect(s.duplicateCopies.C).toEqual([]);
+    expect(s.tierItems.C).toEqual([keep]);
+    expect(s.originalTierOf.a).toEqual(['C']);
+  });
+
   it('a move becomes the new baseline', () => {
     let s = loaded({ S: ['a'], A: ['b'] });
     s = reducer(s, moveVideoToTier({ fromTier: 'S', toTier: 'A', videoId: 'a' }));

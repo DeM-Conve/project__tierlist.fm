@@ -15,6 +15,7 @@ import namingReducer, { linkTodoList, setNaming, startMigration } from './naming
 import addSongsReducer from './addSongsSlice';
 import {
   selectDuelPool,
+  selectHasLocalEdits,
   selectDuelRuns,
   selectDuelTierSizes,
   selectFocusSequence,
@@ -174,9 +175,22 @@ describe('selectPendingMoves', () => {
   });
 
   describe('same video twice in one playlist', () => {
-    it('is not a duplicate across tiers and not a pending change', () => {
-      const s = withBoard({ S: ['a', 'a'] });
-      expect(pending(s)).toEqual([]);
+    it('shows one copy and stages every extra copy as a dedupe in that tier', () => {
+      const s = withBoard({ C: ['a', 'x', 'a', 'a'] });
+      expect(s.getState().tiers.tierItems.C.map((x) => x.videoId)).toEqual(['a', 'x']);
+      expect(summary(s)).toEqual(['dedupe a C->C', 'dedupe a C->C']);
+    });
+
+    it('the extra copies are the later playlist items, deleted by their own item id', () => {
+      const s = makeStore();
+      s.dispatch(resetTierBoard({ presentTiers: ['C'] }));
+      s.dispatch(setTierForCategory({ tier: 'C', videos: [{ ...v('a'), id: 'i1' }, { ...v('a'), id: 'i2' }] }));
+      expect(s.getState().tiers.tierItems.C.map((x) => x.id)).toEqual(['i1']);
+      expect(pending(s).map((m) => m.video.id)).toEqual(['i2']);
+    });
+
+    it('is not an edit, so a background refresh still lands', () => {
+      expect(selectHasLocalEdits(withBoard({ S: ['a', 'a'] }).getState())).toBe(false);
     });
   });
 
@@ -293,9 +307,9 @@ describe('focus sequence selectors', () => {
     expect(selectFocusSequence(s.getState()).map((e) => e.video.videoId)).toEqual(['b']);
   });
 
-  it('selectFocusSequence keeps both copies of a video that is twice in a playlist', () => {
+  it('selectFocusSequence plays a video that is twice in a playlist once', () => {
     const s = withBoard({ S: ['a', 'a'] });
-    expect(selectFocusSequence(s.getState())).toHaveLength(2);
+    expect(selectFocusSequence(s.getState())).toHaveLength(1);
   });
 
   it('selectVideoLookup maps videoId -> the last entry for it', () => {

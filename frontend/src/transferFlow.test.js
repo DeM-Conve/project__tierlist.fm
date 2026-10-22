@@ -141,11 +141,12 @@ describe('moving a song to another board', () => {
     expect(selectTransfers(state())).toEqual([]);
   });
 
-  it('two copies of one song: each copy is its own transfer', () => {
+  it('two copies of one song: the board shows one, the other is a staged duplicate removal', () => {
     store.dispatch(loadBoard({ category: 'Rock', data: { S: [v('a'), { ...v('a'), id: 'item-a2' }] } }));
     dragToBoard('a', 'S', 'Pop', POP, 'B');
     store.dispatch(loadBoard({ category: 'Rock', data: { S: [v('a'), { ...v('a'), id: 'item-a2' }] } }));
-    expect(tiers().S.map((x) => x.id)).toEqual(['item-a2']);
+    expect(tiers().S).toEqual([]);
+    expect(selectPendingMoves(state()).map((m) => [m.kind, m.video.id])).toEqual([['dedupe', 'item-a2']]);
   });
 });
 

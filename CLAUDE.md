@@ -339,7 +339,10 @@ category.
 - **Duplicate videos are auto-resolved, not flagged for the user to decide.** If the same
   video exists in two of a board's real tier playlists, the highest-tier copy is kept and
   every other copy is automatically staged as a pending removal (shows in the "N pending"
-  popup as `tier → removed (duplicate)`). No manual dedupe UI.
+  popup as `tier → removed (duplicate)`). The same goes for a video listed more than once
+  in *one* tier playlist (the user's call, 2026-10-22): the board shows only the first copy
+  (`tiersSlice.duplicateCopies` holds the rest) and every extra copy is staged as a dedupe
+  with `keptTier === tier`, deleted by its own playlist-item id on push. No manual dedupe UI.
 - **The embedded video player must never be unmounted/remounted just to change its
   layout.** `PlayerDock` renders in `expanded` (full-screen) or `mini` (bottom bar,
   YouTube-Music-style) mode via CSS class changes on the same DOM shape - never via
