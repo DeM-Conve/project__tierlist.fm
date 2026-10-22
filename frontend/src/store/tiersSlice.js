@@ -59,7 +59,6 @@ function mapBoard(board, fn) {
 // push no copy anywhere still carries an item id YouTube has since deleted
 // (an undo would otherwise bring that stale id back into the next push).
 function mapEveryBoard(state, fn) {
-  const plain = (x) => (isDraft(x) ? current(x) : x);
   const draft = plain(state.tierItems);
   const nextDraft = mapBoard(draft, fn);
   if (nextDraft !== draft) state.tierItems = nextDraft;
@@ -68,6 +67,96 @@ function mapEveryBoard(state, fn) {
     const next = stack.map((b) => mapBoard(b, fn));
     if (next.some((b, i) => b !== stack[i])) state[key] = next;
   }
+}
+
+const plain = (x) => (isDraft(x) ? current(x) : x);
+
+// Same songs, same copies (item ids), same places - an undo from one to the
+// other would change nothing.
+function sameBoard(a, b) {
+  if (a === b) return true;
+  for (const tier of new Set([...Object.keys(a || {}), ...Object.keys(b || {})])) {
+    const x = a?.[tier] || [];
+    const y = b?.[tier] || [];
+    if (x.length !== y.length) return false;
+    for (let i = 0; i < x.length; i++) {
+      if (x[i] !== y[i] && (x[i].id !== y[i].id || x[i].videoId !== y[i].videoId || x[i].transfer !== y[i].transfer)) {
+        return false;
+      }
+    }
+  }
+  return true;
+}
+
+// `board` with every video `gone(video)` left out (`board` itself if none).
+function withoutVideos(board, gone) {
+  if (!board) return board;
+  let changed = false;
+  const out = {};
+  for (const [tier, list] of Object.entries(board)) {
+    out[tier] = (list || []).filter((v) => !gone(v));
+    if (out[tier].length !== (list || []).length) changed = true;
+  }
+  return changed ? out : board;
+}
+
+// `board` with the copy `is(video)` added where `newer` (the board one undo
+// step later) has it, unless it already holds it.
+function withVideoFrom(board, newer, is) {
+  if (Object.values(board).some((list) => (list || []).some(is))) return board;
+  for (const [tier, list] of Object.entries(newer || {})) {
+    const index = (list || []).findIndex(is);
+    if (index < 0) continue;
+    const target = [...(board[tier] || [])];
+    target.splice(Math.min(index, target.length), 0, list[index]);
+    return { ...board, [tier]: target };
+  }
+  return board;
+}
+
+// Undo history vs YouTube. A snapshot is the board as it was before an edit;
+// undoing to it must never quietly bring back a song YouTube no longer has
+// (a pushed removal or duplicate removal, an Add songs filing taken back) or
+// drop one YouTube now has (a pushed transfer's arrival, an Add songs
+// filing) - the board would stop matching YouTube with nothing staged to say
+// so. So when a song's presence on YouTube changes, every snapshot is
+// rebased onto it, and edits made before *and* after stay undoable:
+// - `lost(video)`: copies now gone from YouTube - left out of the draft and
+//   every undo/redo snapshot.
+// - `gained`: predicates for copies now on YouTube (and in the draft): each
+//   undo snapshot lacking one gets it where the next newer board has it, so
+//   an undo leaves it in place. (The redo stack is always cleared by the
+//   callers, so it never needs one.)
+// Where a song *is* (its tier) is not rebased: undoing a pushed move puts
+// the song back in its old tier as a staged move, shown in "N changes
+// staged" like any other - nothing silent. A step that no longer changes
+// anything (undoing the pushed removal itself, or the pushed transfer's
+// drop) is dropped from the history, so Ctrl+Z goes on to the edit before it
+// instead of doing nothing; with no edits left it is a no-op.
+function rebaseHistory(state, { lost = null, gained = [] }) {
+  if (lost) {
+    const draft = plain(state.tierItems);
+    const next = withoutVideos(draft, lost);
+    if (next !== draft) state.tierItems = next;
+    state.redoStack = plain(state.redoStack).map((b) => withoutVideos(b, lost));
+  }
+  const stack = plain(state.undoStack);
+  const rebased = new Array(stack.length);
+  let newer = plain(state.tierItems);
+  for (let i = stack.length - 1; i >= 0; i--) {
+    let snap = lost ? withoutVideos(stack[i], lost) : stack[i];
+    for (const is of gained) snap = withVideoFrom(snap, newer, is);
+    rebased[i] = snap;
+    newer = snap;
+  }
+  const kept = [];
+  newer = plain(state.tierItems);
+  for (let i = rebased.length - 1; i >= 0; i--) {
+    if (sameBoard(rebased[i], newer)) continue;
+    kept.unshift(rebased[i]);
+    newer = rebased[i];
+  }
+  if (kept.length !== stack.length || kept.some((b, i) => b !== stack[i])) state.undoStack = kept;
 }
 
 // A pushed move's song now lives in its new playlist under a new item id
@@ -196,6 +285,13 @@ const tiersSlice = createSlice({
     applySyncedMoves: (state, action) => {
       state.redoStack = [];
       const { moves, newIds = {}, inserted = [] } = action.payload;
+      // Ids of hidden copies (duplicateCopies) before this push: removing one
+      // of those leaves the board's copy alone.
+      const hiddenIds = new Set(
+        Object.values(state.duplicateCopies)
+          .flat()
+          .map((v) => v.id)
+      );
       if (Object.keys(newIds).length) mapEveryBoard(state, (v) => withNewId(v, newIds));
       const toBaseline = (m) => {
         state.originalTierItems[m.from] = (state.originalTierItems[m.from] || []).filter(
@@ -239,6 +335,16 @@ const tiersSlice = createSlice({
         toBaseline(m);
         state.duplicateCopies[m.from] = [...(state.duplicateCopies[m.from] || []), m.video];
       });
+      // Removed playlist items are gone from YouTube: out of every undo /
+      // redo snapshot too (rebaseHistory) - an undo never shows them again.
+      // Matched by item id: another copy of the song (another tier) stays.
+      const goneIds = new Set(
+        moves
+          .filter((m) => m.kind === 'remove' || (m.kind === 'dedupe' && !hiddenIds.has(m.video.id)))
+          .map((m) => m.video.id)
+          .filter(Boolean)
+      );
+      if (goneIds.size) rebaseHistory(state, { lost: (v) => goneIds.has(v.id) });
       if (inserted.length) state.undoStack = [];
     },
     // Item ids a push couldn't report (YouTube returned none), found by
@@ -262,11 +368,17 @@ const tiersSlice = createSlice({
       state.tierItems[tier] = [...(state.tierItems[tier] || []), video];
       state.originalTierItems[tier] = [...(state.originalTierItems[tier] || []), video];
       state.originalTierOf[video.videoId] = [...(state.originalTierOf[video.videoId] || []), tier];
+      // It's on YouTube now: undoing an edit made before it must not take it
+      // off the board (rebaseHistory).
+      if (video.id) rebaseHistory(state, { gained: [(v) => v.id === video.id] });
     },
     // Undo of addSyncedVideo (the playlist item was deleted again).
     removeSyncedVideo: (state, action) => {
       state.redoStack = [];
       const { tier, videoId } = action.payload;
+      // Its playlist item is deleted: no undo snapshot may bring it back.
+      const goneId = (state.tierItems[tier] || []).find((v) => v.videoId === videoId)?.id;
+      if (goneId) rebaseHistory(state, { lost: (v) => v.id === goneId });
       state.tierItems[tier] = (state.tierItems[tier] || []).filter((v) => v.videoId !== videoId);
       state.originalTierItems[tier] = (state.originalTierItems[tier] || []).filter((v) => v.videoId !== videoId);
       state.originalTierOf[videoId] = (state.originalTierOf[videoId] || []).filter((t) => t !== tier);
@@ -337,6 +449,12 @@ const tiersSlice = createSlice({
       if (state.loadedCategory === t.fromCategory && !(state.tierItems[t.fromTier] || []).some((v) => transferId(v) === t.id)) {
         state.tierItems[t.fromTier] = [...(state.tierItems[t.fromTier] || []), t.video];
       }
+      // The transfer is off: an undo never brings its card back here, nor
+      // takes the put-back song away again (rebaseHistory).
+      rebaseHistory(state, {
+        lost: (v) => v.transfer === t.id,
+        gained: state.loadedCategory === t.fromCategory ? [(v) => !v.transfer && transferId(v) === t.id] : [],
+      });
     },
     // Pushed transfers become the open board's new baseline: an arrived song
     // is simply in its tier now, under its new item id (`newIds`, like
@@ -350,6 +468,11 @@ const tiersSlice = createSlice({
       const { transfers, newIds = {}, inserted = [] } = Array.isArray(action.payload)
         ? { transfers: action.payload }
         : action.payload;
+      // An arrived song is on YouTube now: undoing its drop (or an edit made
+      // before it) must not take it off this board (rebaseHistory). Before
+      // the `transfer` marks below are stripped - they identify the card.
+      const landed = transfers.filter((t) => state.loadedCategory === t.toCategory && !t.inserted);
+      if (landed.length) rebaseHistory(state, { gained: landed.map((t) => (v) => v.transfer === t.id) });
       const arrived = (t) => {
         if (state.loadedCategory !== t.toCategory || t.inserted) return;
         const fix = (v) => {

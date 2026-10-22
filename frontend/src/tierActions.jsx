@@ -226,13 +226,20 @@ export const landBoardRefresh = ({ category, data, dataUpdatedAt }) => (dispatch
 // `plan`, syncPlan.buildSyncPlan). What it did becomes the new baseline,
 // under the songs' new item ids; a half-done change keeps only its delete
 // staged; every failure's reason is kept for the review list. -> the outcome.
-export const applySyncOutcome = (plan, results) => (dispatch) => {
+//
+// What the push removed (or added, a transfer's arrival) is taken out of (put
+// into) every undo snapshot - see tiersSlice rebaseHistory. A step that then
+// changes nothing is gone from the history, so the last edit's toast is
+// closed: its Undo would otherwise undo an older edit instead.
+export const applySyncOutcome = (plan, results) => (dispatch, getState) => {
   const o = syncOutcome(plan, results);
+  const stepsBefore = getState().tiers.undoStack.length;
   dispatch(applySyncedMoves({ moves: o.moves, newIds: o.newIds, inserted: o.insertedMoves }));
   dispatch(transfersApplied({ transfers: o.transfers, newIds: o.newIds, inserted: o.insertedTransfers }));
   dispatch(transfersPushed(o.transfers.map((t) => t.id)));
   dispatch(transfersInserted(o.insertedTransfers.map((t) => ({ id: t.id, newItemId: o.newIds[t.video.id] }))));
   dispatch(syncFailuresRecorded({ attempted: plan.payload.map((r) => r.fromItemId), failures: o.failures }));
+  if (getState().tiers.undoStack.length < stepsBefore) notifications.hide(TOAST_ID);
   return o;
 };
 

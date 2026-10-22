@@ -449,6 +449,15 @@ category.
   `moveVideoToTier`/`moveVideos` directly from a component. That's what gives every
   surface the same undo toast, the same Ctrl+Z step (`tiersSlice.undoStack`), and keeps
   the player's `focusedVideo.tier` in sync after a move.
+  **An undo/redo snapshot never resurrects or drops a song relative to YouTube**:
+  whatever changes a song's *presence* on YouTube (a pushed removal / duplicate
+  removal, a pushed transfer's arrival, an Add songs filing or its undo, a transfer
+  put back) rebases every snapshot onto it (`tiersSlice` `rebaseHistory`: gone item
+  ids out of the draft + every snapshot, a new copy into every older snapshot where
+  the next newer board has it), and steps that then change nothing are dropped
+  (`applySyncOutcome` closes the edit toast when that happens). A song's *tier* is
+  not rebased - undoing a pushed move re-stages the way back, visibly. A new
+  reducer that adds or deletes a playlist item must call `rebaseHistory` too.
 - **The tier list is the product's moat** (see `PRODUCT.md`): the Tier Rail
   (`TierRail.jsx`) is always on board pages; board pages render inside `BoardShell`
   in `App.jsx` (rail + shared `PendingChanges` bar, which also owns Shift+P).
