@@ -1,4 +1,5 @@
 import { createSlice } from '@reduxjs/toolkit';
+import { itemIdsRebased, rebaseVideo } from './itemIds';
 
 // Songs staged to move to another board (see transfers.js), plus the song
 // being dragged right now - kept here, not in the board draft, because
@@ -48,6 +49,15 @@ const transfersSlice = createSlice({
     transfersDiscarded: (state) => {
       state.list = state.list.filter((t) => t.inserted);
     },
+  },
+  extraReducers: (builder) => {
+    // A transfer's id is its song's playlist item id: both follow a rebase
+    // (the card on the target board carries the same new id - tiersSlice).
+    builder.addCase(itemIdsRebased, (state, action) => {
+      const renamed = action.payload;
+      state.list = state.list.map((t) => ({ ...t, id: renamed[t.id] ?? t.id, video: rebaseVideo(t.video, renamed) }));
+      if (state.drag) state.drag = { ...state.drag, video: rebaseVideo(state.drag.video, renamed) };
+    });
   },
 });
 

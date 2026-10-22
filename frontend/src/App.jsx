@@ -33,7 +33,9 @@ import { CANVAS_TOP, CANVAS_X, PART_GAP, SHELL_Y } from './layout/spacing';
 import { CanvasContext } from './layout/canvas';
 import PendingChanges from './components/PendingChanges';
 import { applySyncOutcome, landBoardRefresh, loadBoard, moveWithFeedback, syncRequestFailed } from './tierActions';
-import { buildSyncPlan, resolveItemIds, songMoves, touchedPlaylists } from './syncPlan';
+import { buildSyncPlan, resolveItemIds, songMoves } from './syncPlan';
+import { checkItemIds, heldItems, recordPush } from './syncCache';
+import { itemIdsRebased } from './store/itemIds';
 import { dragEnded, transfersDiscarded } from './store/transfersSlice';
 import TierBoardView from './components/TierBoardView';
 import PlayerDock from './components/PlayerDock';
@@ -126,7 +128,6 @@ import {
   usePlaylistsQuery,
   useTierBoardQueries,
   useTierSyncMutation,
-  useInvalidatePlaylistItems,
   useFetchPlaylistItems,
   useFetchVideo,
 } from './api/queries';
@@ -384,7 +385,6 @@ function Layout() {
   });
 
   const tierSyncMutation = useTierSyncMutation();
-  const invalidatePlaylistItems = useInvalidatePlaylistItems();
   const fetchPlaylistItems = useFetchPlaylistItems();
 
   const [shortcutsOpened, shortcutsHandlers] = useDisclosure(false);
@@ -422,18 +422,43 @@ function Layout() {
     return pushChain.current;
   }
   async function runSync(category, videoIds) {
-    const state = store.getState();
-    let moves = selectPendingMoves(state);
-    let staged = selectTransfers(state);
-    if (videoIds) {
-      moves = songMoves(moves, videoIds);
-      staged = [];
-    }
-    if (!moves.length && !staged.length) return;
+    // The changes to push, as the store has them now; `gone` (item ids
+    // YouTube no longer has - see syncCache.js) are left out, staged.
+    const planNow = (gone = new Set()) => {
+      const state = store.getState();
+      let moves = selectPendingMoves(state);
+      let staged = selectTransfers(state);
+      if (videoIds) {
+        moves = songMoves(moves, videoIds);
+        staged = [];
+      }
+      const all = moves.length + staged.length;
+      moves = moves.filter((m) => !gone.has(m.video.id));
+      staged = staged.filter((t) => !gone.has(t.video.id));
+      if (!moves.length && !staged.length) return { plan: null, skipped: all };
+      return { plan: buildSyncPlan(moves, staged, selectTierGroups(state), category), skipped: all - moves.length - staged.length };
+    };
+    if (!planNow().plan) return;
     dispatch(setSyncStatus('syncing'));
-    const plan = buildSyncPlan(moves, staged, selectTierGroups(state), category);
+    const groups = selectTierGroups(store.getState());
+    let plan = null;
 
     try {
+      // Never push an item id older than the last push to its playlist:
+      // re-read whatever playlist the board may hold a stale copy of and
+      // re-point the ids first (syncCache.js checkItemIds).
+      const { renamed, gone } = await checkItemIds(queryClient, heldItems(store.getState(), groups, category));
+      if (Object.keys(renamed).length) dispatch(itemIdsRebased(renamed));
+      const next = planNow(gone);
+      plan = next.plan;
+      if (!plan) {
+        dispatch(setSyncStatus('partial'));
+        setTimeout(() => {
+          if (store.getState().tiers.syncStatus === 'partial') dispatch(setSyncStatus('idle'));
+        }, 2500);
+        return;
+      }
+
       const result = await tierSyncMutation.mutateAsync(plan.payload);
 
       // Apply what actually happened (per-item, from the backend's own
@@ -445,13 +470,13 @@ function Layout() {
       // half-done move keeps only its delete staged, failures keep their
       // reason - see tierActions' applySyncOutcome.
       const outcome = dispatch(applySyncOutcome(plan, result.results));
-      const finishedStatus = Object.keys(outcome.failures).length ? 'partial' : 'done';
+      const finishedStatus = Object.keys(outcome.failures).length || next.skipped ? 'partial' : 'done';
 
-      // Still invalidate the underlying query cache in the background so a
-      // stale copy isn't served if the user leaves and comes back later -
-      // this no longer needs to be awaited before updating the UI. A
-      // transfer also touched another board's playlists.
-      invalidatePlaylistItems(touchedPlaylists(plan, tierGroups, category));
+      // The touched playlists' cached items get what the push did written
+      // into them (not a refetch, which can lag behind it and used to bring
+      // deleted item ids back) - see syncCache.js recordPush. Runs after
+      // applySyncOutcome, so it reads the new item ids from the store.
+      await recordPush(queryClient, { state: store.getState(), plan, results: result.results, tierGroups: groups, category });
       if (plan.transfers.length) queryClient.invalidateQueries({ queryKey: ['playlists'] });
 
       dispatch(setSyncStatus(finishedStatus));
@@ -469,7 +494,12 @@ function Layout() {
         dispatch(itemIdsResolved(resolveItemIds(outcome.unknownIds, itemsOf)));
       }
     } catch (e) {
-      dispatch(syncRequestFailed(plan, errorMessage(e, 'The app couldn’t reach the server - nothing was changed.')));
+      // The request may have half-happened: every touched playlist is
+      // re-read before the next push.
+      if (plan) await recordPush(queryClient, { state: store.getState(), plan, results: null, tierGroups: groups, category }).catch(() => {});
+      // A failed id check has no plan yet: blame the changes it was for.
+      const failedPlan = plan ?? planNow().plan;
+      if (failedPlan) dispatch(syncRequestFailed(failedPlan, errorMessage(e, 'The app couldn’t reach the server - nothing was changed.')));
       dispatch(setSyncStatus('error'));
     }
   }

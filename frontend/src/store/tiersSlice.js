@@ -1,6 +1,7 @@
 import { createSlice, current, isDraft, original } from '@reduxjs/toolkit';
 import { REMOVED_TIER } from '../tiers';
 import { overlayTransfers, transferId } from '../transfers';
+import { itemIdsRebased, rebaseTiers } from './itemIds';
 
 const UNDO_LIMIT = 50;
 
@@ -391,6 +392,20 @@ const tiersSlice = createSlice({
       if (state.undoStack.length > UNDO_LIMIT) state.undoStack.shift();
       state.tierItems = next;
     },
+  },
+  extraReducers: (builder) => {
+    // Stale playlist item ids re-pointed at YouTube's current ones (see
+    // syncCache.js): everywhere a song is held - the draft, its baseline,
+    // the hidden duplicate copies and every undo / redo snapshot - so no
+    // later push, undo or redo brings back an id that no longer exists.
+    builder.addCase(itemIdsRebased, (state, action) => {
+      const renamed = action.payload;
+      state.tierItems = rebaseTiers(original(state.tierItems), renamed);
+      state.originalTierItems = rebaseTiers(original(state.originalTierItems), renamed);
+      state.duplicateCopies = rebaseTiers(original(state.duplicateCopies), renamed);
+      state.undoStack = original(state.undoStack).map((snap) => rebaseTiers(snap, renamed));
+      state.redoStack = original(state.redoStack).map((snap) => rebaseTiers(snap, renamed));
+    });
   },
 });
 
