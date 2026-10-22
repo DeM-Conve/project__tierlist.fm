@@ -6,6 +6,8 @@ import { useNavigate } from 'react-router-dom';
 import { linkTodoList } from '../store/namingSlice';
 import { selectNaming, selectTodoRows } from '../store/selectors';
 import { exampleTitle } from '../naming';
+import { useTierName } from '../tierLabels';
+import { TODO_TIER } from '../tiers';
 
 // A board's "Add a TODO list": use a playlist that's already there (any
 // playlist named like a to-do list that isn't some board's to-do list yet), or
@@ -14,8 +16,10 @@ export default function TodoListModal({ category, onClose, onCreateNew }) {
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const naming = useSelector(selectNaming);
-  const keyword = naming.tierLabels.TODO;
-  const example = exampleTitle(naming, category, 'TODO');
+  // On screen the to-do tier goes by its shown name; the example title uses
+  // the name playlists carry (exampleTitle).
+  const todoName = useTierName()(TODO_TIER);
+  const example = exampleTitle(naming, category, TODO_TIER);
   const rows = useSelector(selectTodoRows);
   const free = rows.filter((r) => r.status !== 'active');
   const [picked, setPicked] = useState(free[0]?.playlist.id ?? null);
@@ -26,7 +30,7 @@ export default function TodoListModal({ category, onClose, onCreateNew }) {
   }
 
   return (
-    <Modal opened onClose={onClose} centered title={<Text fw={800}>{keyword} list for {category}</Text>}>
+    <Modal opened onClose={onClose} centered title={<Text fw={800}>{todoName} list for {category}</Text>}>
       <Stack gap="md">
         <Text fz="sm" c="dimmed">
           Songs waiting for a tier - a playlist named like <b>{example}</b>.

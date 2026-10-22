@@ -496,3 +496,13 @@ describe('TierBoardView - "/" find', () => {
     expect(box()).toBeNull();
   });
 });
+
+describe('TierBoardView - counts', () => {
+  it('the header counts ranked songs and tiers, the to-do list on its own; the mix bar leaves TODO out', () => {
+    renderBoard();
+    expect(screen.getByText('150 videos · 5 tiers · 30 to do')).toBeInTheDocument();
+    const bar = document.querySelector('.mantine-Progress-root');
+    expect(bar.querySelectorAll('.mantine-Progress-section')).toHaveLength(5);
+    expect(within(rowOf('TODO')).getByText('30')).toBeInTheDocument();
+  });
+});
