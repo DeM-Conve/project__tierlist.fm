@@ -5,7 +5,10 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
@@ -22,6 +25,7 @@ import org.springframework.web.client.RestTemplate;
 import java.io.IOException;
 import java.time.Instant;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.nullValue;
@@ -47,6 +51,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 // makes of the answers. Expectations match in any order - batch writes run a
 // few at a time (YoutubeBatch) - so two calls to one URL are told apart by
 // their bodies; a test that pins down an order binds an ordered server.
+@ExtendWith(OutputCaptureExtension.class)
 class PlaylistControllerIT extends PostgresIT {
 
     private static final String YT = "https://www.googleapis.com/youtube/v3";
@@ -349,10 +354,21 @@ class PlaylistControllerIT extends PostgresIT {
             .andRespond(withNoContent());
     }
 
+    private void expectDeleteAnswering(String itemId, HttpStatus status, String reason) {
+        youtube.expect(requestTo(YT + "/playlistItems?id=" + itemId))
+            .andExpect(method(HttpMethod.DELETE))
+            .andRespond(withStatus(status).contentType(MediaType.APPLICATION_JSON)
+                .body(youtubeError(status.value(), reason, reason + " message")));
+    }
+
+    private MockRestServiceServer ordered() {
+        return MockRestServiceServer.bindTo(youtubeRestTemplate).build();
+    }
+
     @Test
-    void aMoveInsertsIntoTheTargetBeforeDeletingTheOriginal() throws Exception {
+    void aMoveInsertsIntoTheTargetBeforeDeletingTheOriginalAndReturnsTheNewItemId() throws Exception {
         // Ordered: moves into one playlist run one after another, insert first.
-        youtube = MockRestServiceServer.bindTo(youtubeRestTemplate).build();
+        youtube = ordered();
         expectInsert("PLrapS", "vid1");
         expectDelete("OLD1");
         expectInsert("PLrapS", "vid2");
@@ -366,7 +382,14 @@ class PlaylistControllerIT extends PostgresIT {
             .andExpect(jsonPath("$.total").value(2))
             .andExpect(jsonPath("$.results[0].videoId").value("vid1"))
             .andExpect(jsonPath("$.results[0].success").value(true))
-            .andExpect(jsonPath("$.results[1].success").value(true));
+            .andExpect(jsonPath("$.results[0].inserted").value(true))
+            .andExpect(jsonPath("$.results[0].removed").value(true))
+            // The song's item id from now on - the old one is gone.
+            .andExpect(jsonPath("$.results[0].newItemId").value("NEW-vid1"))
+            .andExpect(jsonPath("$.results[0].step").doesNotExist())
+            .andExpect(jsonPath("$.results[0].error").doesNotExist())
+            .andExpect(jsonPath("$.results[1].success").value(true))
+            .andExpect(jsonPath("$.results[1].newItemId").value("NEW-vid2"));
     }
 
     @Test
@@ -381,7 +404,13 @@ class PlaylistControllerIT extends PostgresIT {
                  {"videoId": "vid3", "toPlaylistId": "PLrapA"}]"""))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.applied").value(3))
-            .andExpect(jsonPath("$.total").value(3));
+            .andExpect(jsonPath("$.total").value(3))
+            .andExpect(jsonPath("$.results[0].inserted").value(false))
+            .andExpect(jsonPath("$.results[0].removed").value(true))
+            .andExpect(jsonPath("$.results[0].newItemId").doesNotExist())
+            .andExpect(jsonPath("$.results[2].inserted").value(true))
+            .andExpect(jsonPath("$.results[2].removed").value(false)) // there was no source item
+            .andExpect(jsonPath("$.results[2].newItemId").value("NEW-vid3"));
     }
 
     @Test
@@ -402,15 +431,68 @@ class PlaylistControllerIT extends PostgresIT {
             .andExpect(jsonPath("$.applied").value(1))
             .andExpect(jsonPath("$.total").value(2))
             .andExpect(jsonPath("$.results[0].success").value(false))
-            .andExpect(jsonPath("$.results[0].error").value(containsString("403")))
+            .andExpect(jsonPath("$.results[0].inserted").value(false))
+            .andExpect(jsonPath("$.results[0].removed").value(false))
+            .andExpect(jsonPath("$.results[0].newItemId").doesNotExist())
+            .andExpect(jsonPath("$.results[0].step").value("insert"))
+            .andExpect(jsonPath("$.results[0].error").value(containsString("quota")))
             .andExpect(jsonPath("$.results[1].success").value(true))
             .andExpect(jsonPath("$.results[1].error").doesNotExist());
     }
 
     @Test
-    void aFailedDeleteAfterASuccessfulInsertIsReportedAsAFailure() throws Exception {
+    void aDeleteThatFindsTheItemAlreadyGoneIsASuccess() throws Exception {
+        // The bug behind "SOME FAILED": a stale source id 404s on delete.
+        youtube = ordered();
         expectInsert("PLrapS", "vid1");
-        youtube.expect(requestTo(YT + "/playlistItems?id=OLD1"))
+        expectDeleteAnswering("STALE", HttpStatus.NOT_FOUND, "playlistItemNotFound");
+
+        mvc.perform(json(post("/api/tier-sync"), """
+                [{"videoId": "vid1", "fromItemId": "STALE", "toPlaylistId": "PLrapS"}]"""))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.applied").value(1))
+            .andExpect(jsonPath("$.results[0].success").value(true))
+            .andExpect(jsonPath("$.results[0].inserted").value(true))
+            .andExpect(jsonPath("$.results[0].removed").value(true))
+            .andExpect(jsonPath("$.results[0].newItemId").value("NEW-vid1"))
+            .andExpect(jsonPath("$.results[0].step").doesNotExist());
+    }
+
+    @Test
+    void aDuplicateCleanupOfAnAlreadyGoneItemIsASuccess() throws Exception {
+        expectDeleteAnswering("GONE", HttpStatus.NOT_FOUND, "playlistItemNotFound");
+
+        mvc.perform(json(post("/api/tier-sync"), "[{\"videoId\": \"vid1\", \"fromItemId\": \"GONE\"}]"))
+            .andExpect(jsonPath("$.applied").value(1))
+            .andExpect(jsonPath("$.results[0].removed").value(true))
+            .andExpect(jsonPath("$.results[0].inserted").value(false));
+    }
+
+    @Test
+    void aRefusedDeleteAfterASuccessfulInsertSaysSoAndCarriesTheNewItemId(CapturedOutput output) throws Exception {
+        youtube = ordered();
+        expectInsert("PLrapS", "vid1");
+        expectDeleteAnswering("OLD1", HttpStatus.FORBIDDEN, "forbidden"); // final, not retried
+
+        mvc.perform(json(post("/api/tier-sync"), """
+                [{"videoId": "vid1", "fromItemId": "OLD1", "toPlaylistId": "PLrapS"}]"""))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.applied").value(0))
+            .andExpect(jsonPath("$.results[0].success").value(false))
+            .andExpect(jsonPath("$.results[0].inserted").value(true))
+            .andExpect(jsonPath("$.results[0].removed").value(false))
+            .andExpect(jsonPath("$.results[0].newItemId").value("NEW-vid1"))
+            .andExpect(jsonPath("$.results[0].step").value("delete"))
+            .andExpect(jsonPath("$.results[0].error").value(containsString("remove the song from its old playlist")));
+
+        assertThat(output).contains("WARN").contains("tier-sync delete failed for video vid1: YouTube 403 (forbidden)");
+        assertThat(output).doesNotContain(TOKEN);
+    }
+
+    @Test
+    void aDeleteKeepsFailingWithAServerErrorIsReportedAfterTheLastRetry(CapturedOutput output) throws Exception {
+        expectInsert("PLrapS", "vid1");
+        youtube.expect(ExpectedCount.times(PlaylistController.WRITE_ATTEMPTS), requestTo(YT + "/playlistItems?id=OLD1"))
             .andExpect(method(HttpMethod.DELETE))
             .andRespond(withStatus(HttpStatus.INTERNAL_SERVER_ERROR));
 
@@ -419,7 +501,146 @@ class PlaylistControllerIT extends PostgresIT {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.applied").value(0))
             .andExpect(jsonPath("$.results[0].success").value(false))
-            .andExpect(jsonPath("$.results[0].error").value(containsString("500")));
+            .andExpect(jsonPath("$.results[0].inserted").value(true))
+            .andExpect(jsonPath("$.results[0].newItemId").value("NEW-vid1"))
+            .andExpect(jsonPath("$.results[0].step").value("delete"))
+            .andExpect(jsonPath("$.results[0].error").value(containsString("temporary problem")));
+
+        assertThat(output).contains("tier-sync delete failed for video vid1: YouTube 500");
+    }
+
+    @Test
+    void aPassingServerErrorOnADeleteIsRetried() throws Exception {
+        youtube = ordered();
+        expectInsert("PLrapS", "vid1");
+        youtube.expect(requestTo(YT + "/playlistItems?id=OLD1")).andRespond(withStatus(HttpStatus.SERVICE_UNAVAILABLE));
+        youtube.expect(requestTo(YT + "/playlistItems?id=OLD1")).andRespond(withException(new IOException("reset")));
+        expectDelete("OLD1");
+
+        mvc.perform(json(post("/api/tier-sync"), """
+                [{"videoId": "vid1", "fromItemId": "OLD1", "toPlaylistId": "PLrapS"}]"""))
+            .andExpect(jsonPath("$.applied").value(1))
+            .andExpect(jsonPath("$.results[0].removed").value(true));
+    }
+
+    @Test
+    void aRetriedDeleteThatTookEffectTheFirstTimeIsASuccess() throws Exception {
+        // The 503'd delete went through after all: the retry finds it gone.
+        youtube = ordered();
+        youtube.expect(requestTo(YT + "/playlistItems?id=OLD1")).andRespond(withStatus(HttpStatus.SERVICE_UNAVAILABLE));
+        expectDeleteAnswering("OLD1", HttpStatus.NOT_FOUND, "playlistItemNotFound");
+
+        mvc.perform(json(post("/api/tier-sync"), "[{\"videoId\": \"vid1\", \"fromItemId\": \"OLD1\"}]"))
+            .andExpect(jsonPath("$.applied").value(1))
+            .andExpect(jsonPath("$.results[0].removed").value(true));
+    }
+
+    @Test
+    void aServerErrorOnAnInsertIsNotRetriedSinceItMayHaveLandedAndTheOriginalStays(CapturedOutput output) throws Exception {
+        youtube.expect(ExpectedCount.once(), requestTo(YT + "/playlistItems?part=snippet"))
+            .andExpect(method(HttpMethod.POST))
+            .andRespond(withStatus(HttpStatus.INTERNAL_SERVER_ERROR).contentType(MediaType.APPLICATION_JSON)
+                .body(youtubeError(500, "backendError", "Backend Error")));
+
+        mvc.perform(json(post("/api/tier-sync"), """
+                [{"videoId": "vid1", "fromItemId": "OLD1", "toPlaylistId": "PLrapS"}]"""))
+            .andExpect(jsonPath("$.results[0].success").value(false))
+            .andExpect(jsonPath("$.results[0].inserted").value(false))
+            .andExpect(jsonPath("$.results[0].removed").value(false))
+            .andExpect(jsonPath("$.results[0].step").value("insert"))
+            .andExpect(jsonPath("$.results[0].error").value(containsString("temporary problem")));
+
+        assertThat(output).contains("tier-sync insert failed for video vid1: YouTube 500 (backendError): Backend Error");
+    }
+
+    @Test
+    void anAbortedInsertIsTriedAgain() throws Exception {
+        youtube = ordered();
+        youtube.expect(requestTo(YT + "/playlistItems?part=snippet"))
+            .andRespond(withStatus(HttpStatus.CONFLICT).contentType(MediaType.APPLICATION_JSON)
+                .body(youtubeError(409, "SERVICE_UNAVAILABLE", "The operation was aborted.")));
+        expectInsert("PLrapS", "vid1");
+        expectDelete("OLD1");
+
+        mvc.perform(json(post("/api/tier-sync"), """
+                [{"videoId": "vid1", "fromItemId": "OLD1", "toPlaylistId": "PLrapS"}]"""))
+            .andExpect(jsonPath("$.applied").value(1))
+            .andExpect(jsonPath("$.results[0].newItemId").value("NEW-vid1"));
+    }
+
+    @Test
+    void insertFailuresSayWhatIsMissingOrUnreachable() throws Exception {
+        youtube.expect(requestTo(YT + "/playlistItems?part=snippet"))
+            .andExpect(content().json("{\"snippet\": {\"playlistId\": \"PLrapS\"}}"))
+            .andRespond(withStatus(HttpStatus.NOT_FOUND).contentType(MediaType.APPLICATION_JSON)
+                .body(youtubeError(404, "videoNotFound", "Video not found.")));
+        youtube.expect(requestTo(YT + "/playlistItems?part=snippet"))
+            .andExpect(content().json("{\"snippet\": {\"playlistId\": \"PLgone\"}}"))
+            .andRespond(withStatus(HttpStatus.NOT_FOUND).contentType(MediaType.APPLICATION_JSON)
+                .body(youtubeError(404, "playlistNotFound", "Playlist not found.")));
+        youtube.expect(ExpectedCount.once(), requestTo(YT + "/playlistItems?part=snippet"))
+            .andExpect(content().json("{\"snippet\": {\"playlistId\": \"PLnet\"}}"))
+            .andRespond(withException(new IOException("timed out")));
+
+        mvc.perform(json(post("/api/tier-sync"), """
+                [{"videoId": "vid1", "fromItemId": "OLD1", "toPlaylistId": "PLrapS"},
+                 {"videoId": "vid2", "fromItemId": "OLD2", "toPlaylistId": "PLgone"},
+                 {"videoId": "vid3", "fromItemId": "OLD3", "toPlaylistId": "PLnet"}]"""))
+            .andExpect(jsonPath("$.applied").value(0))
+            .andExpect(jsonPath("$.results[0].error").value(containsString("no longer on YouTube")))
+            .andExpect(jsonPath("$.results[1].error").value(containsString("playlist no longer exists")))
+            .andExpect(jsonPath("$.results[2].error").value(containsString("Couldn't reach YouTube")))
+            .andExpect(jsonPath("$.results[2].step").value("insert"));
+    }
+
+    @Test
+    void aRowRepeatingAnEarlierRowIsNotSentToYoutubeTwice() throws Exception {
+        // Same source item twice: one insert, one delete - never a second copy.
+        youtube.expect(ExpectedCount.once(), requestTo(YT + "/playlistItems?part=snippet"))
+            .andExpect(content().json("{\"snippet\": {\"playlistId\": \"PLrapS\"}}"))
+            .andRespond(withSuccess("{\"id\": \"NEW-vid1\"}", MediaType.APPLICATION_JSON));
+        youtube.expect(ExpectedCount.once(), requestTo(YT + "/playlistItems?id=OLD1")).andRespond(withNoContent());
+        // Insert-only rows: the same video into the same playlist once.
+        youtube.expect(ExpectedCount.once(), requestTo(YT + "/playlistItems?part=snippet"))
+            .andExpect(content().json("{\"snippet\": {\"playlistId\": \"PLrapA\"}}"))
+            .andRespond(withSuccess("{\"id\": \"NEW-vid2\"}", MediaType.APPLICATION_JSON));
+
+        mvc.perform(json(post("/api/tier-sync"), """
+                [{"videoId": "vid1", "fromItemId": "OLD1", "toPlaylistId": "PLrapS"},
+                 {"videoId": "vid2", "toPlaylistId": "PLrapA"},
+                 {"videoId": "vid1", "fromItemId": "OLD1", "toPlaylistId": "PLrapS"},
+                 {"videoId": "vid1", "fromItemId": "OLD1", "toPlaylistId": "PLrapB"},
+                 {"videoId": "vid2", "toPlaylistId": "PLrapA"}]"""))
+            .andExpect(jsonPath("$.total").value(5))
+            .andExpect(jsonPath("$.applied").value(4))
+            .andExpect(jsonPath("$.results[2].success").value(true))
+            .andExpect(jsonPath("$.results[2].newItemId").value("NEW-vid1"))
+            // The same item sent to another tier too: only the first move is made.
+            .andExpect(jsonPath("$.results[3].success").value(false))
+            .andExpect(jsonPath("$.results[3].inserted").value(false))
+            .andExpect(jsonPath("$.results[3].removed").value(true))
+            .andExpect(jsonPath("$.results[3].step").value("insert"))
+            .andExpect(jsonPath("$.results[3].error").value(containsString("already moved")))
+            .andExpect(jsonPath("$.results[4].newItemId").value("NEW-vid2"));
+    }
+
+    @Test
+    void aMoveWithoutAVideoIdFailsWithoutCallingYoutube() throws Exception {
+        mvc.perform(json(post("/api/tier-sync"), "[{\"fromItemId\": \"OLD1\", \"toPlaylistId\": \"PLrapS\"}]"))
+            .andExpect(jsonPath("$.applied").value(0))
+            .andExpect(jsonPath("$.results[0].success").value(false))
+            .andExpect(jsonPath("$.results[0].step").value("insert"))
+            .andExpect(jsonPath("$.results[0].removed").value(false));
+    }
+
+    @Test
+    void anInsertAnswerWithoutAnIdStillCountsAsInserted() throws Exception {
+        youtube.expect(requestTo(YT + "/playlistItems?part=snippet")).andRespond(withSuccess("{}", MediaType.APPLICATION_JSON));
+
+        mvc.perform(json(post("/api/tier-sync"), "[{\"videoId\": \"vid1\", \"toPlaylistId\": \"PLrapS\"}]"))
+            .andExpect(jsonPath("$.results[0].success").value(true))
+            .andExpect(jsonPath("$.results[0].inserted").value(true))
+            .andExpect(jsonPath("$.results[0].newItemId").value(nullValue()));
     }
 
     @Test

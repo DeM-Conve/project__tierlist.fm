@@ -106,4 +106,28 @@ class YoutubeErrorHandlerTest {
         assertThat(problem.getStatus()).isEqualTo(502);
         assertThat(problem.getDetail()).isEqualTo("YouTube refused the request: Forbidden");
     }
+
+    // ---- PlaylistController.writeFailure: one tier-sync item's sentence ----
+
+    private static String writeFailure(String step, int status, String body) {
+        return PlaylistController.writeFailure(step, YoutubeError.of(youtube(status, body)));
+    }
+
+    @Test
+    void aWriteFailureIsSpecificWhereTheStepSaysMore() {
+        assertThat(writeFailure("insert", 404, error(404, "videoNotFound", "x"))).contains("no longer on YouTube");
+        assertThat(writeFailure("insert", 404, error(404, "playlistNotFound", "x"))).contains("playlist no longer exists");
+        assertThat(writeFailure("delete", 403, error(403, "forbidden", "x"))).contains("won't let this app remove");
+        assertThat(writeFailure("insert", 409, error(409, "SERVICE_UNAVAILABLE", "aborted"))).contains("busy");
+        assertThat(writeFailure("delete", 503, "")).contains("temporary problem");
+    }
+
+    @Test
+    void anyOtherWriteFailureUsesTheSharedSentence() {
+        assertThat(writeFailure("insert", 403, error(403, "quotaExceeded", "q"))).contains("quota");
+        assertThat(writeFailure("delete", 401, error(401, "authError", "a"))).contains("log out and back in");
+        assertThat(writeFailure("delete", 403, error(403, "insufficientPermissions", "p"))).contains("tick the YouTube permission");
+        assertThat(writeFailure("insert", 403, error(403, "forbidden", "Forbidden"))).isEqualTo("YouTube refused the request: Forbidden");
+        assertThat(writeFailure("insert", 400, "not json")).isEqualTo("YouTube refused the request.");
+    }
 }

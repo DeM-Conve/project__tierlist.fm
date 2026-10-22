@@ -3,6 +3,8 @@ package fm.tierlist.controller;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.client.HttpClientErrorException;
+import org.springframework.web.client.HttpServerErrorException;
+import org.springframework.web.client.ResourceAccessException;
 
 import java.util.Collections;
 import java.util.List;
@@ -90,7 +92,7 @@ class YoutubeBatchTest {
             return "ok";
         });
         assertThat(result).isEqualTo("ok");
-        assertThat(calls).hasValue(PlaylistController.WRITE_ATTEMPTS);
+        assertThat(calls).hasValue(3);
     }
 
     @Test
@@ -111,6 +113,66 @@ class YoutubeBatchTest {
             throw HttpClientErrorException.create(HttpStatus.FORBIDDEN, "Forbidden", null, null, null);
         })).isInstanceOf(HttpClientErrorException.Forbidden.class);
         assertThat(calls).hasValue(1);
+    }
+
+    @Test
+    void aServerErrorIsNotRetriedForANonRepeatableWrite() {
+        // An insert that 500s may still have landed - repeating it would duplicate the video.
+        AtomicInteger calls = new AtomicInteger();
+        assertThatThrownBy(() -> PlaylistController.retryAborted(() -> {
+            calls.incrementAndGet();
+            throw HttpServerErrorException.create(HttpStatus.INTERNAL_SERVER_ERROR, "Error", null, null, null);
+        })).isInstanceOf(HttpServerErrorException.class);
+        assertThat(calls).hasValue(1);
+    }
+
+    @Test
+    void aRepeatableWriteRetriesServerErrorsNetworkFailuresAndAborts() {
+        AtomicInteger calls = new AtomicInteger();
+        String result = PlaylistController.retryTransient(() -> switch (calls.incrementAndGet()) {
+            case 1 -> throw HttpServerErrorException.create(HttpStatus.SERVICE_UNAVAILABLE, "Unavailable", null, null, null);
+            case 2 -> throw new ResourceAccessException("reset");
+            case 3 -> throw HttpClientErrorException.create(HttpStatus.CONFLICT, "Conflict", null, null, null);
+            default -> "ok";
+        });
+        assertThat(result).isEqualTo("ok");
+        assertThat(calls).hasValue(4);
+    }
+
+    @Test
+    void aRepeatableWriteStillStopsOnAFinalError() {
+        AtomicInteger calls = new AtomicInteger();
+        assertThatThrownBy(() -> PlaylistController.retryTransient(() -> {
+            calls.incrementAndGet();
+            throw HttpClientErrorException.create(HttpStatus.NOT_FOUND, "Not Found", null, null, null);
+        })).isInstanceOf(HttpClientErrorException.NotFound.class);
+        assertThat(calls).hasValue(1);
+    }
+
+    @Test
+    void anInterruptedWaitGivesUpAtOnce() {
+        AtomicInteger calls = new AtomicInteger();
+        Thread.currentThread().interrupt();
+        try {
+            assertThatThrownBy(() -> PlaylistController.retryAborted(() -> {
+                calls.incrementAndGet();
+                throw HttpClientErrorException.create(HttpStatus.CONFLICT, "Conflict", null, null, null);
+            })).isInstanceOf(HttpClientErrorException.Conflict.class);
+            assertThat(calls).hasValue(1);
+            assertThat(Thread.currentThread().isInterrupted()).isTrue();
+        } finally {
+            Thread.interrupted(); // clear for the next test
+        }
+    }
+
+    @Test
+    void theWaitGrowsAndIsJittered() {
+        for (int attempt = 1; attempt < PlaylistController.WRITE_ATTEMPTS; attempt++) {
+            long base = PlaylistController.RETRY_BASE_MILLIS << (attempt - 1);
+            for (int i = 0; i < 50; i++) {
+                assertThat(PlaylistController.backoff(attempt)).isBetween(base, base + base / 2);
+            }
+        }
     }
 
     private static void sleep(long ms) {

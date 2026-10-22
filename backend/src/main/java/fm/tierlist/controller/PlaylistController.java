@@ -1,5 +1,7 @@
 package fm.tierlist.controller;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
@@ -20,17 +22,26 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.client.HttpClientErrorException;
+import org.springframework.web.client.HttpServerErrorException;
+import org.springframework.web.client.HttpStatusCodeException;
+import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestTemplate;
 
 import java.net.URI;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.concurrent.ThreadLocalRandom;
+import java.util.function.Predicate;
 import java.util.function.Supplier;
 
 @RestController
 public class PlaylistController {
+
+    private static final Logger log = LoggerFactory.getLogger(PlaylistController.class);
 
     // How many YouTube writes a batch (tier-sync, rename, create) runs at
     // once - see YoutubeBatch. Inside the HTTP client's per-host pool (5).
@@ -181,38 +192,157 @@ public class PlaylistController {
      * removes the original playlistItem, so a failed delete never loses a video.
      * A null/blank toPlaylistId means "delete only" - used for a duplicate cleanup,
      * where the video already exists in another of this board's tier playlists and
-     * this occurrence is just the redundant copy, not a real move.
+     * this occurrence is just the redundant copy, not a real move. A missing
+     * fromItemId means "insert only" (a new filing).
      * Each entry is applied independently; failures are reported per-item rather than
-     * aborting the whole batch.
+     * aborting the whole batch. Body: [{ "videoId", "fromItemId"?, "toPlaylistId"? }].
+     * <p>
+     * Each result: {@code videoId}, {@code success}, {@code inserted} (the insert
+     * ran and YouTube took it), {@code removed} (the source item is gone - deleted
+     * now, or YouTube says it already was), {@code newItemId} (the inserted
+     * playlistItem's id, only when {@code inserted}) and, on failure, {@code step}
+     * ("insert" | "delete") and a plain-language {@code error}. The new id matters:
+     * the browser must use it as the song's item id from now on, or its next move
+     * deletes the old (gone) id and re-inserts - a duplicate.
+     * <p>
+     * A row repeating an earlier row's source item (or an earlier insert-only row)
+     * is not sent to YouTube again - that second insert would be a duplicate.
      */
     @PostMapping("/api/tier-sync")
     public Map<String, Object> tierSync(
             @RequestBody List<Map<String, Object>> moves,
             @RegisteredOAuth2AuthorizedClient("google") OAuth2AuthorizedClient client
     ) {
+        int[] repeats = new int[moves.size()]; // index of the earlier row this one repeats, or -1
+        Map<String, Integer> firstRow = new HashMap<>();
+        List<Integer> toRun = new ArrayList<>();
+        for (int i = 0; i < moves.size(); i++) {
+            String key = rowKey(moves.get(i));
+            Integer first = key == null ? null : firstRow.putIfAbsent(key, i);
+            repeats[i] = first == null ? -1 : first;
+            if (first == null) toRun.add(i);
+        }
         // Moves into the same playlist run one after another (keyed by it).
-        List<Map<String, Object>> results = YoutubeBatch.run(moves, WRITE_PARALLELISM, move -> move.get("toPlaylistId"), move -> {
-            String videoId = (String) move.get("videoId");
-            String fromItemId = (String) move.get("fromItemId");
-            String toPlaylistId = (String) move.get("toPlaylistId");
+        List<Map<String, Object>> ran = YoutubeBatch.run(toRun, WRITE_PARALLELISM,
+            i -> moves.get(i).get("toPlaylistId"), i -> moveOne(client, moves.get(i)));
 
-            Map<String, Object> result = new LinkedHashMap<>();
-            result.put("videoId", videoId);
-            try {
-                if (toPlaylistId != null && !toPlaylistId.isBlank()) {
-                    insertPlaylistItem(client, toPlaylistId, videoId);
-                }
-                if (fromItemId != null) {
-                    deletePlaylistItem(client, fromItemId);
-                }
-                result.put("success", true);
-            } catch (Exception e) {
-                result.put("success", false);
-                result.put("error", e.getMessage());
-            }
-            return result;
-        });
+        Map<Integer, Map<String, Object>> byRow = new HashMap<>();
+        for (int k = 0; k < toRun.size(); k++) byRow.put(toRun.get(k), ran.get(k));
+        List<Map<String, Object>> results = new ArrayList<>();
+        for (int i = 0; i < moves.size(); i++) {
+            results.add(repeats[i] < 0 ? byRow.get(i) : repeatOf(moves.get(i), moves.get(repeats[i]), byRow.get(repeats[i])));
+        }
         return batchResponse(results);
+    }
+
+    // Two rows doing the same YouTube work share a key: the same source item,
+    // or (insert-only) the same video into the same playlist. Null = nothing to do.
+    private static String rowKey(Map<String, Object> move) {
+        String fromItemId = text(move.get("fromItemId"));
+        String toPlaylistId = text(move.get("toPlaylistId"));
+        if (fromItemId != null) return "from:" + fromItemId;
+        if (toPlaylistId != null) return "new:" + move.get("videoId") + "\n" + toPlaylistId;
+        return null;
+    }
+
+    private static Map<String, Object> repeatOf(Map<String, Object> move, Map<String, Object> first, Map<String, Object> firstResult) {
+        String videoId = (String) move.get("videoId");
+        if (Objects.equals(text(move.get("toPlaylistId")), text(first.get("toPlaylistId")))) {
+            Map<String, Object> same = new LinkedHashMap<>(firstResult);
+            same.put("videoId", videoId);
+            return same;
+        }
+        log.warn("tier-sync insert skipped for video {}: its source item is moved by an earlier row of the same push", videoId);
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("videoId", videoId);
+        result.put("success", false);
+        result.put("inserted", false);
+        result.put("removed", firstResult.get("removed"));
+        result.put("step", "insert");
+        result.put("error", "This song was already moved to another tier in this push - only that move was made.");
+        return result;
+    }
+
+    // One row of a tier-sync: insert (if a target), then delete (if a source).
+    private Map<String, Object> moveOne(OAuth2AuthorizedClient client, Map<String, Object> move) {
+        String videoId = (String) move.get("videoId");
+        String fromItemId = text(move.get("fromItemId"));
+        String toPlaylistId = text(move.get("toPlaylistId"));
+
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("videoId", videoId);
+        boolean inserted = false;
+        String newItemId = null;
+        if (toPlaylistId != null) {
+            if (videoId == null || videoId.isBlank()) {
+                log.warn("tier-sync insert failed: no videoId in the request");
+                return finish(result, false, false, false, null, "insert", "No video id was sent for this song.");
+            }
+            try {
+                Map<String, Object> item = insertPlaylistItem(client, toPlaylistId, videoId);
+                inserted = true;
+                newItemId = item != null && item.get("id") instanceof String id ? id : null;
+            } catch (RuntimeException e) {
+                return finish(result, false, false, false, null, "insert", failure("insert", videoId, e));
+            }
+        }
+        boolean removed = false;
+        if (fromItemId != null) {
+            try {
+                deletePlaylistItem(client, fromItemId);
+                removed = true;
+            } catch (HttpClientErrorException.NotFound e) {
+                removed = true; // already gone - what the delete was for
+            } catch (RuntimeException e) {
+                return finish(result, false, inserted, false, newItemId, "delete", failure("delete", videoId, e));
+            }
+        }
+        return finish(result, true, inserted, removed, newItemId, null, null);
+    }
+
+    private static Map<String, Object> finish(Map<String, Object> result, boolean success, boolean inserted,
+                                              boolean removed, String newItemId, String step, String error) {
+        result.put("success", success);
+        result.put("inserted", inserted);
+        result.put("removed", removed);
+        if (inserted) result.put("newItemId", newItemId);
+        if (step != null) {
+            result.put("step", step);
+            result.put("error", error);
+        }
+        return result;
+    }
+
+    // Logs one failed write (YouTube's status / reason only - never the token)
+    // and says in plain words what went wrong.
+    private static String failure(String step, String videoId, RuntimeException e) {
+        if (e instanceof HttpStatusCodeException http) {
+            YoutubeError error = YoutubeError.of(http);
+            log.warn("tier-sync {} failed for video {}: YouTube {} ({}): {}",
+                step, videoId, error.youtubeStatus(), error.reason(), error.message());
+            return writeFailure(step, error);
+        }
+        log.warn("tier-sync {} failed for video {}: {}", step, videoId, e.toString());
+        if (e instanceof ResourceAccessException) return "Couldn't reach YouTube - check the connection and push again.";
+        return "Something went wrong talking to YouTube - push again.";
+    }
+
+    // The per-item sentence for a failed tier-sync write: the shared mapping,
+    // made specific where the step tells us more.
+    static String writeFailure(String step, YoutubeError error) {
+        String reason = error.reason() == null ? "" : error.reason();
+        if (reason.equals("videoNotFound")) return "This video is no longer on YouTube (deleted or made private).";
+        if (reason.equals("playlistNotFound")) return "The target playlist no longer exists on YouTube.";
+        if ("delete".equals(step) && error.youtubeStatus() == 403 && error.status() == HttpStatus.BAD_GATEWAY) {
+            return "YouTube won't let this app remove the song from its old playlist.";
+        }
+        if (error.youtubeStatus() == 409) return "YouTube was busy with this playlist and gave up - push again.";
+        if (error.youtubeStatus() >= 500) return "YouTube had a temporary problem - push again.";
+        return error.detail();
+    }
+
+    private static String text(Object value) {
+        return value instanceof String s && !s.isBlank() ? s : null;
     }
 
     private static Map<String, Object> batchResponse(List<Map<String, Object>> results) {
@@ -303,6 +433,8 @@ public class PlaylistController {
         return retryAborted(() -> restTemplate.exchange(url, method, new HttpEntity<>(body, headers), Map.class).getBody());
     }
 
+    // Not retried beyond YouTube's 409: a 5xx / timeout on an insert may
+    // still have added the video, and trying again would add it twice.
     private Map<String, Object> insertPlaylistItem(OAuth2AuthorizedClient client, String playlistId, String videoId) {
         HttpHeaders headers = new HttpHeaders();
         headers.setBearerAuth(client.getAccessToken().getTokenValue());
@@ -316,11 +448,14 @@ public class PlaylistController {
         return retryAborted(() -> restTemplate.exchange(apiBase + "/playlistItems?part=snippet", HttpMethod.POST, entity, Map.class).getBody());
     }
 
+    // A delete is safe to repeat (a second one that finds it gone is a 404,
+    // which callers treat as done), so YouTube's passing 5xx and network
+    // blips are retried too.
     private void deletePlaylistItem(OAuth2AuthorizedClient client, String playlistItemId) {
         HttpHeaders headers = new HttpHeaders();
         headers.setBearerAuth(client.getAccessToken().getTokenValue());
         HttpEntity<Void> entity = new HttpEntity<>(headers);
-        retryAborted(() -> restTemplate.exchange(
+        retryTransient(() -> restTemplate.exchange(
             apiBase + "/playlistItems?id=" + playlistItemId,
             HttpMethod.DELETE,
             entity,
@@ -328,25 +463,49 @@ public class PlaylistController {
         ));
     }
 
-    static final int WRITE_ATTEMPTS = 3;
+    static final int WRITE_ATTEMPTS = 4;
+    static final long RETRY_BASE_MILLIS = 200;
 
-    // YouTube answers 409 ABORTED when two writes touch one playlist at once
-    // (batches run a few writes in parallel). Nothing was applied, so the
-    // write is simply tried again after a short wait; any other error is final.
+    // YouTube answers 409 ABORTED (reason SERVICE_UNAVAILABLE) when two writes
+    // touch one playlist at once - batches run a few writes in parallel, and a
+    // move's delete hits its *source* playlist, which another group may be
+    // writing to. Nothing was applied, so the write is simply tried again
+    // after a growing, jittered wait (so colliding writers spread out); any
+    // other error is final.
     static <T> T retryAborted(Supplier<T> write) {
+        return retry(write, PlaylistController::aborted);
+    }
+
+    // retryAborted, plus YouTube's 5xx (backendError, ...) and network
+    // failures - only for writes that are safe to repeat.
+    static <T> T retryTransient(Supplier<T> write) {
+        return retry(write, e -> aborted(e) || e instanceof HttpServerErrorException || e instanceof ResourceAccessException);
+    }
+
+    private static boolean aborted(RuntimeException e) {
+        return e instanceof HttpClientErrorException.Conflict;
+    }
+
+    private static <T> T retry(Supplier<T> write, Predicate<RuntimeException> retryable) {
         for (int attempt = 1; ; attempt++) {
             try {
                 return write.get();
-            } catch (HttpClientErrorException.Conflict e) {
-                if (attempt >= WRITE_ATTEMPTS) throw e;
+            } catch (RuntimeException e) {
+                if (attempt >= WRITE_ATTEMPTS || !retryable.test(e)) throw e;
                 try {
-                    Thread.sleep(250L * attempt);
+                    Thread.sleep(backoff(attempt));
                 } catch (InterruptedException ie) {
                     Thread.currentThread().interrupt();
                     throw e;
                 }
             }
         }
+    }
+
+    // 200, 400, 800 ms (+ up to half again, random) before attempts 2, 3, 4.
+    static long backoff(int attempt) {
+        long base = RETRY_BASE_MILLIS << (attempt - 1);
+        return base + ThreadLocalRandom.current().nextLong(base / 2 + 1);
     }
 
     private List<Map<String, Object>> fetchAllPages(OAuth2AuthorizedClient client, String baseUrl) {

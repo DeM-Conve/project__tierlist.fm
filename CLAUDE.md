@@ -313,7 +313,13 @@ category.
   never waits on the chunk. Every YouTube read asks for only the fields it uses
   (`fields=`). Batch writes (tier-sync, rename, create) run through
   `YoutubeBatch` (4 at a time, one-at-a-time per target playlist, results in
-  input order) with `retryAborted` on YouTube's 409. The sidebar prefetches a
+  input order) with `retryAborted` on YouTube's 409 (deletes, being safe to
+  repeat, also retry 5xx/network errors via `retryTransient`; inserts never do -
+  a 500'd insert may have landed). Tier-sync results carry `inserted`, `removed`,
+  `newItemId` and, on failure, `step` + a plain-language `error`; a delete that
+  404s counts as removed, and every failed item is logged at WARN. The browser
+  must adopt `newItemId` as the song's item id, or its next move re-inserts (a
+  duplicate) and deletes a stale id. The sidebar prefetches a
   board when the pointer rests on it (`usePrefetchBoard`, same query as the
   board). Entities with assigned ids that are inserted in bulk implement
   `Persistable` (`DuelPrior`) so `save()` doesn't SELECT per row.
