@@ -7,6 +7,9 @@ import org.springframework.web.client.HttpServerErrorException;
 import org.springframework.web.client.ResourceAccessException;
 
 import java.util.Collections;
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.List;
 import java.util.ArrayList;
 import java.util.concurrent.CountDownLatch;
@@ -80,6 +83,71 @@ class YoutubeBatchTest {
         List<Job> jobs = List.of(new Job(null, 0), new Job(null, 1));
         assertThat(YoutubeBatch.run(jobs, 4, Job::key, Job::n)).containsExactly(0, 1);
         assertThat(YoutubeBatch.<Job, Integer>run(List.of(), 4, Job::key, Job::n)).isEmpty();
+    }
+
+    // ---- runLocked: an item writing to several playlists ------------------
+
+    record Move(Set<String> playlists, int n) {
+    }
+
+    @Test
+    void itemsSharingAnyPlaylistNeverOverlapAndKeepTheirOrder() {
+        // 0 writes A+S, 1 writes S+B (its source is 0's target), 2 writes B+C, 3 is unrelated.
+        List<Move> moves = List.of(new Move(Set.of("A", "S"), 0), new Move(Set.of("S", "B"), 1),
+            new Move(Set.of("B", "C"), 2), new Move(Set.of("X"), 3));
+        Map<String, AtomicInteger> busy = new ConcurrentHashMap<>();
+        AtomicInteger overlap = new AtomicInteger();
+        List<Integer> chain = Collections.synchronizedList(new ArrayList<>());
+        List<Integer> out = YoutubeBatch.runLocked(moves, 4, Move::playlists, m -> {
+            for (String p : m.playlists()) if (busy.computeIfAbsent(p, k -> new AtomicInteger()).incrementAndGet() > 1) overlap.incrementAndGet();
+            if (m.n() < 3) chain.add(m.n());
+            sleep(15);
+            for (String p : m.playlists()) busy.get(p).decrementAndGet();
+            return m.n();
+        });
+        assertThat(overlap).hasValue(0);
+        assertThat(chain).containsExactly(0, 1, 2);
+        assertThat(out).containsExactly(0, 1, 2, 3);
+    }
+
+    @Test
+    void itemsWithNoPlaylistInCommonStillRunAtTheSameTime() {
+        CountDownLatch allStarted = new CountDownLatch(3);
+        List<Move> moves = List.of(new Move(Set.of("A", "S"), 0), new Move(Set.of("B", "T"), 1), new Move(Set.of(), 2));
+        List<Boolean> out = YoutubeBatch.runLocked(moves, 4, Move::playlists, m -> {
+            allStarted.countDown();
+            return await(allStarted);
+        });
+        assertThat(out).containsExactly(true, true, true);
+    }
+
+    @Test
+    void aParallelismOfOneRunsEverythingInOrder() {
+        List<Integer> seen = new ArrayList<>();
+        YoutubeBatch.runLocked(List.of(new Move(Set.of("A"), 0), new Move(Set.of("B"), 1)), 1, Move::playlists, m -> {
+            seen.add(m.n());
+            return m.n();
+        });
+        assertThat(seen).containsExactly(0, 1);
+    }
+
+    // ---- PlaylistController.playlistsWritten --------------------------------
+
+    @Test
+    void aRowWithItsSourcePlaylistLocksTargetAndSource() {
+        assertThat(PlaylistController.playlistsWritten(Map.of("toPlaylistId", "PLs", "fromPlaylistId", "PLa")))
+            .containsExactlyInAnyOrder("PLs", "PLa");
+        // A dedupe (delete only) locks just its source.
+        assertThat(PlaylistController.playlistsWritten(Map.of("fromPlaylistId", "PLa", "toPlaylistId", " ")))
+            .containsExactly("PLa");
+    }
+
+    @Test
+    void aRowWithoutItsSourcePlaylistIsKeyedByItsTargetAsBefore() {
+        assertThat(PlaylistController.playlistsWritten(Map.of("toPlaylistId", "PLs"))).containsExactly("PLs");
+        assertThat(PlaylistController.playlistsWritten(Map.of("fromItemId", "OLD"))).containsExactly("");
+        assertThat(PlaylistController.playlistsWritten(Map.of("toPlaylistId", "PLs", "fromPlaylistId", "")))
+            .containsExactly("PLs");
     }
 
     // ---- PlaylistController.retryAborted ------------------------------------

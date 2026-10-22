@@ -312,8 +312,9 @@ category.
   a lazy view gets its *own* `Suspense` inside its page, so the page's data load
   never waits on the chunk. Every YouTube read asks for only the fields it uses
   (`fields=`). Batch writes (tier-sync, rename, create) run through
-  `YoutubeBatch` (4 at a time, one-at-a-time per target playlist, results in
-  input order) with `retryAborted` on YouTube's 409 (deletes, being safe to
+  `YoutubeBatch` (4 at a time, one-at-a-time per playlist written - a tier-sync
+  row that sends its optional `fromPlaylistId` locks its source as well as its
+  target, `runLocked` - results in input order) with `retryAborted` on YouTube's 409 (deletes, being safe to
   repeat, also retry 5xx/network errors via `retryTransient`; inserts never do -
   a 500'd insert may have landed). Tier-sync results carry `inserted`, `removed`,
   `newItemId` and, on failure, `step` + a plain-language `error`; a delete that

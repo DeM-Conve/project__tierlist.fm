@@ -31,9 +31,11 @@ import java.net.URI;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
@@ -195,7 +197,9 @@ public class PlaylistController {
      * this occurrence is just the redundant copy, not a real move. A missing
      * fromItemId means "insert only" (a new filing).
      * Each entry is applied independently; failures are reported per-item rather than
-     * aborting the whole batch. Body: [{ "videoId", "fromItemId"?, "toPlaylistId"? }].
+     * aborting the whole batch. Body: [{ "videoId", "fromItemId"?, "toPlaylistId"?,
+     * "fromPlaylistId"? }] - fromPlaylistId is the playlist fromItemId sits in; when
+     * sent, the row is also kept from running alongside other writes to it.
      * <p>
      * Each result: {@code videoId}, {@code success}, {@code inserted} (the insert
      * ran and YouTube took it), {@code removed} (the source item is gone - deleted
@@ -222,9 +226,9 @@ public class PlaylistController {
             repeats[i] = first == null ? -1 : first;
             if (first == null) toRun.add(i);
         }
-        // Moves into the same playlist run one after another (keyed by it).
-        List<Map<String, Object>> ran = YoutubeBatch.run(toRun, WRITE_PARALLELISM,
-            i -> moves.get(i).get("toPlaylistId"), i -> moveOne(client, moves.get(i)));
+        // Rows writing to a common playlist run one after another.
+        List<Map<String, Object>> ran = YoutubeBatch.runLocked(toRun, WRITE_PARALLELISM,
+            i -> playlistsWritten(moves.get(i)), i -> moveOne(client, moves.get(i)));
 
         Map<Integer, Map<String, Object>> byRow = new HashMap<>();
         for (int k = 0; k < toRun.size(); k++) byRow.put(toRun.get(k), ran.get(k));
@@ -233,6 +237,20 @@ public class PlaylistController {
             results.add(repeats[i] < 0 ? byRow.get(i) : repeatOf(moves.get(i), moves.get(repeats[i]), byRow.get(repeats[i])));
         }
         return batchResponse(results);
+    }
+
+    // The playlists a row writes to. With fromPlaylistId (optional) that is
+    // the target and the source, so a move's delete never races another row's
+    // insert into, or delete from, its source playlist (YouTube's 409). Without
+    // it, just the target as sent (null = one shared "" key), as before.
+    static Set<Object> playlistsWritten(Map<String, Object> move) {
+        String fromPlaylistId = text(move.get("fromPlaylistId"));
+        if (fromPlaylistId == null) return Set.of(Objects.requireNonNullElse(move.get("toPlaylistId"), ""));
+        Set<Object> keys = new LinkedHashSet<>();
+        keys.add(fromPlaylistId);
+        String toPlaylistId = text(move.get("toPlaylistId"));
+        if (toPlaylistId != null) keys.add(toPlaylistId);
+        return keys;
     }
 
     // Two rows doing the same YouTube work share a key: the same source item,

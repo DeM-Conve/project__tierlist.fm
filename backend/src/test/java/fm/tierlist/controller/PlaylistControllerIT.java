@@ -393,6 +393,25 @@ class PlaylistControllerIT extends PostgresIT {
     }
 
     @Test
+    void rowsSharingASourceOrTargetPlaylistRunOneAfterAnother() throws Exception {
+        // Row 1 moves out of PLs while row 0 moves into it: with fromPlaylistId sent,
+        // row 1 waits for row 0, so the calls come strictly in this order.
+        youtube = ordered();
+        expectInsert("PLs", "vid1");
+        expectDelete("OLD1");
+        expectInsert("PLb", "vid2");
+        expectDelete("OLD2");
+
+        mvc.perform(json(post("/api/tier-sync"), """
+                [{"videoId": "vid1", "fromItemId": "OLD1", "fromPlaylistId": "PLa", "toPlaylistId": "PLs"},
+                 {"videoId": "vid2", "fromItemId": "OLD2", "fromPlaylistId": "PLs", "toPlaylistId": "PLb"}]"""))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.applied").value(2))
+            .andExpect(jsonPath("$.results[0].newItemId").value("NEW-vid1"))
+            .andExpect(jsonPath("$.results[1].newItemId").value("NEW-vid2"));
+    }
+
+    @Test
     void aDuplicateCleanupOnlyDeletesAndANewFilingOnlyInserts() throws Exception {
         expectDelete("DUP1");   // toPlaylistId null
         expectDelete("DUP2");   // toPlaylistId blank
