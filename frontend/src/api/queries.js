@@ -22,7 +22,7 @@ export function useAuthStatusQuery() {
 
 // One playlist's items - the same query wherever it's read or prefetched,
 // so a prefetched copy is exactly what the board then finds in the cache.
-const playlistItemsQuery = (playlistId) => ({
+export const playlistItemsQuery = (playlistId) => ({
   queryKey: queryKeys.playlistItems(playlistId),
   queryFn: async () => (await api.get(`/api/playlists/${playlistId}/items`)).data,
 });
@@ -89,17 +89,6 @@ export function useTierSyncMutation() {
   return useMutation({
     mutationFn: async (payload) => (await api.post('/api/tier-sync', payload)).data,
   });
-}
-
-// Invalidates every playlist-items query for a board's underlying
-// playlists, so the next mount/refetch pulls fresh data after a sync
-// actually changed what's on YouTube.
-export function useInvalidatePlaylistItems() {
-  const queryClient = useQueryClient();
-  return (playlistIds) =>
-    Promise.all(
-      playlistIds.map((id) => queryClient.invalidateQueries({ queryKey: queryKeys.playlistItems(id) }))
-    );
 }
 
 // Naming-template migration job: [{ id, title }] -> per-item results.
