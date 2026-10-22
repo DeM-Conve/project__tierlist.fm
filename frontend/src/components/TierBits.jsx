@@ -1,4 +1,4 @@
-import { Fragment, memo, useState } from 'react';
+import { Fragment, cloneElement, memo, useState } from 'react';
 import { useTierName } from '../tierLabels';
 import { ActionIcon, Box, Group, Image, Menu, Progress, Text, Tooltip, UnstyledButton } from '@mantine/core';
 import { MoreHorizontal, Play, Trash2 } from 'lucide-react';
@@ -49,18 +49,24 @@ export function TierChip({ tier, size = 22, active = true, onClick, title, kbd, 
     </Box>
   );
   if (!onClick) return content;
+  const button = (
+    <UnstyledButton
+      onClick={(e) => {
+        e.stopPropagation();
+        onClick();
+      }}
+      aria-label={title ?? `Move to ${text}`}
+      className="tier-chip-btn"
+    >
+      {content}
+    </UnstyledButton>
+  );
+  // No title, no tooltip: the tier page's rows draw six chips each, and a
+  // disabled Tooltip still mounts its positioning hooks.
+  if (!title) return button;
   return (
-    <Tooltip label={title} disabled={!title} withArrow openDelay={300}>
-      <UnstyledButton
-        onClick={(e) => {
-          e.stopPropagation();
-          onClick();
-        }}
-        aria-label={title ?? `Move to ${text}`}
-        className="tier-chip-btn"
-      >
-        {content}
-      </UnstyledButton>
+    <Tooltip label={title} withArrow openDelay={300}>
+      {button}
     </Tooltip>
   );
 }
@@ -144,11 +150,23 @@ export function TierMixBar({ tiers, counts, size = 8, onSegmentClick, labels = f
   );
 }
 
-// "..." button menu. The items are built only while it's open (Mantine
-// mounts a closed Menu's dropdown children lazily) - a board has hundreds.
-export function MoveMenu({ video, tier, tiers, onMove, target, defaultOpened }) {
+// "..." button menu. It's mounted on the button's first click (and opens at
+// once): a Mantine Menu is a popover with its own positioning hooks, and a
+// board or tier page shows hundreds of these buttons - mounting one menu
+// each made expanding a 333-song tier take twice as long. The items are
+// built only while it's open (Mantine mounts dropdown children lazily).
+export function MoveMenu({ video, tier, tiers, onMove, target }) {
+  const [armed, setArmed] = useState(false);
+  if (!armed) {
+    return cloneElement(target, {
+      onClick: (e) => {
+        target.props.onClick?.(e);
+        setArmed(true);
+      },
+    });
+  }
   return (
-    <Menu position="bottom-end" withinPortal shadow="md" width={210} defaultOpened={defaultOpened}>
+    <Menu position="bottom-end" withinPortal shadow="md" width={210} defaultOpened>
       <Menu.Target>{target}</Menu.Target>
       <Menu.Dropdown onClick={(e) => e.stopPropagation()}>
         <MoveMenuItems video={video} tier={tier} tiers={tiers} onMove={onMove} />
@@ -203,29 +221,8 @@ export const TierTile = memo(function TierTile({
   const ring = isPlaying || searchState;
   const { song, artist } = songLabel(video);
   const openSongMenu = useSongContextMenu();
-  // The "..." menu (a Mantine Menu: a popover with its own positioning
-  // hooks) is only mounted once it's first clicked - an expanded big tier
-  // is hundreds of tiles, and mounting a menu and a tooltip per tile made
-  // expanding a 333-song tier take twice as long. The full title is the
-  // tile's native tooltip (as on the tier page's rows).
-  const [menuArmed, setMenuArmed] = useState(false);
-  const menuButton = (
-    <ActionIcon
-      pos="absolute"
-      top={3}
-      right={3}
-      size={20}
-      variant="filled"
-      aria-label="Move to tier"
-      onClick={(e) => {
-        e.stopPropagation();
-        setMenuArmed(true);
-      }}
-      style={{ background: 'var(--media-control-bg)', color: 'var(--media-fg)' }}
-    >
-      <MoreHorizontal size={13} />
-    </ActionIcon>
-  );
+  // The full title is the tile's native tooltip (as on the tier page's
+  // rows): a Mantine Tooltip per tile made expanding a big tier slow.
   return (
     <Box
       className="tile"
@@ -336,11 +333,26 @@ export const TierTile = memo(function TierTile({
         </Text>
       )}
       <Box className="tile-overlay" pos="absolute" inset={0} style={{ borderRadius: 6 }}>
-        {menuArmed ? (
-          <MoveMenu video={video} tier={tier} tiers={tiers} onMove={onMove} target={menuButton} defaultOpened />
-        ) : (
-          menuButton
-        )}
+        <MoveMenu
+          video={video}
+          tier={tier}
+          tiers={tiers}
+          onMove={onMove}
+          target={
+            <ActionIcon
+              pos="absolute"
+              top={3}
+              right={3}
+              size={20}
+              variant="filled"
+              aria-label="Move to tier"
+              onClick={(e) => e.stopPropagation()}
+              style={{ background: 'var(--media-control-bg)', color: 'var(--media-fg)' }}
+            >
+              <MoreHorizontal size={13} />
+            </ActionIcon>
+          }
+        />
         <Box
           pos="absolute"
           top="50%"

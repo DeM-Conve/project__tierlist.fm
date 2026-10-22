@@ -227,3 +227,13 @@ describe('TierFocusView - tier tabs', () => {
     expect(store.getState().tiers.tierItems.A.map((v) => v.videoId)).toEqual(['S1']);
   });
 });
+
+describe('TierFocusView - a row\'s menu', () => {
+  it('one click on "..." opens it (it mounts on that click); Bottom of S moves the song', async () => {
+    const store = renderPage(3);
+    const row = document.querySelector('.track-row[data-video-id="S0"]');
+    fireEvent.click(within(row).getByRole('button', { name: 'More' }));
+    fireEvent.click(await screen.findByRole('menuitem', { name: /Bottom of/ }));
+    expect(order(store)).toEqual(['S1', 'S2', 'S0']);
+  });
+});
