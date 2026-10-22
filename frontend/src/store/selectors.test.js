@@ -154,23 +154,34 @@ describe('selectPendingMoves', () => {
       expect(summary(s)).toEqual(['dedupe a A->S']);
     });
 
-    // BUG: moving the kept (top) copy of a duplicate to another tier is
-    // lost. With "a" in S and A on YouTube, moving the S copy to C leaves
-    // `originalTierOf.a = [S, A]`; the selector then keeps the A copy and
-    // stages the *C* copy as a duplicate removal - but the C playlist doesn't
-    // hold that video on YouTube, and nothing removes the S copy. After a
-    // push the song is still in S and A, not C.
-    it.fails('moving the top copy of a duplicate is reported as a real change', () => {
-      const s = withBoard({ S: ['a'], A: ['a'], C: [] });
-      move(s, 'S', 'C', 'a');
-      const moves = pending(s);
-      expect(moves.some((m) => m.kind === 'dedupe' && m.tier === 'C')).toBe(false);
-    });
-
-    it('documents current behaviour for moving the top copy of a duplicate', () => {
+    it('moving the top copy below the other one keeps the higher copy', () => {
       const s = withBoard({ S: ['a'], A: ['a'], C: [] });
       move(s, 'S', 'C', 'a');
       expect(summary(s)).toEqual(['dedupe a C->A']);
+    });
+
+    // Was a bug (the drag was lost - the copy the user placed was staged as
+    // the duplicate and the song stayed where it was): the copy the board
+    // shows highest is kept, where the user put it - a move from its own
+    // playlist (found by its item id).
+    it('moving the lower copy above the other one keeps it there', () => {
+      const s = makeStore();
+      s.dispatch(resetTierBoard({ presentTiers: ['S', 'B', 'D'] }));
+      s.dispatch(setTierForCategory({ tier: 'S', videos: [] }));
+      s.dispatch(setTierForCategory({ tier: 'B', videos: [{ ...v('a'), id: 'iB' }] }));
+      s.dispatch(setTierForCategory({ tier: 'D', videos: [{ ...v('a'), id: 'iD' }] }));
+      s.dispatch(setLoadedCategory('Rap'));
+      move(s, 'D', 'S', 'a');
+      expect(pending(s).map((m) => [m.kind, m.video.id, m.from ?? m.tier, m.to ?? m.keptTier])).toEqual([
+        ['move', 'iD', 'D', 'S'],
+        ['dedupe', 'iB', 'B', 'S'],
+      ]);
+    });
+
+    it('a ranked copy moved down below its to-do copy still beats it', () => {
+      const s = withBoard({ A: ['a'], D: [], TODO: ['a'] });
+      move(s, 'A', 'D', 'a');
+      expect(summary(s)).toEqual(['move a A->D', 'dedupe a TODO->D']);
     });
   });
 

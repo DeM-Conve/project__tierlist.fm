@@ -97,6 +97,7 @@
 ## Duplicate cleanup
 - A song listed more than once in the same tier playlist shows once on the board; every extra copy is staged as a duplicate removal ("duplicate copy" in the review list) and deleted on push.
 - If the same video genuinely exists in two of a board's real tier playlists at once, the lower-tier copy is automatically staged as a pending removal (kept: the highest tier it's in; removed: every other copy) - no manual action needed to flag it.
+- Dragging one of those copies keeps the copy the board shows highest - where you put it: drag the top copy below the other and the other one is kept; drag a copy above the other (or a rated copy below its TODO copy) and it moves there, the rest are removed. Dropping a copy onto the tier that already holds the song puts it in the Remove bin (that copy is deleted on push). Filing a song with Add songs into a tier that already has it adds a hidden copy that is removed on push.
 - It shows up in the pending popup as "Remove from [TODO] · already in [T2]" (the copy going away, then the tier that keeps the song), and the tile is greyed out and tagged "Duplicate" (tooltip: removed on sync) until you sync.
 - "Push to YouTube" actually deletes the redundant playlist entry (no bogus re-insert into the same playlist).
 

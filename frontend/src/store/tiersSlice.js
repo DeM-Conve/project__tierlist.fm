@@ -1,5 +1,5 @@
 import { createSlice, current, isDraft, original } from '@reduxjs/toolkit';
-import { REMOVED_TIER } from '../tiers';
+import { BOARD_TIERS, REMOVED_TIER } from '../tiers';
 import { overlayTransfers, transferId } from '../transfers';
 import { itemIdsRebased, rebaseTiers } from './itemIds';
 
@@ -19,6 +19,16 @@ function applyMove(state, { fromTier, toTier, videoId, dropIndex }) {
     index = Math.max(0, Math.min(index, withoutVideo.length));
     withoutVideo.splice(index, 0, video);
     state.tierItems[fromTier] = withoutVideo;
+    return;
+  }
+
+  // The song's other copy already sits in the target tier (a duplicate in two
+  // tiers, dragged onto the kept one): the board shows it there once, and
+  // this copy goes to the Remove bin - so Push deletes its playlist item
+  // instead of leaving it on YouTube behind a second card.
+  if (toTier !== REMOVED_TIER && (state.tierItems[toTier] || []).some((v) => v.videoId === videoId)) {
+    state.tierItems[fromTier] = sourceArr.filter((v) => v.videoId !== videoId);
+    state.tierItems[REMOVED_TIER] = [...(state.tierItems[REMOVED_TIER] || []), video];
     return;
   }
 
@@ -318,15 +328,21 @@ const tiersSlice = createSlice({
           // stays.
           state.duplicateCopies[m.tier] = (state.duplicateCopies[m.tier] || []).filter((v) => v.id !== m.video.id);
         } else if (m.kind === 'dedupe') {
-          state.tierItems[m.tier] = (state.tierItems[m.tier] || []).filter(
-            (v) => v.videoId !== m.video.videoId
-          );
-          state.originalTierItems[m.tier] = (state.originalTierItems[m.tier] || []).filter(
-            (v) => v.videoId !== m.video.videoId
-          );
-          state.originalTierOf[m.video.videoId] = (state.originalTierOf[m.video.videoId] || []).filter(
-            (t) => t !== m.tier
-          );
+          // The deleted item is the card's own playlist item - which isn't
+          // in the tier the card sits in if the user dragged that copy away
+          // (a song in S and B, its S copy dragged to C: the C card deletes
+          // the S item). Clean *that* tier's baseline, found by item id:
+          // cleaning the card's tier left the deleted item in S's baseline,
+          // so a later Discard showed it again and the next push deleted
+          // the song's last real copy.
+          const same = (v) => (m.video.id != null ? v.id === m.video.id : v.videoId === m.video.videoId);
+          const home =
+            BOARD_TIERS.find((t) => m.video.id != null && (state.originalTierItems[t] || []).some(same)) ?? m.tier;
+          state.tierItems[m.tier] = (state.tierItems[m.tier] || []).filter((v) => !same(v));
+          state.originalTierItems[home] = (state.originalTierItems[home] || []).filter((v) => !same(v));
+          if (!(state.originalTierItems[home] || []).some((v) => v.videoId === m.video.videoId)) {
+            state.originalTierOf[m.video.videoId] = (state.originalTierOf[m.video.videoId] || []).filter((t) => t !== home);
+          }
         } else {
           toBaseline(m);
         }
@@ -365,6 +381,13 @@ const tiersSlice = createSlice({
     addSyncedVideo: (state, action) => {
       state.redoStack = [];
       const { tier, video } = action.payload;
+      // Filed into a tier that already shows it: YouTube now lists it twice
+      // there - the new copy is a hidden duplicate, removed on push (like a
+      // playlist that came with the song twice).
+      if ((state.tierItems[tier] || []).some((v) => v.videoId === video.videoId)) {
+        state.duplicateCopies[tier] = [...(state.duplicateCopies[tier] || []), video];
+        return;
+      }
       state.tierItems[tier] = [...(state.tierItems[tier] || []), video];
       state.originalTierItems[tier] = [...(state.originalTierItems[tier] || []), video];
       state.originalTierOf[video.videoId] = [...(state.originalTierOf[video.videoId] || []), tier];
@@ -375,14 +398,31 @@ const tiersSlice = createSlice({
     // Undo of addSyncedVideo (the playlist item was deleted again).
     removeSyncedVideo: (state, action) => {
       state.redoStack = [];
-      const { tier, videoId } = action.payload;
+      const { tier, videoId, itemId } = action.payload;
       // Its playlist item is deleted: no undo snapshot may bring it back.
-      const goneId = (state.tierItems[tier] || []).find((v) => v.videoId === videoId)?.id;
+      const goneId = itemId ?? (state.tierItems[tier] || []).find((v) => v.videoId === videoId)?.id;
+      // It was a hidden duplicate (see addSyncedVideo): only that copy goes.
+      if (itemId && (state.duplicateCopies[tier] || []).some((v) => v.id === itemId)) {
+        state.duplicateCopies[tier] = state.duplicateCopies[tier].filter((v) => v.id !== itemId);
+        return;
+      }
+      // The card goes wherever it sits now (dragged since, it keeps its
+      // item id until pushed); `tier` is the playlist the item was in.
       if (goneId) rebaseHistory(state, { lost: (v) => v.id === goneId });
-      state.tierItems[tier] = (state.tierItems[tier] || []).filter((v) => v.videoId !== videoId);
-      state.originalTierItems[tier] = (state.originalTierItems[tier] || []).filter((v) => v.videoId !== videoId);
-      state.originalTierOf[videoId] = (state.originalTierOf[videoId] || []).filter((t) => t !== tier);
-      if (!state.originalTierOf[videoId].length) delete state.originalTierOf[videoId];
+      const byId = itemId != null && Object.values(state.tierItems).some((list) => (list || []).some((v) => v.id === itemId));
+      if (byId) {
+        for (const t of Object.keys(state.tierItems)) {
+          state.tierItems[t] = (state.tierItems[t] || []).filter((v) => v.id !== itemId);
+        }
+      } else {
+        state.tierItems[tier] = (state.tierItems[tier] || []).filter((v) => v.videoId !== videoId);
+      }
+      const gone = (v) => (itemId != null ? v.id === itemId : v.videoId === videoId);
+      state.originalTierItems[tier] = (state.originalTierItems[tier] || []).filter((v) => !gone(v));
+      if (!state.originalTierItems[tier].some((v) => v.videoId === videoId)) {
+        state.originalTierOf[videoId] = (state.originalTierOf[videoId] || []).filter((t) => t !== tier);
+        if (!state.originalTierOf[videoId].length) delete state.originalTierOf[videoId];
+      }
     },
     discardTierChanges: (state) => {
       state.redoStack = [];

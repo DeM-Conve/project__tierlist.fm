@@ -8,6 +8,7 @@ import { TODO_TIER } from '../tiers';
 const selectPlaylists = (state) => state.auth.playlists;
 const selectTierItems = (state) => state.tiers.tierItems;
 const selectOriginalTierOf = (state) => state.tiers.originalTierOf;
+const selectOriginalTierItems = (state) => state.tiers.originalTierItems;
 const selectDuplicateCopies = (state) => state.tiers.duplicateCopies;
 const selectCurrentCategory = (state) => state.view.currentCategory;
 const selectFocusedVideo = (state) => state.focus.focusedVideo;
@@ -95,9 +96,14 @@ export const selectTierCategories = createSelector([selectTierGroups], (groups) 
 // ordinary reverse move). A video listed twice in the *same* playlist is
 // shown once; its extra copies are dedupes kept in that same tier.
 export const selectPendingMoves = createSelector(
-  [selectTierItems, selectOriginalTierOf, selectDuplicateCopies],
-  (tierItems, originalTierOf, duplicateCopies) => {
+  [selectTierItems, selectOriginalTierOf, selectDuplicateCopies, selectOriginalTierItems],
+  (tierItems, originalTierOf, duplicateCopies, originalTierItems) => {
     const moves = [];
+    // The tier whose playlist this card's item is in (by playlist item id).
+    // (Any tier's: originalTierOf can forget a copy - a push's move resets it.)
+    const homeOf = (video) =>
+      video.id == null ? undefined : BOARD_TIERS.find((t) => (originalTierItems?.[t] || []).some((v) => v.id === video.id));
+    const multiDone = new Set();
     const stillIn = (t, videoId) => (tierItems[t] || []).some((v) => v.videoId === videoId);
     // A hidden copy (the same playlist listing it twice, or the old copy a
     // half-done push left behind) is kept wherever the board has the song.
@@ -115,11 +121,23 @@ export const selectPendingMoves = createSelector(
         if (!originalTiers) continue;
 
         if (originalTiers.length > 1) {
-          // Keep the highest copy that's still on the board - if the user
-          // removed the top copy by hand, the next one down survives.
-          const keepTier = BOARD_TIERS.find((t) => originalTiers.includes(t) && stillIn(t, video.videoId));
-          if (tier !== keepTier) {
-            moves.push({ kind: 'dedupe', video, tier, keptTier: keepTier });
+          // A song on YouTube in several of this board's tiers: the copy the
+          // board shows highest is kept - where the user sees it, even if
+          // they dragged it there (then it's a move from its own playlist) -
+          // and every other copy is removed. Keying this on the original
+          // tiers instead dropped a drag: the S copy dragged to D, with a
+          // second copy in TODO, ended up only in TODO.
+          if (multiDone.has(video.videoId)) continue;
+          multiDone.add(video.videoId);
+          const copies = BOARD_TIERS.flatMap((t) =>
+            (tierItems[t] || []).filter((v) => v.videoId === video.videoId && !v.transfer).map((v) => ({ v, t }))
+          );
+          const home = (c) => homeOf(c.v) ?? (originalTiers.includes(c.t) ? c.t : originalTiers[0]);
+          const top = copies[0].t;
+          const kept = copies.find((c) => c.t === top && home(c) === top) ?? copies[0];
+          if (home(kept) !== kept.t) moves.push({ kind: 'move', video: kept.v, from: home(kept), to: kept.t });
+          for (const c of copies) {
+            if (c !== kept) moves.push({ kind: 'dedupe', video: c.v, tier: c.t, keptTier: kept.t });
           }
           continue;
         }
@@ -133,7 +151,7 @@ export const selectPendingMoves = createSelector(
       const originalTiers = originalTierOf[video.videoId];
       if (!originalTiers) continue;
       // The copy that's no longer on the board is the one being removed.
-      const from = originalTiers.find((t) => !stillIn(t, video.videoId)) ?? originalTiers[0];
+      const from = homeOf(video) ?? originalTiers.find((t) => !stillIn(t, video.videoId)) ?? originalTiers[0];
       moves.push({ kind: 'remove', video, from, to: REMOVED_TIER });
     }
     return moves;
