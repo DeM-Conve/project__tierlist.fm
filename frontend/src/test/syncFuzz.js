@@ -80,10 +80,8 @@ function expectedBoards(h) {
 
 const sets = (board) => Object.fromEntries(Object.entries(board).map(([t, ids]) => [t, [...new Set(ids)].sort()]));
 
-// undoAcrossPush: false keeps Ctrl+Z from reaching back past the last push
-// (an open bug: a pushed removal or transfer undone leaves the board out of
-// step with YouTube - see sync.e2e.test.jsx), so a run still finds every
-// *other* bug. faults: inject refused YouTube writes (pushed again until
+// undoAcrossPush: let Ctrl+Z reach back past pushes (and undo/bin more
+// often) - false keeps undo within the edits since the last push. faults: inject refused YouTube writes (pushed again until
 // clean at the end). duplicates: start from a board with duplicate songs.
 export async function fuzzRun(seed, { ops = 30, undoAcrossPush = false, faults = false, duplicates = false } = {}) {
   const r = rng(seed);

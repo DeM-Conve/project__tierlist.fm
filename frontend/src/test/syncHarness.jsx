@@ -12,6 +12,7 @@ import { ProgressProvider } from '@bprogress/react';
 import App from '../App';
 import AppearanceRoot from '../components/AppearanceRoot';
 import { api } from '../api/client';
+import { resetPushLedger } from '../api/pushLedger';
 import { createQueryClient } from '../api/queryClient';
 import { makeStore } from './render';
 import { moveWithFeedback, undoEdit, redoEdit, transferWithFeedback, cancelTransfer } from '../tierActions';
@@ -49,6 +50,9 @@ export function youtubeBoards(yt) {
 }
 
 export async function mountApp(yt, { path = '/' } = {}) {
+  // A freshly mounted app is a new session (a page load): the push ledger is
+  // module state, and each fake YouTube starts its item ids over.
+  resetPushLedger();
   api.defaults.adapter = yt.adapter;
   const store = makeStore();
   const queryClient = createQueryClient();

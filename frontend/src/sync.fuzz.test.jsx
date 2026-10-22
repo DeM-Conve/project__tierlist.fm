@@ -25,11 +25,9 @@ describe('random editing sessions', () => {
     await runSeeds(1, RUNS, { faults: true });
   }, TIMEOUT);
 
-  // OPEN BUG, owned by the undo-after-push fix (another agent): Ctrl+Z
-  // reaching back past a push restores pushed removals / drops pushed
-  // transfers without staging anything (see 'after a push that deleted
-  // something' in sync.e2e.test.jsx). Flips to passing once that lands.
-  it.fails('undo across pushes', async () => {
+  // Ctrl+Z reaching back past pushes (pushed removals, transfers, moves) -
+  // fixed by fix/undo-after-push (rebaseHistory).
+  it('undo across pushes', async () => {
     await runSeeds(101, RUNS, { undoAcrossPush: true });
   }, TIMEOUT);
 

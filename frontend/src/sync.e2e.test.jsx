@@ -535,12 +535,11 @@ describe('after a push that deleted something', () => {
     expectInSync(await h.push());
   });
 
-  // OPEN BUG, owned by the undo-after-push fix (another agent; tiersSlice
-  // undo snapshots): the undo stack survives a push, so undoing a pushed
-  // Remove brings the card back with the id of the item the push deleted.
-  // It has no baseline, so nothing is staged: the board shows a song
-  // YouTube no longer has.
-  it.fails('Remove, push, then Undo: the board must not show a song YouTube lost', async () => {
+  // Was a bug (fixed by fix/undo-after-push, rebaseHistory): the undo stack
+  // survived a push, so undoing a pushed Remove brought the card back with
+  // the id of the item the push deleted - nothing staged, the board showed a
+  // song YouTube no longer had.
+  it('Remove, push, then Undo: the board must not show a song YouTube lost', async () => {
     await start();
     h.remove('b');
     await h.push();
@@ -550,10 +549,10 @@ describe('after a push that deleted something', () => {
     expect(shownAndThere).toBe(true);
   });
 
-  // OPEN BUG, same owner and root cause: undoing the drop of a pushed transfer takes
-  // the card off the target board, but the song is on YouTube there now -
-  // nothing is staged and the board hides a song it has.
-  it.fails('transfer, push, then Undo the drop: the board still matches YouTube', async () => {
+  // Was a bug, same fix: undoing the drop of a pushed transfer took the card
+  // off the target board while the song was on YouTube there - nothing
+  // staged, the board hid a song it had.
+  it('transfer, push, then Undo the drop: the board still matches YouTube', async () => {
     await start();
     await h.transfer('a', 'Pop', 'A');
     await h.push();
