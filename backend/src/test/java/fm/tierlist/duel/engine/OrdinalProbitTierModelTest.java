@@ -25,7 +25,7 @@ class OrdinalProbitTierModelTest {
 
     @Test
     void probabilitiesSumToOneAndPeakAtTheSongsTier() {
-        TierModel.Fit fit = model.fit(placed(10), 5, priors);
+        TierModel.Fit fit = model.fit(placed(10), Boards.TIERS, priors);
         double[] p = fit.probabilities(new Rating(31, 1));
         assertThat(java.util.Arrays.stream(p).sum()).isCloseTo(1, within(1e-9));
         assertThat(p[1]).isGreaterThan(0.6);
@@ -33,22 +33,22 @@ class OrdinalProbitTierModelTest {
 
     @Test
     void cutpointsAreOrderedAndBetweenTiers() {
-        double[] c = model.fit(placed(10), 5, priors).cutpoints();
+        double[] c = model.fit(placed(10), Boards.TIERS, priors).cutpoints();
         for (int k = 1; k < c.length; k++) assertThat(c[k]).isLessThan(c[k - 1]);
         assertThat(c[0]).isBetween(31.0, 37.0);
     }
 
     @Test
     void anEmptyTierKeepsABandNearItsPrior() {
-        double[] c = model.fit(placed(10, 0), 5, priors).cutpoints();
+        double[] c = model.fit(placed(10, 0), Boards.TIERS, priors).cutpoints();
         assertThat(c[0]).isCloseTo(34, within(4.0));
-        TierModel.Fit fit = model.fit(placed(10, 0), 5, priors);
+        TierModel.Fit fit = model.fit(placed(10, 0), Boards.TIERS, priors);
         assertThat(fit.probabilities(new Rating(45, 1))[0]).isGreaterThan(0.9);
     }
 
     @Test
     void uncertainSongsAreSpreadOut() {
-        TierModel.Fit fit = model.fit(placed(10), 5, priors);
+        TierModel.Fit fit = model.fit(placed(10), Boards.TIERS, priors);
         double sure = fit.probabilities(new Rating(31, 0.5))[1];
         double unsure = fit.probabilities(new Rating(31, 8))[1];
         assertThat(unsure).isLessThan(sure);
@@ -56,8 +56,8 @@ class OrdinalProbitTierModelTest {
 
     @Test
     void oneTierOrNoSongs() {
-        assertThat(model.fit(List.of(), 5, priors).cutpoints()).containsExactly(priors);
-        assertThat(model.fit(List.of(new TierModel.Placed(0, new Rating(25, 1))), 1, new double[0]).probabilities(new Rating(25, 1)))
+        assertThat(model.fit(List.of(), Boards.TIERS, priors).cutpoints()).containsExactly(priors);
+        assertThat(model.fit(List.of(new TierModel.Placed(0, new Rating(25, 1))), List.of("S"), new double[0]).probabilities(new Rating(25, 1)))
             .containsExactly(1.0);
     }
 }
