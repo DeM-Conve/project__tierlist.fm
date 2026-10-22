@@ -3,6 +3,8 @@ package fm.tierlist.settings;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.AssertTrue;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
@@ -23,8 +25,48 @@ import java.util.stream.Stream;
 // the table can evolve independently; conversion lives here, pointing inward.
 public record SettingsDto(
     @Valid @NotNull AppearanceDto appearance,
-    @Valid @NotNull NamingDto naming
+    @Valid @NotNull NamingDto naming,
+    @Valid DuelsDto duels
 ) {
+
+    // An older tab that doesn't know the duels group yet: it keeps the row's.
+    public SettingsDto(AppearanceDto appearance, NamingDto naming) {
+        this(appearance, naming, null);
+    }
+
+    // Settings -> Duels. Optional on input (null = keep the account's).
+    // tierMinimums: each ranked tier's lowest shown score (D = below C's);
+    // required for "custom", kept under "learned" so switching back restores them.
+    public record DuelsDto(@NotNull TierBorderMode tierBorders, @Valid TierMinimumsDto tierMinimums) {
+
+        @AssertTrue(message = "your own tier ranges need every tier's minimum")
+        boolean isCustomComplete() {
+            return tierBorders != TierBorderMode.CUSTOM || tierMinimums != null;
+        }
+
+        static DuelsDto from(DuelSettings d) {
+            return new DuelsDto(d.tierBorders(), d.sMin() == null ? null : new TierMinimumsDto(d.sMin(), d.aMin(), d.bMin(), d.cMin()));
+        }
+
+        DuelSettings toDuelSettings() {
+            return tierMinimums == null
+                ? new DuelSettings(tierBorders, null, null, null, null)
+                : new DuelSettings(tierBorders, tierMinimums.s(), tierMinimums.a(), tierMinimums.b(), tierMinimums.c());
+        }
+    }
+
+    // Keys are the frontend's ranked tier ids, best first; D has no minimum.
+    public record TierMinimumsDto(
+        @JsonProperty("S") @NotNull @Min(DuelSettings.MIN_SCORE) @Max(DuelSettings.MAX_SCORE) Integer s,
+        @JsonProperty("A") @NotNull @Min(DuelSettings.MIN_SCORE) @Max(DuelSettings.MAX_SCORE) Integer a,
+        @JsonProperty("B") @NotNull @Min(DuelSettings.MIN_SCORE) @Max(DuelSettings.MAX_SCORE) Integer b,
+        @JsonProperty("C") @NotNull @Min(DuelSettings.MIN_SCORE) @Max(DuelSettings.MAX_SCORE) Integer c
+    ) {
+        @AssertTrue(message = "tier minimums must go down tier by tier (S above A above B above C)")
+        boolean isDescending() {
+            return s == null || a == null || b == null || c == null || (s > a && a > b && b > c);
+        }
+    }
 
     // activityOrder: the activity bar's top group, as frontend ids. Optional
     // on input - missing/null means the default order, and a partial list is
@@ -120,7 +162,8 @@ public record SettingsDto(
             new AppearanceDto(a.theme(), a.accent(), a.tierPalette(), row.getActivityOrder()),
             new NamingDto(n.template(), TierLabelsDto.from(n.tierLabels()), TierDisplayNamesDto.from(n.tierDisplayNames()),
                 n.migratingFrom(),
-                TierLabelsDto.from(n.migratingFromTierLabels()), row.getTodoLinks())
+                TierLabelsDto.from(n.migratingFromTierLabels()), row.getTodoLinks()),
+            DuelsDto.from(row.getDuels())
         );
     }
 
@@ -138,6 +181,11 @@ public record SettingsDto(
     // Complete: see AppearanceDto.
     public List<ActivityItem> toActivityOrder() {
         return ActivityItem.completeOrder(appearance.activityOrder());
+    }
+
+    // null when the request had no duels group (keep the account's).
+    public DuelSettings toDuels() {
+        return duels == null ? null : duels.toDuelSettings();
     }
 
     public Map<String, String> toTodoLinks() {

@@ -103,8 +103,9 @@ public final class DuelDtos {
     public record AnalysisDto(double certainty, List<BorderDto> borders, List<SongDto> songs, int onFence,
                               List<SuggestionDto> suggestions, List<SuggestionDto> leaning,
                               Map<String, List<String>> tierOrders, UUID activeSession,
-                              long duelsTotal) {
-        static AnalysisDto from(BoardAnalysis a, UUID activeSession, long duelsTotal) {
+                              long duelsTotal, boolean customBorders) {
+        // customBorders: the borders are the user's own ranges (Settings -> Duels), not learned.
+        static AnalysisDto from(BoardAnalysis a, UUID activeSession, long duelsTotal, boolean customBorders) {
             List<String> tiers = a.layout().rankedTiers();
             double[] cuts = a.cutpoints();
             List<BorderDto> borders = new ArrayList<>();
@@ -112,7 +113,7 @@ public final class DuelDtos {
             return new AnalysisDto(a.certainty(), borders, a.songs().values().stream().map(s -> SongDto.from(s, a)).toList(),
                 a.onFence().size(), a.suggestions().stream().map(SuggestionDto::from).toList(),
                 a.leaning().stream().map(SuggestionDto::from).toList(), a.tierOrders(),
-                activeSession, duelsTotal);
+                activeSession, duelsTotal, customBorders);
         }
     }
 

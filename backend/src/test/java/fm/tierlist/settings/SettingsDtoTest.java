@@ -100,7 +100,8 @@ class SettingsDtoTest {
         assertThat(back.naming().tierDisplayNames()).isEqualTo(new TierDisplayNamesDto(null, null, null, null, null, null));
         assertThat(back).isEqualTo(new SettingsDto(
             new AppearanceDto(Theme.DRACULA, Accent.TEAL, TierPalette.CLASSIC, ActivityItem.DEFAULT_ORDER),
-            new NamingDto("{category} {tier}", DEFAULT, new TierDisplayNamesDto(null, null, null, null, null, null), null, null, Map.of())));
+            new NamingDto("{category} {tier}", DEFAULT, new TierDisplayNamesDto(null, null, null, null, null, null), null, null, Map.of()),
+            new SettingsDto.DuelsDto(TierBorderMode.LEARNED, null)));
     }
 
     @Test
@@ -274,5 +275,57 @@ class SettingsDtoTest {
         assertThat(violations(naming("{category} {tier}", DEFAULT, null, null, links))).hasSize(1);
         links.remove("PL0");
         assertThat(violations(naming("{category} {tier}", DEFAULT, null, null, links))).isEmpty();
+    }
+
+    // ---- duels (tier borders) -------------------------------------------------
+
+    private static final SettingsDto.TierMinimumsDto RANGES = new SettingsDto.TierMinimumsDto(340, 280, 220, 160);
+
+    @Test
+    void duelTierBordersRoundTripAndAMissingGroupKeepsTheAccounts() throws Exception {
+        SettingsDto mine = new SettingsDto(new AppearanceDto(Theme.TOKYO, Accent.BLUE, TierPalette.VIVID, null),
+            naming("{category} {tier}", DEFAULT, null, null, Map.of()), new SettingsDto.DuelsDto(TierBorderMode.CUSTOM, RANGES));
+        DuelSettings d = mine.toDuels();
+        assertThat(d).isEqualTo(new DuelSettings(TierBorderMode.CUSTOM, 340, 280, 220, 160));
+        assertThat(d.customMinimums()).contains(Map.of("S", 340, "A", 280, "B", 220, "C", 160));
+
+        UserSettings row = new UserSettings("alice", mine.toAppearance(), mine.toNaming(), Map.of(), null);
+        assertThat(row.getDuels()).isEqualTo(DuelSettings.DEFAULT);
+        row.replaceDuels(d);
+        row.replaceDuels(null); // an older tab: keeps the row's
+        assertThat(SettingsDto.from(row).duels()).isEqualTo(mine.duels());
+
+        ObjectMapper json = new ObjectMapper();
+        JsonNode tree = json.valueToTree(mine);
+        assertThat(tree.at("/duels/tierBorders").asText()).isEqualTo("custom");
+        assertThat(tree.at("/duels/tierMinimums").fieldNames()).toIterable().containsExactly("S", "A", "B", "C");
+        assertThat(tree.at("/duels").has("customComplete")).isFalse();
+        assertThat(json.readValue(json.writeValueAsString(mine), SettingsDto.class)).isEqualTo(mine);
+
+        assertThat(dto(naming("{category} {tier}", DEFAULT, null, null, Map.of())).toDuels()).isNull();
+        // Learned keeps the user's ranges for later, and has none to begin with.
+        assertThat(new SettingsDto.DuelsDto(TierBorderMode.LEARNED, RANGES).toDuelSettings().customMinimums()).isEmpty();
+        assertThat(new SettingsDto.DuelsDto(TierBorderMode.LEARNED, null).toDuelSettings()).isEqualTo(DuelSettings.DEFAULT);
+    }
+
+    @Test
+    void customTierRangesMustBeCompleteDescendingAndInRange() {
+        assertThat(violations(new SettingsDto.DuelsDto(TierBorderMode.CUSTOM, RANGES))).isEmpty();
+        assertThat(violations(new SettingsDto.DuelsDto(TierBorderMode.CUSTOM, null)))
+            .containsExactly("customComplete: your own tier ranges need every tier's minimum");
+        assertThat(violations(new SettingsDto.DuelsDto(null, null))).containsExactly("tierBorders: must not be null");
+        assertThat(violations(new SettingsDto.TierMinimumsDto(340, 340, 220, 160)))
+            .containsExactly("descending: tier minimums must go down tier by tier (S above A above B above C)");
+        assertThat(violations(new SettingsDto.TierMinimumsDto(1001, 280, 220, -1))).hasSize(2);
+        assertThat(violations(new SettingsDto.TierMinimumsDto(null, 280, 220, 160))).containsExactly("s: must not be null");
+    }
+
+    @Test
+    void duelSettingsRefuseWhatTheDatabaseWould() {
+        assertThatThrownBy(() -> new DuelSettings(TierBorderMode.CUSTOM, null, null, null, null)).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> new DuelSettings(TierBorderMode.LEARNED, 300, null, null, null)).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> new DuelSettings(TierBorderMode.CUSTOM, 200, 280, 220, 160)).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> new DuelSettings(TierBorderMode.CUSTOM, 340, 280, 220, -5)).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> new DuelSettings(null, null, null, null, null)).isInstanceOf(NullPointerException.class);
     }
 }

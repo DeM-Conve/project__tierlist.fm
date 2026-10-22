@@ -14,9 +14,12 @@ import fm.tierlist.duel.engine.Decision;
 import fm.tierlist.duel.engine.Duel;
 import fm.tierlist.duel.engine.DuelEngine;
 import fm.tierlist.duel.engine.DuelHistory;
+import fm.tierlist.duel.engine.FixedCutpointsTierModel;
+import fm.tierlist.duel.engine.ScoreScale;
 import fm.tierlist.duel.engine.Rating;
 import fm.tierlist.duel.engine.pairing.Matchup;
 import fm.tierlist.duel.engine.pairing.SessionContext;
+import fm.tierlist.settings.SettingsService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -52,10 +55,12 @@ public class DuelService {
     private final DuelPriorRepository priors;
     private final DuelDecisionRepository decisions;
     private final DuelLockRepository locks;
+    private final SettingsService settings;
 
     public DuelService(DuelEngine engine, Clock clock, DuelSessionRepository sessions, DuelRecordRepository duels,
                        DuelSkipRepository skips, DuelPriorRepository priors, DuelDecisionRepository decisions,
-                       DuelLockRepository locks) {
+                       DuelLockRepository locks, SettingsService settings) {
+        this.settings = settings;
         this.engine = engine;
         this.clock = clock;
         this.sessions = sessions;
@@ -84,9 +89,26 @@ public class DuelService {
     @Transactional
     public AnalysisDto analyze(String userId, String board, BoardLayout layout) {
         DuelHistory history = history(userId, board, layout);
-        BoardAnalysis a = engine.analyze(layout, history, clock.instant());
+        Engine e = engineFor(userId);
+        BoardAnalysis a = e.engine().analyze(layout, history, clock.instant());
         UUID active = openSession(userId, board).map(DuelSession::getId).orElse(null);
-        return AnalysisDto.from(a, active, history.duels().size());
+        return AnalysisDto.from(a, active, history.duels().size(), e.customBorders());
+    }
+
+    // The engine for this user's request: tier borders learned from the board
+    // (the standard engine), or the user's own ranges (Settings -> Duels) as
+    // fixed cutpoints - every score, probability, pairing and suggestion then
+    // follows those borders. Global per account (not per board).
+    private record Engine(DuelEngine engine, boolean customBorders) {}
+
+    private Engine engineFor(String userId) {
+        return settings.duels(userId).customMinimums()
+            .map(min -> {
+                Map<String, Double> lower = new HashMap<>();
+                min.forEach((tier, score) -> lower.put(tier, ScoreScale.borderBelow(score)));
+                return new Engine(engine.withTierModel(new FixedCutpointsTierModel(lower, engine.tierModel())), true);
+            })
+            .orElseGet(() -> new Engine(engine, false));
     }
 
     @Transactional
@@ -150,7 +172,7 @@ public class DuelService {
         Instant now = clock.instant();
         openSession(userId, board).ifPresent(s -> s.end(now));
         DuelHistory history = history(userId, board, layout);
-        double certainty = engine.analyze(layout, history, now).certainty();
+        double certainty = engineFor(userId).engine().analyze(layout, history, now).certainty();
         DuelSession s = sessions.save(new DuelSession(userId, board, req.focus(), req.minutes(), now, certainty));
         return view(s, layout, history, null);
     }
@@ -203,7 +225,7 @@ public class DuelService {
         DuelSession s = session(userId, board, id);
         s.end(clock.instant());
         DuelHistory history = history(userId, board, layout);
-        BoardAnalysis a = engine.analyze(layout, history, clock.instant());
+        BoardAnalysis a = engineFor(userId).engine().analyze(layout, history, clock.instant());
         List<Duel> mine = history.duels().stream().filter(d -> s.getId().equals(d.session())).toList();
         Set<String> played = new HashSet<>();
         mine.forEach(d -> {
@@ -290,6 +312,7 @@ public class DuelService {
 
     private SessionDto view(DuelSession s, BoardLayout layout, DuelHistory history, Duel rematch) {
         Instant now = clock.instant();
+        DuelEngine engine = engineFor(s.getUserId()).engine();
         BoardAnalysis a = engine.analyze(layout, history, now);
         List<Duel> mine = history.duels().stream().filter(d -> s.getId().equals(d.session())).toList();
         List<String> skipped = skips.findByIdSessionId(s.getId()).stream().map(DuelSkip::getVideoId).toList();
