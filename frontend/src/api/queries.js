@@ -3,6 +3,7 @@ import { api } from './client';
 import { BOARD_TIERS } from '../tiers';
 import { queryKeys } from './queryKeys';
 import { claimBoardCache } from './boardCache';
+import { reconcileItems } from './pushLedger';
 
 // Also hands the board cache to the signed-in account before anything can
 // read it: another account's cached playlists are dropped right here, before
@@ -22,9 +23,11 @@ export function useAuthStatusQuery() {
 
 // One playlist's items - the same query wherever it's read or prefetched,
 // so a prefetched copy is exactly what the board then finds in the cache.
+// Every read is reconciled with this session's pushes (pushLedger.js): a
+// read that lags behind a push never brings its deleted items back.
 export const playlistItemsQuery = (playlistId) => ({
   queryKey: queryKeys.playlistItems(playlistId),
-  queryFn: async () => (await api.get(`/api/playlists/${playlistId}/items`)).data,
+  queryFn: async () => reconcileItems(playlistId, (await api.get(`/api/playlists/${playlistId}/items`)).data),
 });
 
 export function usePlaylistsQuery(enabled) {
