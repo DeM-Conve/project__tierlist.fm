@@ -394,16 +394,23 @@ export default function TierBoardView({
   // lines, and share them out between the rows (allocateLines). Only a
   // board too big for even one line per tier scrolls.
   const { ref: canvasRef, height: viewportHeight } = useCanvas();
-  const { ref: headerRef, height: headerHeight } = useElementSize();
+  // (Its size is state: a header that rewraps re-renders the board, and the
+  // rows' offset below is re-measured.)
+  const { ref: headerRef } = useElementSize();
   const { ref: footerRef, height: footerHeight } = useElementSize();
   const rowsRef = useRef(null);
   const [rowsTop, setRowsTop] = useState(0);
   const [rowWidth, setRowWidth] = useState(0);
+  // Re-measured after every render, not only when the header resizes:
+  // something above the board (the "couldn't refresh" notice) can push the
+  // rows down, and a stale offset cut the last row off. Setting the same
+  // (rounded) value doesn't re-render, so this settles at once.
+  // oxlint-disable-next-line react-hooks/exhaustive-deps
   useLayoutEffect(() => {
     const el = rowsRef.current;
     const canvas = canvasRef.current;
-    if (el && canvas) setRowsTop(el.getBoundingClientRect().top - canvas.getBoundingClientRect().top + canvas.scrollTop);
-  }, [headerHeight, viewportHeight]);
+    if (el && canvas) setRowsTop(Math.round(el.getBoundingClientRect().top - canvas.getBoundingClientRect().top + canvas.scrollTop));
+  });
 
   // Staged removals aren't a row: they live on the rail's Remove slot and in
   // the staged-changes review (Put back).
@@ -707,7 +714,7 @@ export default function TierBoardView({
               leftSection={<Plus size={14} />}
               onClick={() => onAddMissingTiers(TIER_ORDER.filter((t) => !tiers.includes(t)))}
             >
-              Add missing tiers ({TIER_ORDER.filter((t) => !tiers.includes(t)).join(', ')})
+              Add missing tiers ({TIER_ORDER.filter((t) => !tiers.includes(t)).map(tierName).join(', ')})
             </Button>
           )}
           {!hasTodo && (
@@ -719,7 +726,7 @@ export default function TierBoardView({
                 leftSection={<ListTodo size={14} />}
                 onClick={() => onAddMissingTiers([TODO_TIER])}
               >
-                Add a TODO list
+                Add a {tierName(TODO_TIER)} list
               </Button>
             </Tooltip>
           )}
@@ -738,11 +745,11 @@ export default function TierBoardView({
           bg="var(--surface-2)"
           style={{
             position: 'fixed',
-            top: 16,
+            top: 'var(--mantine-spacing-md)',
             left: '50%',
             translate: '-50% 0',
             zIndex: 60,
-            width: 'min(440px, calc(100vw - 32px))',
+            width: 'min(440px, calc(100vw - 2 * var(--mantine-spacing-md)))',
           }}
         >
           <Group gap="xs" wrap="nowrap">

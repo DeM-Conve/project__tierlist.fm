@@ -10,6 +10,7 @@ import { loadBoard, moveWithFeedback } from '../tierActions';
 import { discardTierChanges } from '../store/tiersSlice';
 import { selectPendingMoves, selectTierGroups } from '../store/selectors';
 import { songLabel } from '../tierUtils';
+import { syncTierLabels } from '../tierLabels';
 
 vi.mock('@mantine/notifications', () => ({ notifications: { show: vi.fn(), hide: vi.fn() } }));
 // songLabel runs once per tile render: counting its calls counts tile renders.
@@ -63,9 +64,9 @@ function Board({ boardLoading = false, handlers = {}, playingVideoId = null }) {
 
 // A 700px canvas: six rows only just fit at the full 88px tile size - the
 // case where taking the bar's 80px out of the room shrank every tile.
-function renderBoard(height = 700, { loading = false, handlers, boardData = data, playingVideoId = null } = {}) {
+function renderBoard(height = 700, { loading = false, handlers, boardData = data, playingVideoId = null, boardPlaylists = playlists, naming = NAMING } = {}) {
   // Loading: the playlists list hasn't arrived, so not even the tiers are known.
-  const store = makeStore({ playlists: loading ? [] : playlists, naming: NAMING });
+  const store = makeStore({ playlists: loading ? [] : boardPlaylists, naming });
   if (!loading) store.dispatch(loadBoard({ category: 'Rock', data: boardData }));
   const canvas = { ref: { current: document.createElement('div') }, height };
   renderWithApp(
@@ -396,5 +397,102 @@ describe('TierBoardView - a drag redraws only the tiles it changes', () => {
     songLabel.mockClear();
     fireEvent.dragEnd(tile('S10'), { dataTransfer: dt });
     expect(tileRenders()).toBeLessThanOrEqual(1);
+  });
+});
+
+describe('TierBoardView - fitting the screen', () => {
+  // Something shown above the board after it first measured (the "couldn't
+  // refresh" notice) pushes the rows down: the board used to keep the old
+  // offset (it only re-measured when the header resized) and its last row
+  // ran off the screen.
+  it('re-measures where the rows start when something above pushes them down', () => {
+    let pushedDown = 0;
+    const real = HTMLElement.prototype.getBoundingClientRect;
+    HTMLElement.prototype.getBoundingClientRect = function () {
+      const r = real.call(this);
+      const isRows = this.firstElementChild?.classList?.contains('mantine-Paper-root') && !this.closest('.mantine-Paper-root');
+      return isRows ? { ...r, top: r.top + pushedDown } : r;
+    };
+    try {
+      const store = renderBoard(700);
+      const before = tileWidth();
+      pushedDown = 120;
+      act(() => {
+        store.dispatch(moveWithFeedback([{ fromTier: 'TODO', toTier: 'S', videoId: 'TODO0' }], { quiet: true }));
+      });
+      expect(tileWidth()).toBeLessThan(before);
+    } finally {
+      HTMLElement.prototype.getBoundingClientRect = real;
+    }
+  });
+});
+
+describe('TierBoardView - tiers are shown by their names', () => {
+  const named = {
+    ...NAMING,
+    tierDisplayNames: { S: 'Gold', A: 'Silver', B: 'Bronze', C: null, D: null, TODO: 'Inbox' },
+  };
+  it('"Add missing tiers" and "Add a ... list" use your tier names, not the ids', () => {
+    syncTierLabels(named);
+    try {
+      renderBoard(700, {
+        boardPlaylists: playlists.filter((p) => ['Rock C', 'Rock D'].includes(p.title)),
+        boardData: { C: songs('C', 3), D: songs('D', 3) },
+        naming: named,
+      });
+      expect(screen.getByRole('button', { name: /Add missing tiers \(Gold, Silver, Bronze\)/ })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Add a Inbox list' })).toBeInTheDocument();
+    } finally {
+      syncTierLabels(NAMING);
+    }
+  });
+});
+
+describe('TierBoardView - "/" find', () => {
+  const box = () => screen.queryByPlaceholderText('/search titles...');
+  const type = (value) => fireEvent.change(box(), { target: { value } });
+  const counter = () => box().closest('.mantine-Paper-root').querySelector('.mantine-Badge-root').textContent;
+  beforeAll(() => {
+    Element.prototype.scrollIntoView ??= () => {};
+  });
+
+  it('"/" opens the box with the "/" typed in; deleting it closes the search', () => {
+    renderBoard();
+    fireEvent.keyDown(window, { key: '/' });
+    expect(box()).toHaveValue('/');
+    type('');
+    expect(box()).toBeNull();
+  });
+
+  it('each row filters to its matches and counts matches/total; n / N step, Esc closes', () => {
+    renderBoard();
+    fireEvent.keyDown(window, { key: '/' });
+    type('/Song S1');
+    // S1 and S10..S19 match in S; nothing else on the board.
+    expect(within(rowOf('S')).getByText('11/30')).toBeInTheDocument();
+    expect(within(rowOf('A')).getByText('No matches in this tier')).toBeInTheDocument();
+    expect(counter()).toBe('1/11');
+    box().blur();
+    fireEvent.keyDown(window, { key: 'n' });
+    expect(counter()).toBe('2/11');
+    fireEvent.keyDown(window, { key: 'N' });
+    fireEvent.keyDown(window, { key: 'N' });
+    expect(counter()).toBe('11/11');
+    fireEvent.keyDown(window, { key: 'Escape' });
+    expect(box()).toBeNull();
+    expect(within(rowOf('S')).getByText('30')).toBeInTheDocument();
+  });
+
+  it('matches the artist and ignores accents; Enter on a single match plays it', () => {
+    const onPlay = vi.fn();
+    const boardData = { ...data, A: [{ videoId: 'bey', id: 'item-bey', title: 'Halo', channelTitle: 'Beyoncé' }, ...songs('A', 3)] };
+    renderBoard(700, { boardData, handlers: { onPlay } });
+    fireEvent.keyDown(window, { key: '/' });
+    type('/beyonce halo');
+    expect(counter()).toBe('1/1');
+    box().focus();
+    fireEvent.keyDown(box(), { key: 'Enter' });
+    expect(onPlay).toHaveBeenCalledWith('A', 'bey');
+    expect(box()).toBeNull();
   });
 });
