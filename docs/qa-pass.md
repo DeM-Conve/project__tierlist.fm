@@ -15,12 +15,12 @@ Method for every area:
 Status: `[ ]` not started · `[~]` in progress · `[x]` verified · `[!]` needs the user
 
 ## Already in flight (sync reliability)
-- [~] Sync review fixes - lagging re-read, stuck held-back changes, per-playlist renames (`fix/sync-review`)
-- [~] Deep sync test harness + fuzzing, cross-tier dedupe rule, Add songs undo id (`test/sync-harness`)
-- [x] Undo/redo after a push never drops or revives a song (`fix/undo-after-push`, merged)
+- [x] Sync review fixes - lagging re-read, stuck held-back changes, per-playlist renames (`fix/sync-review`, merged, deployed 2026-10-22)
+- [x] Deep sync test harness + fuzzing, cross-tier dedupe rule, Add songs undo id (`test/sync-harness`, merged, deployed 2026-10-22)
+- [x] Undo/redo after a push never drops or revives a song (`fix/undo-after-push`, merged, deployed 2026-10-22)
 
 ## 1. Boards (`qa/boards`)
-- [ ] Tier boards: layout, fit-to-screen, +N / show all, empty tiers, counts, header bar
+- [~] Tier boards: layout, fit-to-screen, +N / show all, empty tiers, counts, header bar
 - [ ] Tier page (full list), Find (`/`), filter, play/shuffle per tier
 - [ ] Tier Rail: drop targets, counts, Remove bin, playing-song drag
 - [ ] Drag-and-drop UX (within tier, between tiers, to rail, to sidebar board) - not sync logic
@@ -58,4 +58,8 @@ Status: `[ ]` not started · `[~]` in progress · `[x]` verified · `[!]` needs 
 - [ ] Backup / restore scripts work under hl
 
 ## Open questions for the user
-- (agents add here)
+- [!] Opening another board silently drops the open board's staged (unpushed) moves - only
+  dragging to another board warns. Keep a draft per board, or confirm before leaving?
+  (test: "keeps the staged moves of the board left behind", `it.fails`)
+- [!] `useBoardDropOpen` counts auto-dedupes as staged changes, so a board with duplicates
+  can't drag songs to another board until pushed.
