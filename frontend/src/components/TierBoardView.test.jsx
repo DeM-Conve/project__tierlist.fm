@@ -506,3 +506,20 @@ describe('TierBoardView - counts', () => {
     expect(within(rowOf('TODO')).getByText('30')).toBeInTheDocument();
   });
 });
+
+describe('TierBoardView - a tile\'s menu and title', () => {
+  // The menu mounts on its first click (not with every tile): one click
+  // must still open it, and its moves work.
+  it('one click on "..." opens the song menu; Move to moves the song', async () => {
+    const store = renderBoard();
+    fireEvent.click(within(tile('S0')).getByRole('button', { name: 'Move to tier' }));
+    const item = await screen.findByRole('menuitem', { name: /^B$/ });
+    fireEvent.click(item);
+    expect(store.getState().tiers.tierItems.B.at(-1).videoId).toBe('S0');
+  });
+
+  it('the full title is the tile\'s tooltip', () => {
+    renderBoard();
+    expect(tile('S0')).toHaveAttribute('title', 'Band - Song S0');
+  });
+});
