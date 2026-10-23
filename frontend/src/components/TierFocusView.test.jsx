@@ -1,5 +1,5 @@
 import { beforeAll, describe, expect, it, vi } from 'vitest';
-import { act, cleanup, fireEvent, screen } from '@testing-library/react';
+import { act, cleanup, fireEvent, screen, within } from '@testing-library/react';
 import { useSelector } from 'react-redux';
 import { ContextMenuProvider } from 'mantine-contextmenu';
 import TierFocusView, { TRACK_ROW_HEIGHT } from './TierFocusView';
@@ -199,5 +199,41 @@ describe('TierFocusView - p plays and s shuffles this tier', () => {
     renderPage(0, { handlers: { onPlayFrom } });
     fireEvent.keyDown(document, { key: 'p', code: 'KeyP' });
     expect(onPlayFrom).not.toHaveBeenCalled();
+  });
+});
+
+describe('TierFocusView - tier tabs', () => {
+  it('show every tier with its count, and are drop targets (the song goes to the end there)', () => {
+    const store = renderPage(5);
+    const tabA = screen.getByRole('tab', { name: /^A/ });
+    expect(screen.getByRole('tab', { name: /^S/ })).toHaveTextContent('S 5');
+    expect(tabA).toHaveTextContent('A 0');
+    const row = document.querySelector('.track-row[data-video-id="S2"]');
+    const data = {};
+    const dataTransfer = { setData: (k, v) => (data[k] = v), getData: (k) => data[k] ?? '', effectAllowed: '' };
+    fireEvent.dragStart(row, { dataTransfer });
+    fireEvent.dragOver(tabA, { dataTransfer });
+    expect(store.getState().tiers.dragOverTier).toBe('tab:A');
+    fireEvent.drop(tabA, { dataTransfer });
+    expect(store.getState().tiers.tierItems.A.map((v) => v.videoId)).toEqual(['S2']);
+    expect(tabA).toHaveTextContent('A 1');
+    expect(order(store)).toEqual(['S0', 'S1', 'S3', 'S4']);
+  });
+
+  it('a row\'s tier chip moves the song there', () => {
+    const store = renderPage(3);
+    const row = document.querySelector('.track-row[data-video-id="S1"]');
+    fireEvent.click(within(row).getByRole('button', { name: 'Move to A' }));
+    expect(store.getState().tiers.tierItems.A.map((v) => v.videoId)).toEqual(['S1']);
+  });
+});
+
+describe('TierFocusView - a row\'s menu', () => {
+  it('one click on "..." opens it (it mounts on that click); Bottom of S moves the song', async () => {
+    const store = renderPage(3);
+    const row = document.querySelector('.track-row[data-video-id="S0"]');
+    fireEvent.click(within(row).getByRole('button', { name: 'More' }));
+    fireEvent.click(await screen.findByRole('menuitem', { name: /Bottom of/ }));
+    expect(order(store)).toEqual(['S1', 'S2', 'S0']);
   });
 });

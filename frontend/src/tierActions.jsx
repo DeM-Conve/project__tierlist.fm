@@ -51,10 +51,14 @@ function findTierOf(tierItems, videoId) {
 // The dock tracks the playing video's tier separately (focusedVideo.tier) -
 // after any edit that moved it, point that back at wherever it now lives,
 // so the player's tier pills / the Tier Rail marker never go stale.
+// The edit was made to the loaded board's tierItems - which stays loaded on
+// Home / Settings, where the rail and the player still rate the playing
+// song - so that's the board to check, not the page being viewed (on Home
+// the playing song used to move while the player still showed its old tier).
 function resyncFocusedTier(dispatch, getState) {
-  const { focus, tiers, view } = getState();
+  const { focus, tiers } = getState();
   const fv = focus.focusedVideo;
-  if (!fv || focus.focusedCategory !== view.currentCategory) return;
+  if (!fv || focus.focusedCategory !== tiers.loadedCategory) return;
   const tier = findTierOf(tiers.tierItems, fv.videoId);
   if (tier && tier !== fv.tier) dispatch(setFocusedVideo({ tier, videoId: fv.videoId }));
 }
@@ -123,7 +127,18 @@ function describe(moves, tierItems) {
 
 // moves: [{ fromTier, toTier, videoId, dropIndex? }] - applied as ONE undo step.
 export const moveWithFeedback = (moves, { quiet = false } = {}) => (dispatch, getState) => {
-  const real = moves.filter((m) => m.fromTier !== m.toTier || m.dropIndex != null);
+  // A move of a song that isn't (any more) where it says - a stale drag, the
+  // player's snapshot after a reload - changes nothing: no undo step, no toast.
+  const { tierItems } = getState().tiers;
+  // A song dropped back on its own slot doesn't move either ("Reordered"
+  // toast and undo step for nothing).
+  const changes = (m) => {
+    const at = tierItems[m.fromTier]?.findIndex((v) => v.videoId === m.videoId) ?? -1;
+    if (at < 0) return false;
+    if (m.fromTier !== m.toTier) return true;
+    return m.dropIndex != null && m.dropIndex !== at && m.dropIndex !== at + 1;
+  };
+  const real = moves.filter(changes);
   if (real.length === 0) return;
   const message = describe(real, getState().tiers.tierItems);
   dispatch(moveVideos({ moves: real }));
@@ -267,6 +282,12 @@ export function useTierDnd() {
   const loadedCategory = useSelector((s) => s.tiers.loadedCategory);
   const drag = useSelector((s) => s.transfers.drag);
 
+  function endDrag() {
+    dispatch(setDraggedVideoId(null));
+    dispatch(setDragOverTier(null));
+    dispatch(dragEnded());
+  }
+
   return {
     dragOverTier,
     draggedVideoId,
@@ -274,6 +295,12 @@ export function useTierDnd() {
       e.dataTransfer.setData('application/json', JSON.stringify({ videoId: video.videoId, fromTier }));
       e.dataTransfer.effectAllowed = 'move';
       dispatch(setDraggedVideoId(video.videoId));
+      // A drag carried to another board (its sidebar entry opens it) loses
+      // its source tile, and React only hears events on mounted elements: a
+      // drag cancelled there never reached onDragEnd, so the song stayed
+      // "being dragged" (rail dimmed). The browser still fires dragend on
+      // the detached source - listen on the element itself.
+      e.currentTarget?.addEventListener?.('dragend', endDrag, { once: true });
       // The board's own copy, not the caller's: the Tier Rail drags the
       // player's snapshot of the song, whose item id can be from before a
       // push - a transfer must delete the item that exists now.
@@ -283,9 +310,7 @@ export function useTierDnd() {
       });
     },
     onDragEnd() {
-      dispatch(setDraggedVideoId(null));
-      dispatch(setDragOverTier(null));
-      dispatch(dragEnded());
+      endDrag();
     },
     onDragOver(e, tier) {
       e.preventDefault();
@@ -306,7 +331,10 @@ export function useTierDnd() {
       }
       dispatch(setDragOverTier(null));
       dispatch(setDraggedVideoId(null));
-      const crossBoard = drag && drag.fromCategory && drag.fromCategory !== loadedCategory;
+      // Only the song this drag carries: a drop of anything else (a link or
+      // file from outside) never acts on a drag left over from before.
+      const crossBoard =
+        drag && drag.fromCategory && drag.fromCategory !== loadedCategory && data.videoId === drag.video.videoId;
       dispatch(dragEnded());
       if (crossBoard) {
         dispatch(transferWithFeedback(drag, toTier, dropIndex));

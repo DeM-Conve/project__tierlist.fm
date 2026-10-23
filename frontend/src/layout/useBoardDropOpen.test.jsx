@@ -137,4 +137,24 @@ describe('useBoardDropOpen', () => {
     expect(screen.getByTestId('path').textContent).toBe('/tier/Rock');
     expect(show).toHaveBeenCalledWith(expect.objectContaining({ message: expect.stringMatching(/Push or discard the 1 staged change on Rock/) }));
   });
+
+  it('an auto-staged duplicate removal doesn\'t block opening another board', () => {
+    const store = makeStore();
+    // "a" is in S and A: the A copy is staged for removal on its own.
+    store.dispatch(loadBoard({ category: 'Rock', data: { S: [{ videoId: 'a', id: 'i-a' }], A: [{ videoId: 'a', id: 'i-a2' }] } }));
+    render(
+      <Provider store={store}>
+        <MemoryRouter initialEntries={['/tier/Rock']}>
+          <Routes>
+            <Route path="*" element={<><Entry category="Pop Hits" /><Where /></>} />
+          </Routes>
+        </MemoryRouter>
+      </Provider>
+    );
+    drag(store);
+    fireEvent.dragEnter(screen.getByTestId('Pop Hits'));
+    act(() => vi.advanceTimersByTime(OPEN_DELAY_MS));
+    expect(show).not.toHaveBeenCalled();
+    expect(screen.getByTestId('path')).toHaveTextContent('/tier/Pop Hits');
+  });
 });

@@ -70,7 +70,9 @@ export function songMenuGroups({ video, tier, tiers, onMove, dispatch }) {
 export function useSongContextMenu() {
   const dispatch = useDispatch();
   const { showContextMenu } = useContextMenu();
-  return (video, tier, tiers, onMove) => {
+  // The menu is built on the right-click itself, not per render of every
+  // tile / row that hands out a handler.
+  return (video, tier, tiers, onMove) => (e) => {
     const groups = songMenuGroups({ video, tier, tiers, onMove, dispatch });
     const toEntry = (item) => ({
       key: item.key,
@@ -85,10 +87,7 @@ export function useSongContextMenu() {
         ? [{ key: g.key, title: g.label, icon: <ArrowRightLeft size={14} />, items: g.items.map(toEntry) }]
         : g.items.map(toEntry)),
     ]);
-    return (e) => {
-      e.stopPropagation();
-      showContextMenu(content)(e);
-    };
+    e.stopPropagation();
+    showContextMenu(content)(e);
   };
 }
-

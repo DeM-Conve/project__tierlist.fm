@@ -560,7 +560,7 @@ function Layout() {
         queue: todo.map((e) => e.video.videoId),
         entries: focusSequence,
         category: currentCategory,
-        label: `${currentCategory} · ${TODO_TIER}`,
+        label: `${currentCategory} · ${tierName(TODO_TIER)}`,
         triage: true,
       })
     );

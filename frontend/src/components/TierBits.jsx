@@ -1,4 +1,4 @@
-import { Fragment } from 'react';
+import { Fragment, cloneElement, memo, useState } from 'react';
 import { useTierName } from '../tierLabels';
 import { ActionIcon, Box, Group, Image, Menu, Progress, Text, Tooltip, UnstyledButton } from '@mantine/core';
 import { MoreHorizontal, Play, Trash2 } from 'lucide-react';
@@ -49,18 +49,24 @@ export function TierChip({ tier, size = 22, active = true, onClick, title, kbd, 
     </Box>
   );
   if (!onClick) return content;
+  const button = (
+    <UnstyledButton
+      onClick={(e) => {
+        e.stopPropagation();
+        onClick();
+      }}
+      aria-label={title ?? `Move to ${text}`}
+      className="tier-chip-btn"
+    >
+      {content}
+    </UnstyledButton>
+  );
+  // No title, no tooltip: the tier page's rows draw six chips each, and a
+  // disabled Tooltip still mounts its positioning hooks.
+  if (!title) return button;
   return (
-    <Tooltip label={title} disabled={!title} withArrow openDelay={300}>
-      <UnstyledButton
-        onClick={(e) => {
-          e.stopPropagation();
-          onClick();
-        }}
-        aria-label={title ?? `Move to ${text}`}
-        className="tier-chip-btn"
-      >
-        {content}
-      </UnstyledButton>
+    <Tooltip label={title} withArrow openDelay={300}>
+      {button}
     </Tooltip>
   );
 }
@@ -144,41 +150,61 @@ export function TierMixBar({ tiers, counts, size = 8, onSegmentClick, labels = f
   );
 }
 
-// "..." button menu.
+// "..." button menu. It's mounted on the button's first click (and opens at
+// once): a Mantine Menu is a popover with its own positioning hooks, and a
+// board or tier page shows hundreds of these buttons - mounting one menu
+// each made expanding a 333-song tier take twice as long. The items are
+// built only while it's open (Mantine mounts dropdown children lazily).
 export function MoveMenu({ video, tier, tiers, onMove, target }) {
-  const dispatch = useDispatch();
-  const groups = songMenuGroups({ video, tier, tiers, onMove, dispatch });
+  const [armed, setArmed] = useState(false);
+  if (!armed) {
+    return cloneElement(target, {
+      onClick: (e) => {
+        target.props.onClick?.(e);
+        setArmed(true);
+      },
+    });
+  }
   return (
-    <Menu position="bottom-end" withinPortal shadow="md" width={210}>
+    <Menu position="bottom-end" withinPortal shadow="md" width={210} defaultOpened>
       <Menu.Target>{target}</Menu.Target>
       <Menu.Dropdown onClick={(e) => e.stopPropagation()}>
-        {groups.map((g, i) => (
-          <Fragment key={g.key}>
-            {i > 0 && <Menu.Divider />}
-            {g.label && <Menu.Label>{g.label}</Menu.Label>}
-            {g.items.map((item) =>
-              item.href ? (
-                <Menu.Item key={item.key} component="a" href={item.href} target="_blank" rel="noopener noreferrer" leftSection={item.icon}>
-                  {item.title}
-                </Menu.Item>
-              ) : (
-                <Menu.Item key={item.key} color={item.color} leftSection={item.icon} onClick={item.onClick}>
-                  {item.title}
-                </Menu.Item>
-              )
-            )}
-          </Fragment>
-        ))}
+        <MoveMenuItems video={video} tier={tier} tiers={tiers} onMove={onMove} />
       </Menu.Dropdown>
     </Menu>
   );
+}
+
+function MoveMenuItems({ video, tier, tiers, onMove }) {
+  const dispatch = useDispatch();
+  const groups = songMenuGroups({ video, tier, tiers, onMove, dispatch });
+  return groups.map((g, i) => (
+    <Fragment key={g.key}>
+      {i > 0 && <Menu.Divider />}
+      {g.label && <Menu.Label>{g.label}</Menu.Label>}
+      {g.items.map((item) =>
+        item.href ? (
+          <Menu.Item key={item.key} component="a" href={item.href} target="_blank" rel="noopener noreferrer" leftSection={item.icon}>
+            {item.title}
+          </Menu.Item>
+        ) : (
+          <Menu.Item key={item.key} color={item.color} leftSection={item.icon} onClick={item.onClick}>
+            {item.title}
+          </Menu.Item>
+        )
+      )}
+    </Fragment>
+  ));
 }
 
 // Square album-art tile used on the tier list. Click plays, drag moves,
 // right-click or the hover "..." opens the song menu. The song name (+ artist, when there's
 // room) is always printed over the bottom of the art, so an album cover
 // shared by many songs is still tellable apart without hovering.
-export function TierTile({
+// Memoized: a big board draws hundreds of tiles, and a drag (start, the
+// hovered row or slot changing) must only redraw the tiles it changes - the
+// board passes stable handlers for that.
+export const TierTile = memo(function TierTile({
   video,
   tier,
   tiers,
@@ -195,155 +221,156 @@ export function TierTile({
   const ring = isPlaying || searchState;
   const { song, artist } = songLabel(video);
   const openSongMenu = useSongContextMenu();
+  // The full title is the tile's native tooltip (as on the tier page's
+  // rows): a Mantine Tooltip per tile made expanding a big tier slow.
   return (
-    <Tooltip label={video.title} openDelay={450} withArrow multiline maw={260}>
-      <Box
-        className="tile"
-        data-video-id={video.videoId}
-        data-tier={tier}
-        pos="relative"
+    <Box
+      className="tile"
+      title={video.title}
+      data-video-id={video.videoId}
+      data-tier={tier}
+      pos="relative"
+      w={size}
+      h={size}
+      draggable
+      onDragStart={(e) => onDragStart(e, video, tier)}
+      onDragEnd={onDragEnd}
+      onClick={() => onPlay(tier, video.videoId)}
+      onContextMenu={openSongMenu(video, tier, tiers, onMove)}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          onPlay(tier, video.videoId);
+        }
+      }}
+      role="button"
+      tabIndex={0}
+      aria-label={video.title}
+      style={{
+        flexShrink: 0,
+        cursor: 'grab',
+        borderRadius: 6,
+        opacity: isDragging ? 0.3 : isPendingRemoval ? 0.45 : 1,
+        outline: ring ? '2px solid var(--accent)' : undefined,
+        outlineOffset: 2,
+        boxShadow:
+          searchState === 'active' ? '0 0 0 6px color-mix(in srgb, var(--accent) 35%, transparent)' : undefined,
+      }}
+    >
+      <Image
+        src={video.thumbnail || undefined}
+        alt=""
         w={size}
         h={size}
-        draggable
-        onDragStart={(e) => onDragStart(e, video, tier)}
-        onDragEnd={onDragEnd}
-        onClick={() => onPlay(tier, video.videoId)}
-        onContextMenu={openSongMenu(video, tier, tiers, onMove)}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter' || e.key === ' ') {
-            e.preventDefault();
-            onPlay(tier, video.videoId);
-          }
-        }}
-        role="button"
-        tabIndex={0}
-        aria-label={video.title}
+        radius={6}
+        fit="cover"
+        bg="var(--surface-2)"
+        draggable={false}
+        // A big board is hundreds of covers in one unvirtualized page:
+        // only the ones scrolled near load, decoded off the main thread.
+        loading="lazy"
+        decoding="async"
+        style={{ pointerEvents: 'none', filter: isPendingRemoval ? 'grayscale(1)' : undefined }}
+      />
+      {/* The scrim hugs the label: it starts a little above the first line
+          and darkens toward the edge, so a one-line name only shades the
+          bottom strip and a two-line one gets a taller fade - the art
+          above stays clean, even on white covers. */}
+      <Box
+        pos="absolute"
+        left={0}
+        right={0}
+        bottom={0}
+        px="3xs"
+        pb="3xs"
+        pt={size >= 80 ? 'md' : 'sm'}
         style={{
-          flexShrink: 0,
-          cursor: 'grab',
-          borderRadius: 6,
-          opacity: isDragging ? 0.3 : isPendingRemoval ? 0.45 : 1,
-          outline: ring ? '2px solid var(--accent)' : undefined,
-          outlineOffset: 2,
-          boxShadow:
-            searchState === 'active' ? '0 0 0 6px color-mix(in srgb, var(--accent) 35%, transparent)' : undefined,
+          borderRadius: '0 0 6px 6px',
+          pointerEvents: 'none',
+          background: 'linear-gradient(180deg, transparent, var(--media-scrim) 40%, var(--media-control-bg))',
+          textShadow: '0 1px 2px var(--media-control-shadow)',
         }}
       >
-        <Image
-          src={video.thumbnail || undefined}
-          alt=""
-          w={size}
-          h={size}
-          radius={6}
-          fit="cover"
-          bg="var(--surface-2)"
-          draggable={false}
-          // A big board is hundreds of covers in one unvirtualized page:
-          // only the ones scrolled near load, decoded off the main thread.
-          loading="lazy"
-          decoding="async"
-          style={{ pointerEvents: 'none', filter: isPendingRemoval ? 'grayscale(1)' : undefined }}
+        {/* Big tiles: up to two lines. Small (phone) tiles: one line with an
+            ellipsis - two lines there would split words mid-way. */}
+        <Text
+          fz={size >= 80 ? 'xs' : '2xs'}
+          fw={700}
+          lh={1.15}
+          c="var(--media-fg)"
+          lineClamp={size >= 80 ? 2 : undefined}
+          truncate={size >= 80 ? undefined : 'end'}
+          style={{ overflowWrap: 'anywhere' }}
+        >
+          {song}
+        </Text>
+        {artist && size >= 80 && (
+          <Text fz="2xs" lh={1.2} c="var(--media-fg)" opacity={0.75} truncate="end">
+            {artist}
+          </Text>
+        )}
+      </Box>
+      {isPlaying && (
+        <Box pos="absolute" top={4} left={4} bg="accent" px="4xs" py="4xs" style={{ borderRadius: 3 }}>
+          <EqualizerMark height={9} />
+        </Box>
+      )}
+      {isPendingRemoval && (
+        <Text
+          pos="absolute"
+          top={3}
+          left={3}
+          right={3}
+          ta="center"
+          fz="2xs"
+          fw={800}
+          tt="uppercase"
+          c={TIER_INK}
+          bg="yellow.5"
+          style={{ borderRadius: 3 }}
+        >
+          Duplicate
+        </Text>
+      )}
+      <Box className="tile-overlay" pos="absolute" inset={0} style={{ borderRadius: 6 }}>
+        <MoveMenu
+          video={video}
+          tier={tier}
+          tiers={tiers}
+          onMove={onMove}
+          target={
+            <ActionIcon
+              pos="absolute"
+              top={3}
+              right={3}
+              size={20}
+              variant="filled"
+              aria-label="Move to tier"
+              onClick={(e) => e.stopPropagation()}
+              style={{ background: 'var(--media-control-bg)', color: 'var(--media-fg)' }}
+            >
+              <MoreHorizontal size={13} />
+            </ActionIcon>
+          }
         />
-        {/* The scrim hugs the label: it starts a little above the first line
-            and darkens toward the edge, so a one-line name only shades the
-            bottom strip and a two-line one gets a taller fade - the art
-            above stays clean, even on white covers. */}
         <Box
           pos="absolute"
-          left={0}
-          right={0}
-          bottom={0}
-          px="3xs"
-          pb="3xs"
-          pt={size >= 80 ? 'md' : 'sm'}
+          top="50%"
+          left="50%"
+          w={size > 60 ? 30 : 22}
+          h={size > 60 ? 30 : 22}
+          bg="accent"
           style={{
-            borderRadius: '0 0 6px 6px',
+            transform: 'translate(-50%, -50%)',
+            borderRadius: '50%',
+            display: 'grid',
+            placeItems: 'center',
             pointerEvents: 'none',
-            background: 'linear-gradient(180deg, transparent, var(--media-scrim) 40%, var(--media-control-bg))',
-            textShadow: '0 1px 2px var(--media-control-shadow)',
           }}
         >
-          {/* Big tiles: up to two lines. Small (phone) tiles: one line with an
-              ellipsis - two lines there would split words mid-way. */}
-          <Text
-            fz={size >= 80 ? 'xs' : '2xs'}
-            fw={700}
-            lh={1.15}
-            c="var(--media-fg)"
-            lineClamp={size >= 80 ? 2 : undefined}
-            truncate={size >= 80 ? undefined : 'end'}
-            style={{ overflowWrap: 'anywhere' }}
-          >
-            {song}
-          </Text>
-          {artist && size >= 80 && (
-            <Text fz="2xs" lh={1.2} c="var(--media-fg)" opacity={0.75} truncate="end">
-              {artist}
-            </Text>
-          )}
-        </Box>
-        {isPlaying && (
-          <Box pos="absolute" top={4} left={4} bg="accent" px="4xs" py="4xs" style={{ borderRadius: 3 }}>
-            <EqualizerMark height={9} />
-          </Box>
-        )}
-        {isPendingRemoval && (
-          <Text
-            pos="absolute"
-            top={3}
-            left={3}
-            right={3}
-            ta="center"
-            fz="2xs"
-            fw={800}
-            tt="uppercase"
-            c={TIER_INK}
-            bg="yellow.5"
-            style={{ borderRadius: 3 }}
-          >
-            Duplicate
-          </Text>
-        )}
-        <Box className="tile-overlay" pos="absolute" inset={0} style={{ borderRadius: 6 }}>
-          <MoveMenu
-            video={video}
-            tier={tier}
-            tiers={tiers}
-            onMove={onMove}
-            target={
-              <ActionIcon
-                pos="absolute"
-                top={3}
-                right={3}
-                size={20}
-                variant="filled"
-                color="dark.8"
-                aria-label="Move to tier"
-                onClick={(e) => e.stopPropagation()}
-              >
-                <MoreHorizontal size={13} />
-              </ActionIcon>
-            }
-          />
-          <Box
-            pos="absolute"
-            top="50%"
-            left="50%"
-            w={size > 60 ? 30 : 22}
-            h={size > 60 ? 30 : 22}
-            bg="accent"
-            style={{
-              transform: 'translate(-50%, -50%)',
-              borderRadius: '50%',
-              display: 'grid',
-              placeItems: 'center',
-              pointerEvents: 'none',
-            }}
-          >
-            <Play size={size > 60 ? 13 : 10} fill="currentColor" style={{ color: TIER_INK }} />
-          </Box>
+          <Play size={size > 60 ? 13 : 10} fill="currentColor" style={{ color: TIER_INK }} />
         </Box>
       </Box>
-    </Tooltip>
+    </Box>
   );
-}
+});
