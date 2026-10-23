@@ -844,6 +844,43 @@ class PlaylistControllerIT extends PostgresIT {
             .andExpect(jsonPath("$.results[1].error").value(org.hamcrest.Matchers.not(containsString("409"))));
     }
 
+    // ---- bad bodies ---------------------------------------------------------
+
+    // A body the frontend would never send is a 400 ProblemDetail saying
+    // what's wrong - before any YouTube call, never a bare 500.
+    @Test
+    void badBodiesAre400ProblemDetailsAndCallNothing() throws Exception {
+        youtube.expect(ExpectedCount.never(), requestTo(org.hamcrest.Matchers.startsWith(YT)));
+        String[][] cases = {
+            {"/api/playlists/PL1/items", "{}"},
+            {"/api/playlists/PL1/items", "{\"videoId\": \" \"}"},
+            {"/api/playlists/PL1/items", "{\"videoId\": {\"x\": 1}}"},
+            {"/api/playlists/PL1/items", ""},
+            {"/api/tier-sync", "[null]"},
+            {"/api/tier-sync", "[{\"videoId\": {\"x\": 1}, \"toPlaylistId\": \"PL1\"}]"},
+            {"/api/tier-sync", "[{\"videoId\": \"v\", \"toPlaylistId\": [\"PL1\"]}]"},
+            {"/api/tier-sync", "{\"videoId\": \"v\"}"},
+            {"/api/tier-sync", "not json"},
+            {"/api/playlists/rename", "[{}]"},
+            {"/api/playlists/rename", "[{\"id\": \"PL1\"}]"},
+            {"/api/playlists/rename", "[{\"id\": \"PL1\", \"title\": \"  \"}]"},
+            {"/api/playlists/rename", "[{\"id\": 5, \"title\": \"Rap S\"}]"},
+            {"/api/playlists/rename", "[null]"},
+            {"/api/playlists/create", "[{}]"},
+            {"/api/playlists/create", "[{\"title\": [\"Rap S\"]}]"},
+            {"/api/playlists/create", "[{\"title\": \"Rap S\", \"privacyStatus\": \"secret\"}]"},
+            {"/api/playlists/create", "null"},
+        };
+        for (String[] c : cases) {
+            mvc.perform(json(post(c[0]), c[1]))
+                .andExpect(r -> assertThat(r.getResponse().getStatus()).as(c[0] + " " + c[1]).isEqualTo(400))
+                .andExpect(r -> assertThat(r.getResponse().getContentType()).as(c[0] + " " + c[1])
+                    .isEqualTo(MediaType.APPLICATION_PROBLEM_JSON_VALUE));
+        }
+        mvc.perform(json(post("/api/playlists/rename"), "[{\"id\": \"PL1\"}]"))
+            .andExpect(jsonPath("$.detail").value("Row 1: title is missing."));
+    }
+
     // ---- auth ---------------------------------------------------------------
 
     @Test

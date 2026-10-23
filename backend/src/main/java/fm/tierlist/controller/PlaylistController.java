@@ -27,6 +27,7 @@ import org.springframework.web.client.HttpStatusCodeException;
 import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.net.URI;
 import java.util.ArrayList;
@@ -152,7 +153,9 @@ public class PlaylistController {
             @RequestBody Map<String, String> body,
             @RegisteredOAuth2AuthorizedClient("google") OAuth2AuthorizedClient client
     ) {
-        return toVideo(insertPlaylistItem(client, id, body.get("videoId")));
+        String videoId = body == null ? null : body.get("videoId");
+        if (videoId == null || videoId.isBlank()) throw badRequest("Send the video to add as {\"videoId\": \"...\"}.");
+        return toVideo(insertPlaylistItem(client, id, videoId));
     }
 
     @DeleteMapping("/api/playlist-items/{itemId}")
@@ -218,6 +221,7 @@ public class PlaylistController {
             @RequestBody List<Map<String, Object>> moves,
             @RegisteredOAuth2AuthorizedClient("google") OAuth2AuthorizedClient client
     ) {
+        checkRows(moves, List.of(), List.of("videoId", "fromItemId", "toPlaylistId", "fromPlaylistId"));
         int[] repeats = new int[moves.size()]; // index of the earlier row this one repeats, or -1
         Map<String, Integer> firstRow = new HashMap<>();
         List<Integer> toRun = new ArrayList<>();
@@ -381,6 +385,30 @@ public class PlaylistController {
         return "Something went wrong talking to YouTube - try again.";
     }
 
+    static final List<String> PRIVACY = List.of("private", "unlisted", "public");
+
+    // A batch body the frontend would never send - a null row, a field that
+    // isn't text, a required one missing - is a 400 ProblemDetail saying
+    // which, before anything is sent to YouTube (it used to be a bare 500
+    // from a NullPointer / ClassCastException mid-batch).
+    static void checkRows(List<Map<String, Object>> rows, List<String> required, List<String> optional) {
+        for (int i = 0; i < rows.size(); i++) {
+            Map<String, Object> row = rows.get(i);
+            if (row == null) throw badRequest("Row " + (i + 1) + " is empty.");
+            for (String field : required) {
+                if (text(row.get(field)) == null) throw badRequest("Row " + (i + 1) + ": " + field + " is missing.");
+            }
+            for (String field : optional) {
+                Object value = row.get(field);
+                if (value != null && !(value instanceof String)) throw badRequest("Row " + (i + 1) + ": " + field + " must be text.");
+            }
+        }
+    }
+
+    private static ResponseStatusException badRequest(String detail) {
+        return new ResponseStatusException(HttpStatus.BAD_REQUEST, detail);
+    }
+
     private static String text(Object value) {
         return value instanceof String s && !s.isBlank() ? s : null;
     }
@@ -406,6 +434,7 @@ public class PlaylistController {
             @RequestBody List<Map<String, Object>> renames,
             @RegisteredOAuth2AuthorizedClient("google") OAuth2AuthorizedClient client
     ) {
+        checkRows(renames, List.of("id", "title"), List.of());
         List<Map<String, Object>> results = YoutubeBatch.run(renames, WRITE_PARALLELISM, rename -> rename.get("id"), rename -> {
             String id = (String) rename.get("id");
             String title = (String) rename.get("title");
@@ -447,10 +476,17 @@ public class PlaylistController {
             @RequestBody List<Map<String, Object>> playlists,
             @RegisteredOAuth2AuthorizedClient("google") OAuth2AuthorizedClient client
     ) {
+        checkRows(playlists, List.of("title"), List.of("privacyStatus"));
+        for (Map<String, Object> playlist : playlists) {
+            Object privacy = playlist.get("privacyStatus");
+            if (privacy != null && !PRIVACY.contains(privacy)) {
+                throw badRequest("privacyStatus must be one of " + PRIVACY + ".");
+            }
+        }
         // Each new playlist is its own key: nothing else writes to it yet.
         List<Map<String, Object>> results = YoutubeBatch.run(playlists, WRITE_PARALLELISM, playlist -> new Object(), playlist -> {
             String title = (String) playlist.get("title");
-            Object privacy = playlist.getOrDefault("privacyStatus", "private");
+            Object privacy = Objects.requireNonNullElse(playlist.get("privacyStatus"), "private");
             Map<String, Object> result = new LinkedHashMap<>();
             result.put("title", title);
             try {
@@ -575,7 +611,7 @@ public class PlaylistController {
         headers.setBearerAuth(client.getAccessToken().getTokenValue());
         RequestEntity<Void> request = new RequestEntity<>(headers, HttpMethod.GET, URI.create(url));
         ResponseEntity<Map> response = restTemplate.exchange(request, Map.class);
-        return response.getBody();
+        return response.getBody() != null ? response.getBody() : Map.of(); // an empty answer reads as "nothing there"
     }
 
     private String extractThumbnail(Map<String, Object> thumbnails) {
