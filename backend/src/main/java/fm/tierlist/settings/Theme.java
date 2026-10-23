@@ -1,6 +1,8 @@
 package fm.tierlist.settings;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonValue;
+import com.fasterxml.jackson.databind.exc.InvalidFormatException;
 
 // Chrome themes - frontend/src/themes.js THEMES.
 // Constant names are the labels of the Postgres enum `theme_option` (V1 migration);
@@ -22,5 +24,11 @@ public enum Theme {
     @JsonValue
     public String key() {
         return key;
+    }
+
+    // By key only - never a number (see FrontendKeys).
+    @JsonCreator
+    static Theme fromKey(String key) throws InvalidFormatException {
+        return FrontendKeys.parse(Theme.class, Theme::key, key);
     }
 }

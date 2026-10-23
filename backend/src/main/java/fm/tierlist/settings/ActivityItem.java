@@ -1,6 +1,8 @@
 package fm.tierlist.settings;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonValue;
+import com.fasterxml.jackson.databind.exc.InvalidFormatException;
 
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
@@ -32,6 +34,12 @@ public enum ActivityItem {
     @JsonValue
     public String key() {
         return key;
+    }
+
+    // By key only - never a number (see FrontendKeys).
+    @JsonCreator
+    static ActivityItem fromKey(String key) throws InvalidFormatException {
+        return FrontendKeys.parse(ActivityItem.class, ActivityItem::key, key);
     }
 
     // The full order a (possibly partial) list stands for: its items first, as

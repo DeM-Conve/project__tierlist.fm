@@ -264,10 +264,8 @@ class SettingsApiIT extends PostgresIT {
         assertThat(jdbc.queryForObject("SELECT count(*) FROM user_settings", Integer.class)).isZero();
     }
 
+    // Only the frontend keys: never an enum's ordinal (see FrontendKeys).
     @Test
-    @Disabled("BUG (minor): Boot's ObjectMapper leaves FAIL_ON_NUMBERS_FOR_ENUMS off, so an enum option sent as a "
-        + "number (or numeric string) is read as the Java constant's ordinal: {\"theme\": 0} saves tokyo, "
-        + "{\"tierPalette\": \"2\"} saves heat. Only frontend keys should be accepted (400 otherwise).")
     void anOptionSentAsANumberIs400() throws Exception {
         mvc.perform(save(alice, body("0", "\"blue\"", "\"2\"", LABELS, "null", "null", "{}"))
                 .header(HttpHeaders.IF_NONE_MATCH, "*"))

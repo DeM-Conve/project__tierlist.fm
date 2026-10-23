@@ -1,6 +1,8 @@
 package fm.tierlist.settings;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonValue;
+import com.fasterxml.jackson.databind.exc.InvalidFormatException;
 
 // Settings -> Duels -> Tier borders - frontend duel/tierRanges.js BORDER_MODES.
 // Constant names are the labels of the Postgres enum `duel_tier_borders` (V3);
@@ -20,5 +22,11 @@ public enum TierBorderMode {
     @JsonValue
     public String key() {
         return key;
+    }
+
+    // By key only - never a number (see FrontendKeys).
+    @JsonCreator
+    static TierBorderMode fromKey(String key) throws InvalidFormatException {
+        return FrontendKeys.parse(TierBorderMode.class, TierBorderMode::key, key);
     }
 }
