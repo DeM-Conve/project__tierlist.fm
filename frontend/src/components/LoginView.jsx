@@ -273,15 +273,17 @@ export default function LoginView({ onLogin, problem = null }) {
               <Button
                 size="lg"
                 radius="md"
-                variant="white"
-                color="dark"
+                // Google's neutral sign-in button, drawn from the theme so it
+                // reads on light and dark themes alike (a fixed white one
+                // vanished into the light themes' page).
+                variant="default"
                 leftSection={<GoogleMark />}
                 onClick={onLogin}
               >
                 Continue with Google
               </Button>
               <Text fz="xs" c="dimmed">
-                Nothing changes on YouTube until you press Sync.
+                Nothing on YouTube changes until you push your changes.
               </Text>
             </Stack>
 
