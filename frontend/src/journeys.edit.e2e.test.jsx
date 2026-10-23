@@ -8,9 +8,17 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { FakeYoutube } from './test/fakeYoutube';
 import { mountApp, unmount, youtubeBoards } from './test/syncHarness';
 import { invariantViolations } from './test/syncInvariants';
+import { setNaming } from './store/namingSlice';
+import { setTheme, setTierPalette } from './store/appearanceSlice';
+import { setFocusedVideo } from './store/focusSlice';
+import { selectStagedFailures } from './store/selectors';
+import { NO_TARGET_REASON } from './syncCache';
 
 vi.mock('./components/PendingChanges', () => import('./test/boardProbe'));
 vi.mock('@mantine/notifications', () => ({ notifications: { show: vi.fn(), hide: vi.fn() }, Notifications: () => null }));
+
+// jsdom has no scrolling; the expanded player's queue scrolls itself.
+if (!Element.prototype.scrollTo) Element.prototype.scrollTo = () => {};
 
 const ACCOUNT = {
   'Rap S': ['a', 'b', 'c'],
@@ -211,5 +219,66 @@ describe('journey 2: send a song to another board, change your mind there, push'
     h.putBackTransfer('a');
     await h.open('Rap');
     expect(h.tierOf('a')).toBe('S');
+  });
+});
+
+const LABELS = { S: 'S', A: 'A', B: 'B', C: 'C', D: 'D', TODO: 'TODO' };
+const NO_SHOWN = { S: null, A: null, B: null, C: null, D: null, TODO: null };
+// Settings -> Playlist naming's Save (PlaylistNamingSettings dispatches this).
+function saveNaming(h, { template = '{category} {tier}', tierLabels = LABELS, tierDisplayNames = NO_SHOWN } = {}) {
+  h.dispatch(setNaming({ template, tierLabels, tierDisplayNames }));
+}
+function play(h, videoId) {
+  const tier = h.tierOf(videoId);
+  h.probe().ctx.playFrom(tier);
+  h.dispatch(setFocusedVideo({ tier, videoId }));
+}
+
+describe('journey 3: Settings changed while changes are staged and a song plays', () => {
+  it('theme and tier palette: the staged changes and the playing song stay as they were', async () => {
+    await start();
+    play(h, 'd');
+    h.move('a', 'B');
+    h.move('d', 'S');
+    await h.go('/settings?tab=appearance');
+    h.dispatch(setTheme('paper'));
+    h.dispatch(setTierPalette('heat'));
+    expect(h.state.focus.focusedVideo).toEqual({ tier: 'S', videoId: 'd' });
+    await h.open('Rap');
+    expect(h.staged()).toHaveLength(2);
+    expectInSync(await h.push());
+  });
+
+  it('the to-do name changed with a move to TODO staged: the push never loses the song', async () => {
+    await start();
+    h.move('a', 'TODO');
+    h.move('h', 'S');
+    await h.go('/settings?tab=naming');
+    // "Rap TODO" is no longer a to-do list under the new name.
+    saveNaming(h, { tierLabels: { ...LABELS, TODO: 'Inbox' } });
+    await h.open('Rap');
+    await h.push();
+    expect(invariantViolations(yt, { universe: everySong })).toEqual([]);
+    expect(youtubeBoards(yt).Rap.S).toEqual(['a', 'b', 'c', 'h']);
+    // Not sent, and it says why until it's moved somewhere else.
+    expect(selectStagedFailures(h.state)).toEqual([
+      expect.objectContaining({ kind: 'move', to: 'TODO', failure: { step: 'insert', error: NO_TARGET_REASON } }),
+    ]);
+    expect(h.state.tiers.syncStatus).toBe('partial');
+    h.move('a', 'D');
+    expectInSync(await h.push());
+    expect(youtubeBoards(yt).Rap.D).toEqual(['g', 'a']);
+  });
+
+  it('a naming that hides the open board, then put back: the staged changes are still there', async () => {
+    await start();
+    play(h, 'd');
+    h.move('a', 'B');
+    await h.go('/settings?tab=naming');
+    saveNaming(h, { tierLabels: { S: 'T1', A: 'T2', B: 'T3', C: 'T4', D: 'T5', TODO: 'TODO' } });
+    saveNaming(h);
+    await h.open('Rap');
+    expect(h.tierOf('a')).toBe('B');
+    expectInSync(await h.push());
   });
 });

@@ -39,6 +39,7 @@ import { applySyncOutcome } from './tierActions';
 const itemKey = (playlistId) => queryKeys.playlistItems(playlistId);
 
 export const GONE_REASON = 'This song is no longer in that playlist on YouTube.';
+export const NO_TARGET_REASON = 'This tier list has no playlist for that tier any more (Settings → Playlist naming) - move it to another tier.';
 
 // Pure. `held`: the items this browser would name in one playlist; `fresh`:
 // that playlist on YouTube. -> { renamed: { oldId: newId }, gone: [oldId], kept: [id] }.
@@ -193,14 +194,23 @@ export async function preparePush(queryClient, { dispatch, getState, tierGroups,
   const full = planNow();
   if (!full) return { plan: null, skipped: 0, settled: 0 };
   const isGone = (i) => !!gone[full.payload[i].fromPlaylistId]?.has(full.payload[i].fromItemId);
-  const send = subPlan(full, (i) => !isGone(i));
-  const held = subPlan(full, isGone);
+  // A move into a tier whose playlist isn't a tier playlist any more (the
+  // naming changed since it was staged): sent, it would only delete the
+  // song from its old playlist - the song would be lost. Held back instead.
+  const noTarget = (i) => i < full.moves.length && full.moves[i].kind === 'move' && !full.payload[i].toPlaylistId;
+  const send = subPlan(full, (i) => !isGone(i) && !noTarget(i));
+  const held = subPlan(full, (i) => isGone(i) && !noTarget(i));
+  const stuck = full.payload.filter((_, i) => noTarget(i));
   let settled = 0;
-  let skipped = 0;
+  let skipped = stuck.length;
+  if (stuck.length) {
+    const failures = Object.fromEntries(stuck.map((r) => [r.fromItemId, { step: 'insert', error: NO_TARGET_REASON }]));
+    dispatch(syncFailuresRecorded({ attempted: [], failures }));
+  }
   if (held.payload.length) {
     const s = await settleGone(queryClient, held);
     if (s.plan.payload.length) dispatch(applySyncOutcome(s.plan, s.results));
-    skipped = Object.keys(s.failures).length;
+    skipped += Object.keys(s.failures).length;
     if (skipped) dispatch(syncFailuresRecorded({ attempted: [], failures: s.failures }));
     settled = s.plan.payload.length;
   }
