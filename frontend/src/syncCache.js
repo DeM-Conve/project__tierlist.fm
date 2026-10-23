@@ -1,6 +1,6 @@
 import { queryKeys } from './api/queryKeys';
 import { SESSION_START } from './api/boardCache';
-import { playlistItemsQuery } from './api/queries';
+import { bumpItemCounts, playlistItemsQuery } from './api/queries';
 import { recordDeleted, recordInserted } from './api/pushLedger';
 import { touchedPlaylists } from './syncPlan';
 import { itemIdsRebased } from './store/itemIds';
@@ -232,6 +232,12 @@ export async function recordPush(queryClient, { state, plan, results, tierGroups
   const videos = [...plan.moves.map((m) => m.video), ...plan.transfers.map((t) => t.video)];
   const deleted = new Set();
   const inserted = {};
+  // Each playlist's song count moves with what the push did (the playlists
+  // list isn't re-read for it: quota, and a whole-app re-render).
+  const counts = {};
+  const count = (id, by) => {
+    if (id) counts[id] = (counts[id] ?? 0) + by;
+  };
   plan.payload.forEach((row, i) => {
     if (!results) return;
     const r = results[i];
@@ -248,8 +254,10 @@ export async function recordPush(queryClient, { state, plan, results, tierGroups
     if (didRemove) {
       deleted.add(row.fromItemId);
       recordDeleted(row.fromItemId);
+      count(row.fromPlaylistId, -1);
     }
     if (!didInsert) return;
+    count(row.toPlaylistId, 1);
     const newId = insertedId(state, tierGroups, category, row, r);
     if (!newId) {
       unsure.add(row.toPlaylistId);
@@ -273,4 +281,5 @@ export async function recordPush(queryClient, { state, plan, results, tierGroups
     queryClient.setQueryData(itemKey(id), [...kept, ...added]);
   }
   unsure.forEach((id) => queryClient.invalidateQueries({ queryKey: itemKey(id), refetchType: 'none' }));
+  bumpItemCounts(queryClient, counts);
 }

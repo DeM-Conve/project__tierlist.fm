@@ -209,8 +209,16 @@ export function useFetchVideo() {
 // into the cached list. Refetching the list for it re-read every playlist of
 // the account from YouTube (quota, and a whole-app re-render) per song filed.
 function bumpItemCount(queryClient, playlistId, by) {
+  bumpItemCounts(queryClient, { [playlistId]: by });
+}
+
+// The same for several playlists at once ({ [playlistId]: +n / -n }) - a
+// push (syncCache.js recordPush), so the sidebar's and Home's counts follow
+// it like the board does.
+export function bumpItemCounts(queryClient, deltas) {
+  if (!Object.values(deltas).some(Boolean)) return;
   queryClient.setQueryData(queryKeys.playlists, (old) =>
-    old?.map((p) => (p.id === playlistId ? { ...p, itemCount: Math.max(0, (p.itemCount ?? 0) + by) } : p))
+    old?.map((p) => (deltas[p.id] ? { ...p, itemCount: Math.max(0, (p.itemCount ?? 0) + deltas[p.id]) } : p))
   );
 }
 
