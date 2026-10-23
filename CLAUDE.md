@@ -78,7 +78,8 @@ scripts/backup.sh / scripts/restore.sh    # database backup / restore
     state for "is the palette open."
   - **Redux Toolkit** (`@reduxjs/toolkit` + `react-redux`) for *client* state only, in
     `frontend/src/store/` (`authSlice` mirrors login/playlists, `viewSlice`,
-    `tiersSlice` - the local editable draft over a board's data - and `focusSlice`).
+    `tiersSlice` - the local editable draft over the open board's data -, `draftsSlice` -
+    every other board's kept draft - and `focusSlice`).
     Cross-slice derived values (pending moves, duel pools, focus navigation sequence,
     etc.) are memoized selectors in `store/selectors.js`, not component-level `useMemo`.
   - **TanStack Query** (`@tanstack/react-query`) is the primary data-fetching layer for
@@ -107,9 +108,12 @@ scripts/backup.sh / scripts/restore.sh    # database backup / restore
     `api/queryClient.js`) makes only it stale -> shown at once, refetched in the
     background; data fetched this session stays `Infinity` (quota). A board loaded
     from such data sets `tiersSlice.awaitingRefresh`; `landBoardRefresh`
-    (`tierActions`) applies the fresh copy **once, and only if `selectHasLocalEdits`
-    is false** (no undo steps / staged moves / sync in flight) - never a later
-    refetch, which can lag behind a sync. A failed refresh keeps the board with a
+    (`tierActions`) applies the fresh copy **once** - plainly when nothing was
+    edited, else as a re-base of the draft over it (`loadBoard({ rebase })`, see
+    Drafts below), but never after something was written from the board since it
+    loaded (`tiersSlice.wroteSinceLoad`) or mid-push - and never a later refetch,
+    which can lag behind a sync (except one asked for by another tab's write,
+    `awaitingRefresh.after`). A failed refresh keeps the board with a
     quiet notice (`refreshError`). No IndexedDB -> plain `QueryClientProvider`.
     **A push never sends an item id older than the last push to its playlist**
     (`src/syncCache.js`): after a push, `recordPush` cancels in-flight reads of
@@ -137,6 +141,40 @@ scripts/backup.sh / scripts/restore.sh    # database backup / restore
     (`syncStatus.js`).
     `useTierBoardQueries` waits on `isPending` (not `isLoading`): during restore
     nothing fetches, and `isLoading` "loaded" empty tiers.
+    **Drafts (unpushed changes belong to their board - the user's call,
+    2026-10-23):** `tiersSlice` is the open board only; `loadBoard` *parks* the
+    board being left in `draftsSlice.boards[category]` (`packBoard`: draft,
+    baseline, hidden copies, undo/redo) and, opening a board with a kept draft
+    that has edits (`selectors.boardHasEdits`: undo steps, user changes, a
+    half-done move's leftover delete), lays it over the fresh load
+    (`tiersSlice.draftRestored`: per-playlist id re-point with `itemIdChanges`,
+    gone copies out of draft + history, new YouTube copies in, hidden copies
+    kept hidden, live transfers respected); a user change that no longer
+    applies is dropped with a note (`tierActions.restoreDraft` ->
+    `draftsSlice.notes`, shown by `BoardDraftNotes`). The same re-base runs when
+    a naming change changes the open board's playlists
+    (`tiersSlice.loadedPlaylists`) and when another tab writes to them
+    (`useOtherTabWrites` callback). **A kept board is still live:**
+    `store/boardScope.js` `boardScope(category)` / `inBoard(category, thunk)`
+    give any thunk or push a `{ dispatch, getState }` where `state.tiers` *is*
+    that board (tiersSlice actions go to `draftsSlice.draftEdited`, which runs
+    the tiersSlice reducer on it; push status / failures stay global) - so
+    `moveWithFeedback(moves, { category })` rates the playing song on its own
+    board from any page, Add songs files into a kept board, and App's
+    `pushAll` pushes each board planned from its own draft (open board first,
+    with the transfers) through the same chain, `preparePush` and
+    `recordPush`. Never write a new reducer that assumes the open board is
+    the only board with changes: read `selectBoardsChanges` (per board,
+    user `changes` apart from auto `dedupes`) for anything global. **Kept
+    across reloads, per account:** `api/draftStore.js` (idb-keyval, own
+    store; `{ owner, schema: DRAFTS_SCHEMA, boards }`, last 20 undo steps)
+    written by `useDraftPersistence` (debounced, flushed on pagehide) from
+    `draftsToSave` (kept boards with edits + the open one); read before any
+    board loads (`drafts.hydrated` gates `useLoadTierBoard`); another or
+    unknown account's copy is dropped; logout clears it (`clearDrafts`,
+    `draftsCleared`). A board with unpushed changes is counted as its draft
+    away from it (`selectShownTierGroups` for the side panel and Home cards,
+    `UnpushedDot`).
   - **React Hook Form** (`react-hook-form`) - used where a real form with cross-field
     validation exists: Settings -> Duels' tier ranges (`DuelSettings.jsx`, a resolver over
     `duel/tierRanges.js` `validateMinimums`, Mantine `NumberInput` via `Controller`,
@@ -456,9 +494,10 @@ scripts/backup.sh / scripts/restore.sh    # database backup / restore
 - **Routing is React Router** (`react-router-dom`), not hand-rolled History API calls -
   see `App.jsx`. `tiersSlice.loadedCategory` guards `TierBoardPage`/`DuelPage` against
   re-fetching a board that's already loaded when the router remounts the page (e.g.
-  returning from a duel) - removing that guard would silently discard an unsynced duel
-  result or drag on every board/duel round-trip. Don't refetch tier-board data on mount
-  without checking `loadedCategory` first.
+  returning from a duel) - removing that guard would reload the board on every
+  board/duel round-trip. Don't refetch tier-board data on mount without checking
+  `loadedCategory` first. (Opening a *different* board parks this one with its
+  draft - see Drafts above.)
 - **Playlist names follow the user's naming (`src/naming.js`, `namingSlice`) = template
   + tier names.** The product knows exactly two tokens, `{category}` and `{tier}`; any
   other `{word}` in the template is a token *of the user's own*, named by them (e.g. `{my_label}` for
@@ -500,7 +539,9 @@ scripts/backup.sh / scripts/restore.sh    # database backup / restore
   reducer that adds or deletes a playlist item must call `rebaseHistory` too.
 - **The tier list is the product's moat** (see `PRODUCT.md`): the Tier Rail
   (`TierRail.jsx`) is always on board pages; board pages render inside `BoardShell`
-  in `App.jsx` (rail + shared `PendingChanges` bar, which also owns Shift+P).
+  in `App.jsx`. The staged-changes bar (`PendingChanges`, owns Shift+P) is the
+  Layout's, on every page but a duel matchup, and reads its actions through
+  `layout/shellActions.js` `useShellActions` (it sits beside the routed page).
 - **TODO is a special, unranked tier** (`tiers.js`: `TODO_TIER`, `BOARD_TIERS` =
   `TIER_ORDER` + TODO). Use `BOARD_TIERS` for what a board holds/loads/plays/moves
   between, `TIER_ORDER` for ranking only (duels, dedupe priority, "missing tiers",
