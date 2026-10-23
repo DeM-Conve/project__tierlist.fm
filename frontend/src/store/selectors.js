@@ -240,10 +240,13 @@ export const selectFocusedVideoData = (state) => state.focus.current?.video ?? n
 // (removed and pushed, dragged to another board) has no tier (null): there's
 // nothing there to rate.
 const LIVE_TIERS = [...BOARD_TIERS, REMOVED_TIER];
+// A board kept with its unpushed changes (draftsSlice) is read the same way.
+const selectFocusedKeptItems = (s) => s.drafts?.boards?.[s.focus.focusedCategory]?.tierItems;
 export const selectPlayingSong = createSelector(
-  [selectFocusedVideo, selectFocusedCategory, selectLoadedCategory, selectTierItems],
-  (focusedVideo, focusedCategory, loadedCategory, tierItems) => {
-    if (!focusedVideo || focusedCategory !== loadedCategory) return focusedVideo;
+  [selectFocusedVideo, selectFocusedCategory, selectLoadedCategory, selectTierItems, selectFocusedKeptItems],
+  (focusedVideo, focusedCategory, loadedCategory, openItems, keptItems) => {
+    const tierItems = focusedCategory === loadedCategory ? openItems : keptItems;
+    if (!focusedVideo || !tierItems) return focusedVideo;
     const tier = LIVE_TIERS.find((t) => (tierItems[t] || []).some((v) => v.videoId === focusedVideo.videoId)) ?? null;
     return tier === focusedVideo.tier ? focusedVideo : { ...focusedVideo, tier };
   }
@@ -251,16 +254,14 @@ export const selectPlayingSong = createSelector(
 
 // Rating targets are the ranked tiers only (Shift+1-5 stay S..D); a song
 // goes back to TODO via the Tier Rail, a menu or a drag.
-// Tier reassignment only works while the playing video's board is the one
-// loaded in `tiersSlice.tierItems` (the pills/shift+digit shortcut write
-// there). That stays true on Home / Settings / playlist pages after leaving
-// the board - only opening a *different* board replaces it, and then the
-// controls hide rather than silently no-op. The same for a song that has
-// left its board (selectPlayingSong's tier is null).
+// Rating works while the playing song's board is in reach: the open board,
+// or one kept with its draft after another board opened (draftsSlice) - the
+// change is staged on that board either way (moveWithFeedback's category).
+// Not for a song that has left its board (selectPlayingSong's tier is null).
 export const selectFocusedAvailableTiers = createSelector(
-  [selectPlayingSong, selectFocusedCategory, selectLoadedCategory, selectTierGroups],
-  (playing, focusedCategory, loadedCategory, tierGroups) =>
-    playing?.tier && focusedCategory && focusedCategory === loadedCategory
+  [selectPlayingSong, selectFocusedCategory, selectLoadedCategory, (s) => !!s.drafts?.boards?.[s.focus.focusedCategory], selectTierGroups],
+  (playing, focusedCategory, loadedCategory, kept, tierGroups) =>
+    playing?.tier && focusedCategory && (focusedCategory === loadedCategory || kept)
       ? TIER_ORDER.filter((t) => tierGroups[focusedCategory]?.[t])
       : []
 );

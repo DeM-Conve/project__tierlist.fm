@@ -137,10 +137,11 @@ function describe(moves, tierItems) {
 // rating the playing song from the player, the rail or a key on any page
 // stages the change on *its* board, kept with its unpushed changes if
 // another board is open (boardScope). Without one: the open board.
-export const moveWithFeedback = (moves, { quiet = false, category = null } = {}) => (dispatch, getState) => {
+// `onBoard`: named in the toast (the edit went to a board that isn't open).
+export const moveWithFeedback = (moves, { quiet = false, category = null, onBoard = null } = {}) => (dispatch, getState) => {
   if (category != null && getState().tiers.loadedCategory !== category) {
     if (!boardInReach(getState(), category)) return;
-    return dispatch(inBoard(category, moveWithFeedback(moves, { quiet })));
+    return dispatch(inBoard(category, moveWithFeedback(moves, { quiet, onBoard: category })));
   }
   // A move of a song that isn't (any more) where it says - a stale drag, the
   // player's snapshot after a reload - changes nothing: no undo step, no toast.
@@ -155,7 +156,7 @@ export const moveWithFeedback = (moves, { quiet = false, category = null } = {})
   };
   const real = moves.filter(changes);
   if (real.length === 0) return;
-  const message = describe(real, getState().tiers.tierItems);
+  const message = describe(real, getState().tiers.tierItems) + (onBoard ? ` · ${onBoard}` : '');
   dispatch(moveVideos({ moves: real }));
   resyncFocusedTier(dispatch, getState);
   advanceTriage(dispatch, getState, real);
@@ -363,11 +364,14 @@ export const discardAll = () => (dispatch, getState) => {
 // tier-focus list, Tier Rail): a drag carries { videoId, fromTier }. The
 // dragged song is also kept in the store (transfers.drag), so it can be
 // dropped on another board after the sidebar opens it (see Sidebar).
-export function useTierDnd() {
+// `category`: the board these drop targets belong to (the Tier Rail of the
+// playing song's board when another one is open); the open board by default.
+export function useTierDnd(category = null) {
   const dispatch = useDispatch();
   const dragOverTier = useSelector((s) => s.tiers.dragOverTier);
   const draggedVideoId = useSelector((s) => s.tiers.draggedVideoId);
-  const loadedCategory = useSelector((s) => s.tiers.loadedCategory);
+  const openCategory = useSelector((s) => s.tiers.loadedCategory);
+  const loadedCategory = category ?? openCategory;
   const drag = useSelector((s) => s.transfers.drag);
 
   function endDrag() {
@@ -392,10 +396,10 @@ export function useTierDnd() {
       // The board's own copy, not the caller's: the Tier Rail drags the
       // player's snapshot of the song, whose item id can be from before a
       // push - a transfer must delete the item that exists now.
-      dispatch((d, getState) => {
+      dispatch(inBoard(loadedCategory, (d, getState) => {
         const live = getState().tiers.tierItems[fromTier]?.find((v) => v.videoId === video.videoId);
         d(dragStarted({ video: live ?? video, fromCategory: loadedCategory, fromTier }));
-      });
+      }));
     },
     onDragEnd() {
       endDrag();
@@ -425,11 +429,12 @@ export function useTierDnd() {
         drag && drag.fromCategory && drag.fromCategory !== loadedCategory && data.videoId === drag.video.videoId;
       dispatch(dragEnded());
       if (crossBoard) {
-        dispatch(transferWithFeedback(drag, toTier, dropIndex));
+        // To another board: only onto the open one (a transfer lands there).
+        if (loadedCategory === openCategory) dispatch(transferWithFeedback(drag, toTier, dropIndex));
         return;
       }
       if (!data.videoId) return;
-      dispatch(moveWithFeedback([{ fromTier: data.fromTier, toTier, videoId: data.videoId, dropIndex }]));
+      dispatch(moveWithFeedback([{ fromTier: data.fromTier, toTier, videoId: data.videoId, dropIndex }], { category: loadedCategory }));
     },
   };
 }

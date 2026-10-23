@@ -9,6 +9,7 @@ import { recordAction, revertAction } from '../store/addSongsSlice';
 import { addSyncedVideo, removeSyncedVideo } from '../store/tiersSlice';
 import { cancelTransfer } from '../tierActions';
 import { openFocus } from '../store/focusSlice';
+import { boardInReach, inBoard } from '../store/boardScope';
 import { songLabel } from '../tierUtils';
 
 const TOAST_ID = 'add-song';
@@ -101,8 +102,10 @@ export function useAddSongsActions(addSongs) {
     advance(video, entry);
     const { song } = songLabel(video);
     const request = addMutation.mutateAsync({ playlistId: playlist.id, videoId: video.videoId, video }).then((item) => {
-      if (store.getState().tiers.loadedCategory === category) {
-        dispatch(addSyncedVideo({ tier, video: { ...video, ...item, channelTitle: item.channelTitle ?? video.channelTitle } }));
+      // On its board - the open one, or one kept with unpushed changes.
+      if (boardInReach(store.getState(), category)) {
+        const added = { ...video, ...item, channelTitle: item.channelTitle ?? video.channelTitle };
+        dispatch(inBoard(category, (d) => d(addSyncedVideo({ tier, video: added }))));
       }
       return item;
     });
@@ -150,9 +153,9 @@ export function useAddSongsActions(addSongs) {
       // transfer, or Push would add the song back to the other board.
       const staged = store.getState().transfers.list.find((t) => t.id === now.itemId);
       if (staged) dispatch(cancelTransfer(staged));
-      if (store.getState().tiers.loadedCategory === entry.category) {
+      if (boardInReach(store.getState(), entry.category)) {
         const tier = Object.keys(board).find((t) => board[t].id === now.playlistId) ?? entry.tier;
-        dispatch(removeSyncedVideo({ tier, videoId: entry.video.videoId, itemId: now.itemId }));
+        dispatch(inBoard(entry.category, (d) => d(removeSyncedVideo({ tier, videoId: entry.video.videoId, itemId: now.itemId }))));
       }
       dispatch(revertAction(entry));
     } catch {

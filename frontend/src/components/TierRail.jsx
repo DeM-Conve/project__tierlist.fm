@@ -33,17 +33,20 @@ export default function TierRail({ category, activeTier }) {
   const navigate = useNavigate();
   const loadedCategory = useSelector((s) => s.tiers.loadedCategory);
   const tierGroups = useSelector(selectTierGroups);
-  const tierItems = useSelector((s) => s.tiers.tierItems);
+  const openItems = useSelector((s) => s.tiers.tierItems);
+  const keptItems = useSelector((s) => s.drafts.boards[category]?.tierItems);
   const focusedVideo = useSelector(selectPlayingSong);
   const focusedCategory = useSelector((s) => s.focus.focusedCategory);
   const playingVideo = useSelector(selectFocusedVideoData);
-  const dnd = useTierDnd();
+  const dnd = useTierDnd(category);
 
   if (!category || !tierGroups[category]) return null;
   const tiers = BOARD_TIERS.filter((t) => tierGroups[category][t]);
-  // Rating writes into tierItems, so it needs this board to be the loaded one
-  // (it still is after leaving it for Home/Settings; not after opening another).
-  const loaded = loadedCategory === category;
+  // The board's songs: the open board, or one kept with its unpushed
+  // changes after another opened (draftsSlice) - rating the playing song
+  // stages the change on its own board either way.
+  const tierItems = loadedCategory === category ? openItems : keptItems;
+  const loaded = !!tierItems;
   // (A song no longer on its board - pushed away, dragged to another board -
   // has no tier: there's nothing to rate.)
   const playingHere = focusedVideo?.tier && focusedCategory === category && loaded ? focusedVideo : null;
@@ -54,7 +57,7 @@ export default function TierRail({ category, activeTier }) {
       return {
         label: `Rate "${playingVideo.title}" → ${tierName(tier)}`,
         run: () =>
-          dispatch(moveWithFeedback([{ fromTier: playingHere.tier, toTier: tier, videoId: playingHere.videoId }])),
+          dispatch(moveWithFeedback([{ fromTier: playingHere.tier, toTier: tier, videoId: playingHere.videoId }], { category })),
       };
     }
     return {
@@ -67,7 +70,7 @@ export default function TierRail({ category, activeTier }) {
   const ranked = tiers.filter((t) => t !== TODO_TIER);
   const todo = tiers.includes(TODO_TIER) ? TODO_TIER : null;
   const removeOver = dnd.dragOverTier === `rail:${REMOVED_TIER}`;
-  const removedCount = tierItems[REMOVED_TIER]?.length ?? 0;
+  const removedCount = tierItems?.[REMOVED_TIER]?.length ?? 0;
 
   function renderTier(tier, i) {
     const count = loaded ? (tierItems[tier]?.length ?? 0) : (tierGroups[category][tier].itemCount ?? 0);
@@ -198,7 +201,7 @@ export default function TierRail({ category, activeTier }) {
                     playingHere && playingHere.tier !== REMOVED_TIER
                       ? () =>
                           dispatch(
-                            moveWithFeedback([{ fromTier: playingHere.tier, toTier: REMOVED_TIER, videoId: playingHere.videoId }])
+                            moveWithFeedback([{ fromTier: playingHere.tier, toTier: REMOVED_TIER, videoId: playingHere.videoId }], { category })
                           )
                       : undefined
                   }
