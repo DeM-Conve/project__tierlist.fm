@@ -25,6 +25,7 @@ import { TIER_COLORS, TIER_ORDER, TODO_TIER } from '../tiers';
 import { selectPlayerCoversPage, selectTierCategories, selectTierGroups } from '../store/selectors';
 import { chooseBoard, setCurrent } from '../store/addSongsSlice';
 import { isSequenceKey } from '../keyboard/sequence';
+import { focusInOverlay } from '../keyboard/overlay';
 import { songLabel, TIER_INK, youtubeUrl } from '../tierUtils';
 import { EqualizerMark, TierChip } from './TierBits';
 import PageHeader from './PageHeader';
@@ -51,7 +52,9 @@ function TierTarget({ tier, hotkey, disabled, onClick }) {
       h={76}
       style={{
         flex: 1,
-        minWidth: 64,
+        // Shrinks with the card: six targets side by side on a phone, no
+        // sideways scroll.
+        minWidth: 0,
         borderRadius: 10,
         display: 'flex',
         flexDirection: 'column',
@@ -174,7 +177,9 @@ export default function AddSongsView({ addSongs, actions, onAddLinks }) {
   useEffect(() => {
     function onKeyDown(e) {
       if (isSequenceKey(e)) return;
-      if (playerCoversPage || isTyping() || e.altKey) return;
+      // A modal or menu over the page (the "?" list, a song menu) keeps its
+      // keys: "s" there must not skip the song behind it.
+      if (playerCoversPage || isTyping() || focusInOverlay() || e.altKey) return;
       const mod = e.ctrlKey || e.metaKey;
       const claim = () => {
         e.preventDefault();
@@ -321,7 +326,7 @@ export default function AddSongsView({ addSongs, actions, onAddLinks }) {
                       </Text>
                     )}
                   </Group>
-                  <Group gap="sm" wrap="nowrap">
+                  <Flex gap={{ base: '2xs', sm: 'sm' }} wrap="nowrap" data-testid="tier-targets">
                     {TIER_ORDER.map((tier, i) => (
                       <TierTarget
                         key={tier}
@@ -334,7 +339,7 @@ export default function AddSongsView({ addSongs, actions, onAddLinks }) {
                     {hasTodo && (
                       <TierTarget tier={TODO_TIER} hotkey="t" onClick={() => actions.file(current, guess.category, TODO_TIER)} />
                     )}
-                  </Group>
+                  </Flex>
                 </>
               )}
 
@@ -425,7 +430,7 @@ export default function AddSongsView({ addSongs, actions, onAddLinks }) {
                     </Text>
                   </Stack>
                   <TierChip tier={entry.tier} />
-                  <Text fz="sm" w={140} truncate="end">
+                  <Text fz="sm" w={{ base: 72, sm: 140 }} truncate="end">
                     {entry.category}
                   </Text>
                   <Tooltip label="Undo - take it out again" withArrow>

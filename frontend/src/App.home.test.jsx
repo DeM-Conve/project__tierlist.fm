@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { notifications } from '@mantine/notifications';
 import { Provider } from 'react-redux';
 import { MemoryRouter, useLocation } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -16,8 +17,10 @@ const PLAYLISTS = [
   { id: 'p4', title: 'Rock S', itemCount: 1, thumbnail: null },
   { id: 'secret', title: 'Holiday mix', itemCount: 9, thumbnail: null },
 ];
+const h = vi.hoisted(() => ({ fetchVideo: null }));
 vi.mock('./api/queries', async (importOriginal) => ({
   ...(await importOriginal()),
+  useFetchVideo: () => (id) => h.fetchVideo(id),
   useAuthStatusQuery: () => ({ data: { loggedIn: true, userId: 'u1' }, isError: false }),
   usePlaylistsQuery: () => ({ data: PLAYLISTS }),
 }));
@@ -82,5 +85,25 @@ describe('old /playlist/<id> links', () => {
     renderApp('/playlist/secret');
     await screen.findByRole('navigation', { name: 'Activity bar' });
     expect(where()).toBe('/');
+  });
+});
+
+describe('pasting a YouTube link on any page', () => {
+  it('shows that the song is being looked up, then opens Add songs with it', async () => {
+    let land;
+    h.fetchVideo = vi.fn(() => new Promise((resolve) => { land = resolve; }));
+    const show = vi.spyOn(notifications, 'show');
+    const hide = vi.spyOn(notifications, 'hide');
+    renderApp('/');
+    await screen.findByRole('navigation', { name: 'Activity bar' });
+    const paste = new Event('paste', { bubbles: true });
+    paste.clipboardData = { getData: () => 'https://youtu.be/pastedvid01' };
+    act(() => { window.dispatchEvent(paste); });
+    await waitFor(() => expect(show).toHaveBeenCalledWith(expect.objectContaining({ id: 'add-links', loading: true })));
+    await act(async () => land({ videoId: 'pastedvid01', title: 'Pasted song', thumbnail: null }));
+    await waitFor(() => expect(where()).toBe('/add'));
+    expect(hide).toHaveBeenCalledWith('add-links');
+    show.mockRestore();
+    hide.mockRestore();
   });
 });

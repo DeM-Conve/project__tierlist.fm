@@ -402,7 +402,20 @@ function Layout() {
   function handleAddLinks(text) {
     const ids = videoIdsFromText(text);
     if (!ids.length) return false;
-    Promise.allSettled(ids.map(fetchVideo)).then((results) => {
+    // Looking a song up takes a round trip to YouTube: show that it's
+    // happening at once (a paste used to look ignored until it landed).
+    // Songs already looked up this session come straight from the cache.
+    const lookup = Promise.allSettled(ids.map(fetchVideo));
+    const slow = setTimeout(() => notifications.show({
+      id: 'add-links',
+      loading: true,
+      autoClose: false,
+      withCloseButton: false,
+      message: ids.length === 1 ? 'Looking up that song on YouTube…' : `Looking up ${ids.length} songs on YouTube…`,
+    }), 150);
+    lookup.then((results) => {
+      clearTimeout(slow);
+      notifications.hide('add-links');
       const videos = results.filter((r) => r.status === 'fulfilled').map((r) => r.value);
       const failed = results.filter((r) => r.status === 'rejected');
       if (videos.length) {
