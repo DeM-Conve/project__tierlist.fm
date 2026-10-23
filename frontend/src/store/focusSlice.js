@@ -7,7 +7,7 @@ import { readDevicePref } from '../settings';
 //   current   (the playing entry)
 //   upcoming  (everything still to play - one list, "Up next")
 //
-// Every entry is { key, tier, video, source }. `key` is unique per entry
+// Every entry is { key, tier, video, category, source }. `key` is unique per entry
 // (not the video id), so the same song can be queued more than once.
 // `source` only decides where "Add to queue" lands: 'user' entries (Play
 // next / Add to queue, or anything you drag into place) form the front of
@@ -17,13 +17,16 @@ import { readDevicePref } from '../settings';
 //
 // Each entry carries a { tier, video } snapshot taken when it was queued,
 // so the dock keeps working when you navigate to a different board (a
-// board's `tiersSlice.tierItems` only holds the loaded category).
+// board's `tiersSlice.tierItems` only holds the loaded category), and the
+// board it's on (`category`, null for Add songs' songs): a queue can mix
+// boards (Play next on another board, a duel page's Play), and the playing
+// song is always rated on its own board.
 // Starting something new replaces the whole queue, as YouTube Music does.
 
 const HISTORY_LIMIT = 200;
 
-function makeEntry({ tier, video }, source) {
-  return { key: nanoid(), tier, video, source };
+function makeEntry({ tier, video, category = null }, source) {
+  return { key: nanoid(), tier, video, category, source };
 }
 
 // `focusedVideo` ({ tier, videoId }) mirrors `current` for the many
@@ -31,6 +34,7 @@ function makeEntry({ tier, video }, source) {
 // tier moves, triage).
 function sync(state) {
   state.focusedVideo = state.current ? { tier: state.current.tier, videoId: state.current.video.videoId } : null;
+  state.focusedCategory = state.current?.category ?? null;
 }
 
 function pushHistory(state, entry) {
@@ -59,11 +63,10 @@ function startContext(state, { tier, videoId, queue, entries, category, label })
     ordered.unshift(own);
     start = 0;
   }
-  const made = ordered.map((e) => makeEntry(e, 'context'));
+  const made = ordered.map((e) => makeEntry({ ...e, category }, 'context'));
   state.history = made.slice(0, start);
   state.current = { ...made[start], tier: tier ?? made[start].tier };
   state.upcoming = made.slice(start + 1);
-  state.focusedCategory = category;
   state.contextLabel = label ?? category ?? null;
   return true;
 }
@@ -80,10 +83,11 @@ const focusSlice = createSlice({
     // What was started ("Rap", "Rap · A · shuffle", "Rap · TODO", ...),
     // shown as "Playing from" in the queue panel.
     contextLabel: null,
-    // The tier-board category playback was started from. Tier reassignment
-    // (the pills/Shift+digit) writes into `tiersSlice.tierItems`, which only
-    // holds the loaded category, so `selectFocusedAvailableTiers` only shows
-    // those controls while this matches the board being viewed.
+    // The board of the playing song (its entry's `category` - see sync()).
+    // Tier reassignment (the pills/Shift+digit) writes into
+    // `tiersSlice.tierItems`, which only holds the loaded category, so
+    // `selectFocusedAvailableTiers` only shows those controls while this
+    // matches the loaded board.
     focusedCategory: null,
     isShuffling: false,
     // YouTube Music's repeat button: 'off' -> 'all' (loop the whole queue)
@@ -195,7 +199,7 @@ const focusSlice = createSlice({
     // YouTube Music's "Play next" (right after the playing song) and "Add to
     // queue" (after the songs you've already queued, before the rest of the
     // board). Always a new entry - queuing a song twice plays it twice.
-    // `entry` is a { tier, video } snapshot.
+    // `entry` is a { tier, video, category } snapshot.
     enqueue: (state, action) => {
       const { entry, position } = action.payload;
       if (!state.current) return;

@@ -9,6 +9,7 @@ import { FakeYoutube } from './test/fakeYoutube';
 import { mountApp, youtubeBoards } from './test/syncHarness';
 import { invariantViolations } from './test/syncInvariants';
 import { minimizePlayer } from './store/focusSlice';
+import { queueSong } from './queueActions';
 import { selectFocusedAvailableTiers, selectPlayingSong } from './store/selectors';
 import { BOARD_TIERS, REMOVED_TIER, TIER_ORDER } from './tiers';
 
@@ -156,5 +157,26 @@ describe('journey 1: play from one board, browse, drive the player', () => {
     expect(rail().playingOn).toBe('S');
     rateKey(5);
     expect(h.tierOf('a')).toBe('D');
+  });
+
+  it('a song queued from another board is that board\'s song when it plays', async () => {
+    await start();
+    await playTile('a');
+    await h.open('Pop');
+    // Pop's song menu: Play next.
+    const p = h.tierItems().S.find((v) => v.videoId === 'p');
+    h.dispatch(queueSong('S', p, 'next'));
+    next();
+    expect(playingId()).toBe('p');
+    // On Pop the playing song is Pop's: the rail rates it, the keys rate it.
+    expect(focus().focusedCategory).toBe('Pop');
+    expect(rail().mode).toBe('Rate');
+    rateKey(2);
+    expect(h.tierOf('p')).toBe('A');
+    // Back on Rap's song: Pop's player controls are gone again.
+    prev();
+    expect(playingId()).toBe('a');
+    expect(selectFocusedAvailableTiers(h.state)).toEqual([]);
+    expect(rail().mode).toBe('Tiers');
   });
 });

@@ -9,7 +9,8 @@ const TOAST_ID = 'queue-feedback';
 // becomes the start of a fresh queue.
 export const queueSong = (tier, video, position) => (dispatch, getState) => {
   const { focus, tiers } = getState();
-  const entry = { tier, video };
+  // The song's board travels with it: the queue may be another board's.
+  const entry = { tier, video, category: tiers.loadedCategory };
   if (!focus.focusedVideo) {
     dispatch(
       openFocus({
@@ -37,10 +38,11 @@ export const queueSong = (tier, video, position) => (dispatch, getState) => {
 // skip to it) and the queue carries on after it. With nothing playing it
 // starts a fresh queue in the mini bar, like queueSong.
 export const playSongNow = (tier, video) => (dispatch, getState) => {
-  if (!getState().focus.focusedVideo) {
+  const { focus, tiers } = getState();
+  if (!focus.focusedVideo) {
     dispatch(queueSong(tier, video, 'next'));
     return;
   }
-  dispatch(enqueue({ entry: { tier, video }, position: 'next' }));
+  dispatch(enqueue({ entry: { tier, video, category: tiers.loadedCategory }, position: 'next' }));
   dispatch(playNextInQueue());
 };
