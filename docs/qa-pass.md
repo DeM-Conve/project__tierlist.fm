@@ -33,11 +33,11 @@ Status: `[ ]` not started · `[~]` in progress · `[x]` verified · `[!]` needs 
 - [x] Keyboard shortcuts (full list) + shortcuts modal + link hints
 - [x] Command palette
 
-## 3. Duels (`qa/duels`)
-- [~] Duel hub, session start, matchups, verdicts, skips, summary
-- [ ] Suggested moves (Move pushes at once, Keep, locks), score map / trend
-- [ ] Tier borders setting (learned / my own ranges) end to end
-- [ ] Engine correctness (backend unit tests), TODO songs never in duels
+## 3. Duels (`qa/duels`, merged, deployed 2026-10-23)
+- [x] Duel hub, session start, matchups, verdicts, skips, summary
+- [x] Suggested moves (Move pushes at once, Keep, locks), score map / trend
+- [x] Tier borders setting (learned / my own ranges) end to end
+- [x] Engine correctness (backend unit tests), TODO songs never in duels
 
 ## 4. App shell, Home, Add songs, Settings (`qa/shell`)
 - [~] Login / auth errors, load-failure cards (never skeleton forever)
@@ -53,11 +53,14 @@ Status: `[ ]` not started · `[~]` in progress · `[x]` verified · `[!]` needs 
 - [ ] Backend endpoint latency, N+1 queries, compression
 
 ## 6. Backend & API (`qa/backend`)
-- [ ] Every endpoint: auth required, input validation, ProblemDetail errors
+- [~] Every endpoint: auth required, input validation, ProblemDetail errors
 - [ ] Settings ETag flow, migrations, playlists rename/create, tier-sync contract
 - [ ] Backup / restore scripts work under hl
 
 ## Open questions for the user
+- [!] Duels: a locked song can't be unlocked after leaving the page (nowhere lists locks). Add an unlock place?
+- [!] Duels: "Don't know one of them" (`s`) always skips song B - add a way to say it's song A?
+- [!] Duels: 2-minute grace to answer the last duel after time runs out - right length?
 - [!] Shift+digit rating: the player and Tier Rail number only the tiers a board has (no S tier -> Shift+1 = A), Add songs always uses fixed S-D. Which should it be?
 - [!] Opening another board silently drops the open board's staged (unpushed) moves - only
   dragging to another board warns. Keep a draft per board, or confirm before leaving?
