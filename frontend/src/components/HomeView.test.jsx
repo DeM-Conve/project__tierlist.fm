@@ -64,3 +64,28 @@ describe('HomeView - loading placeholders mirror the loaded page', () => {
     });
   });
 });
+
+describe('HomeView - covers', () => {
+  it('load lazily (Home draws one per playlist, most below the fold)', () => {
+    cleanup();
+    renderWithApp(
+      <HomeView
+        playlists={[{ id: 'x', title: 'Rock S', itemCount: 1, thumbnail: 'https://i.ytimg.com/x.jpg', parsed: { category: 'Rock', tier: 'S' } }]}
+        loadError={null}
+        hiddenCount={0}
+        tierGroups={{ Rock: { S: { id: 'x', title: 'Rock S', itemCount: 1, thumbnail: 'https://i.ytimg.com/x.jpg' } } }}
+        tierCategories={['Rock']}
+        query=""
+        onQueryChange={noop}
+        onAddSongs={noop}
+        onOpenBoard={noop}
+        onDuel={noop}
+        onOpenPlaylist={noop}
+        onOpenNaming={noop}
+      />
+    );
+    const covers = document.querySelectorAll('img');
+    expect(covers.length).toBeGreaterThan(0);
+    covers.forEach((img) => expect(img).toHaveAttribute('loading', 'lazy'));
+  });
+});

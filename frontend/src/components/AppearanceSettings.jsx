@@ -10,7 +10,7 @@ import { setAccent, setTheme, setTierPalette } from '../store/appearanceSlice';
 function ThemePreview({ theme, accent, tierColors }) {
   const fill = accent.scale[theme.scheme === 'dark' ? accent.onDark : accent.onLight];
   return (
-    <Box h={64} bg={theme.bg} style={{ borderRadius: 6, border: `1px solid ${theme.border}`, display: 'flex', overflow: 'hidden' }}>
+    <Box h={64} data-accent-fill={fill} bg={theme.bg} style={{ borderRadius: 6, border: `1px solid ${theme.border}`, display: 'flex', overflow: 'hidden' }}>
       <Box w={34} bg={theme.surface} style={{ borderRight: `1px solid ${theme.borderSoft}` }} p="3xs">
         <Stack gap="4xs">
           {[0, 1, 2].map((i) => (
@@ -61,7 +61,9 @@ export default function AppearanceSettings() {
           <SimpleGrid cols={{ base: 2, sm: 3, xl: 6 }} spacing="xs">
             {Object.entries(THEMES).map(([key, theme]) => (
               <Radio.Card key={key} value={key} radius="md" p="2xs">
-                <ThemePreview theme={theme} accent={accent} tierColors={tierColors} />
+                {/* Picking a theme also picks its signature accent, so its
+                    card is drawn with that one (else the current accent). */}
+                <ThemePreview theme={theme} accent={ACCENTS[theme.accent] ?? accent} tierColors={tierColors} />
                 <Group justify="space-between" mt="2xs" wrap="nowrap" gap="4xs">
                   <Group gap="3xs" wrap="nowrap" miw={0}>
                     <Radio.Indicator size="xs" />

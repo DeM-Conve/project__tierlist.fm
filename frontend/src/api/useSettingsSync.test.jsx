@@ -16,7 +16,7 @@ vi.mock('@mantine/notifications', () => ({ notifications: { show: vi.fn(), hide:
 import { notifications } from '@mantine/notifications';
 import { useSettingsSync } from './useSettingsSync';
 import { toServer } from './settingsMapping';
-import appearanceReducer, { setActivityOrder, setTheme } from '../store/appearanceSlice';
+import appearanceReducer, { setAccent, setActivityOrder, setTheme } from '../store/appearanceSlice';
 import { DEFAULT_ACTIVITY_ORDER } from '../activityOrder';
 import namingReducer from '../store/namingSlice';
 import duelsReducer, { setOwnRanges } from '../store/duelSettingsSlice';
@@ -104,7 +104,7 @@ describe('useSettingsSync', () => {
     const base = toServer(store.getState());
     Object.assign(query, { data: { settings: base, etag: '"1"' }, isSuccess: true });
     const newer = { ...base, appearance: { ...base.appearance, tierPalette: 'heat' } };
-    query.refetch.mockResolvedValue({ data: { settings: newer, etag: '"2"' } });
+    query.refetch.mockResolvedValue({ isSuccess: true, data: { settings: newer, etag: '"2"' } });
     mutateAsync
       .mockRejectedValueOnce({ response: { status: 412 } })
       .mockImplementation(async ({ settings }) => ({ settings, etag: '"3"' }));
@@ -130,7 +130,7 @@ describe('useSettingsSync', () => {
     expect(base.appearance.activityOrder).toEqual(DEFAULT_ACTIVITY_ORDER);
     Object.assign(query, { data: { settings: base, etag: '"1"' }, isSuccess: true });
     const newer = { ...base, appearance: { ...base.appearance, theme: 'sand' } };
-    query.refetch.mockResolvedValue({ data: { settings: newer, etag: '"2"' } });
+    query.refetch.mockResolvedValue({ isSuccess: true, data: { settings: newer, etag: '"2"' } });
     mutateAsync
       .mockRejectedValueOnce({ response: { status: 412 } })
       .mockImplementation(async ({ settings }) => ({ settings, etag: '"3"' }));
@@ -172,5 +172,51 @@ describe('useSettingsSync', () => {
     });
     await settle();
     expect(mutateAsync).not.toHaveBeenCalled();
+  });
+  it('a failed load says so (with Retry), and the notice goes once the row loads', async () => {
+    const store = makeStore();
+    query.isError = true;
+    const { rerender } = mount(store);
+    expect(notifications.show).toHaveBeenCalledWith(expect.objectContaining({ id: 'settings-load-failed', autoClose: false }));
+    Object.assign(query, { isError: false, isSuccess: true, data: { settings: toServer(store.getState()), etag: '"1"' } });
+    rerender();
+    expect(notifications.hide).toHaveBeenCalledWith('settings-load-failed');
+  });
+
+  it('an edit made while a 412 is being resolved is kept, not rolled back by the merge', async () => {
+    const store = makeStore();
+    const base = toServer(store.getState());
+    Object.assign(query, { data: { settings: base, etag: '"1"' }, isSuccess: true });
+    const newer = { ...base, appearance: { ...base.appearance, tierPalette: 'heat' } };
+    let answer;
+    query.refetch.mockImplementation(() => new Promise((resolve) => { answer = resolve; }));
+    mutateAsync
+      .mockRejectedValueOnce({ response: { status: 412 } })
+      .mockImplementation(async ({ settings }) => ({ settings, etag: '"3"' }));
+    mount(store);
+    await settle();
+    act(() => { store.dispatch(setTheme('sand')); });
+    await settle(); // the save 412s; the refetch is now in flight
+    act(() => { store.dispatch(setAccent('teal')); });
+    await act(async () => answer({ isSuccess: true, data: { settings: newer, etag: '"2"' } }));
+    await settle();
+    expect(store.getState().appearance).toMatchObject({ theme: 'sand', accent: 'teal', tierPalette: 'heat' });
+    expect(mutateAsync.mock.calls.at(-1)[0].settings.appearance).toMatchObject({ theme: 'sand', accent: 'teal', tierPalette: 'heat' });
+  });
+
+  it('a 412 whose refetch fails stops with a notice - no save loop on the stale row', async () => {
+    const store = makeStore();
+    const base = toServer(store.getState());
+    Object.assign(query, { data: { settings: base, etag: '"1"' }, isSuccess: true });
+    // A failed refetch still returns the old cached data.
+    query.refetch.mockResolvedValue({ isSuccess: false, isError: true, data: { settings: base, etag: '"1"' } });
+    mutateAsync.mockRejectedValue({ response: { status: 412 } });
+    mount(store);
+    await settle();
+    act(() => { store.dispatch(setTheme('sand')); });
+    await settle();
+    await settle();
+    expect(mutateAsync).toHaveBeenCalledTimes(1);
+    expect(notifications.show).toHaveBeenCalledWith(expect.objectContaining({ id: 'settings-save-failed' }));
   });
 });

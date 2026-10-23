@@ -11,6 +11,7 @@ import {
   useParams,
   useMatch,
   useOutletContext,
+  useLocation,
 } from 'react-router-dom';
 import { spotlight } from '@mantine/spotlight';
 import { ActionIcon, Affix, Alert, Box, Button, Center, Flex, Loader, Text } from '@mantine/core';
@@ -147,9 +148,17 @@ function useLoadTierBoard(category, tiers) {
   const dispatch = useDispatch();
   const loadedCategory = useSelector((s) => s.tiers.loadedCategory);
   const awaitingRefresh = useSelector((s) => s.tiers.awaitingRefresh);
-  const { data, isLoading, error, retry, dataUpdatedAt, isStale, isFetching, refreshError } =
-    useTierBoardQueries(category, tiers);
+  const board = useTierBoardQueries(category, tiers);
+  const { data, isLoading, dataUpdatedAt, isStale, isFetching, refreshError } = board;
   const boardLoading = !tiers || isLoading || loadedCategory !== category;
+  // The playlists list itself couldn't load (a refresh / deep link straight
+  // onto a board): there's no board to load yet - say why and offer Retry,
+  // never skeletons (and a progress bar) forever.
+  const playlistsLoaded = useSelector((s) => s.auth.playlists !== null);
+  const { error: playlistsError, refetch: retryPlaylists } = usePlaylistsQuery(true);
+  const listFailed = !playlistsLoaded && !!playlistsError;
+  const error = listFailed ? playlistsError : board.error;
+  const retry = listFailed ? () => retryPlaylists() : board.retry;
 
   useEffect(() => {
     // `tiers` is undefined until the playlists list itself has loaded (e.g.
@@ -179,7 +188,7 @@ function useLoadTierBoard(category, tiers) {
   // Its Retry waits for the fresh copy again, so a successful retry lands.
   const retryRefresh = () => {
     dispatch(setAwaitingRefresh({ category, since: dataUpdatedAt }));
-    retry();
+    board.retry();
   };
   return {
     isLoading: boardLoading,
@@ -194,7 +203,14 @@ export default function App() {
   const dispatch = useDispatch();
   const loggedIn = useSelector((s) => s.auth.loggedIn);
 
-  const { data: authData, isError: authErrored } = useAuthStatusQuery();
+  const location = useLocation();
+  const {
+    data: authData,
+    isError: authErrored,
+    error: authError,
+    refetch: retryAuth,
+    isFetching: retryingAuth,
+  } = useAuthStatusQuery();
   const { data: playlistsData } = usePlaylistsQuery(authData?.loggedIn === true);
 
   // Mirrors TanStack Query's cache into Redux so the many selectors built on
@@ -228,9 +244,7 @@ export default function App() {
   }
 
   if (loggedIn === false) {
-    return (
-      <LoginView onLogin={login} />
-    );
+    return <LoginView onLogin={login} problem={loginProblem(authErrored && authError, location.search, retryAuth, retryingAuth)} />;
   }
 
   if (loggedIn === null) {
@@ -258,6 +272,28 @@ export default function App() {
       </Route>
     </Routes>
   );
+}
+
+// Why the signed-out page is showing, if it isn't simply "not logged in":
+// the login check itself failed (the server is down or unreachable - logging
+// in can't work either, so say so and offer Retry), or Google sent the
+// visitor back without signing in (Spring's failure redirect, `?error`).
+function loginProblem(authError, search, onRetry, retrying) {
+  if (authError) {
+    return {
+      title: 'Couldn’t reach the Tierlist.fm server',
+      message: errorMessage(authError, 'The app couldn’t check whether you’re logged in - the server may be down or restarting.'),
+      onRetry: () => onRetry(),
+      retrying,
+    };
+  }
+  if (new URLSearchParams(search).has('error')) {
+    return {
+      title: 'Google sign-in didn’t finish',
+      message: 'You weren’t logged in - the sign-in was cancelled or Google refused it. Try again, and allow access to your YouTube account.',
+    };
+  }
+  return null;
 }
 
 // Sidebar + the persistent player dock + command palette, all of which stay
@@ -310,6 +346,12 @@ function Layout() {
     else if (!sidebarCollapsed && panel.isCollapsed()) panel.resize(openSizeRef.current);
   }, [sidebarCollapsed, narrow, sidebarPanelRef]);
   const tierPlaylists = useSelector(selectTierPlaylists);
+  // The playlists list failed (and nothing cached is shown): the side panel
+  // says so instead of showing placeholders forever.
+  const { error: playlistsError, refetch: retryPlaylists } = usePlaylistsQuery(true);
+  const playlistsLoadError = tierPlaylists === null && playlistsError
+    ? errorMessage(playlistsError, 'The app couldn’t reach YouTube.')
+    : null;
   const focusedVideo = useSelector((s) => s.focus.focusedVideo);
   const isShuffling = useSelector((s) => s.focus.isShuffling);
   const isTriage = useSelector((s) => s.focus.isTriage);
@@ -360,7 +402,20 @@ function Layout() {
   function handleAddLinks(text) {
     const ids = videoIdsFromText(text);
     if (!ids.length) return false;
-    Promise.allSettled(ids.map(fetchVideo)).then((results) => {
+    // Looking a song up takes a round trip to YouTube: show that it's
+    // happening at once (a paste used to look ignored until it landed).
+    // Songs already looked up this session come straight from the cache.
+    const lookup = Promise.allSettled(ids.map(fetchVideo));
+    const slow = setTimeout(() => notifications.show({
+      id: 'add-links',
+      loading: true,
+      autoClose: false,
+      withCloseButton: false,
+      message: ids.length === 1 ? 'Looking up that song on YouTube…' : `Looking up ${ids.length} songs on YouTube…`,
+    }), 150);
+    lookup.then((results) => {
+      clearTimeout(slow);
+      notifications.hide('add-links');
       const videos = results.filter((r) => r.status === 'fulfilled').map((r) => r.value);
       const failed = results.filter((r) => r.status === 'rejected');
       if (videos.length) {
@@ -600,7 +655,19 @@ function Layout() {
   }
 
   async function logout() {
-    await api.post('/api/auth/logout');
+    try {
+      await api.post('/api/auth/logout');
+    } catch (e) {
+      // Still logged in on the server: say so rather than doing nothing
+      // (or pretending - the session would come straight back on reload).
+      notifications.show({
+        id: 'logout-failed',
+        color: 'red',
+        title: 'Couldn’t log out',
+        message: errorMessage(e, 'The app couldn’t reach the server - you’re still logged in. Try again.'),
+      });
+      return;
+    }
     queryClient.clear();
     // This device forgets the account's cached playlists too.
     clearBoardCache();
@@ -751,6 +818,8 @@ function Layout() {
           playlistCount={tierPlaylists?.length ?? 0}
           waitingCount={addSongs.list.length}
           loading={tierPlaylists === null}
+          loadError={playlistsLoadError}
+          onRetry={() => retryPlaylists()}
           onSelectSettings={() => navigate('/settings')}
           onOpenShortcuts={shortcutsHandlers.open}
           onLogout={logout}
@@ -794,6 +863,8 @@ function Layout() {
                 tierGroups={tierGroups}
                 playlistCount={tierPlaylists?.length ?? 0}
                 loading={tierPlaylists === null}
+                loadError={playlistsLoadError}
+                onRetry={() => retryPlaylists()}
                 view={sidebarView}
               />
                 </Box>
@@ -957,17 +1028,25 @@ function BoardRefreshNotice({ error, onRetry }) {
           Showing the copy saved on this device - couldn’t refresh it from YouTube.{' '}
           {errorMessage(error, '')}
         </Text>
-        <Button size="xs" variant="subtle" onClick={onRetry}>Retry</Button>
+        <Button size="compact-sm" variant="subtle" color="gray" onClick={onRetry}>Retry</Button>
       </Flex>
     </Alert>
   );
 }
 
+// The login expired (401) or lacks the YouTube permission (403): Retry
+// can't fix that - logging in again can.
+const needsLogin = (error) => [401, 403].includes(error?.response?.status);
+const relogin = () => (window.location.href = `${API_BASE}/oauth2/authorization/google`);
+
 function BoardLoadError({ error, onRetry }) {
   return (
     <Alert color="red" title="Couldn’t load this board">
       {errorMessage(error, 'The app couldn’t load this board’s playlists from YouTube.')}
-      <Box mt="sm"><Button size="xs" onClick={onRetry}>Retry</Button></Box>
+      <Flex mt="sm" gap="sm">
+        <Button size="compact-sm" variant="default" onClick={onRetry}>Retry</Button>
+        {needsLogin(error) && <Button size="compact-sm" onClick={relogin}>Log in again</Button>}
+      </Flex>
     </Alert>
   );
 }
@@ -1009,7 +1088,7 @@ function HomePage() {
       }
       retrying={retryingPlaylists}
       onRetry={() => retryPlaylists()}
-      onRelogin={() => (window.location.href = `${API_BASE}/oauth2/authorization/google`)}
+      onRelogin={relogin}
       hiddenCount={allPlaylists && tierPlaylists ? allPlaylists.length - tierPlaylists.length : 0}
       onOpenNaming={() => navigate('/settings?tab=naming')}
       tierGroups={tierGroups}

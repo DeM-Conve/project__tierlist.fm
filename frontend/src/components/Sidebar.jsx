@@ -2,6 +2,7 @@ import { Link, useLocation } from 'react-router-dom';
 import {
   Box,
   ActionIcon,
+  Button,
   CloseButton,
   Group,
   Indicator,
@@ -301,7 +302,9 @@ export function ActivityBar({ openView, onShowView, onOpenPalette, waitingCount,
 // The side panel: the open view (Tier lists, Playlists or Duels), its
 // filter and its list. On desktop it lives in App's resizable panel group; on a phone,
 // in the drawer beside the activity bar.
-export function SidebarPanel({ query, onQueryChange, tierCategories, tierGroups, playlistCount, loading, view = 'boards' }) {
+// `loadError`: why the playlists list couldn't load (with `onRetry`) - shown
+// in place of the placeholders, which would otherwise never go away.
+export function SidebarPanel({ query, onQueryChange, tierCategories, tierGroups, playlistCount, loading, loadError = null, onRetry, view = 'boards' }) {
   const naming = useSelector(selectNaming);
   const location = useLocation();
   const q = query.trim().toLowerCase();
@@ -330,9 +333,9 @@ export function SidebarPanel({ query, onQueryChange, tierCategories, tierGroups,
         <Text fz="lg" fw={700} c="var(--text)">
           {VIEW_TITLES[view] ?? VIEW_TITLES.boards}
         </Text>
-        {loading ? (
+        {loading && !loadError ? (
           <Skeleton h={10} w={14} />
-        ) : (
+        ) : loading ? null : (
           <Text fz="md" c={MUTED}>
             {isPlaylists ? playlistCount : tierCategories.length}
           </Text>
@@ -404,7 +407,17 @@ export function SidebarPanel({ query, onQueryChange, tierCategories, tierGroups,
           ))}
           {/* Until playlists arrive we don't know the boards yet - placeholders,
               not "0 boards" and the naming-convention hint. */}
-          {loading &&
+          {loadError && (
+            <Stack gap="2xs" px="2xs" align="flex-start">
+              <Text size="sm" c="dimmed">
+                Couldn’t load your playlists. {loadError}
+              </Text>
+              <Button size="compact-sm" variant="default" onClick={onRetry}>
+                Retry
+              </Button>
+            </Stack>
+          )}
+          {loading && !loadError &&
             Array.from({ length: 7 }).map((_, i) => (
               <Stack key={i} gap="3xs" px="sm" py="2xs">
                 <Skeleton h={10} w={`${55 + ((i * 17) % 35)}%`} />

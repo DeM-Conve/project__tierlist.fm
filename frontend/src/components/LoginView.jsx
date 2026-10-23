@@ -1,4 +1,5 @@
 import {
+  Alert,
   Badge,
   Box,
   Button,
@@ -11,7 +12,7 @@ import {
   ThemeIcon,
   Title,
 } from '@mantine/core';
-import { LayoutGrid, ListOrdered, Radio, Swords } from 'lucide-react';
+import { CircleAlert, LayoutGrid, ListOrdered, Radio, Swords } from 'lucide-react';
 import { TIER_ORDER, TIER_COLORS } from '../tiers';
 import { TIER_INK } from '../tierUtils';
 import { DEMO_ART } from '../themes';
@@ -198,7 +199,10 @@ function GoogleMark() {
   );
 }
 
-export default function LoginView({ onLogin }) {
+// `problem`: why the visitor is here instead of in the app - the server
+// couldn't be reached (`{ title, message, onRetry, retrying }`, with Retry),
+// or Google sign-in didn't finish (no Retry: "Continue with Google" is it).
+export default function LoginView({ onLogin, problem = null }) {
   return (
     <Box
       mih="100vh"
@@ -252,19 +256,34 @@ export default function LoginView({ onLogin }) {
               you do it.
             </Text>
 
+            {problem && (
+              <Alert variant="light" color="red" radius="md" icon={<CircleAlert size={18} />} title={problem.title} maw={470}>
+                <Stack gap="sm" align="flex-start">
+                  <Text fz="sm">{problem.message}</Text>
+                  {problem.onRetry && (
+                    <Button size="compact-sm" variant="default" loading={problem.retrying} onClick={problem.onRetry}>
+                      Retry
+                    </Button>
+                  )}
+                </Stack>
+              </Alert>
+            )}
+
             <Stack gap="xs" align="flex-start">
               <Button
                 size="lg"
                 radius="md"
-                variant="white"
-                color="dark"
+                // Google's neutral sign-in button, drawn from the theme so it
+                // reads on light and dark themes alike (a fixed white one
+                // vanished into the light themes' page).
+                variant="default"
                 leftSection={<GoogleMark />}
                 onClick={onLogin}
               >
                 Continue with Google
               </Button>
               <Text fz="xs" c="dimmed">
-                Nothing changes on YouTube until you press Sync.
+                Nothing on YouTube changes until you push your changes.
               </Text>
             </Stack>
 

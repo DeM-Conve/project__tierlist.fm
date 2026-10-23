@@ -1,4 +1,5 @@
-import { useEffect, useRef } from 'react';
+import { createElement, useEffect, useRef } from 'react';
+import { Button, Stack, Text } from '@mantine/core';
 import { useDispatch, useSelector, useStore } from 'react-redux';
 import { useDebouncedCallback } from '@mantine/hooks';
 import { notifications } from '@mantine/notifications';
@@ -42,10 +43,15 @@ export function useSettingsSync(enabled) {
         server.current = await mutateAsync({ settings: local, etag: base.etag });
         retry = true; // edits made while this save was in flight
       } catch (error) {
-        const fresh = error.response?.status === 412 ? (await refetch()).data : undefined;
+        // A refetch that fails still hands back the old cached row - never
+        // rebase onto that (it would 412 again, round and round).
+        const refetched = error.response?.status === 412 ? await refetch() : undefined;
+        const fresh = refetched?.isSuccess ? refetched.data : undefined;
         if (fresh) {
           server.current = fresh;
-          dispatch(settingsLoaded(rebase(local, base.settings, fresh.settings)));
+          // The store as it is now: edits made while the save and refetch
+          // were in flight are this browser's edits too, not to be undone.
+          dispatch(settingsLoaded(rebase(toServer(store.getState()), base.settings, fresh.settings)));
           retry = true;
         } else {
           notifications.show({
@@ -65,6 +71,29 @@ export function useSettingsSync(enabled) {
   useEffect(() => {
     flushRef.current = flush;
   }, [flush]);
+
+  // The account's row couldn't be loaded: this browser's cached copy is
+  // what's showing, and nothing can be saved until the row loads (a save
+  // needs its version) - say so, with Retry, instead of silently dropping
+  // every change made meanwhile.
+  useEffect(() => {
+    if (isError && server.current === undefined) {
+      notifications.show({
+        id: 'settings-load-failed',
+        color: 'red',
+        autoClose: false,
+        title: 'Couldn’t load your settings from your account',
+        message: createElement(
+          Stack,
+          { gap: 'xs', align: 'flex-start' },
+          createElement(Text, { fz: 'sm' }, 'Showing the copy saved on this browser. Changes won’t be saved to your account until they load.'),
+          createElement(Button, { size: 'compact-sm', variant: 'default', onClick: () => refetch() }, 'Retry')
+        ),
+      });
+    } else if (isSuccess) {
+      notifications.hide('settings-load-failed');
+    }
+  }, [isError, isSuccess, refetch]);
 
   useEffect(() => {
     if (!isSuccess || server.current !== undefined) return;
