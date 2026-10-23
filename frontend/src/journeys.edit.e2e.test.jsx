@@ -292,3 +292,102 @@ describe('journey 3: Settings changed while changes are staged and a song plays'
     expectInSync(await h.push());
   });
 });
+
+describe('journey 4: a push fails mid-journey, then navigate, reload, retry', () => {
+  it('quota on one move: the reason stays through navigation, the retry lands it once', async () => {
+    await start();
+    yt.inject({ op: 'insert', videoId: 'a', status: 403, reason: 'quotaExceeded' });
+    h.move('a', 'A');
+    h.move('d', 'B');
+    await h.push();
+    expect(selectStagedFailures(h.state)).toEqual([expect.objectContaining({ kind: 'move', to: 'A' })]);
+    await h.goHome();
+    await h.go('/settings');
+    await h.open('Rap');
+    expect(selectStagedFailures(h.state)).toEqual([expect.objectContaining({ kind: 'move', to: 'A' })]);
+    expectInSync(await h.push());
+    expect(selectStagedFailures(h.state)).toEqual([]);
+    await reload('Rap');
+    expect(h.staged()).toEqual([]);
+    expect(h.tierOf('a')).toBe('A');
+    expect(h.tierOf('d')).toBe('B');
+  });
+
+  it('a transfer refused: still staged with its reason on the other board, retried from there', async () => {
+    await start();
+    yt.inject({ op: 'insert', videoId: 'a', status: 403, reason: 'quotaExceeded' });
+    await h.transfer('a', 'Pop', 'A');
+    await h.push();
+    await h.open('Rap');
+    expect(h.tierOf('a')).toBeUndefined();
+    expect(selectStagedFailures(h.state)).toEqual([expect.objectContaining({ kind: 'transfer', toCategory: 'Pop' })]);
+    expectInSync(await h.push(), { others: { Pop: { S: ['p', 'q'], A: ['r', 'a'], TODO: ['s'] } } });
+    expect(selectStagedFailures(h.state)).toEqual([]);
+  });
+
+  it('the whole push request fails: every change keeps the reason, the retry sends each once', async () => {
+    await start();
+    yt.failRequest({ url: '/api/tier-sync', status: 503 });
+    h.move('a', 'A');
+    h.remove('f');
+    await h.push();
+    expect(h.state.tiers.syncStatus).toBe('error');
+    expect(selectStagedFailures(h.state)).toHaveLength(2);
+    await h.goHome();
+    await h.open('Rap');
+    expect(selectStagedFailures(h.state)).toHaveLength(2);
+    expectInSync(await h.push(), { removed: ['f'] });
+    expect(selectStagedFailures(h.state)).toEqual([]);
+    await reload('Rap');
+    expect(h.staged()).toEqual([]);
+    expectInSync(null, { removed: ['f'] });
+  });
+
+  it('added but not removed (delete keeps failing): navigate away and back, retry finishes the move', async () => {
+    await start();
+    yt.inject({ op: 'delete', videoId: 'a', status: 500, times: 4 });
+    h.move('a', 'A');
+    await h.push();
+    expect(h.tierOf('a')).toBe('A');
+    expect(h.staged()).toEqual([expect.objectContaining({ kind: 'dedupe', tier: 'S', keptTier: 'A' })]);
+    await h.goHome();
+    await h.open('Rap');
+    expect(h.tierOf('a')).toBe('A');
+    expectInSync(await h.push());
+    expect(youtubeBoards(yt).Rap.A).toEqual(['d', 'e', 'a']);
+  });
+
+  // NOT FIXED - the global pending bar (fix/board-drafts is reworking it):
+  // syncStatus is one value for the whole app and 'error' stays until the
+  // next push, so after a failed push on Rap every other board's bar says
+  // "Sync failed" with nothing staged there to retry (and opening Pop also
+  // drops Rap's failed changes - the per-board drafts issue).
+  it.fails('a failed push on one board does not say "Sync failed" on another board with nothing staged', async () => {
+    await start();
+    yt.failRequest({ url: '/api/tier-sync', status: 503 });
+    h.move('a', 'A');
+    await h.push();
+    expect(h.state.tiers.syncStatus).toBe('error');
+    await h.open('Pop');
+    expect(h.staged()).toEqual([]);
+    expect(h.screen.queryByText('Sync failed')).toBeNull();
+  });
+
+  // NOT FIXED - needs a product call: the push added the song to A but
+  // couldn't delete it from S. In the session the S copy is a staged
+  // delete-only change, but a reload forgets that, finds the song in S and A
+  // on YouTube and auto-dedupes it the documented way - the highest tier
+  // (S) is kept, so the user's move is silently undone by the next push.
+  // Options: keep the most recently added copy (the backend would have to
+  // return each item's playlist-item publishedAt), or remember a half-done
+  // move's leftover delete on this device across reloads.
+  it.fails('added but not removed, then reloaded before the retry: the song stays where it was moved', async () => {
+    await start();
+    yt.inject({ op: 'delete', videoId: 'a', status: 500, times: 4 });
+    h.move('a', 'A');
+    await h.push();
+    await reload('Rap');
+    // YouTube has the song in S and A now; the user put it in A.
+    expect(h.tierOf('a')).toBe('A');
+  });
+});

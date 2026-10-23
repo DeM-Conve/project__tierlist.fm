@@ -38,6 +38,7 @@ export class FakeYoutube {
     this.nextItem = 1;
     this.nextPlaylist = 1;
     this.faults = []; // [{ op, videoId?, playlistId?, itemId?, status, reason, times }]
+    this.requestFaults = []; // [{ method, url, status, detail, times }]
     this.log = []; // every request: { method, url, body }
     this.syncCalls = []; // every tier-sync: { payload, response }
     for (const [title, videoIds] of Object.entries(playlists)) this.addPlaylist(title, videoIds);
@@ -70,6 +71,12 @@ export class FakeYoutube {
   // Fail the next `times` matching YouTube writes (op: 'insert' | 'delete').
   inject({ op, videoId, playlistId, itemId, status = 500, reason = 'backendError', times = 1 }) {
     this.faults.push({ op, videoId, playlistId, itemId, status, reason, times });
+  }
+
+  // Fail the next `times` requests to `url` (e.g. '/api/tier-sync') as a
+  // whole - the server down, or answering 5xx before doing anything.
+  failRequest({ method = 'post', url, status = 503, detail = 'The server is unavailable', times = 1 }) {
+    this.requestFaults.push({ method, url, status, detail, times });
   }
 
   fault(op, { videoId, playlistId, itemId }) {
@@ -202,6 +209,11 @@ export class FakeYoutube {
     this.log.push({ method, url, body });
     // A real round trip is async; one macrotask keeps React Query's timing honest.
     await new Promise((r) => setTimeout(r, 0));
+    const down = this.requestFaults.find((f) => f.times > 0 && f.method === method && f.url === url);
+    if (down) {
+      down.times -= 1;
+      throw httpError(config, down.status, down.detail);
+    }
     try {
       return this.route(config, method, url, body);
     } catch (e) {
