@@ -24,8 +24,9 @@ browser ── one origin ──► frontend container (nginx)
   The app keeps no copy of playlist contents on the server.
 - **Postgres holds only what YouTube can't**: per-account settings and the duel log
   (and what's derived from it: starting scores, the user's decisions, locks).
-- **The browser holds the editable draft** of the open board (Redux `tiersSlice`):
-  edits are staged there and only reach YouTube on **Push**.
+- **The browser holds the editable draft** of the open board (Redux `tiersSlice`)
+  and of every other board with unpushed changes (`draftsSlice`, saved in IndexedDB per
+  account): edits are staged there and only reach YouTube on **Push**.
 - Only the frontend container publishes a port. Its nginx serves the bundle and
   proxies the API and Google-login paths to the backend, so the browser sees a single
   origin (no CORS in normal use, no URL baked into the image).
@@ -99,6 +100,9 @@ browser ── one origin ──► frontend container (nginx)
    into `tiersSlice`. Duplicates are detected and staged automatically: a video in two
    tiers keeps its highest copy; extra copies inside one playlist are hidden
    (`tiersSlice.duplicateCopies`) and staged for removal by their own item ids.
+4. The board being left is parked in `draftsSlice`; a board opened with a kept draft gets
+   it laid over the fresh load (`tiersSlice.draftRestored`), changes that no longer apply
+   dropped with a note (see CLAUDE.md "Drafts").
 
 ### Editing and pushing
 
@@ -106,7 +110,8 @@ browser ── one origin ──► frontend container (nginx)
    `tierActions.jsx` -> `tiersSlice` (undo/redo stack, 50 steps). Moves, removals,
    duplicate removals and cross-board transfers are derived as *pending changes*
    (`selectors.js`).
-2. **Push** (`Shift+P`): `preparePush` (`syncCache.js`) first re-reads every playlist
+2. **Push** (`Shift+P`, every board's changes - each board in turn, planned from its own
+   draft through `store/boardScope.js`): `preparePush` (`syncCache.js`) first re-reads every playlist
    whose item ids it would send that isn't known good, re-points stale ids by video id
    per playlist (`store/itemIds.js`) and settles changes whose item is already gone. Then
    it builds a plan (`syncPlan.js`) and `POST /api/tier-sync`: for each row the backend
