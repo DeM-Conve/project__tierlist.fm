@@ -111,7 +111,8 @@ describe('a board shown from the board cache', () => {
     await screen.findByRole('navigation', { name: 'Activity bar' });
     act(() => { store.dispatch(moveWithFeedback([{ fromTier: 'S', toTier: 'A', videoId: 'cached00001', dropIndex: null }])); });
     land(fresh);
-    expect(sIds()).toEqual([]);
+    // Laid over the fresh copy: the new song shows, the drag stays.
+    expect(sIds()).toEqual(['fresh000001']);
     expect(store.getState().tiers.tierItems.A.map((v) => v.videoId)).toEqual(['cached00002', 'cached00001']);
   });
 

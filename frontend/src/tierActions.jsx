@@ -19,14 +19,19 @@ import {
   applySyncedMoves,
   transfersApplied,
   syncFailuresRecorded,
+  draftRestored,
+  discardTierChanges,
 } from './store/tiersSlice';
-import { selectHasLocalEdits } from './store/selectors';
+import { boardHasEdits, pendingMovesOfBoard, selectHasLocalEdits } from './store/selectors';
+import { boardParked, boardUnparked, draftEdited, notesAdded, packBoard } from './store/draftsSlice';
+import { boardInReach, inBoard } from './store/boardScope';
 import {
   dragEnded,
   dragStarted,
   transferCancelled,
   transferStaged,
   transfersCommitted,
+  transfersDiscarded,
   transfersInserted,
   transfersPushed,
 } from './store/transfersSlice';
@@ -128,7 +133,15 @@ function describe(moves, tierItems) {
 }
 
 // moves: [{ fromTier, toTier, videoId, dropIndex? }] - applied as ONE undo step.
-export const moveWithFeedback = (moves, { quiet = false } = {}) => (dispatch, getState) => {
+// `category`: the board the songs are on, when it may not be the open one -
+// rating the playing song from the player, the rail or a key on any page
+// stages the change on *its* board, kept with its unpushed changes if
+// another board is open (boardScope). Without one: the open board.
+export const moveWithFeedback = (moves, { quiet = false, category = null } = {}) => (dispatch, getState) => {
+  if (category != null && getState().tiers.loadedCategory !== category) {
+    if (!boardInReach(getState(), category)) return;
+    return dispatch(inBoard(category, moveWithFeedback(moves, { quiet })));
+  }
   // A move of a song that isn't (any more) where it says - a stale drag, the
   // player's snapshot after a reload - changes nothing: no undo step, no toast.
   const { tierItems } = getState().tiers;
@@ -197,30 +210,67 @@ export const transferWithFeedback = ({ video, fromCategory, fromTier }, toTier, 
     return;
   }
   dispatch(transferStaged({ ...home, toCategory, toTier }));
+  // The board it leaves is kept (it was left to open this one): the song
+  // goes from there now, as it would on reopening it (overlayTransfers).
+  if (getState().drafts?.boards[home.fromCategory]) {
+    dispatch(draftEdited({ category: home.fromCategory, action: transfersOverlaid({ category: home.fromCategory, transfers: getState().transfers.list }) }));
+  }
   dispatch(transferArrived({ tier: toTier, video: { ...home.video, transfer: id }, dropIndex }));
   resyncFocusedTier(dispatch, getState);
   showToast(dispatch, `"${songLabel(home.video).song}" → ${toCategory} · ${tierName(toTier)} (from ${home.fromCategory}) - on push`);
 };
 
-// Puts a freshly fetched board into the draft. First the board being left
-// hands its transfers' current targets to the store (its draft - where an
-// arrived song was dragged since - is about to be replaced), then the new
-// board is shown with the staged transfers laid over it.
+// Puts a freshly fetched board into the draft. The board being left is kept
+// with everything on it (draftsSlice: staged moves, removals, order, undo
+// history) - unpushed changes belong to their board and never vanish on
+// navigation (the user's call) - after handing its transfers' current
+// targets to the store. The board being opened gets its own kept draft back,
+// laid over the fresh data (restoreDraft), then the staged transfers.
 //
 // `refreshingSince`: the data is a copy being refreshed in the background
 // (from the board cache) - its dataUpdatedAt, so landBoardRefresh can tell
 // the fresh copy when it arrives.
-export const loadBoard = ({ category, data, refreshingSince = null }) => (dispatch, getState) => {
+// `rebase`: the open board itself is laid over newer data (landBoardRefresh).
+export const loadBoard = ({ category, data, refreshingSince = null, rebase = false }) => (dispatch, getState) => {
   const { tiers, transfers } = getState();
   if (tiers.loadedCategory) {
     dispatch(transfersCommitted(effectiveTransfers(transfers.list, tiers.loadedCategory, tiers.tierItems)));
+    if (getState().drafts && (tiers.loadedCategory !== category || rebase)) {
+      dispatch(boardParked({ category: tiers.loadedCategory, board: packBoard(tiers) }));
+    }
   }
+  const kept = getState().drafts?.boards[category];
   const presentTiers = Object.keys(data);
   dispatch(resetTierBoard({ category, presentTiers }));
   presentTiers.forEach((tier) => dispatch(setTierForCategory({ tier, videos: data[tier] })));
+  if (kept) {
+    if (boardHasEdits(kept)) dispatch(restoreDraft(category, kept));
+    dispatch(boardUnparked(category));
+  }
   dispatch(transfersOverlaid({ category, transfers: getState().transfers.list }));
   dispatch(setLoadedCategory(category));
   dispatch(setAwaitingRefresh(refreshingSince == null ? null : { category, since: refreshingSince }));
+};
+
+// The board's kept draft laid over its fresh load (tiersSlice draftRestored).
+// A change of the user's that no longer applies - its song was moved or
+// removed on YouTube meanwhile - is dropped, never silently: it's listed in
+// a note on the board (draftsSlice.notes). One already done on YouTube (the
+// song is where the change put it) needs no note.
+export const restoreDraft = (category, kept) => (dispatch, getState) => {
+  const wanted = pendingMovesOfBoard(kept).filter((m) => m.kind === 'move' || m.kind === 'remove');
+  dispatch(draftRestored({ draft: kept, category, liveTransfers: getState().transfers.list }));
+  const { tierItems } = getState().tiers;
+  const tierOf = (videoId) => Object.keys(tierItems).find((t) => (tierItems[t] || []).some((v) => v.videoId === videoId && !v.transfer));
+  const notes = wanted.flatMap((m) => {
+    const now = tierOf(m.video.videoId);
+    if (m.kind === 'move' ? now === m.to : now === REMOVED_TIER || now === undefined) return [];
+    const { song } = songLabel(m.video);
+    const what = m.kind === 'move' ? `${tierName(m.from)} → ${tierName(m.to)}` : `removal from ${tierName(m.from)}`;
+    const where = now ? `it’s in ${tierName(now)} there now` : 'it’s no longer on this board';
+    return [{ key: `${m.video.id ?? m.video.videoId}-${m.kind}`, title: m.video.title, text: `"${song}" changed on YouTube since you staged ${what} - ${where}, so that change was dropped.` }];
+  });
+  if (notes.length) dispatch(notesAdded({ category, notes }));
 };
 
 // The background refresh of a board shown from the board cache has finished
@@ -235,8 +285,17 @@ export const landBoardRefresh = ({ category, data, dataUpdatedAt }) => (dispatch
   if (!awaitingRefresh || awaitingRefresh.category !== category || loadedCategory !== category) return;
   dispatch(setAwaitingRefresh(null));
   if (!data || dataUpdatedAt <= awaitingRefresh.since) return;
-  if (selectHasLocalEdits(getState())) return;
-  dispatch(loadBoard({ category, data }));
+  if (!selectHasLocalEdits(getState())) {
+    dispatch(loadBoard({ category, data }));
+    return;
+  }
+  // Edited already (or a draft kept from before the reload): the edits are
+  // laid over the fresh copy like a kept draft - unless something was
+  // written to YouTube from this board since it loaded or a push is under
+  // way, which this refresh (started before) may not show yet.
+  const { wroteSinceLoad, syncStatus } = getState().tiers;
+  if (wroteSinceLoad || syncStatus === 'syncing') return;
+  dispatch(loadBoard({ category, data, rebase: true }));
 };
 
 // A push came back (`results`: the backend's per-item results for
@@ -268,9 +327,36 @@ export const syncRequestFailed = (plan, error) => (dispatch) => {
 };
 
 // "Put back" on a staged transfer (the review list).
-export const cancelTransfer = (transfer) => (dispatch) => {
+// The song comes back on its board (and leaves the target), whether those
+// boards are open or kept with unpushed changes.
+export const cancelTransfer = (transfer) => (dispatch, getState) => {
   dispatch(transferCancelled(transfer.id));
   dispatch(transferUndone(transfer));
+  const kept = getState().drafts?.boards ?? {};
+  for (const category of new Set([transfer.fromCategory, transfer.toCategory])) {
+    if (kept[category] && category !== getState().tiers.loadedCategory) {
+      dispatch(draftEdited({ category, action: transferUndone(transfer) }));
+    }
+  }
+};
+
+// Discard on one board: its draft back to what's on YouTube, and every song
+// staged to move to or from it stays where it was. (A push failure of its
+// songs goes too.)
+export const discardBoard = (category) => (dispatch, getState) => {
+  for (const t of getState().transfers.list) {
+    if (!t.inserted && (t.fromCategory === category || t.toCategory === category)) dispatch(cancelTransfer(t));
+  }
+  dispatch(inBoard(category, (d) => d(discardTierChanges())));
+};
+
+// Discard all: every board's changes and every staged transfer.
+export const discardAll = () => (dispatch, getState) => {
+  const { tiers, drafts } = getState();
+  const boards = new Set([tiers.loadedCategory, ...Object.keys(drafts?.boards ?? {})].filter(Boolean));
+  for (const category of boards) dispatch(inBoard(category, (d) => d(discardTierChanges())));
+  dispatch(transfersDiscarded());
+  dispatch(syncFailuresRecorded({ attempted: Object.keys(getState().tiers.syncFailures), failures: {} }));
 };
 
 // Native HTML5 drag-and-drop shared by every drop surface (board rows,

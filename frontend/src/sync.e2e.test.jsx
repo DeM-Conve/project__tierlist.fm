@@ -462,7 +462,7 @@ describe('opening another board', () => {
   // Only the drag-to-another-board path warns (useBoardDropOpen). Fix
   // options: keep a draft per board, or block/confirm leaving a board with
   // staged moves (React Router's useBlocker needs a data router).
-  it.fails('keeps the staged moves of the board left behind', async () => {
+  it('keeps the staged moves of the board left behind', async () => {
     await start();
     h.move('a', 'A');
     await h.open('Pop');

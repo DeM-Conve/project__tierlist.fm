@@ -11,6 +11,7 @@ import appearanceReducer from '../store/appearanceSlice';
 import namingReducer from '../store/namingSlice';
 import addSongsReducer from '../store/addSongsSlice';
 import transfersReducer from '../store/transfersSlice';
+import draftsReducer from '../store/draftsSlice';
 import duelsReducer from '../store/duelSettingsSlice';
 import { SPACING } from '../themes';
 
@@ -23,6 +24,7 @@ const reducer = {
   naming: namingReducer,
   addSongs: addSongsReducer,
   transfers: transfersReducer,
+  drafts: draftsReducer,
   duels: duelsReducer,
 };
 

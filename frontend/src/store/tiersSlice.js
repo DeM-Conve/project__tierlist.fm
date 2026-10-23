@@ -1,7 +1,7 @@
 import { createSlice, current, isDraft, original } from '@reduxjs/toolkit';
 import { BOARD_TIERS, REMOVED_TIER } from '../tiers';
 import { overlayTransfers, transferId } from '../transfers';
-import { itemIdsRebased, rebaseTiers } from './itemIds';
+import { itemIdChanges, itemIdsRebased, rebaseTiers } from './itemIds';
 
 const UNDO_LIMIT = 50;
 
@@ -173,6 +173,73 @@ function rebaseHistory(state, { lost = null, gained = [] }) {
 // (`newIds`: old item id -> new one, see syncPlan.syncOutcome).
 const withNewId = (video, newIds) => (newIds[video.id] ? { ...video, id: newIds[video.id] } : video);
 
+
+// Every playlist item id the board knows is in tier `tier`'s playlist: the
+// copies it shows plus the hidden extra copies.
+const heldIn = (board, tier) => [...(board.originalTierItems?.[tier] || []), ...(board.duplicateCopies?.[tier] || [])];
+
+// A board left behind with unpushed edits (draftsSlice) laid back over the
+// same board freshly loaded from YouTube - `state` is that fresh load. Its
+// baseline (what's on YouTube) is the fresh one; the draft's own board and
+// undo / redo history are kept, re-based onto it the way a push re-bases
+// stale ids (syncCache.js): per playlist, an item id YouTube no longer has
+// takes the copy of the same video that is there now; a copy that is gone
+// leaves the board and every snapshot (an edit of it no longer applies -
+// the caller tells the user, draftActions.restoreDraft); a song YouTube has
+// now that the draft doesn't (added or moved there meanwhile, a pushed
+// transfer's arrival) joins its tier, in the draft and in every snapshot.
+// `liveTransfers`: the staged transfers - a card that arrived for one no
+// longer staged leaves; a song leaving for one stays off the board.
+function restoreDraftInto(state, draft, category, liveTransfers) {
+  const fresh = { originalTierItems: plain(state.originalTierItems), duplicateCopies: plain(state.duplicateCopies) };
+  const ownerOf = new Map();
+  const renamedIn = {};
+  const goneIn = {};
+  for (const tier of new Set([...Object.keys(draft.originalTierItems || {}), ...Object.keys(draft.duplicateCopies || {})])) {
+    const held = heldIn(draft, tier);
+    held.forEach((v) => v.id != null && !ownerOf.has(v.id) && ownerOf.set(v.id, tier));
+    const c = itemIdChanges(held, fresh.originalTierItems[tier] ? heldIn(fresh, tier) : []);
+    renamedIn[tier] = c.renamed;
+    goneIn[tier] = new Set(c.gone);
+  }
+  const live = (v) =>
+    liveTransfers.find((t) => t.id === v.transfer) ??
+    liveTransfers.find((t) => t.toCategory === category && !t.inserted && t.video.videoId === v.videoId);
+  const repoint = (v) => {
+    if (v.transfer != null) {
+      const t = live(v);
+      return t && t.id !== v.transfer ? { ...v, transfer: t.id } : v;
+    }
+    const next = renamedIn[ownerOf.get(v.id)]?.[v.id];
+    return next ? { ...v, id: next } : v;
+  };
+  const lost = (v) => (v.transfer != null ? !live(v) : !!goneIn[ownerOf.get(v.id)]?.has(v.id));
+  const tiersNow = new Set([...Object.keys(fresh.originalTierItems), REMOVED_TIER]);
+  const keepTiers = (board) => Object.fromEntries(Object.entries(board || {}).filter(([t]) => tiersNow.has(t)));
+  const shownTiers = keepTiers(mapBoard(draft.tierItems, repoint));
+  state.tierItems = withoutVideos(shownTiers, lost);
+  state.undoStack = (draft.undoStack || []).map((b) => keepTiers(mapBoard(b, repoint)));
+  state.redoStack = (draft.redoStack || []).map((b) => keepTiers(mapBoard(b, repoint)));
+  // What YouTube has that the draft doesn't show anywhere (by item id).
+  const shownIds = new Set(Object.values(state.tierItems).flat().map((v) => v.id));
+  const leaving = new Set(liveTransfers.filter((t) => t.fromCategory === category).map((t) => t.id));
+  const gained = [];
+  for (const [tier, list] of Object.entries(fresh.originalTierItems)) {
+    list.forEach((v, i) => {
+      if (shownIds.has(v.id) || leaving.has(transferId(v))) return;
+      // The draft shows the song in this tier under another copy: the
+      // fresh copy is the same song, nothing to add.
+      if ((state.tierItems[tier] || []).some((x) => x.videoId === v.videoId && !x.transfer)) return;
+      const target = [...(state.tierItems[tier] || [])];
+      target.splice(Math.min(i, target.length), 0, v);
+      state.tierItems[tier] = target;
+      gained.push((x) => x.id === v.id);
+    });
+  }
+  for (const tier of Object.keys(fresh.originalTierItems)) state.tierItems[tier] ??= [];
+  rebaseHistory(state, { lost, gained });
+}
+
 const tiersSlice = createSlice({
   name: 'tiers',
   initialState: {
@@ -220,6 +287,10 @@ const tiersSlice = createSlice({
     // a new edit (pushUndo) or anything else that rewrites tierItems (a
     // load, sync, transfer, discard) clears it - see dropRedo.
     redoStack: [],
+    // Something was written to YouTube from this board since it loaded (a
+    // push, an Add songs filing): a background refresh started before it
+    // may not show it, so it is never laid under the board (landBoardRefresh).
+    wroteSinceLoad: false,
   },
   reducers: {
     resetTierBoard: (state, action) => {
@@ -231,6 +302,13 @@ const tiersSlice = createSlice({
       state.originalTierOf = {};
       state.duplicateCopies = {};
       state.undoStack = [];
+      state.wroteSinceLoad = false;
+    },
+    // The board's unpushed edits, kept from when it was left (draftsSlice),
+    // laid back over it just after a fresh load - see restoreDraftInto.
+    draftRestored: (state, action) => {
+      const { draft, category, liveTransfers = [] } = action.payload;
+      restoreDraftInto(state, draft, category, liveTransfers);
     },
     // Deliberately separate from resetTierBoard: this marks "the mirror
     // effect has finished applying fresh query data for this category" and
@@ -295,6 +373,7 @@ const tiersSlice = createSlice({
     applySyncedMoves: (state, action) => {
       state.redoStack = [];
       const { moves, newIds = {}, inserted = [] } = action.payload;
+      if (moves.length || inserted.length) state.wroteSinceLoad = true;
       // Ids of hidden copies (duplicateCopies) before this push: removing one
       // of those leaves the board's copy alone.
       const hiddenIds = new Set(
@@ -380,6 +459,7 @@ const tiersSlice = createSlice({
     // loaded board's draft *and* its baseline - it's not a pending change.
     addSyncedVideo: (state, action) => {
       state.redoStack = [];
+      state.wroteSinceLoad = true;
       const { tier, video } = action.payload;
       // Filed into a tier that already shows it: YouTube now lists it twice
       // there - the new copy is a hidden duplicate, removed on push (like a
@@ -398,6 +478,7 @@ const tiersSlice = createSlice({
     // Undo of addSyncedVideo (the playlist item was deleted again).
     removeSyncedVideo: (state, action) => {
       state.redoStack = [];
+      state.wroteSinceLoad = true;
       const { tier, videoId, itemId } = action.payload;
       // Its playlist item is deleted: no undo snapshot may bring it back.
       const goneId = itemId ?? (state.tierItems[tier] || []).find((v) => v.videoId === videoId)?.id;
@@ -426,9 +507,12 @@ const tiersSlice = createSlice({
     },
     discardTierChanges: (state) => {
       state.redoStack = [];
+      // Only this board's push failures go (other boards keep theirs).
+      for (const list of [...Object.values(state.tierItems), ...Object.values(state.originalTierItems), ...Object.values(state.duplicateCopies)]) {
+        for (const v of list || []) delete state.syncFailures[v.id];
+      }
       state.tierItems = JSON.parse(JSON.stringify(state.originalTierItems));
       state.syncStatus = 'idle';
-      state.syncFailures = {};
       state.undoStack = [];
     },
     setSyncStatus: (state, action) => {
@@ -508,6 +592,7 @@ const tiersSlice = createSlice({
       const { transfers, newIds = {}, inserted = [] } = Array.isArray(action.payload)
         ? { transfers: action.payload }
         : action.payload;
+      if (transfers.length || inserted.length) state.wroteSinceLoad = true;
       // An arrived song is on YouTube now: undoing its drop (or an edit made
       // before it) must not take it off this board (rebaseHistory). Before
       // the `transfer` marks below are stripped - they identify the card.
@@ -591,6 +676,7 @@ const tiersSlice = createSlice({
 
 export const {
   resetTierBoard,
+  draftRestored,
   setLoadedCategory,
   setAwaitingRefresh,
   setTierForCategory,

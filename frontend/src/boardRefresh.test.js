@@ -37,16 +37,28 @@ describe('a board shown from the board cache', () => {
     expect(tiers().awaitingRefresh).toBeNull();
   });
 
+  // The drag is laid over the fresh copy (like a kept draft): the song
+  // added on YouTube meanwhile shows up, the drag stays staged and undoable.
   it('keeps an unsynced drag: the refresh does not clobber it', () => {
     store.dispatch(moveWithFeedback([{ fromTier: 'S', toTier: 'A', videoId: 'a', dropIndex: null }]));
     store.dispatch(landBoardRefresh({ category: 'Rock', data: FRESH, dataUpdatedAt: FRESH_AT }));
-    expect(ids('S')).toEqual([]);
+    expect(ids('S')).toEqual(['new']);
+    expect(tiers().originalTierItems.S.map((x) => x.videoId)).toEqual(['a', 'new']);
     expect(ids('A')).toEqual(['b', 'a']);
     expect(selectPendingMoves(store.getState())).toEqual([
       expect.objectContaining({ kind: 'move', from: 'S', to: 'A' }),
     ]);
     expect(tiers().undoStack).toHaveLength(1);
     // and the wait is over - a later refetch never lands over the draft
+    expect(tiers().awaitingRefresh).toBeNull();
+  });
+
+  it('a drag after something was written to YouTube from the board keeps the cached copy', () => {
+    store.dispatch(moveWithFeedback([{ fromTier: 'S', toTier: 'A', videoId: 'a', dropIndex: null }]));
+    store.dispatch(applySyncedMoves({ moves: [{ kind: 'move', video: v('a'), from: 'S', to: 'A' }] }));
+    store.dispatch(moveWithFeedback([{ fromTier: 'A', toTier: 'TODO', videoId: 'b', dropIndex: null }]));
+    store.dispatch(landBoardRefresh({ category: 'Rock', data: FRESH, dataUpdatedAt: FRESH_AT }));
+    expect(ids('S')).toEqual([]);
     expect(tiers().awaitingRefresh).toBeNull();
   });
 

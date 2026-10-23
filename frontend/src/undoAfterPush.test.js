@@ -132,7 +132,8 @@ describe('undo after a pushed transfer, on its new board', () => {
     move('q', 'B', 'S');
     push();
     undo(); // q back to B (a staged move after the push)
-    expect(ids('B')).toEqual(['q', 'a']);
+    // p's move was kept with Pop's draft when Rock opened (per-board drafts).
+    expect(ids('B')).toEqual(['q', 'p', 'a']);
     expect(onBoard()).toEqual(['a', 'p', 'q']);
     undo(); // the drop: nothing left to undo for it
     expect(onBoard()).toEqual(['a', 'p', 'q']);

@@ -179,6 +179,24 @@ export const selectHasLocalEdits = createSelector(
     undoStack.length > 0 || syncStatus === 'syncing' || moves.some((m) => m.kind !== 'dedupe')
 );
 
+// The same, for a board kept in draftsSlice (not open): its staged changes
+// (cached per kept board object - they're immutable).
+const keptMoves = new WeakMap();
+export function pendingMovesOfBoard(board) {
+  if (!board) return [];
+  let moves = keptMoves.get(board);
+  if (!moves) {
+    moves = selectPendingMoves.resultFunc(board.tierItems || {}, board.originalTierOf || {}, board.duplicateCopies || {}, board.originalTierItems || {});
+    keptMoves.set(board, moves);
+  }
+  return moves;
+}
+
+// Is a kept board worth keeping as a draft: an undo step or a change the
+// user made (auto-staged duplicate removals come back with the data).
+export const boardHasEdits = (board) =>
+  !!board && ((board.undoStack || []).length > 0 || pendingMovesOfBoard(board).some((m) => m.kind !== 'dedupe'));
+
 export const selectDuelPool = createSelector([selectTierItems], (tierItems) =>
   TIER_ORDER.flatMap((t) => tierItems[t] || [])
 );
@@ -294,11 +312,48 @@ export const selectDuelLayout = createSelector([selectTierItems], (tierItems) =>
   return { layout: { tiers }, key: (hash >>> 0).toString(36) };
 });
 
+const selectKeptBoards = (state) => state.drafts?.boards ?? EMPTY;
+const EMPTY = {};
+
+// Every board's staged changes - the open board first, then each board kept
+// with unpushed changes (draftsSlice) - as [{ category, open, changes,
+// dedupes }]: `changes` are the user's own (moves, removals, songs moved to
+// another board - listed under the board they leave), `dedupes` the
+// auto-staged duplicate removals, kept apart so a board with only those
+// never looks like the user staged something. Both push with Push.
+export const selectBoardsChanges = createSelector(
+  [selectPendingMoves, selectLoadedCategory, selectKeptBoards, selectTransfers],
+  (openMoves, loadedCategory, kept, transfers) => {
+    const groups = new Map();
+    const group = (category) => {
+      if (!groups.has(category)) groups.set(category, { category, open: category === loadedCategory, changes: [], dedupes: [] });
+      return groups.get(category);
+    };
+    const add = (category, moves) => {
+      for (const m of moves) {
+        if (m.kind === 'dedupe') group(category).dedupes.push(m);
+        else group(category).changes.push(m);
+      }
+    };
+    if (loadedCategory) add(loadedCategory, openMoves);
+    for (const [category, board] of Object.entries(kept)) {
+      if (category !== loadedCategory) add(category, pendingMovesOfBoard(board));
+    }
+    for (const t of transfers) group(t.fromCategory).changes.push({ kind: 'transfer', ...t });
+    return [...groups.values()].filter((g) => g.changes.length || g.dedupes.length);
+  }
+);
+
+// Everything Push (all boards) would send, flat.
+export const selectAllStagedChanges = createSelector([selectBoardsChanges], (groups) =>
+  groups.flatMap((g) => [...g.changes, ...g.dedupes])
+);
+
 // Staged changes whose last push failed, each with `failure` = { step,
-// error } (see tiersSlice.syncFailures). A change that was pushed since,
-// put back or discarded drops out on its own.
+// error } (see tiersSlice.syncFailures) - on every board. A change that was
+// pushed since, put back or discarded drops out on its own.
 export const selectStagedFailures = createSelector(
-  [selectStagedChanges, (s) => s.tiers.syncFailures],
+  [selectAllStagedChanges, (s) => s.tiers.syncFailures],
   (changes, failures) =>
     changes.flatMap((c) => (failures?.[c.video.id] ? [{ ...c, failure: failures[c.video.id] }] : []))
 );

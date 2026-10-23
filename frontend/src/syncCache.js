@@ -4,7 +4,9 @@ import { bumpItemCounts, playlistItemsQuery } from './api/queries';
 import { recordDeleted, recordInserted } from './api/pushLedger';
 import { announceWrites } from './api/pushBroadcast';
 import { touchedPlaylists } from './syncPlan';
-import { itemIdsRebased } from './store/itemIds';
+import { itemIdChanges, itemIdsRebased } from './store/itemIds';
+
+export { itemIdChanges };
 import { syncFailuresRecorded } from './store/tiersSlice';
 import { applySyncOutcome } from './tierActions';
 
@@ -41,37 +43,6 @@ const itemKey = (playlistId) => queryKeys.playlistItems(playlistId);
 
 export const GONE_REASON = 'This song is no longer in that playlist on YouTube.';
 export const NO_TARGET_REASON = 'This tier list has no playlist for that tier any more (Settings → Playlist naming) - move it to another tier.';
-
-// Pure. `held`: the items this browser would name in one playlist; `fresh`:
-// that playlist on YouTube. -> { renamed: { oldId: newId }, gone: [oldId], kept: [id] }.
-// A held id YouTube doesn't have takes a copy of the same video that no held
-// item already points at (a playlist may hold a video twice).
-export function itemIdChanges(held, fresh) {
-  const freshIds = new Set(fresh.map((v) => v.id));
-  const heldIds = new Set(held.map((v) => v.id));
-  const spare = new Map();
-  for (const v of fresh) {
-    if (heldIds.has(v.id)) continue;
-    if (!spare.has(v.videoId)) spare.set(v.videoId, []);
-    spare.get(v.videoId).push(v.id);
-  }
-  const renamed = {};
-  const gone = [];
-  const kept = [];
-  const seen = new Set();
-  for (const v of held) {
-    if (v.id == null || seen.has(v.id)) continue;
-    seen.add(v.id);
-    if (freshIds.has(v.id)) {
-      kept.push(v.id);
-      continue;
-    }
-    const next = spare.get(v.videoId)?.shift();
-    if (next) renamed[v.id] = next;
-    else gone.push(v.id);
-  }
-  return { renamed, gone, kept };
-}
 
 // Every playlist item a push from `category` could name, by playlist id: the
 // open board's baseline (what's on YouTube as far as it knows, extra copies

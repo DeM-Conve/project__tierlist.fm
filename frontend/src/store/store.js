@@ -7,6 +7,7 @@ import appearanceReducer from './appearanceSlice';
 import namingReducer from './namingSlice';
 import addSongsReducer from './addSongsSlice';
 import transfersReducer from './transfersSlice';
+import draftsReducer from './draftsSlice';
 import duelsReducer from './duelSettingsSlice';
 import { SETTINGS, cleanStorage, setSetting, writeDevicePref } from '../settings';
 import { syncTierLabels } from '../tierLabels';
@@ -21,6 +22,7 @@ export const store = configureStore({
     naming: namingReducer,
     addSongs: addSongsReducer,
     transfers: transfersReducer,
+    drafts: draftsReducer,
     duels: duelsReducer,
   },
 });
