@@ -372,6 +372,49 @@ class DuelApiIT extends PostgresIT {
         assertThat(failed).isEmpty();
     }
 
+    // A big board end to end (HTTP, Postgres, engine): 335 ranked songs and
+    // 1,500 duels in the log - the hub's analysis and a verdict stay quick.
+    @Test
+    void aBigBoardStaysQuick() throws Exception {
+        StringBuilder b = new StringBuilder("{\"layout\": {\"tiers\": {");
+        String[] tiers = {"S", "A", "B", "C", "D"};
+        List<String> all = new ArrayList<>();
+        for (int t = 0; t < tiers.length; t++) {
+            List<String> ids = new ArrayList<>();
+            for (int i = 0; i < 67; i++) {
+                ids.add("\"" + id(tiers[t], i) + "\"");
+                all.add(id(tiers[t], i));
+            }
+            b.append(t > 0 ? ", " : "").append('"').append(tiers[t]).append("\": [").append(String.join(", ", ids)).append(']');
+        }
+        String big = b.append("}}}").toString();
+        String sid = ok(call(post(at(BOARD, "/sessions")), big.replace("}}}", "}}, \"focus\": \"SMART_MIX\", \"minutes\": 15}"), alice)
+            .andExpect(status().isCreated())).get("id").asText();
+        java.util.Random r = new java.util.Random(3);
+        String[] verdicts = {"A_CLEARLY", "A", "TOO_CLOSE", "B", "B_CLEARLY"};
+        List<Object[]> rows = new ArrayList<>();
+        for (int i = 0; i < 1500; i++) {
+            String x = all.get(r.nextInt(all.size()));
+            String y = all.get(r.nextInt(all.size()));
+            if (!x.equals(y)) rows.add(new Object[] {sid, x, y, verdicts[r.nextInt(5)], java.sql.Timestamp.from(now.minusSeconds(3000 - i))});
+        }
+        jdbc.batchUpdate("INSERT INTO duel (session_id, video_a, video_b, verdict, created_at) VALUES (?::uuid, ?, ?, ?::duel_verdict, ?)", rows);
+        for (int i = 0; i < 2; i++) call(post(at(BOARD, "/analysis")), big, alice).andExpect(status().isOk()); // warm up
+        long t0 = System.nanoTime();
+        call(post(at(BOARD, "/analysis")), big, alice).andExpect(status().isOk());
+        long analysis = (System.nanoTime() - t0) / 1_000_000;
+        JsonNode s = ok(call(post(at(BOARD, "/sessions/" + sid)), big, alice).andExpect(status().isOk()));
+        String a = s.get("matchup").get("a").asText();
+        String bb = s.get("matchup").get("b").asText();
+        String v = big.replace("}}}", "}}, \"a\": \"%s\", \"b\": \"%s\", \"verdict\": \"A\", \"seenDuels\": %d}".formatted(a, bb, seen(sid)));
+        t0 = System.nanoTime();
+        call(post(at(BOARD, "/sessions/" + sid + "/verdicts")), v, alice).andExpect(status().isOk());
+        long verdict = (System.nanoTime() - t0) / 1_000_000;
+        System.out.printf("API, 335 songs / %d duels: analysis %d ms, verdict %d ms%n", rows.size(), analysis, verdict);
+        assertThat(analysis).isLessThan(1500);
+        assertThat(verdict).isLessThan(1500);
+    }
+
     @Test
     void sessionsBelongToTheirUserAndBoard() throws Exception {
         String sid = start("SMART_MIX").get("id").asText();
