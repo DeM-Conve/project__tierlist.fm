@@ -79,7 +79,7 @@ class DuelTierRangesIT extends PostgresIT {
     }
 
     private JsonNode analysis(RequestPostProcessor who) throws Exception {
-        return json.readTree(mvc.perform(post("/api/duels/Rap/analysis").with(who).contentType(MediaType.APPLICATION_JSON).content(layout()))
+        return json.readTree(mvc.perform(post("/api/duels/analysis?board=Rap").with(who).contentType(MediaType.APPLICATION_JSON).content(layout()))
             .andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
     }
 
@@ -107,7 +107,7 @@ class DuelTierRangesIT extends PostgresIT {
         assertThat(mine.get("certainty").asDouble()).isLessThan(learned.get("certainty").asDouble());
         // A session's certainty uses the same borders.
         String start = layout().replaceFirst("\\}$", ", \"focus\": \"SMART_MIX\", \"minutes\": 5}");
-        JsonNode session = json.readTree(mvc.perform(post("/api/duels/Rap/sessions").with(alice).contentType(MediaType.APPLICATION_JSON).content(start))
+        JsonNode session = json.readTree(mvc.perform(post("/api/duels/sessions?board=Rap").with(alice).contentType(MediaType.APPLICATION_JSON).content(start))
             .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString());
         assertThat(session.get("certaintyStart").asDouble()).isCloseTo(mine.get("certainty").asDouble(), within(1e-6));
 

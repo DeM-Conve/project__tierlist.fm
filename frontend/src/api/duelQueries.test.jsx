@@ -19,11 +19,11 @@ beforeEach(() => {
 });
 
 describe('duel API hooks', () => {
-  it('analysis posts the board layout to the board (name URL-encoded)', async () => {
+  it('analysis posts the board layout, the board as a query parameter (any name, "/" and "%" too)', async () => {
     api.post.mockResolvedValue({ data: { certainty: 0.5 } });
     const { result } = renderHook(() => useDuelAnalysisQuery('Indie Indian', { layout, key: 'k1' }), { wrapper });
     await waitFor(() => expect(result.current.data).toEqual({ certainty: 0.5 }));
-    expect(api.post).toHaveBeenCalledWith('/api/duels/Indie%20Indian/analysis', { layout });
+    expect(api.post).toHaveBeenCalledWith('/api/duels/analysis', { layout }, { params: { board: 'Indie Indian' } });
   });
 
   it('a new layout of the same board keeps the previous analysis up while it loads - never another board\'s', async () => {
@@ -49,13 +49,13 @@ describe('duel API hooks', () => {
     api.post.mockResolvedValueOnce({ data: { id: 's1', duels: [] } });
     const start = renderHook(() => useStartDuelMutation('Rock'), { wrapper });
     await act(() => start.result.current.mutateAsync({ layout, focus: 'SMART_MIX', minutes: 5 }));
-    expect(api.post).toHaveBeenLastCalledWith('/api/duels/Rock/sessions', { layout, focus: 'SMART_MIX', minutes: 5 });
+    expect(api.post).toHaveBeenLastCalledWith('/api/duels/sessions', { layout, focus: 'SMART_MIX', minutes: 5 }, { params: { board: 'Rock' } });
     expect(client.getQueryData(duelKeys.session('Rock', 's1'))).toEqual({ id: 's1', duels: [] });
 
     api.post.mockResolvedValueOnce({ data: { id: 's1', duels: [{ id: 1 }] } });
     const verdict = renderHook(() => useDuelVerdictMutation('Rock', 's1'), { wrapper });
     await act(() => verdict.result.current.mutateAsync({ layout, a: 'x', b: 'y', verdict: 'A' }));
-    expect(api.post).toHaveBeenLastCalledWith('/api/duels/Rock/sessions/s1/verdicts', { layout, a: 'x', b: 'y', verdict: 'A' });
+    expect(api.post).toHaveBeenLastCalledWith('/api/duels/sessions/s1/verdicts', { layout, a: 'x', b: 'y', verdict: 'A' }, { params: { board: 'Rock' } });
     expect(client.getQueryData(duelKeys.session('Rock', 's1')).duels).toHaveLength(1);
 
     const read = renderHook(() => useDuelSessionQuery('Rock', 's1', { layout }), { wrapper });
@@ -67,7 +67,7 @@ describe('duel API hooks', () => {
     api.post.mockResolvedValue({ data: { duels: 3 } });
     const end = renderHook(() => useEndDuelMutation('Rock', 's1'), { wrapper });
     await act(() => end.result.current.mutateAsync({ layout }));
-    expect(api.post).toHaveBeenCalledWith('/api/duels/Rock/sessions/s1/end', { layout });
+    expect(api.post).toHaveBeenCalledWith('/api/duels/sessions/s1/end', { layout }, { params: { board: 'Rock' } });
     expect(client.getQueryData(duelKeys.summary('Rock', 's1'))).toEqual({ duels: 3 });
     expect(client.getQueryData(duelKeys.session('Rock', 's1'))).toBeUndefined();
     const summary = renderHook(() => useDuelSummaryQuery('Rock', 's1', { layout }), { wrapper });
@@ -79,20 +79,20 @@ describe('duel API hooks', () => {
     api.delete.mockResolvedValue({});
     const decision = renderHook(() => useDuelDecisionMutation('Rock'), { wrapper });
     await act(() => decision.result.current.mutateAsync({ videoId: 'v', decision: 'KEPT', from: 'A', to: 'S', confidence: 0.9 }));
-    expect(api.put).toHaveBeenCalledWith('/api/duels/Rock/decisions/v', { decision: 'KEPT', from: 'A', to: 'S', confidence: 0.9 });
+    expect(api.put).toHaveBeenCalledWith('/api/duels/decisions/v', { decision: 'KEPT', from: 'A', to: 'S', confidence: 0.9 }, { params: { board: 'Rock' } });
     await act(() => decision.result.current.mutateAsync({ videoId: 'v', decision: null }));
-    expect(api.delete).toHaveBeenCalledWith('/api/duels/Rock/decisions/v');
+    expect(api.delete).toHaveBeenCalledWith('/api/duels/decisions/v', { params: { board: 'Rock' } });
     const lock = renderHook(() => useDuelLockMutation('Rock'), { wrapper });
     await act(() => lock.result.current.mutateAsync({ videoId: 'v', locked: true }));
-    expect(api.put).toHaveBeenLastCalledWith('/api/duels/Rock/locks/v');
+    expect(api.put).toHaveBeenLastCalledWith('/api/duels/locks/v', null, { params: { board: 'Rock' } });
     await act(() => lock.result.current.mutateAsync({ videoId: 'v', locked: false }));
-    expect(api.delete).toHaveBeenLastCalledWith('/api/duels/Rock/locks/v');
+    expect(api.delete).toHaveBeenLastCalledWith('/api/duels/locks/v', { params: { board: 'Rock' } });
   });
 
   it('a board rename moves its duel history to the new name', async () => {
     api.post.mockResolvedValue({});
     const rename = renderHook(() => useRenameDuelBoardMutation(), { wrapper });
     await act(() => rename.result.current.mutateAsync({ from: 'Old Name', to: 'New' }));
-    expect(api.post).toHaveBeenCalledWith('/api/duels/Old%20Name/rename', { to: 'New' });
+    expect(api.post).toHaveBeenCalledWith('/api/duels/rename', { to: 'New' }, { params: { board: 'Old Name' } });
   });
 });
