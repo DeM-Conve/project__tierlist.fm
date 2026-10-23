@@ -5,9 +5,9 @@ import { IDS, analysis, renderDuel, suggestion } from '../../test/duelFixtures';
 
 vi.mock('@mantine/notifications', () => ({ notifications: { show: vi.fn(), hide: vi.fn() } }));
 
-const h = vi.hoisted(() => ({ analysis: null, error: null, decision: null, lock: null, push: null }));
+const h = vi.hoisted(() => ({ analysis: null, error: null, decision: null, lock: null, push: null, flags: {} }));
 vi.mock('../../api/queries', () => ({
-  useDuelAnalysisQuery: () => ({ data: h.analysis, isError: !!h.error, error: h.error, refetch: vi.fn() }),
+  useDuelAnalysisQuery: () => ({ data: h.analysis, isError: !!h.error, error: h.error, refetch: vi.fn(), ...h.flags }),
   useDuelDecisionMutation: () => ({ mutate: h.decision }),
   useDuelLockMutation: () => ({ mutate: h.lock }),
 }));
@@ -23,6 +23,7 @@ beforeEach(() => {
   h.decision = vi.fn();
   h.lock = vi.fn();
   h.push = vi.fn();
+  h.flags = {};
   h.analysis = analysis({ suggestions: [suggestion(), up] });
 });
 
@@ -312,5 +313,38 @@ describe('DuelMoves', () => {
     expect(skeleton.parentElement.children.length).toBe(columns);
     expect(['Where it belongs', 'Key results'].map((l) => !!within(skeleton).queryByText(l))).toEqual(labels);
     expect(within(skeleton.parentElement).getByText('browse')).toBeInTheDocument();
+  });
+
+  it('a cached analysis being refreshed is not pinned: its refresh is no "your moves changed" notice', () => {
+    // Back from a session: the cached analysis (stale) shows while the fresh one loads.
+    h.flags = { isStale: true, isFetchedAfterMount: false };
+    h.analysis = analysis({ suggestions: [suggestion()] });
+    page();
+    expect(screen.getByText('All · 1')).toBeInTheDocument();
+    // The refresh lands with what the session's verdicts changed.
+    h.flags = { isStale: false, isFetchedAfterMount: true };
+    h.analysis = analysis({ suggestions: [suggestion(), up] });
+    fireEvent.click(screen.getByText('Up a tier · 1'));
+    expect(screen.queryByTestId('moves-changed')).not.toBeInTheDocument();
+    expect(screen.getByText('Up a tier · 2')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Show evidence for Other Song/ })).toBeInTheDocument();
+  });
+
+  it('with no ready move the keys stay the page\'s and the dock\'s: arrows scroll, m / l / p are not taken', () => {
+    h.analysis = analysis({ suggestions: [], leaning: [lean] });
+    page();
+    for (const [key, code] of [['ArrowDown', 'ArrowDown'], ['ArrowUp', 'ArrowUp'], ['m', 'KeyM'], ['x', 'KeyX'], ['l', 'KeyL'], ['p', 'KeyP']]) {
+      // fireEvent returns false when a handler called preventDefault.
+      expect(fireEvent.keyDown(document, { key, code })).toBe(true);
+    }
+    expect(h.decision).not.toHaveBeenCalled();
+    expect(h.lock).not.toHaveBeenCalled();
+  });
+
+  it('Move all never moves a song just locked in its tier', () => {
+    const store = page();
+    fireEvent.click(screen.getByRole('checkbox'));
+    expect(screen.getByRole('button', { name: 'Move all 0 at ≥90%' })).toBeDisabled();
+    expect(tierOf(store, IDS.low)).toBe('B');
   });
 });
