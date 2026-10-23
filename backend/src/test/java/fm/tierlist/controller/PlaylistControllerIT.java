@@ -3,7 +3,6 @@ package fm.tierlist.controller;
 import fm.tierlist.PostgresIT;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -826,17 +825,51 @@ class PlaylistControllerIT extends PostgresIT {
             .andExpect(jsonPath("$.userId").value("alice"));
     }
 
+    // No answer at all (connection refused, timeout, DNS) on any read: a 502
+    // ProblemDetail that says so - never a bare 500 with no detail.
     @Test
-    @Disabled("BUG: YouTube unreachable (connection refused / timeout / DNS -> ResourceAccessException) is not an "
-        + "HttpStatusCodeException, so YoutubeErrorHandler never sees it: the request fails with an unhandled "
-        + "ServletException -> a bare 500 from Boot's error page with no plain-language `detail`, against the "
-        + "'a failed load must say why' rule. Expected: 502 ProblemDetail saying YouTube couldn't be reached.")
     void youtubeBeingUnreachableIsA502SayingSo() throws Exception {
         youtube.expect(requestTo(YT + "/playlists?part=snippet,contentDetails&mine=true&maxResults=50&fields=" + PlaylistController.PLAYLIST_FIELDS))
             .andRespond(withException(new IOException("Connection refused")));
+        youtube.expect(requestTo(itemsUrl("PL1"))).andRespond(withException(new IOException("Read timed out")));
+        youtube.expect(requestTo(YT + "/videos?part=snippet&id=vid1&fields=" + PlaylistController.VIDEO_FIELDS))
+            .andRespond(withException(new IOException("UnknownHost")));
+        youtube.expect(requestTo(YT + "/playlistItems?part=snippet")).andRespond(withException(new IOException("reset")));
 
-        mvc.perform(get("/api/playlists").with(signedIn()))
+        for (MockHttpServletRequestBuilder request : new MockHttpServletRequestBuilder[] {
+            get("/api/playlists").with(signedIn()),
+            get("/api/playlists/PL1/items").with(signedIn()),
+            get("/api/videos/vid1").with(signedIn()),
+            json(post("/api/playlists/PL1/items"), "{\"videoId\": \"vid1\"}"),
+        }) {
+            mvc.perform(request)
+                .andExpect(status().isBadGateway())
+                .andExpect(r -> assertThat(r.getResponse().getContentType()).isEqualTo(MediaType.APPLICATION_PROBLEM_JSON_VALUE))
+                .andExpect(jsonPath("$.status").value(502))
+                .andExpect(jsonPath("$.detail").value(containsString("Couldn't reach YouTube")));
+        }
+    }
+
+    // A delete is retried on network failures; still unreachable after the
+    // last try is the same 502.
+    @Test
+    void aDeleteThatNeverReachesYoutubeIsA502AfterTheRetries() throws Exception {
+        youtube.expect(ExpectedCount.times(PlaylistController.WRITE_ATTEMPTS), requestTo(YT + "/playlistItems?id=ITEM1"))
+            .andRespond(withException(new IOException("Connection refused")));
+
+        mvc.perform(delete("/api/playlist-items/ITEM1").with(signedIn()))
             .andExpect(status().isBadGateway())
-            .andExpect(jsonPath("$.detail").isNotEmpty());
+            .andExpect(jsonPath("$.detail").value(containsString("Couldn't reach YouTube")));
+    }
+
+    // An answer that isn't the JSON the app expects (a proxy's HTML error
+    // page with a 200, say) is a 502 too.
+    @Test
+    void anUnreadableYoutubeAnswerIsA502SayingSo() throws Exception {
+        youtube.expect(requestTo(itemsUrl("PL1"))).andRespond(withSuccess("<html>oops</html>", MediaType.APPLICATION_JSON));
+
+        mvc.perform(get("/api/playlists/PL1/items").with(signedIn()))
+            .andExpect(status().isBadGateway())
+            .andExpect(jsonPath("$.detail").value(containsString("couldn't read")));
     }
 }

@@ -4,6 +4,8 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.client.HttpStatusCodeException;
+import org.springframework.web.client.ResourceAccessException;
+import org.springframework.web.client.RestClientException;
 
 // What a failed YouTube Data API call means, in one place: YouTube's own
 // status / reason / message, the status the app answers with, and a
@@ -39,5 +41,14 @@ record YoutubeError(int youtubeStatus, String reason, String message, HttpStatus
             default -> "YouTube refused the request" + (message != null ? ": " + message : ".");
         };
         return new YoutubeError(youtubeStatus, reason, message, status, detail);
+    }
+
+    static final String UNREACHABLE = "Couldn't reach YouTube - check the connection and try again.";
+    static final String UNREADABLE = "YouTube sent an answer the app couldn't read - try again.";
+
+    // The plain-language sentence for a YouTube call that got no usable HTTP
+    // answer (no YouTube status to map): unreachable, or an unreadable body.
+    static String noAnswer(RestClientException e) {
+        return e instanceof ResourceAccessException ? UNREACHABLE : UNREADABLE;
     }
 }
