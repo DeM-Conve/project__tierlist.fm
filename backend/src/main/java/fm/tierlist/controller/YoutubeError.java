@@ -35,7 +35,7 @@ record YoutubeError(int youtubeStatus, String reason, String message, HttpStatus
         };
         String detail = switch (status) {
             case TOO_MANY_REQUESTS -> "YouTube's daily API quota for this app is used up - it resets at midnight Pacific time.";
-            case UNAUTHORIZED -> "Your YouTube login expired - log out and back in.";
+            case UNAUTHORIZED -> LOGIN_EXPIRED;
             case NOT_FOUND -> "YouTube says that doesn't exist (or it's private).";
             case FORBIDDEN -> "This app wasn't given access to your YouTube account - log in again and tick the YouTube permission on Google's screen.";
             default -> "YouTube refused the request" + (message != null ? ": " + message : ".");
@@ -43,6 +43,7 @@ record YoutubeError(int youtubeStatus, String reason, String message, HttpStatus
         return new YoutubeError(youtubeStatus, reason, message, status, detail);
     }
 
+    static final String LOGIN_EXPIRED = "Your YouTube login expired - log out and back in.";
     static final String UNREACHABLE = "Couldn't reach YouTube - check the connection and try again.";
     static final String UNREADABLE = "YouTube sent an answer the app couldn't read - try again.";
 

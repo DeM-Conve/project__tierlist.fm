@@ -6,6 +6,7 @@ import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
+import org.springframework.security.oauth2.client.ClientAuthorizationRequiredException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.client.HttpStatusCodeException;
@@ -33,6 +34,16 @@ class YoutubeErrorHandler {
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(error.status(), error.detail());
         problem.setProperty("youtubeReason", error.reason());
         return problem;
+    }
+
+    // Signed in, but the session holds no YouTube authorization (Google
+    // refused to renew it, say). Left alone, Spring Security turns this into
+    // a 302 to Google's consent page, which an API call can't follow - so it
+    // is the same 401 as an expired YouTube login.
+    @ExceptionHandler(ClientAuthorizationRequiredException.class)
+    ProblemDetail youtubeAuthorizationMissing(ClientAuthorizationRequiredException e) {
+        log.warn("YouTube call without an authorized client ({}): asking the user to log in again", e.getClientRegistrationId());
+        return ProblemDetail.forStatusAndDetail(HttpStatus.UNAUTHORIZED, YoutubeError.LOGIN_EXPIRED);
     }
 
     // No answer at all (connection refused, timeout, DNS), or one the app

@@ -917,6 +917,36 @@ class PlaylistControllerIT extends PostgresIT {
             .andExpect(status().isUnauthorized());
     }
 
+    // Signed in, but the session holds no YouTube authorization any more
+    // (e.g. Google refused to renew it): the same 401 ProblemDetail as an
+    // expired login - never a 302 to Google's login page, which an API call
+    // (axios, cross-origin to accounts.google.com) can only fail on.
+    @Test
+    void aSessionWithoutYoutubeAuthorizationIsA401NotARedirectToGoogle() throws Exception {
+        RequestPostProcessor noClient = org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors
+            .authentication(new org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken(
+                new org.springframework.security.oauth2.core.user.DefaultOAuth2User(
+                    org.springframework.security.core.authority.AuthorityUtils.createAuthorityList("OAUTH2_USER"),
+                    java.util.Map.of("sub", "alice"), "sub"),
+                org.springframework.security.core.authority.AuthorityUtils.createAuthorityList("OAUTH2_USER"), "google"));
+        for (MockHttpServletRequestBuilder request : new MockHttpServletRequestBuilder[] {
+            get("/api/playlists"),
+            get("/api/playlists/PL1/items"),
+            get("/api/videos/vid1"),
+            post("/api/playlists/PL1/items").contentType(MediaType.APPLICATION_JSON).content("{\"videoId\": \"v\"}"),
+            delete("/api/playlist-items/ITEM1"),
+            post("/api/tier-sync").contentType(MediaType.APPLICATION_JSON).content("[]"),
+            post("/api/playlists/rename").contentType(MediaType.APPLICATION_JSON).content("[]"),
+            post("/api/playlists/create").contentType(MediaType.APPLICATION_JSON).content("[]"),
+        }) {
+            mvc.perform(request.with(noClient))
+                .andExpect(status().isUnauthorized())
+                .andExpect(r -> assertThat(r.getResponse().getHeader(HttpHeaders.LOCATION)).isNull())
+                .andExpect(r -> assertThat(r.getResponse().getContentType()).isEqualTo(MediaType.APPLICATION_PROBLEM_JSON_VALUE))
+                .andExpect(jsonPath("$.detail").value(containsString("log out and back in")));
+        }
+    }
+
     @Test
     void authStatusIsPublicAndSaysWhetherYouAreLoggedIn() throws Exception {
         mvc.perform(get("/api/auth/status"))
