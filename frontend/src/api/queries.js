@@ -258,11 +258,16 @@ export const duelKeys = {
   summary: (board, id) => ['duels', board, 'summary', id],
 };
 
+// Every edit to the board (a Move, a drag) is a new layout, so a new query:
+// while it loads, the same board's previous analysis stays up
+// (`isPlaceholderData`) instead of the page dropping back to skeletons -
+// never another board's.
 export function useDuelAnalysisQuery(board, { layout, key }, enabled = true) {
   return useQuery({
     queryKey: duelKeys.analysis(board, key),
     queryFn: async () => (await api.post(`${duelPath(board)}/analysis`, { layout })).data,
     enabled: enabled && !!board,
+    placeholderData: (previous, previousQuery) => (previousQuery?.queryKey[1] === board ? previous : undefined),
   });
 }
 

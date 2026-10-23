@@ -347,4 +347,13 @@ describe('DuelMoves', () => {
     expect(screen.getByRole('button', { name: 'Move all 0 at ≥90%' })).toBeDisabled();
     expect(tierOf(store, IDS.low)).toBe('B');
   });
+
+  it('sorting a tier by an order a step behind the board never pulls in a song moved out since', () => {
+    // Low Song is in B; the (older) order still lists it in A.
+    h.analysis = analysis({ suggestions: [], tierOrders: { A: [IDS.mid2, IDS.low, IDS.mid] } });
+    const store = page();
+    fireEvent.click(screen.getByRole('button', { name: 'Sort A by score' }));
+    expect(store.getState().tiers.tierItems.A.map((v) => v.videoId)).toEqual([IDS.mid2, IDS.mid]);
+    expect(tierOf(store, IDS.low)).toBe('B');
+  });
 });

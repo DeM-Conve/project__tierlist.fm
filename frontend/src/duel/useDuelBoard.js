@@ -62,9 +62,16 @@ export function useDuelBoard(category) {
     lock.mutate({ videoId, locked }, { onError: failed });
   }
 
-  // "Order within a tier is just sorting by score."
+  // "Order within a tier is just sorting by score." Only the tier's own
+  // songs, as they are now: an order from an analysis a step behind the
+  // board (a song moved out since, or in) never pulls a song into this tier
+  // or drops one - songs it doesn't name keep their place at the end.
   function applyTierOrder(tier, ids) {
-    dispatch(applyOrderWithFeedback({ [tier]: ids.map((id) => videoMap.get(id)).filter(Boolean) }));
+    const items = tierItems[tier] || [];
+    const byId = new Map(items.map((v) => [v.videoId, v]));
+    const named = new Set(ids);
+    const ordered = [...new Set(ids)].filter((id) => byId.has(id)).map((id) => byId.get(id));
+    dispatch(applyOrderWithFeedback({ [tier]: [...ordered, ...items.filter((v) => !named.has(v.videoId))] }));
   }
 
   return { tierItems, duelLayout, videoOf, nameOf, artistOf, accept, pushNow: push, keep, undo, setLocked, applyTierOrder };

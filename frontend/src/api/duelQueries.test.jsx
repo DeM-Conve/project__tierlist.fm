@@ -26,6 +26,25 @@ describe('duel API hooks', () => {
     expect(api.post).toHaveBeenCalledWith('/api/duels/Indie%20Indian/analysis', { layout });
   });
 
+  it('a new layout of the same board keeps the previous analysis up while it loads - never another board\'s', async () => {
+    api.post.mockResolvedValueOnce({ data: { certainty: 0.5 } });
+    const { result, rerender } = renderHook(({ board, key }) => useDuelAnalysisQuery(board, { layout, key }), {
+      wrapper, initialProps: { board: 'Rock', key: 'k1' },
+    });
+    await waitFor(() => expect(result.current.data).toEqual({ certainty: 0.5 }));
+    let resolve;
+    api.post.mockReturnValueOnce(new Promise((r) => { resolve = r; }));
+    rerender({ board: 'Rock', key: 'k2' });
+    expect(result.current.data).toEqual({ certainty: 0.5 });
+    expect(result.current.isPlaceholderData).toBe(true);
+    await act(async () => resolve({ data: { certainty: 0.6 } }));
+    await waitFor(() => expect(result.current.isPlaceholderData).toBe(false));
+    expect(result.current.data).toEqual({ certainty: 0.6 });
+    api.post.mockReturnValueOnce(new Promise(() => {}));
+    rerender({ board: 'Jazz', key: 'k3' });
+    expect(result.current.data).toBeUndefined();
+  });
+
   it('a session read resumes it; start / verdict replace the cached session', async () => {
     api.post.mockResolvedValueOnce({ data: { id: 's1', duels: [] } });
     const start = renderHook(() => useStartDuelMutation('Rock'), { wrapper });

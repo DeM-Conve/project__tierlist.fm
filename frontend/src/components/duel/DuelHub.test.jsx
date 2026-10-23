@@ -137,4 +137,48 @@ describe('DuelHub', () => {
     page();
     expect(screen.getByText('Login expired.')).toBeInTheDocument();
   });
+
+  it('Enter on a focused link or button is that control\'s: Resume is never turned into a new session', () => {
+    h.analysis = analysis({ activeSession: 'open-one' });
+    page();
+    const resume = screen.getByText('Resume the session in progress →');
+    resume.focus();
+    expect(fireEvent.keyDown(resume, { key: 'Enter', code: 'Enter' })).toBe(true);
+    const move = screen.getByRole('button', { name: 'Move' });
+    expect(fireEvent.keyDown(move, { key: 'Enter', code: 'Enter' })).toBe(true);
+    expect(h.start).not.toHaveBeenCalled();
+  });
+
+  it('Enter after picking a session length or a focus card starts it', () => {
+    page();
+    fireEvent.click(screen.getByText('Quick · 2 min'));
+    const radio = screen.getByRole('radio', { name: 'Quick · 2 min' });
+    fireEvent.keyDown(radio, { key: 'Enter', code: 'Enter' });
+    expect(h.start.mock.calls[0][0]).toMatchObject({ focus: 'SMART_MIX', minutes: 2 });
+    cleanup();
+    h.start.mockClear();
+    page();
+    const card = screen.getByText('Borderlines only').closest('[data-duel-focus]');
+    fireEvent.click(card);
+    fireEvent.keyDown(card, { key: 'Enter', code: 'Enter' });
+    expect(h.start.mock.calls[0][0]).toMatchObject({ focus: 'BORDERLINES' });
+  });
+
+  it('Borderlines only with no song on the fence any more starts Smart mix, not an empty session', () => {
+    page();
+    fireEvent.click(screen.getByText('Borderlines only'));
+    // A refreshed analysis (e.g. after a Move) has nobody on the fence.
+    h.analysis = analysis({ onFence: 0 });
+    fireEvent.click(screen.getByText('Deep · 15 min'));
+    fireEvent.click(screen.getByRole('button', { name: /Start duelling/ }));
+    expect(h.start.mock.calls[0][0]).toMatchObject({ focus: 'SMART_MIX' });
+  });
+
+  it('a suggestion whose song already left its tier (moved here, fresh analysis on its way) is not offered again', () => {
+    page();
+    fireEvent.click(screen.getByRole('button', { name: 'Move' }));
+    // The analysis on screen still lists it until the new one lands.
+    expect(screen.queryByText('Ready to move')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Move' })).not.toBeInTheDocument();
+  });
 });
