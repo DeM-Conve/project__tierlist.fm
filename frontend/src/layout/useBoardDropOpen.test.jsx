@@ -126,7 +126,9 @@ describe('useBoardDropOpen', () => {
     expect(screen.getByTestId('path').textContent).toBe('/tier/Rock');
   });
 
-  it('with staged moves on the open board it explains instead of opening (they would be lost)', () => {
+  // The open board keeps its staged moves when another opens (per-board
+  // drafts), so nothing blocks it any more.
+  it('with staged moves on the open board it still opens the other board', () => {
     const store = setup();
     act(() => {
       store.dispatch(moveWithFeedback([{ fromTier: 'S', toTier: 'A', videoId: 'a' }], { quiet: true }));
@@ -134,8 +136,8 @@ describe('useBoardDropOpen', () => {
     drag(store);
     fireEvent.dragEnter(screen.getByTestId('Pop Hits'));
     act(() => vi.advanceTimersByTime(OPEN_DELAY_MS * 2));
-    expect(screen.getByTestId('path').textContent).toBe('/tier/Rock');
-    expect(show).toHaveBeenCalledWith(expect.objectContaining({ message: expect.stringMatching(/Push or discard the 1 staged change on Rock/) }));
+    expect(screen.getByTestId('path').textContent).toBe('/tier/Pop Hits');
+    expect(show).not.toHaveBeenCalled();
   });
 
   it('an auto-staged duplicate removal doesn\'t block opening another board', () => {

@@ -113,6 +113,23 @@ describe('several boards', () => {
   });
 });
 
+describe('moving a song to another board', () => {
+  it('works from a board with staged moves, and both push', async () => {
+    const yt = new FakeYoutube(ACCOUNT);
+    const h = await mountApp(yt);
+    await h.open('Rap');
+    h.move('h', 'S');
+    await h.transfer('a', 'Pop', 'TODO');
+    expect(h.keptBoard('Rap')).toEqual({ S: ['b', 'h'], A: ['c'], TODO: ['i'] });
+    expect(h.barText()).toBe('2 changes on Rap · 1 duplicate to clean up · review');
+    await h.push();
+    expectYoutube(yt, { Rap: { S: ['b', 'h'], A: ['c'], TODO: ['i'] }, Pop: { S: ['p'], A: ['r'], TODO: ['s', 'a'] } });
+    await h.open('Rap');
+    expect(h.shown()).toEqual({ S: ['b', 'h'], A: ['c'], TODO: ['i'] });
+    unmount();
+  });
+});
+
 describe('a naming change with the board open', () => {
   it('rebuilds the board from its new playlists, the staged change kept', async () => {
     const yt = new FakeYoutube({ ...ACCOUNT, 'Rap Great': ['z'] });

@@ -2,8 +2,6 @@ import { useEffect, useState } from 'react';
 import { useTimeout } from '@mantine/hooks';
 import { useSelector } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
-import { notifications } from '@mantine/notifications';
-import { selectPendingMoves } from '../store/selectors';
 
 // How long a dragged song hovers over a board in the sidebar before that
 // board opens (like a spring-loaded folder), so the song can be dropped on
@@ -11,16 +9,12 @@ import { selectPendingMoves } from '../store/selectors';
 export const OPEN_DELAY_MS = 600;
 
 // Drag handlers for one sidebar board entry. -> { hovering, handlers }.
-// Opening a board replaces the open board's draft, so while it still has
-// staged moves of its own the board doesn't open - push or discard first.
+// The board left behind keeps its staged changes (draftsSlice), so a board
+// with some opens like any other.
 export function useBoardDropOpen(category) {
   const navigate = useNavigate();
   const drag = useSelector((s) => s.transfers.drag);
   const loadedCategory = useSelector((s) => s.tiers.loadedCategory);
-  // Only the user's own staged changes: auto-staged duplicate removals are
-  // derived from the board's data and come back with it, so they never
-  // block (a board with a duplicate used to refuse every cross-board drag).
-  const pendingCount = useSelector(selectPendingMoves).filter((m) => m.kind !== 'dedupe').length;
   const [hovering, setHovering] = useState(false);
   // Mantine useTimeout: start() is a no-op while one is pending (dragenter
   // fires again for every child), and it's cleared on unmount.
@@ -38,15 +32,6 @@ export function useBoardDropOpen(category) {
     if (!active) return;
     e.preventDefault();
     setHovering(true);
-    // (No timer can be pending here: with staged moves none is started.)
-    if (pendingCount > 0) {
-      notifications.show({
-        id: 'board-drop-blocked',
-        color: 'yellow',
-        message: `Push or discard the ${pendingCount} staged change${pendingCount === 1 ? '' : 's'} on ${loadedCategory} first, then drag songs to another board`,
-      });
-      return;
-    }
     start();
   }
 
