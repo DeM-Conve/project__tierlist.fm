@@ -368,10 +368,11 @@ public class PlaylistController {
 
     static final String PLAYLIST_GONE = "This playlist no longer exists on YouTube.";
 
-    // Logs one failed playlist rename / create (YouTube's status / reason
-    // only - never the token) and says in plain words what went wrong: the
-    // same mapping as a failed request (YoutubeError), made specific where a
-    // playlist write tells us more. Never the raw exception text.
+    // Logs one failed playlist rename / create (YouTube's status / reason and
+    // the playlist id - never the token or a title) and says in plain words
+    // what went wrong: the same mapping as a failed request (YoutubeError),
+    // made specific where a playlist write tells us more. Never the raw
+    // exception text.
     static String playlistWriteFailure(String what, String playlist, RuntimeException e) {
         if (e instanceof HttpStatusCodeException http) {
             YoutubeError error = YoutubeError.of(http);
@@ -509,7 +510,7 @@ public class PlaylistController {
                 result.put("success", true);
             } catch (RuntimeException e) {
                 result.put("success", false);
-                result.put("error", playlistWriteFailure("create", title, e));
+                result.put("error", playlistWriteFailure("create", "a new playlist", e));
             }
             return result;
         });
