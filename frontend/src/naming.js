@@ -41,11 +41,13 @@ export const TIER_LABEL_PRESETS = [
 export const TIER_LABEL_MAX = 20;
 
 // Title -> comparable words: case, accents, punctuation, brackets and "_"
-// all fold away ("Jazz_Cozy - TODO" -> "jazz cozy todo").
+// all fold away ("Jazz_Cozy - TODO" -> "jazz cozy todo"). Same steps as the
+// backend's TierLabelValidator.words (NFKD, drop every combining mark, lower
+// case, symbols to one space) - keep the two in step.
 export function normalizeName(text) {
   return text
     .normalize('NFKD')
-    .replace(/\p{Diacritic}/gu, '')
+    .replace(/\p{M}+/gu, '')
     .toLowerCase()
     .replace(/[^\p{L}\p{N}]+/gu, ' ')
     .trim();
@@ -81,22 +83,50 @@ export function validateTemplate(template) {
   return errors;
 }
 
-// Mirrors the backend's @TierLabels - keep the two in step.
+// What the database counts as a letter or digit (postgres:17-alpine's
+// [[:alnum:]]): letters, decimal digits and letter-like numerals ("Ⅻ") - not
+// what NFKD merely folds into a digit (circled "①", superscript "²").
+// Mirrors TierLabelValidator's DB_ALNUM / DB_SYMBOLS - keep them in step.
+const DB_ALNUM = /[\p{L}\p{Nd}\p{Nl}]/u;
+const DB_SYMBOLS = /[^\p{L}\p{Nd}\p{Nl}]+/gu;
+
+// A tier name as the database's tier_labels_distinct compares it: lower case,
+// every run of non-alnum one space ("S²" -> "s", the same as "S").
+export function databaseName(label) {
+  return label.toLowerCase().replace(DB_SYMBOLS, ' ').trim();
+}
+
+// The format rules a tier name and a "shown as" name share (@TierLabel):
+// null = fine, else the error.
+function tierNameFormatError(name) {
+  if (name.length > TIER_LABEL_MAX) return `At most ${TIER_LABEL_MAX} characters`;
+  if (name !== name.trim()) return 'No spaces at the start or end';
+  if (!normalizeName(name)) return 'Needs a letter or digit';
+  if (!DB_ALNUM.test(name)) return 'Needs a plain letter or digit - ① or ² don\'t count';
+  if (/[{}]/.test(name)) return 'No { or }';
+  return null;
+}
+
+// Mirrors the backend's @TierLabel + TierLabelsDto.isDistinct (and the
+// database's tier_label_valid / tier_labels_distinct) - keep them in step.
+// Two names clash when they're the same words (normalizeName) or the same to
+// the database (databaseName).
 // labels -> { [slot]: error } (empty = all fine).
 export function validateTierLabels(labels) {
   const errors = {};
-  const seen = new Map();
+  const seenWords = new Map();
+  const seenInDb = new Map();
   for (const slot of [...TIER_ORDER, TODO_TIER]) {
     const label = labels?.[slot] ?? '';
-    let error = null;
-    if (!label) error = 'Enter a name';
-    else if (label.length > TIER_LABEL_MAX) error = `At most ${TIER_LABEL_MAX} characters`;
-    else if (label !== label.trim()) error = 'No spaces at the start or end';
-    else if (!normalizeName(label)) error = 'Needs a letter or digit';
-    else if (/[{}]/.test(label)) error = 'No { or }';
-    else if (seen.has(normalizeName(label))) error = `Same as ${labels[seen.get(normalizeName(label))]}`;
-    if (error) errors[slot] = error;
-    else seen.set(normalizeName(label), slot);
+    let error = label ? tierNameFormatError(label) : 'Enter a name';
+    const twin = error ? undefined : (seenWords.get(normalizeName(label)) ?? seenInDb.get(databaseName(label)));
+    if (twin) error = `Same as ${labels[twin]}`;
+    if (error) {
+      errors[slot] = error;
+    } else {
+      seenWords.set(normalizeName(label), slot);
+      seenInDb.set(databaseName(label), slot);
+    }
   }
   return errors;
 }
@@ -109,10 +139,8 @@ export function validateDisplayNames(names) {
   for (const slot of [...TIER_ORDER, TODO_TIER]) {
     const name = names?.[slot];
     if (!name) continue;
-    if (name.length > TIER_LABEL_MAX) errors[slot] = `At most ${TIER_LABEL_MAX} characters`;
-    else if (name !== name.trim()) errors[slot] = 'No spaces at the start or end';
-    else if (!normalizeName(name)) errors[slot] = 'Needs a letter or digit';
-    else if (/[{}]/.test(name)) errors[slot] = 'No { or }';
+    const error = tierNameFormatError(name);
+    if (error) errors[slot] = error;
   }
   return errors;
 }

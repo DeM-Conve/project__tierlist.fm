@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   customTokens,
+  databaseName,
   detectNaming,
   exampleTitle,
   normalizeName,
@@ -98,6 +99,61 @@ describe('validateTierLabels', () => {
   it('treats missing labels as empty', () => {
     expect(Object.keys(validateTierLabels(undefined))).toHaveLength(6);
   });
+});
+
+// Parity with the backend: the same cases as TierLabelValidatorTest,
+// SettingsDtoTest, DatabaseConstraintsIT and SettingsApiIT, so a name the
+// server (or Postgres' CHECK) would refuse is flagged here before Save.
+describe('validateTierLabels - backend parity', () => {
+  // Other slots are names nothing below clashes with.
+  const others = { A: 'Ka', B: 'Kb', C: 'Kc', D: 'Kd', TODO: 'Kt' };
+  const valid = (label) => validateTierLabels({ ...others, S: label }).S === undefined;
+  const distinct = (one, other) => Object.keys(validateTierLabels({ S: one, A: other, B: 'B', C: 'C', D: 'D', TODO: 'TODO' })).length === 0;
+
+  it.each(['S', 'T1', 'TE', 'Gold', '5 stars', 'À faire', '(**TODO**)', '[TODO]', 'to-do', 'A+', '一', 'Ⅻ', '٣', '５', 'x'.repeat(20)])(
+    'accepts %j',
+    (label) => expect(valid(label)).toBe(true),
+  );
+  it.each(['', ' S', 'S ', '(**)', '+', '{tier}', 'a}', 'abcdefghijklmnopqrstu', '\tS', 'S\n', ' S'])('refuses %j', (label) =>
+    expect(valid(label)).toBe(false),
+  );
+  // NFKD makes these a digit, but Postgres' [[:alnum:]] doesn't count them.
+  it.each(['①', '²', '(①)'])('refuses %j, whose only "digit" the database does not count', (label) => {
+    expect(validateTierLabels({ ...others, S: label }).S).toBe("Needs a plain letter or digit - ① or ² don't count");
+    expect(validateDisplayNames({ S: label }).S).toBe("Needs a plain letter or digit - ① or ² don't count");
+  });
+  it.each([
+    ['S', 's', false],
+    ['TODO', '(**todo**)', false],
+    ['to do', 'to-do', false],
+    ['To do', 'to-do', false],
+    ['À', 'A', false],
+    ['S', 'A', true],
+    ['T1', 'T2', true],
+    ['S', 'S²', false],
+    ['A', 'A①', false],
+  ])('%j and %j distinct: %s', (one, other, expected) => expect(distinct(one, other)).toBe(expected));
+  it('names the clash the database sees', () => {
+    expect(validateTierLabels({ ...DEFAULT_TIER_LABELS, A: 'S²' }).A).toBe('Same as S');
+    expect(validateTierLabels({ ...DEFAULT_TIER_LABELS, TODO: '①' }).TODO).toMatch(/plain letter or digit/);
+  });
+  it('reads a name the way tier_labels_distinct does', () => {
+    expect(databaseName('S²')).toBe('s');
+    expect(databaseName('(**To do**)')).toBe('to do');
+  });
+  it.each([
+    ['S', 's'],
+    ['(**TODO**)', 'todo'],
+    ['(**To do**)', 'to do'],
+    ['to-do', 'to do'],
+    ['  Gold  Star ', 'gold star'],
+    ['À faire', 'a faire'],
+    ['T1', 't1'],
+    ['A+', 'a'],
+    ['Ｓ', 's'],
+    // Every combining mark folds away, as in TierLabelValidator.words.
+    ['aःb', 'ab'],
+  ])('normalizeName(%j) = %j, like the backend', (label, words) => expect(normalizeName(label)).toBe(words));
 });
 
 describe('validateDisplayNames', () => {
