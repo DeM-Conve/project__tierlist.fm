@@ -1,3 +1,4 @@
+import { useCallback } from 'react';
 import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from './client';
 import { BOARD_TIERS } from '../tiers';
@@ -178,11 +179,19 @@ export function useSaveSettingsMutation() {
 // session, or kept in the board cache) - never fetched from here: scanning every playlist would cost
 // ~1 quota unit per 50 songs across all boards. "Add songs" uses this to
 // guess a board from the artist and to spot songs it knows are placed.
+// The map is the same object until a playlist's items change (useQueries'
+// `combine` is memoised): Add songs indexes every cached song from it, and a
+// new map each render re-ran that index on every shell render - each sidebar
+// keystroke, each song the player moved on to.
 export function useCachedTierItems(tierPlaylists) {
-  const results = useQueries({
+  const combine = useCallback(
+    (results) => Object.fromEntries((tierPlaylists ?? []).map((p, i) => [p.id, results[i]?.data])),
+    [tierPlaylists]
+  );
+  return useQueries({
     queries: (tierPlaylists ?? []).map((p) => ({ ...playlistItemsQuery(p.id), enabled: false })),
+    combine,
   });
-  return Object.fromEntries((tierPlaylists ?? []).map((p, i) => [p.id, results[i]?.data]));
 }
 
 // One video's details for a pasted link; cached per id.

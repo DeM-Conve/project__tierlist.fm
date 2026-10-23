@@ -717,6 +717,32 @@ function Layout() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tierCategories, tierPlaylists, currentCategory, stagedCount, tierGroups, focusSequence]);
 
+  // What pages get from the shell (useOutletContext). One object for the
+  // Layout's life: a new one each render re-rendered the whole page (a
+  // 333-song board) on everything Layout reads - every sidebar filter
+  // keystroke, every queue step. The actions call the latest closures.
+  // (Set during render, like sidebarCollapsedRef: a page may call one from
+  // its own mount effect, which runs before this component's effects.)
+  const latestActions = useRef(null);
+  latestActions.current = { syncChanges, discardChanges, moveVideoToTier, openFocus, startShufflePlay, playFrom, handleAddLinks, addSongsActions };
+  const stableActions = useMemo(() => {
+    const call = (name) => (...args) => latestActions.current[name](...args);
+    const addSong = (name) => (...args) => latestActions.current.addSongsActions[name](...args);
+    return {
+      syncChanges: call('syncChanges'),
+      pushSongs: (category, videoIds) => latestActions.current.syncChanges(category, { videoIds }),
+      discardChanges: call('discardChanges'),
+      moveVideoToTier: call('moveVideoToTier'),
+      openFocus: call('openFocus'),
+      startShufflePlay: call('startShufflePlay'),
+      playFrom: call('playFrom'),
+      handleAddLinks: call('handleAddLinks'),
+      addSongsActions: Object.fromEntries(Object.keys(addSongsActions).map((k) => [k, addSong(k)])),
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- stable on purpose: the wrappers read latestActions
+  }, []);
+  const outletContext = useMemo(() => ({ ...stableActions, addSongs }), [stableActions, addSongs]);
+
   return (
     // The shell is a fixed-height column: the body row (sidebar | canvas |
     // rail) above the player dock's own row. The mini dock takes real space
@@ -829,20 +855,7 @@ function Layout() {
                     {/* A lazy page's code loading: only the canvas waits - the
                         shell and the player dock stay as they are. */}
                     <Suspense fallback={<Center py="xl"><Loader size="sm" /></Center>}>
-                    <Outlet
-                      context={{
-                        syncChanges,
-                        pushSongs: (category, videoIds) => syncChanges(category, { videoIds }),
-                        discardChanges,
-                        moveVideoToTier,
-                        openFocus,
-                        startShufflePlay,
-                        playFrom,
-                        addSongs,
-                        addSongsActions,
-                        handleAddLinks,
-                      }}
-                    />
+                    <Outlet context={outletContext} />
                     </Suspense>
                   </CanvasContext.Provider>
                 </Box>
