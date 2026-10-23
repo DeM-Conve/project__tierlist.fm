@@ -1,3 +1,4 @@
+import { useCallback } from 'react';
 import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from './client';
 import { BOARD_TIERS } from '../tiers';
@@ -178,11 +179,19 @@ export function useSaveSettingsMutation() {
 // session, or kept in the board cache) - never fetched from here: scanning every playlist would cost
 // ~1 quota unit per 50 songs across all boards. "Add songs" uses this to
 // guess a board from the artist and to spot songs it knows are placed.
+// The map is the same object until a playlist's items change (useQueries'
+// `combine` is memoised): Add songs indexes every cached song from it, and a
+// new map each render re-ran that index on every shell render - each sidebar
+// keystroke, each song the player moved on to.
 export function useCachedTierItems(tierPlaylists) {
-  const results = useQueries({
+  const combine = useCallback(
+    (results) => Object.fromEntries((tierPlaylists ?? []).map((p, i) => [p.id, results[i]?.data])),
+    [tierPlaylists]
+  );
+  return useQueries({
     queries: (tierPlaylists ?? []).map((p) => ({ ...playlistItemsQuery(p.id), enabled: false })),
+    combine,
   });
-  return Object.fromEntries((tierPlaylists ?? []).map((p, i) => [p.id, results[i]?.data]));
 }
 
 // One video's details for a pasted link; cached per id.
@@ -194,6 +203,15 @@ export function useFetchVideo() {
       queryFn: async () => (await api.get(`/api/videos/${videoId}`)).data,
       staleTime: Infinity,
     });
+}
+
+// A playlist's song count after one song went in (+1) or out (-1), written
+// into the cached list. Refetching the list for it re-read every playlist of
+// the account from YouTube (quota, and a whole-app re-render) per song filed.
+function bumpItemCount(queryClient, playlistId, by) {
+  queryClient.setQueryData(queryKeys.playlists, (old) =>
+    old?.map((p) => (p.id === playlistId ? { ...p, itemCount: Math.max(0, (p.itemCount ?? 0) + by) } : p))
+  );
 }
 
 // Files a video straight into a tier playlist on YouTube; resolves to the new
@@ -208,7 +226,7 @@ export function useAddToPlaylistMutation() {
       queryClient.setQueryData(queryKeys.playlistItems(playlistId), (old) =>
         old ? [...old, { ...video, ...item, channelTitle: item.channelTitle ?? video.channelTitle }] : old
       );
-      queryClient.invalidateQueries({ queryKey: queryKeys.playlists }); // item counts
+      bumpItemCount(queryClient, playlistId, 1);
     },
   });
 }
@@ -238,7 +256,7 @@ export function useRemovePlaylistItemMutation() {
     mutationFn: async ({ itemId }) => (await api.delete(`/api/playlist-items/${itemId}`)).data,
     onSuccess: (_, { playlistId, itemId }) => {
       queryClient.setQueryData(queryKeys.playlistItems(playlistId), (old) => old?.filter((v) => v.id !== itemId));
-      queryClient.invalidateQueries({ queryKey: queryKeys.playlists });
+      bumpItemCount(queryClient, playlistId, -1);
     },
   });
 }

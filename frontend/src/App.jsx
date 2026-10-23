@@ -1,4 +1,4 @@
-import { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react';
+import { Suspense, lazy, memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { tierName } from './tierLabels';
 import { useDispatch, useSelector, useStore } from 'react-redux';
 import { useQueryClient } from '@tanstack/react-query';
@@ -40,7 +40,15 @@ import { preparedStatus, syncStatusRun } from './syncStatus';
 import { dragEnded, transfersDiscarded } from './store/transfersSlice';
 import TierBoardView from './components/TierBoardView';
 import PlayerDock from './components/PlayerDock';
+// The shell's parts are memoised here (their callbacks come from Layout's
+// dockActions / sidebarActions, stable): a board edit or a keystroke in one
+// part no longer re-renders the others.
+const MemoPlayerDock = memo(PlayerDock);
+const MemoSidebar = memo(Sidebar);
+const MemoSidebarPanel = memo(SidebarPanel);
+const MemoTierRail = memo(TierRail);
 import CommandPalette from './components/CommandPalette';
+const MemoCommandPalette = memo(CommandPalette);
 // Pages most visits never open first load on demand, so the app's first
 // paint (home / a board) doesn't wait on their code - and are fetched in
 // idle time right after (usePreloadPages), so opening one later doesn't
@@ -784,6 +792,84 @@ function Layout() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tierCategories, tierPlaylists, currentCategory, stagedCount, tierGroups, focusSequence]);
 
+  // What pages get from the shell (useOutletContext). One object for the
+  // Layout's life: a new one each render re-rendered the whole page (a
+  // 333-song board) on everything Layout reads - every sidebar filter
+  // keystroke, every queue step. The actions call the latest closures.
+  // (Set during render, like sidebarCollapsedRef: a page may call one from
+  // its own mount effect, which runs before this component's effects.)
+  const latestActions = useRef(null);
+  latestActions.current = { syncChanges, discardChanges, moveVideoToTier, openFocus, startShufflePlay, playFrom, handleAddLinks, addSongsActions };
+  const stableActions = useMemo(() => {
+    const call = (name) => (...args) => latestActions.current[name](...args);
+    const addSong = (name) => (...args) => latestActions.current.addSongsActions[name](...args);
+    return {
+      syncChanges: call('syncChanges'),
+      pushSongs: (category, videoIds) => latestActions.current.syncChanges(category, { videoIds }),
+      discardChanges: call('discardChanges'),
+      moveVideoToTier: call('moveVideoToTier'),
+      openFocus: call('openFocus'),
+      startShufflePlay: call('startShufflePlay'),
+      playFrom: call('playFrom'),
+      handleAddLinks: call('handleAddLinks'),
+      addSongsActions: Object.fromEntries(Object.keys(addSongsActions).map((k) => [k, addSong(k)])),
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- stable on purpose: the wrappers read latestActions
+  }, []);
+  const outletContext = useMemo(() => ({ ...stableActions, addSongs }), [stableActions, addSongs]);
+
+  // The dock is memoised (MemoPlayerDock): its props only change when the
+  // player's own state does, so a board edit or a sidebar keystroke no
+  // longer re-renders it and its queue.
+  const dockQueue = useMemo(
+    () => ({ history: queueHistory, current: queueCurrent, upcoming: queueUpcoming, contextLabel }),
+    [queueHistory, queueCurrent, queueUpcoming, contextLabel]
+  );
+  latestActions.current.changeFocusedTier = changeFocusedTier;
+  latestActions.current.queueUpcoming = queueUpcoming;
+  const dockActions = useMemo(
+    () => ({
+      onCycleRepeat: () => dispatch(cycleRepeat()),
+      onStop: () => dispatch(closeFocusAction()),
+      onMinimize: () => dispatch(minimizePlayer()),
+      onExpand: () => dispatch(expandPlayer()),
+      onFloat: () => dispatch(floatPlayer()),
+      onPrev: () => dispatch(playPrevInQueue()),
+      onNext: () => dispatch(playNextInQueue()),
+      onChangeTier: (tier) => latestActions.current.changeFocusedTier(tier),
+      onJump: (section, index) => dispatch(jumpInQueue({ section, index })),
+      onRemove: (key) => dispatch(removeFromQueue(key)),
+      onMoveInQueue: (from, to) => dispatch(moveInQueue({ from, to })),
+      onShuffleUpcoming: () => {
+        const keys = latestActions.current.queueUpcoming.map((e) => e.key);
+        for (let i = keys.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [keys[i], keys[j]] = [keys[j], keys[i]];
+        }
+        dispatch(reorderUpcoming(keys));
+      },
+    }),
+    [dispatch]
+  );
+
+  // The sidebar's callbacks, stable like the dock's (MemoSidebar etc.).
+  latestActions.current.logout = logout;
+  const sidebarActions = useMemo(
+    () => ({
+      onQueryChange: (q) => dispatch(setSidebarQuery(q)),
+      onSelectSettings: () => navigate('/settings'),
+      onOpenShortcuts: () => latestActions.current.openShortcuts(),
+      onLogout: () => latestActions.current.logout(),
+      onOpenPalette: () => spotlight.open(),
+      onCloseMobile: () => dispatch(setMobileSidebarOpen(false)),
+      onShowView: (v) => dispatch(showSidebarView(v)),
+      onRetry: () => latestActions.current.retryPlaylists(),
+    }),
+    [dispatch, navigate]
+  );
+  latestActions.current.openShortcuts = shortcutsHandlers.open;
+  latestActions.current.retryPlaylists = retryPlaylists;
+
   return (
     // The shell is a fixed-height column: the body row (sidebar | canvas |
     // rail) above the player dock's own row. The mini dock takes real space
@@ -810,25 +896,25 @@ function Layout() {
           bar are positioned against this row, i.e. above the dock. */}
       <Flex pos="relative" flex={1} mih={0} bg="var(--chrome)">
         {/* Activity bar always; on a phone the drawer also holds the panel. */}
-        <Sidebar
+        <MemoSidebar
           query={query}
-          onQueryChange={(q) => dispatch(setSidebarQuery(q))}
+          onQueryChange={sidebarActions.onQueryChange}
           tierCategories={tierCategories}
           tierGroups={tierGroups}
           playlistCount={tierPlaylists?.length ?? 0}
           waitingCount={addSongs.list.length}
           loading={tierPlaylists === null}
           loadError={playlistsLoadError}
-          onRetry={() => retryPlaylists()}
-          onSelectSettings={() => navigate('/settings')}
-          onOpenShortcuts={shortcutsHandlers.open}
-          onLogout={logout}
-          onOpenPalette={() => spotlight.open()}
+          onRetry={sidebarActions.onRetry}
+          onSelectSettings={sidebarActions.onSelectSettings}
+          onOpenShortcuts={sidebarActions.onOpenShortcuts}
+          onLogout={sidebarActions.onLogout}
+          onOpenPalette={sidebarActions.onOpenPalette}
           mobileOpen={mobileSidebarOpen}
-          onCloseMobile={() => dispatch(setMobileSidebarOpen(false))}
+          onCloseMobile={sidebarActions.onCloseMobile}
           collapsed={sidebarCollapsed && !narrow}
           view={sidebarView}
-          onShowView={(v) => dispatch(showSidebarView(v))}
+          onShowView={sidebarActions.onShowView}
           withPanel={narrow}
         />
 
@@ -856,15 +942,15 @@ function Layout() {
               <Box h="100%" py={PART_GAP}>
                 {/* The rest of the activity bar's card: joined on its left. */}
                 <Box h="100%" bg="var(--side)" style={{ borderRadius: '0 var(--mantine-radius-md) var(--mantine-radius-md) 0', overflow: 'hidden' }}>
-              <SidebarPanel
+              <MemoSidebarPanel
                 query={query}
-                onQueryChange={(q) => dispatch(setSidebarQuery(q))}
+                onQueryChange={sidebarActions.onQueryChange}
                 tierCategories={tierCategories}
                 tierGroups={tierGroups}
                 playlistCount={tierPlaylists?.length ?? 0}
                 loading={tierPlaylists === null}
                 loadError={playlistsLoadError}
-                onRetry={() => retryPlaylists()}
+                onRetry={sidebarActions.onRetry}
                 view={sidebarView}
               />
                 </Box>
@@ -900,20 +986,7 @@ function Layout() {
                     {/* A lazy page's code loading: only the canvas waits - the
                         shell and the player dock stay as they are. */}
                     <Suspense fallback={<Center py="xl"><Loader size="sm" /></Center>}>
-                    <Outlet
-                      context={{
-                        syncChanges,
-                        pushSongs: (category, videoIds) => syncChanges(category, { videoIds }),
-                        discardChanges,
-                        moveVideoToTier,
-                        openFocus,
-                        startShufflePlay,
-                        playFrom,
-                        addSongs,
-                        addSongsActions,
-                        handleAddLinks,
-                      }}
-                    />
+                    <Outlet context={outletContext} />
                     </Suspense>
                   </CanvasContext.Provider>
                 </Box>
@@ -922,11 +995,11 @@ function Layout() {
           </Panel>
         </Group>
 
-        {railCategory && <TierRail category={railCategory} activeTier={tierPageMatch?.params.tier} />}
+        {railCategory && <MemoTierRail category={railCategory} activeTier={tierPageMatch?.params.tier} />}
       </Flex>
 
       {focusedVideoData && (
-        <PlayerDock
+        <MemoPlayerDock
           mode={playerMode}
           video={focusedVideoData}
           currentTier={focusedVideo.tier}
@@ -934,32 +1007,14 @@ function Layout() {
           hasPrev={queueHistory.length > 0}
           hasNext={queueUpcoming.length > 0}
           repeatMode={repeatMode}
-          onCycleRepeat={() => dispatch(cycleRepeat())}
           isShuffling={isShuffling}
           isTriage={isTriage}
-          onStop={() => dispatch(closeFocusAction())}
-          onMinimize={() => dispatch(minimizePlayer())}
-          onExpand={() => dispatch(expandPlayer())}
-          onFloat={() => dispatch(floatPlayer())}
-          onPrev={() => dispatch(playPrevInQueue())}
-          onNext={() => dispatch(playNextInQueue())}
-          onChangeTier={changeFocusedTier}
-          queue={{ history: queueHistory, current: queueCurrent, upcoming: queueUpcoming, contextLabel }}
-          onJump={(section, index) => dispatch(jumpInQueue({ section, index }))}
-          onRemove={(key) => dispatch(removeFromQueue(key))}
-          onMoveInQueue={(from, to) => dispatch(moveInQueue({ from, to }))}
-          onShuffleUpcoming={() => {
-            const keys = queueUpcoming.map((e) => e.key);
-            for (let i = keys.length - 1; i > 0; i--) {
-              const j = Math.floor(Math.random() * (i + 1));
-              [keys[i], keys[j]] = [keys[j], keys[i]];
-            }
-            dispatch(reorderUpcoming(keys));
-          }}
+          queue={dockQueue}
+          {...dockActions}
         />
       )}
 
-      <CommandPalette items={commandItems} />
+      <MemoCommandPalette items={commandItems} />
       <LinkHints ref={hintsRef} />
       <ShortcutsModal opened={shortcutsOpened} onClose={shortcutsHandlers.close} />
     </Flex>
@@ -1130,6 +1185,8 @@ function TierBoardPage() {
   // "Add a TODO list": link an existing playlist first, create as a fallback.
   const [addingTodo, setAddingTodo] = useState(false);
   const base = `/tier/${encodeURIComponent(category)}`;
+  // Stable: the board's rows are memoised and take it.
+  const openTier = useCallback((t) => navigate(`${base}/t/${t}`), [navigate, base]);
 
   return (
     <BoardShell error={error} onRetry={retry} refreshError={refreshError} onRetryRefresh={retryRefresh}>
@@ -1163,7 +1220,7 @@ function TierBoardPage() {
         onPlayFrom={playFrom}
         onShufflePlay={startShufflePlay}
         onStartDuel={() => navigate(`${base}/duel`)}
-        onOpenTier={(t) => navigate(`${base}/t/${t}`)}
+        onOpenTier={openTier}
         onAddMissingTiers={(tiers) =>
           tiers.length === 1 && tiers[0] === TODO_TIER ? setAddingTodo(true) : setAddingTiers(tiers)
         }
