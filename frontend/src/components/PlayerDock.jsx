@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useSelector } from 'react-redux';
 import { tierName } from '../tierLabels';
 import { ActionIcon, Badge, Group, HoverCard, Slider, Stack, Text } from '@mantine/core';
@@ -84,6 +84,30 @@ function VolumeControl({ volume, muted, onToggleMute, onChange, size }) {
     </HoverCard>
   );
 }
+
+// The mini bar's / floating corner's edge progress line (click to seek).
+// Its own memoized component that owns the poll (usePlayerTime), so the
+// twice-a-second reading re-renders only this line - not the dock, its
+// controls or the queue. `timeRef` hands the dock its setTime, so a seek
+// from a key or a button shows its new position at once.
+const DockProgress = memo(function DockProgress({ playerRef, videoId, enabled, timeRef, onSeekPercent }) {
+  const [time, setTime] = usePlayerTime(playerRef, videoId, enabled);
+  useLayoutEffect(() => {
+    timeRef.current = setTime;
+    return () => {
+      timeRef.current = null;
+    };
+  }, [timeRef, setTime]);
+  function seek(e) {
+    const rect = e.currentTarget.getBoundingClientRect();
+    onSeekPercent(Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width)) * 100);
+  }
+  return (
+    <div className="player-dock-progress-track" onClick={seek}>
+      <div className="player-dock-progress" style={{ width: `${time.dur ? (time.cur / time.dur) * 100 : 0}%` }} />
+    </div>
+  );
+});
 
 const PLAYER_MODE_TRANSITIONS = {
   expanded: { down: 'mini', up: 'expanded' },
@@ -171,8 +195,18 @@ export default function PlayerDock({
   }, [expanded]);
 
 
-  // The mini bar's progress line, polled from the player.
-  const [time, setTime] = usePlayerTime(playerRef, video.videoId);
+  // The progress line's setTime (DockProgress) - only mounted outside the
+  // expanded view, which has no line and so polls nothing.
+  const timeRef = useRef(null);
+  const showTime = (t) => timeRef.current?.(t);
+  // Stable (refs only), so the memoized progress line keeps its props.
+  const seekToPercent = useCallback((pct) => {
+    const player = playerRef.current;
+    const duration = player?.getDuration?.();
+    if (!duration) return;
+    player.seekTo((pct / 100) * duration, true);
+    timeRef.current?.({ cur: (pct / 100) * duration, dur: duration });
+  }, []);
 
   // Vim-style navigation for the dock, active globally (not just while
   // expanded) since the dock is meant to work like a background player:
@@ -341,12 +375,6 @@ export default function PlayerDock({
     }
   }
 
-  // Click anywhere on the edge progress line to jump there.
-  function seek(e) {
-    const rect = e.currentTarget.getBoundingClientRect();
-    seekToPercent(Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width)) * 100);
-  }
-
   // The expanded view's ⟲ ⟳ buttons (and ←/→) scrub within the current
   // video - track skipping is h/l or the prev/next buttons.
   function seekBy(deltaSeconds) {
@@ -355,7 +383,7 @@ export default function PlayerDock({
     if (!duration) return;
     const next = Math.min(duration, Math.max(0, player.getCurrentTime() + deltaSeconds));
     player.seekTo(next, true);
-    setTime({ cur: next, dur: duration });
+    showTime({ cur: next, dur: duration });
   }
 
   function replayCurrent() {
@@ -365,13 +393,14 @@ export default function PlayerDock({
     player.playVideo?.();
   }
 
-  function seekToPercent(pct) {
-    const player = playerRef.current;
-    const duration = player?.getDuration?.();
-    if (!duration) return;
-    player.seekTo((pct / 100) * duration, true);
-    setTime({ cur: (pct / 100) * duration, dur: duration });
-  }
+
+  // The queue's playing row, one object per change (not per render), so
+  // the queue panel's memoized rows and list keep theirs.
+  const queueCurrent = queue?.current;
+  const queuePlaying = useMemo(
+    () => (queueCurrent ? { ...queueCurrent, tier: currentTier ?? queueCurrent.tier } : null),
+    [queueCurrent, currentTier]
+  );
 
   const iconSize = expanded ? 20 : 18;
   const btnSize = expanded ? 38 : 30;
@@ -416,9 +445,13 @@ export default function PlayerDock({
         style={!expanded && currentTier ? { background: `color-mix(in srgb, ${TIER_COLORS[currentTier]} 7%, var(--chrome))` } : undefined}
       >
         {!expanded && (
-          <div className="player-dock-progress-track" onClick={seek}>
-            <div className="player-dock-progress" style={{ width: `${time.dur ? (time.cur / time.dur) * 100 : 0}%` }} />
-          </div>
+          <DockProgress
+            playerRef={playerRef}
+            videoId={video.videoId}
+            enabled={!held}
+            timeRef={timeRef}
+            onSeekPercent={seekToPercent}
+          />
         )}
 
         {/* Floating/expanded only: the mini bar keeps these in its right
@@ -639,11 +672,11 @@ export default function PlayerDock({
           )}
         </div>
 
-        {expanded && queue && (
+        {expanded && queuePlaying && (
           <aside className="player-queue">
             <QueuePanel
               queue={queue}
-              current={{ ...queue.current, tier: currentTier ?? queue.current.tier }}
+              current={queuePlaying}
               onJump={onJump}
               onRemove={onRemove}
               onMove={onMoveInQueue}
