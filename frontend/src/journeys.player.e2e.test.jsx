@@ -289,6 +289,23 @@ describe('journey 3: counts agree after a push', () => {
     expect(sidebarTotals()).toEqual(youtubeTotals());
   });
 
+  // fix/board-drafts (per-board drafts, one global pending bar) owns what a
+  // staged change shows away from its board. Today the board, its header and
+  // the rail count the draft, while the sidebar and the Home cards count
+  // YouTube - on Home both are on screen at once (the rail beside the card).
+  it.fails('a staged change: the Home card and the sidebar agree with the rail', async () => {
+    await start();
+    await playTile('a');
+    h.remove('g');
+    h.remove('f');
+    h.move('h', 'S');
+    expect(headerTotal()).toBe(6);
+    await h.goHome();
+    expect(rail().counts).toMatchObject({ S: 4, B: 0, D: 0, TODO: 2 });
+    expect(homeCard('Rap').counts).toMatchObject({ S: 4, B: 0, D: 0, TODO: 2 });
+    expect(sidebarTotals().Rap).toBe(6);
+  });
+
   it("a duel page's Move: the sidebar and Home follow", async () => {
     await start();
     await h.duelMove('d', 'S');
