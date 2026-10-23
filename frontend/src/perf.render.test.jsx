@@ -73,7 +73,9 @@ describe('render cost on a 333-song board', () => {
     const seq = selectFocusSequence(h.state);
     h.dispatch(openFocus({ tier: 'S', videoId: seq[0].video.videoId, queue: seq.map((e) => e.video.videoId), entries: seq, category: 'Big', label: 'Big' }));
     const move = await measure('[playing] move one song S -> A', async () => h.move(h.tierItems().S[3].videoId, 'A'));
-    await measure('[playing] next song', async () => h.dispatch(playNextInQueue()));
+    const next = await measure('[playing] next song', async () => h.dispatch(playNextInQueue()));
+    // The next song is in the same row: only that row redraws (was all 6).
+    expect(next.count('TierRow')).toBeLessThanOrEqual(2);
     const input = rtl.screen.getByPlaceholderText('Filter boards…');
     const key = await measure('[playing] sidebar filter keystroke', async () => {
       await rtl.act(async () => rtl.fireEvent.change(input, { target: { value: 'r' } }));

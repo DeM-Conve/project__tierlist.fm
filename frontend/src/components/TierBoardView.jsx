@@ -448,6 +448,10 @@ export default function TierBoardView({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rowTiers.join(), tierItems, perLine, lineBudget, rowWidth, viewportHeight]);
 
+  // Each row is told the playing song only if it holds it: the next song
+  // then redraws the row it left and the one it's in, not every row.
+  const playingIn = (t) => (playingVideoId && tierItems[t]?.some((v) => v.videoId === playingVideoId) ? playingVideoId : null);
+
   // Stable for the memoized tiles: the page hands a new onPlay every render.
   const move = useCallback(
     (fromTier, toTier, videoId, dropIndex) => dispatch(moveWithFeedback([{ fromTier, toTier, videoId, dropIndex }])),
@@ -674,7 +678,7 @@ export default function TierBoardView({
             searchActive={searchActive}
             matchedKeys={matchedKeys}
             activeMatchKey={activeMatchKey}
-            playingVideoId={playingVideoId}
+            playingVideoId={playingIn(t)}
             pendingRemovalKeys={pendingRemovalKeys}
             onPlay={playTile}
             onPlayFrom={onPlayFrom}
@@ -700,7 +704,7 @@ export default function TierBoardView({
             searchActive={searchActive}
             matchedKeys={matchedKeys}
             activeMatchKey={activeMatchKey}
-            playingVideoId={playingVideoId}
+            playingVideoId={playingIn(TODO_TIER)}
             pendingRemovalKeys={pendingRemovalKeys}
             onPlay={playTile}
             onPlayFrom={onPlayFrom}
