@@ -27,27 +27,27 @@ Status: `[ ]` not started · `[~]` in progress · `[x]` verified · `[!]` needs 
 - [x] TODO list: triage, to-do list linking modal, counts
 - [x] Big boards (300+ songs) stay smooth: render cost, virtualization, drag lag
 
-## 2. Player & navigation (`qa/player`)
-- [~] Player dock: expanded / mini / floating, never remounts, survives navigation
-- [ ] Queue panel, shuffle play, repeat, volume, seek, rate chips, Remove from player
-- [ ] Keyboard shortcuts (full list) + shortcuts modal + link hints
-- [ ] Command palette
+## 2. Player & navigation (`qa/player`, merged, deployed 2026-10-23)
+- [x] Player dock: expanded / mini / floating, never remounts, survives navigation
+- [x] Queue panel, shuffle play, repeat, volume, seek, rate chips, Remove from player
+- [x] Keyboard shortcuts (full list) + shortcuts modal + link hints
+- [x] Command palette
 
 ## 3. Duels (`qa/duels`)
-- [ ] Duel hub, session start, matchups, verdicts, skips, summary
+- [~] Duel hub, session start, matchups, verdicts, skips, summary
 - [ ] Suggested moves (Move pushes at once, Keep, locks), score map / trend
 - [ ] Tier borders setting (learned / my own ranges) end to end
 - [ ] Engine correctness (backend unit tests), TODO songs never in duels
 
 ## 4. App shell, Home, Add songs, Settings (`qa/shell`)
-- [ ] Login / auth errors, load-failure cards (never skeleton forever)
+- [~] Login / auth errors, load-failure cards (never skeleton forever)
 - [ ] Home & playlists, Sidebar (filter, prefetch, board counts, spring-loaded open)
 - [ ] Add songs flow
 - [ ] Settings: playlist naming (matching preview), appearance (themes/accents/palettes), duels, activity bar order
 - [ ] Routing, PWA, theming in light + dark, phone width
 
 ## 5. Performance (`qa/perf`)
-- [ ] Cold start and board open time, bundle/chunk sizes, lazy pages
+- [~] Cold start and board open time, bundle/chunk sizes, lazy pages
 - [ ] Re-render hot spots (selectors, memoization), drag frame rate
 - [ ] YouTube quota / request count per action, board cache behaviour
 - [ ] Backend endpoint latency, N+1 queries, compression
@@ -58,6 +58,7 @@ Status: `[ ]` not started · `[~]` in progress · `[x]` verified · `[!]` needs 
 - [ ] Backup / restore scripts work under hl
 
 ## Open questions for the user
+- [!] Shift+digit rating: the player and Tier Rail number only the tiers a board has (no S tier -> Shift+1 = A), Add songs always uses fixed S-D. Which should it be?
 - [!] Opening another board silently drops the open board's staged (unpushed) moves - only
   dragging to another board warns. Keep a draft per board, or confirm before leaving?
   (test: "keeps the staged moves of the board left behind", `it.fails`)
