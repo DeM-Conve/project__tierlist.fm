@@ -39,9 +39,15 @@ import { preparedStatus, syncStatusRun } from './syncStatus';
 import { dragEnded, transfersDiscarded } from './store/transfersSlice';
 import TierBoardView from './components/TierBoardView';
 import PlayerDock from './components/PlayerDock';
-// Memoised here (see Layout's dockActions): its props are kept stable.
+// The shell's parts are memoised here (their callbacks come from Layout's
+// dockActions / sidebarActions, stable): a board edit or a keystroke in one
+// part no longer re-renders the others.
 const MemoPlayerDock = memo(PlayerDock);
+const MemoSidebar = memo(Sidebar);
+const MemoSidebarPanel = memo(SidebarPanel);
+const MemoTierRail = memo(TierRail);
 import CommandPalette from './components/CommandPalette';
+const MemoCommandPalette = memo(CommandPalette);
 // Pages most visits never open first load on demand, so the app's first
 // paint (home / a board) doesn't wait on their code - and are fetched in
 // idle time right after (usePreloadPages), so opening one later doesn't
@@ -779,6 +785,22 @@ function Layout() {
     [dispatch]
   );
 
+  // The sidebar's callbacks, stable like the dock's (MemoSidebar etc.).
+  latestActions.current.logout = logout;
+  const sidebarActions = useMemo(
+    () => ({
+      onQueryChange: (q) => dispatch(setSidebarQuery(q)),
+      onSelectSettings: () => navigate('/settings'),
+      onOpenShortcuts: () => latestActions.current.openShortcuts(),
+      onLogout: () => latestActions.current.logout(),
+      onOpenPalette: () => spotlight.open(),
+      onCloseMobile: () => dispatch(setMobileSidebarOpen(false)),
+      onShowView: (v) => dispatch(showSidebarView(v)),
+    }),
+    [dispatch, navigate]
+  );
+  latestActions.current.openShortcuts = shortcutsHandlers.open;
+
   return (
     // The shell is a fixed-height column: the body row (sidebar | canvas |
     // rail) above the player dock's own row. The mini dock takes real space
@@ -805,23 +827,23 @@ function Layout() {
           bar are positioned against this row, i.e. above the dock. */}
       <Flex pos="relative" flex={1} mih={0} bg="var(--chrome)">
         {/* Activity bar always; on a phone the drawer also holds the panel. */}
-        <Sidebar
+        <MemoSidebar
           query={query}
-          onQueryChange={(q) => dispatch(setSidebarQuery(q))}
+          onQueryChange={sidebarActions.onQueryChange}
           tierCategories={tierCategories}
           tierGroups={tierGroups}
           playlistCount={tierPlaylists?.length ?? 0}
           waitingCount={addSongs.list.length}
           loading={tierPlaylists === null}
-          onSelectSettings={() => navigate('/settings')}
-          onOpenShortcuts={shortcutsHandlers.open}
-          onLogout={logout}
-          onOpenPalette={() => spotlight.open()}
+          onSelectSettings={sidebarActions.onSelectSettings}
+          onOpenShortcuts={sidebarActions.onOpenShortcuts}
+          onLogout={sidebarActions.onLogout}
+          onOpenPalette={sidebarActions.onOpenPalette}
           mobileOpen={mobileSidebarOpen}
-          onCloseMobile={() => dispatch(setMobileSidebarOpen(false))}
+          onCloseMobile={sidebarActions.onCloseMobile}
           collapsed={sidebarCollapsed && !narrow}
           view={sidebarView}
-          onShowView={(v) => dispatch(showSidebarView(v))}
+          onShowView={sidebarActions.onShowView}
           withPanel={narrow}
         />
 
@@ -849,9 +871,9 @@ function Layout() {
               <Box h="100%" py={PART_GAP}>
                 {/* The rest of the activity bar's card: joined on its left. */}
                 <Box h="100%" bg="var(--side)" style={{ borderRadius: '0 var(--mantine-radius-md) var(--mantine-radius-md) 0', overflow: 'hidden' }}>
-              <SidebarPanel
+              <MemoSidebarPanel
                 query={query}
-                onQueryChange={(q) => dispatch(setSidebarQuery(q))}
+                onQueryChange={sidebarActions.onQueryChange}
                 tierCategories={tierCategories}
                 tierGroups={tierGroups}
                 playlistCount={tierPlaylists?.length ?? 0}
@@ -900,7 +922,7 @@ function Layout() {
           </Panel>
         </Group>
 
-        {railCategory && <TierRail category={railCategory} activeTier={tierPageMatch?.params.tier} />}
+        {railCategory && <MemoTierRail category={railCategory} activeTier={tierPageMatch?.params.tier} />}
       </Flex>
 
       {focusedVideoData && (
@@ -919,7 +941,7 @@ function Layout() {
         />
       )}
 
-      <CommandPalette items={commandItems} />
+      <MemoCommandPalette items={commandItems} />
       <LinkHints ref={hintsRef} />
       <ShortcutsModal opened={shortcutsOpened} onClose={shortcutsHandlers.close} />
     </Flex>

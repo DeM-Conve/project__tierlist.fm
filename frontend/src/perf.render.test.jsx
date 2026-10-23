@@ -29,7 +29,7 @@ function account() {
 // jsdom has no scrolling; the queue scrolls its current song into view.
 if (!Element.prototype.scrollTo) Element.prototype.scrollTo = function () {};
 
-const WATCH = ['Layout', 'PlayerDock', 'QueuePanel', 'Sidebar', 'TierBoardPage', 'TierBoardView', 'TierRow', 'TierRail', 'PendingChanges', 'CommandPalette'];
+const WATCH = ['Layout', 'PlayerDock', 'QueuePanel', 'Sidebar', 'TierBoardPage', 'TierBoardView', 'TierRow', 'TierFocusPage', 'TierFocusView', 'TierRail', 'PendingChanges', 'CommandPalette'];
 const lines = [];
 async function measure(label, fn) {
   renderProfiler.start();
@@ -56,11 +56,13 @@ describe('render cost on a 333-song board', () => {
       await rtl.act(async () => rtl.fireEvent.change(input, { target: { value: 'r' } }));
     });
     expect(key.count('Sidebar')).toBeGreaterThan(0);
+    expect(key.count('TierRail')).toBe(0);
+    expect(key.count('CommandPalette')).toBe(0);
     // Was 1622 renders, the board page and all 12 tier rows included: the
     // outlet context and Add songs' cached-items map were new every render.
     expect(key.count('TierBoardPage')).toBe(0);
     expect(key.count('TierRow')).toBe(0);
-    expect(key.renders).toBeLessThan(900);
+    expect(key.renders).toBeLessThan(600);
   }, 60000);
 
   it('with the player open: a move, the next song, a keystroke', async () => {
@@ -79,5 +81,31 @@ describe('render cost on a 333-song board', () => {
     expect(move.count('PlayerDock')).toBe(0);
     expect(key.count('PlayerDock')).toBe(0);
     expect(key.count('QueuePanel')).toBe(0);
+  }, 60000);
+
+  it('typing in Find (board)', async () => {
+    const h = await mountApp(new FakeYoutube(account()));
+    await h.open('Big');
+    await rtl.act(async () => rtl.fireEvent.keyDown(document, { key: '/', code: 'Slash' }));
+    const find = await rtl.screen.findByPlaceholderText('/search titles...');
+    const k1 = await measure('Find keystroke (board)', async () => {
+      await rtl.act(async () => rtl.fireEvent.change(find, { target: { value: 'v00000001' } }));
+    });
+    expect(k1.renders).toBeGreaterThan(0);
+  }, 60000);
+
+  it('typing in the tier page filter', async () => {
+    const h = await mountApp(new FakeYoutube(account()));
+    await h.open('Big');
+    await rtl.act(async () => rtl.fireEvent.click(rtl.screen.getAllByLabelText('Open S')[0]));
+    const filter = await rtl.waitFor(() => {
+      const el = rtl.screen.getAllByPlaceholderText(/^Filter /).find((e) => !/boards/.test(e.placeholder));
+      if (!el) throw new Error('no tier filter yet ');
+      return el;
+    }, { timeout: 5000 });
+    const k2 = await measure('filter keystroke (tier page)', async () => {
+      await rtl.act(async () => rtl.fireEvent.change(filter, { target: { value: 'v00000001' } }));
+    });
+    expect(k2.renders).toBeGreaterThan(0);
   }, 60000);
 });
