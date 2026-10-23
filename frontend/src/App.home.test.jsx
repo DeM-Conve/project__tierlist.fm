@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { notifications } from '@mantine/notifications';
 import { Provider } from 'react-redux';
 import { MemoryRouter, useLocation } from 'react-router-dom';
@@ -15,6 +15,7 @@ const PLAYLISTS = [
   { id: 'p2', title: 'Rap A', itemCount: 2, thumbnail: null },
   { id: 'p3', title: 'Rap TODO', itemCount: 4, thumbnail: null },
   { id: 'p4', title: 'Rock S', itemCount: 1, thumbnail: null },
+  { id: 'p5', title: 'R&B/Soul S', itemCount: 1, thumbnail: null },
   { id: 'secret', title: 'Holiday mix', itemCount: 9, thumbnail: null },
 ];
 const h = vi.hoisted(() => ({ fetchVideo: null }));
@@ -105,5 +106,28 @@ describe('pasting a YouTube link on any page', () => {
     expect(hide).toHaveBeenCalledWith('add-links');
     show.mockRestore();
     hide.mockRestore();
+  });
+});
+
+describe('routing', () => {
+  it.each([
+    ['/nope', '/'],
+    ['/login?error', '/'],
+    ['/tier/Nope', '/'],
+    ['/tier/Nope/duel', '/'],
+  ])('%s (no such page / board) goes to %s', async (path, to) => {
+    renderApp(path);
+    await screen.findByRole('navigation', { name: 'Activity bar' });
+    await waitFor(() => expect(where()).toBe(to));
+  });
+
+  it('a board whose name needs encoding opens, and its URL opens it again', async () => {
+    renderApp('/');
+    fireEvent.click(await screen.findByRole('button', { name: 'Open R&B/Soul' }));
+    expect(where()).toBe('/tier/R%26B%2FSoul');
+    cleanup();
+    renderApp('/tier/R%26B%2FSoul');
+    expect(await screen.findByRole('heading', { name: 'R&B/Soul', level: 1 })).toBeInTheDocument();
+    expect(where()).toBe('/tier/R%26B%2FSoul');
   });
 });
