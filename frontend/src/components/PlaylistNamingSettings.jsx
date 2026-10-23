@@ -39,6 +39,13 @@ import { TierChip } from './TierBits';
 // playlists are tier playlists - and so which ones are visible in the app at
 // all. It never renames anything on YouTube; the preview lists what the
 // draft matches, and Save applies it.
+const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
+
+const sameNaming = (a, b) =>
+  a.template === b.template &&
+  sameLabels(a.tierLabels, b.tierLabels) &&
+  sameLabels(a.tierDisplayNames, b.tierDisplayNames);
+
 export default function PlaylistNamingSettings() {
   const dispatch = useDispatch();
   const active = useSelector(selectNamingSettings);
@@ -47,6 +54,16 @@ export default function PlaylistNamingSettings() {
 
   // The draft naming: { template, tierLabels }. Nothing applies until saved.
   const [draft, setDraftRaw] = useState(active);
+  // The naming can change under the page: the account's saved naming lands
+  // after a reload straight onto this tab, first-run detection adopts one,
+  // another tab / device saves. An untouched draft follows it - otherwise
+  // the page showed the old naming as "Unsaved changes", and Save wrote it
+  // back over the account's. A draft being edited is kept.
+  const [shownActive, setShownActive] = useState(active);
+  if (active !== shownActive) {
+    setShownActive(active);
+    if (sameNaming(draft, shownActive)) setDraftRaw(active);
+  }
   const setTemplate = (v) => setDraftRaw((d) => ({ ...d, template: v }));
   const setLabel = (slot, v) => setDraftRaw((d) => ({ ...d, tierLabels: { ...d.tierLabels, [slot]: v } }));
   const setShown = (slot, v) => setDraftRaw((d) => ({ ...d, tierDisplayNames: { ...d.tierDisplayNames, [slot]: v || null } }));
@@ -56,10 +73,7 @@ export default function PlaylistNamingSettings() {
   const labelErrors = validateTierLabels(draft.tierLabels);
   const shownErrors = validateDisplayNames(draft.tierDisplayNames);
   const invalid = templateErrors.length > 0 || Object.keys(labelErrors).length > 0;
-  const dirty =
-    draft.template !== active.template ||
-    !sameLabels(draft.tierLabels, active.tierLabels) ||
-    !sameLabels(draft.tierDisplayNames, active.tierDisplayNames);
+  const dirty = !sameNaming(draft, active);
   const shownName = (slot) => draft.tierDisplayNames[slot] || draft.tierLabels[slot];
   const draftTokens = customTokens(draft.template);
 
@@ -93,7 +107,7 @@ export default function PlaylistNamingSettings() {
 
   function save() {
     dispatch(setNaming(draft));
-    notifications.show({ message: `Saved - ${matched.length} playlists in ${boardCount} tier lists` });
+    notifications.show({ message: `Saved - ${plural(matched.length, 'playlist')} in ${plural(boardCount, 'tier list')}` });
   }
 
   function addToken() {
@@ -175,7 +189,7 @@ export default function PlaylistNamingSettings() {
               <Tooltip key={t.token} label={t.description} withArrow>
                 <Button
                   size="compact-xs"
-                  variant="light"
+                  variant="default"
                   ff="monospace"
                   onClick={() => insertToken(t.token)}
                   disabled={draft.template.includes(t.token)}
@@ -200,7 +214,7 @@ export default function PlaylistNamingSettings() {
               leftSection={<Plus size={13} />}
               rightSectionWidth={52}
               rightSection={
-                <Button size="compact-xs" variant="subtle" onClick={addToken} disabled={!newTokenName || !!newTokenError}>
+                <Button size="compact-xs" variant="subtle" color="gray" onClick={addToken} disabled={!newTokenName || !!newTokenError}>
                   Add
                 </Button>
               }
@@ -270,12 +284,16 @@ export default function PlaylistNamingSettings() {
               Matching playlists
             </Text>
             <Badge variant="light" color="gray">
-              {allPlaylists ? `${matched.length} playlists · ${boardCount} tier lists` : 'loading…'}
+              {allPlaylists
+                ? `${plural(matched.length, 'playlist')} · ${plural(boardCount, 'tier list')}`
+                : 'loading…'}
             </Badge>
           </Group>
           {allPlaylists && (
             <Text fz="xs" c="dimmed">
-              {hiddenCount} other playlist{hiddenCount === 1 ? '' : 's'} don&apos;t match and stay hidden
+              {hiddenCount === 1
+                ? '1 other playlist doesn’t match and stays hidden'
+                : `${hiddenCount} other playlists don’t match and stay hidden`}
             </Text>
           )}
         </Group>
