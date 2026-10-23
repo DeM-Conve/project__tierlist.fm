@@ -121,7 +121,7 @@ export const SHORTCUTS = [
   },
   {
     id: 'player-tier',
-    keys: ['Shift', '1-9'],
+    keys: ['Shift', '1-5'],
     description: 'Rate the playing video into that tier (any player mode, on its own board)',
     category: 'Player',
   },
