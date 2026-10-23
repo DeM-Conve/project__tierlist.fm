@@ -205,6 +205,15 @@ export function useFetchVideo() {
     });
 }
 
+// A playlist's song count after one song went in (+1) or out (-1), written
+// into the cached list. Refetching the list for it re-read every playlist of
+// the account from YouTube (quota, and a whole-app re-render) per song filed.
+function bumpItemCount(queryClient, playlistId, by) {
+  queryClient.setQueryData(queryKeys.playlists, (old) =>
+    old?.map((p) => (p.id === playlistId ? { ...p, itemCount: Math.max(0, (p.itemCount ?? 0) + by) } : p))
+  );
+}
+
 // Files a video straight into a tier playlist on YouTube; resolves to the new
 // item (with its playlistItem `id`, which undo deletes). Patches that
 // playlist's cached items in place instead of refetching all of it.
@@ -217,7 +226,7 @@ export function useAddToPlaylistMutation() {
       queryClient.setQueryData(queryKeys.playlistItems(playlistId), (old) =>
         old ? [...old, { ...video, ...item, channelTitle: item.channelTitle ?? video.channelTitle }] : old
       );
-      queryClient.invalidateQueries({ queryKey: queryKeys.playlists }); // item counts
+      bumpItemCount(queryClient, playlistId, 1);
     },
   });
 }
@@ -247,7 +256,7 @@ export function useRemovePlaylistItemMutation() {
     mutationFn: async ({ itemId }) => (await api.delete(`/api/playlist-items/${itemId}`)).data,
     onSuccess: (_, { playlistId, itemId }) => {
       queryClient.setQueryData(queryKeys.playlistItems(playlistId), (old) => old?.filter((v) => v.id !== itemId));
-      queryClient.invalidateQueries({ queryKey: queryKeys.playlists });
+      bumpItemCount(queryClient, playlistId, -1);
     },
   });
 }
