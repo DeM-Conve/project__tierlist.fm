@@ -38,6 +38,38 @@ describe('usePlayerTime', () => {
     expect(result.current[0]).toEqual({ cur: 0, dur: 0 });
   });
 
+  it('a paused song (same reading) keeps the same state - nothing re-renders', () => {
+    const playerRef = { current: fakePlayer(30, 100) };
+    let renders = 0;
+    const { result } = renderHook(() => {
+      renders++;
+      return usePlayerTime(playerRef, 'a');
+    });
+    act(() => vi.advanceTimersByTime(POLL_MS));
+    const first = result.current[0];
+    // (React may render once more to find the state unchanged - then no more.)
+    act(() => vi.advanceTimersByTime(POLL_MS * 2));
+    const after = renders;
+    act(() => vi.advanceTimersByTime(POLL_MS * 6));
+    expect(renders).toBe(after);
+    expect(result.current[0]).toBe(first);
+  });
+
+  it('does not poll while disabled (a matchup holds the dock), and resumes after', () => {
+    const getDuration = vi.fn(() => 100);
+    const playerRef = { current: { getCurrentTime: () => 7, getDuration } };
+    const { result, rerender } = renderHook(({ on }) => usePlayerTime(playerRef, 'a', on), { initialProps: { on: false } });
+    act(() => vi.advanceTimersByTime(POLL_MS * 3));
+    expect(getDuration).not.toHaveBeenCalled();
+    rerender({ on: true });
+    act(() => vi.advanceTimersByTime(POLL_MS));
+    expect(result.current[0]).toEqual({ cur: 7, dur: 100 });
+    rerender({ on: false });
+    getDuration.mockClear();
+    act(() => vi.advanceTimersByTime(POLL_MS * 3));
+    expect(getDuration).not.toHaveBeenCalled();
+  });
+
   it('stops polling on unmount', () => {
     const getDuration = vi.fn(() => 100);
     const playerRef = { current: { getCurrentTime: () => 1, getDuration } };

@@ -109,3 +109,11 @@ describe('PALETTE_HOTKEYS', () => {
     expect(PALETTE_HOTKEYS).toEqual(['mod + K', 'mod + P', 'mod + shift + P', 'F1']);
   });
 });
+
+describe('player rating keys', () => {
+  it('lists Shift+1 to the number of ranked tiers (TODO is not a rating)', async () => {
+    const { TIER_ORDER } = await import('./tiers');
+    const entry = SHORTCUTS.find((s) => s.id === 'player-tier');
+    expect(entry.keys).toEqual(['Shift', `1-${TIER_ORDER.length}`]);
+  });
+});

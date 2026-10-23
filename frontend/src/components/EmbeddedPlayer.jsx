@@ -31,7 +31,8 @@ export default function EmbeddedPlayer({ videoId, autoplay = true, onEnded, onPl
     const mountEl = document.createElement('div');
     mountEl.style.width = '100%';
     mountEl.style.height = '100%';
-    containerRef.current?.appendChild(mountEl);
+    const container = containerRef.current;
+    container?.appendChild(mountEl);
 
     loadYouTubeApi().then((YT) => {
       if (cancelled) return;
@@ -53,7 +54,11 @@ export default function EmbeddedPlayer({ videoId, autoplay = true, onEnded, onPl
             if (cancelled) return;
             if (e.data === window.YT.PlayerState.ENDED) onEndedRef.current?.();
             if (e.data === window.YT.PlayerState.PLAYING) onPlayingChangeRef.current?.(true);
-            if (e.data === window.YT.PlayerState.PAUSED) onPlayingChangeRef.current?.(false);
+            // Ended (or cued, when the browser blocks autoplay) isn't playing
+            // either - else a Pause button shows over a stopped video.
+            if ([window.YT.PlayerState.PAUSED, window.YT.PlayerState.ENDED, window.YT.PlayerState.CUED].includes(e.data)) {
+              onPlayingChangeRef.current?.(false);
+            }
           },
         },
       });
@@ -68,7 +73,7 @@ export default function EmbeddedPlayer({ videoId, autoplay = true, onEnded, onPl
       }
       playerRef.current = null;
       onPlayerReadyRef.current?.(null);
-      if (containerRef.current) containerRef.current.innerHTML = '';
+      if (container) container.innerHTML = '';
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [videoId]);

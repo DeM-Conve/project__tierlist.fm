@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useSelector } from 'react-redux';
 import { tierName } from '../tierLabels';
 import { ActionIcon, Badge, Group, HoverCard, Slider, Stack, Text } from '@mantine/core';
@@ -25,6 +25,7 @@ import QueuePanel from './QueuePanel';
 import EmbeddedPlayer from './EmbeddedPlayer';
 import { usePlayerTime } from './usePlayerTime';
 import { isSequenceKey } from '../keyboard/sequence';
+import { focusInOverlay } from '../keyboard/overlay';
 import { useDevicePref } from '../settings';
 
 // Renders in 'expanded' (full-screen modal), 'mini' (YouTube-Music-style
@@ -84,6 +85,30 @@ function VolumeControl({ volume, muted, onToggleMute, onChange, size }) {
     </HoverCard>
   );
 }
+
+// The mini bar's / floating corner's edge progress line (click to seek).
+// Its own memoized component that owns the poll (usePlayerTime), so the
+// twice-a-second reading re-renders only this line - not the dock, its
+// controls or the queue. `timeRef` hands the dock its setTime, so a seek
+// from a key or a button shows its new position at once.
+const DockProgress = memo(function DockProgress({ playerRef, videoId, enabled, timeRef, onSeekPercent }) {
+  const [time, setTime] = usePlayerTime(playerRef, videoId, enabled);
+  useLayoutEffect(() => {
+    timeRef.current = setTime;
+    return () => {
+      timeRef.current = null;
+    };
+  }, [timeRef, setTime]);
+  function seek(e) {
+    const rect = e.currentTarget.getBoundingClientRect();
+    onSeekPercent(Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width)) * 100);
+  }
+  return (
+    <div className="player-dock-progress-track" onClick={seek}>
+      <div className="player-dock-progress" style={{ width: `${time.dur ? (time.cur / time.dur) * 100 : 0}%` }} />
+    </div>
+  );
+});
 
 const PLAYER_MODE_TRANSITIONS = {
   expanded: { down: 'mini', up: 'expanded' },
@@ -150,6 +175,11 @@ export default function PlayerDock({
   // Repeat lives in focusSlice (off -> all -> one, YouTube Music's cycle):
   // repeat-all has to wrap the queue itself, which is App's state.
   const repeatOne = repeatMode === 'one';
+  // Repeat all at the end of the queue: Next (and l) wraps to the top, as
+  // playNextInQueue does. A queue of one song has nothing to wrap to, so
+  // repeat all just replays it when it ends.
+  const canNext = hasNext || (repeatMode === 'all' && hasPrev);
+  const loopsAlone = repeatOne || (repeatMode === 'all' && !hasNext && !hasPrev);
   const expanded = mode === 'expanded';
   // "Floating corner" mode: an in-page floating box pinned to the bottom-right
   // corner, the way YouTube Music's own in-app miniplayer works. This is
@@ -171,8 +201,18 @@ export default function PlayerDock({
   }, [expanded]);
 
 
-  // The mini bar's progress line, polled from the player.
-  const [time, setTime] = usePlayerTime(playerRef, video.videoId);
+  // The progress line's setTime (DockProgress) - only mounted outside the
+  // expanded view, which has no line and so polls nothing.
+  const timeRef = useRef(null);
+  const showTime = (t) => timeRef.current?.(t);
+  // Stable (refs only), so the memoized progress line keeps its props.
+  const seekToPercent = useCallback((pct) => {
+    const player = playerRef.current;
+    const duration = player?.getDuration?.();
+    if (!duration) return;
+    player.seekTo((pct / 100) * duration, true);
+    timeRef.current?.({ cur: (pct / 100) * duration, dur: duration });
+  }, []);
 
   // Vim-style navigation for the dock, active globally (not just while
   // expanded) since the dock is meant to work like a background player:
@@ -191,13 +231,19 @@ export default function PlayerDock({
       const active = document.activeElement;
       const isTyping =
         active?.tagName === 'INPUT' || active?.tagName === 'TEXTAREA' || active?.isContentEditable;
-      if (isTyping) return;
+      if (isTyping || focusInOverlay()) return;
       // Ctrl/Cmd-K opens the command palette, Alt-anything is a browser/OS
       // shortcut - e.key is still just 'k' either way, so without this
       // check e.g. Cmd+K would open the palette *and* expand the dock at
       // the same time. Shift is allowed through (shift+digit reassigns a
       // tier below).
       if (e.ctrlKey || e.metaKey || e.altKey) return;
+      // A held key repeats: one press, one action - only seeking (the
+      // expanded view's arrows) may run on while held.
+      if (e.repeat && !(expanded && (e.key === 'ArrowLeft' || e.key === 'ArrowRight'))) {
+        if (e.key === ' ' || e.code === 'Space') e.preventDefault();
+        return;
+      }
 
       if (e.key === 'Escape') {
         if (expanded) onMinimize();
@@ -228,7 +274,7 @@ export default function PlayerDock({
         if (hasPrev) onPrev();
       } else if (e.key === 'ArrowRight' || e.key === 'l') {
         e.preventDefault();
-        if (hasNext) onNext();
+        if (canNext) onNext();
       } else if (e.key === ' ' || e.code === 'Space') {
         e.preventDefault();
         togglePlay();
@@ -278,7 +324,7 @@ export default function PlayerDock({
     onPrev,
     onNext,
     hasPrev,
-    hasNext,
+    canNext,
     availableTiers,
     currentTier,
     onChangeTier,
@@ -291,10 +337,15 @@ export default function PlayerDock({
     held,
   ]);
 
+  // Asks the player what it's doing (1 playing, 3 buffering) rather than
+  // trusting isPlaying, which can lag behind it (a blocked autoplay, a
+  // just-loaded video) - so one press always does the right thing.
   function togglePlay() {
     const player = playerRef.current;
     if (!player) return;
-    if (isPlaying) player.pauseVideo?.();
+    const state = player.getPlayerState?.();
+    const playing = state === undefined ? isPlaying : state === 1 || state === 3;
+    if (playing) player.pauseVideo?.();
     else player.playVideo?.();
   }
 
@@ -341,12 +392,6 @@ export default function PlayerDock({
     }
   }
 
-  // Click anywhere on the edge progress line to jump there.
-  function seek(e) {
-    const rect = e.currentTarget.getBoundingClientRect();
-    seekToPercent(Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width)) * 100);
-  }
-
   // The expanded view's ⟲ ⟳ buttons (and ←/→) scrub within the current
   // video - track skipping is h/l or the prev/next buttons.
   function seekBy(deltaSeconds) {
@@ -355,7 +400,7 @@ export default function PlayerDock({
     if (!duration) return;
     const next = Math.min(duration, Math.max(0, player.getCurrentTime() + deltaSeconds));
     player.seekTo(next, true);
-    setTime({ cur: next, dur: duration });
+    showTime({ cur: next, dur: duration });
   }
 
   function replayCurrent() {
@@ -365,13 +410,14 @@ export default function PlayerDock({
     player.playVideo?.();
   }
 
-  function seekToPercent(pct) {
-    const player = playerRef.current;
-    const duration = player?.getDuration?.();
-    if (!duration) return;
-    player.seekTo((pct / 100) * duration, true);
-    setTime({ cur: (pct / 100) * duration, dur: duration });
-  }
+
+  // The queue's playing row, one object per change (not per render), so
+  // the queue panel's memoized rows and list keep theirs.
+  const queueCurrent = queue?.current;
+  const queuePlaying = useMemo(
+    () => (queueCurrent ? { ...queueCurrent, tier: currentTier ?? queueCurrent.tier } : null),
+    [queueCurrent, currentTier]
+  );
 
   const iconSize = expanded ? 20 : 18;
   const btnSize = expanded ? 38 : 30;
@@ -416,9 +462,13 @@ export default function PlayerDock({
         style={!expanded && currentTier ? { background: `color-mix(in srgb, ${TIER_COLORS[currentTier]} 7%, var(--chrome))` } : undefined}
       >
         {!expanded && (
-          <div className="player-dock-progress-track" onClick={seek}>
-            <div className="player-dock-progress" style={{ width: `${time.dur ? (time.cur / time.dur) * 100 : 0}%` }} />
-          </div>
+          <DockProgress
+            playerRef={playerRef}
+            videoId={video.videoId}
+            enabled={!held}
+            timeRef={timeRef}
+            onSeekPercent={seekToPercent}
+          />
         )}
 
         {/* Floating/expanded only: the mini bar keeps these in its right
@@ -456,7 +506,7 @@ export default function PlayerDock({
                 <EmbeddedPlayer
                   key={video.videoId}
                   videoId={video.videoId}
-                  onEnded={repeatOne ? replayCurrent : hasNext || repeatMode === 'all' ? onNext : undefined}
+                  onEnded={loopsAlone ? replayCurrent : canNext ? onNext : undefined}
                   onPlayerReady={(p) => {
                     playerRef.current = p;
                     // A new EmbeddedPlayer instance mounts per video (its own
@@ -504,7 +554,8 @@ export default function PlayerDock({
                   radius="xl"
                   size={btnSize}
                   onClick={onShuffleUpcoming}
-                  disabled={!queue?.upcoming?.length}
+                  // Like the queue panel's: nothing to shuffle with under two.
+                  disabled={(queue?.upcoming?.length ?? 0) < 2}
                   aria-label="Shuffle up next"
                   title="Shuffle up next"
                 >
@@ -535,7 +586,7 @@ export default function PlayerDock({
                   <RotateCw size={iconSize} />
                 </ActionIcon>
               )}
-              <ActionIcon variant="subtle" color="gray" radius="xl" size={btnSize} onClick={onNext} disabled={!hasNext} aria-label="Next" title="Next (l)">
+              <ActionIcon variant="subtle" color="gray" radius="xl" size={btnSize} onClick={onNext} disabled={!canNext} aria-label="Next" title="Next (l)">
                 <SkipForward size={iconSize} fill="currentColor" />
               </ActionIcon>
               <ActionIcon
@@ -639,11 +690,11 @@ export default function PlayerDock({
           )}
         </div>
 
-        {expanded && queue && (
+        {expanded && queuePlaying && (
           <aside className="player-queue">
             <QueuePanel
               queue={queue}
-              current={{ ...queue.current, tier: currentTier ?? queue.current.tier }}
+              current={queuePlaying}
               onJump={onJump}
               onRemove={onRemove}
               onMove={onMoveInQueue}
