@@ -5,12 +5,12 @@
 // Tier Rail, the boards and every count on screen tell the same story.
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { notifications } from '@mantine/notifications';
-import { act, fireEvent, screen, within } from '@testing-library/react';
+import { act, fireEvent, screen, waitFor } from '@testing-library/react';
 import { FakeYoutube } from './test/fakeYoutube';
 import { mountApp, youtubeBoards } from './test/syncHarness';
 import { invariantViolations } from './test/syncInvariants';
 import { minimizePlayer } from './store/focusSlice';
-import { queueSong } from './queueActions';
+import { playSongNow, queueSong } from './queueActions';
 import { selectFocusedAvailableTiers, selectPlayingSong } from './store/selectors';
 import { BOARD_TIERS, REMOVED_TIER, TIER_ORDER } from './tiers';
 
@@ -67,6 +67,15 @@ const rateKey = (n) => key(String(n), { shiftKey: true, code: `Digit${n}` });
 
 async function goto(path) {
   await act(async () => h.navigate(path));
+}
+
+// A board's duel hub (it loads that board, like opening it).
+async function openDuel(board) {
+  await goto(`/tier/${encodeURIComponent(board)}/duel`);
+  await waitFor(() => {
+    if (h.board !== board || Object.values(h.state.tiers.tierLoading).some(Boolean)) throw new Error('loading');
+  });
+  await h.settle();
 }
 
 // ---- reading what the user sees -------------------------------------------
@@ -286,5 +295,87 @@ describe('journey 3: counts agree after a push', () => {
     expect(youtubeCounts('Rap')).toMatchObject({ S: 4, A: 1 });
     await h.goHome();
     expect(homeCard('Rap').counts).toEqual(youtubeCounts('Rap'));
+  });
+});
+
+describe('journey 1: browsing other boards while a song plays', () => {
+  it("another board never takes the playing song's controls", async () => {
+    await start();
+    await playTile('a');
+    await h.open('Pop');
+    // Pop is open: the rail is Pop's tiers, the keys don't rate Rap's song
+    // on Pop's board, Pop's tiles don't light up.
+    expect(rail()).toMatchObject({ mode: 'Tiers', playingOn: null, counts: { S: 2, A: 1, TODO: 1 } });
+    rateKey(2);
+    key('Delete');
+    expect(h.staged()).toEqual([]);
+    expect(focus().focusedVideo).toMatchObject({ videoId: 'a', tier: 'S' });
+    // Next / prev walk Rap's queue, still Rap's songs.
+    next();
+    expect(playingId()).toBe('b');
+    expect(focus().focusedCategory).toBe('Rap');
+    prev();
+    // Home: the rail follows the playing song's board, counted like Home's card.
+    await h.goHome();
+    expect(rail().counts).toMatchObject(homeCard('Rap').counts);
+    expect(sidebarTotals()).toEqual(youtubeTotals());
+  });
+});
+
+describe("journey 2: duel on one board while the player plays another's song", () => {
+  it("a Move pushes at once, the other board's song plays on untouched", async () => {
+    await start(ACCOUNT, 'Pop');
+    await playTile('p');
+    await openDuel('Rap');
+    // Rap is loaded now: Pop's song can't be rated here.
+    expect(selectFocusedAvailableTiers(h.state)).toEqual([]);
+    rateKey(2);
+    expect(h.staged()).toEqual([]);
+
+    await h.duelMove('d', 'S');
+    expect(youtubeBoards(yt).Rap.S).toContain('d');
+    expect(h.tierOf('d')).toBe('S');
+    expect(playingId()).toBe('p');
+    expect(focus().focusedVideo).toMatchObject({ videoId: 'p', tier: 'S' });
+
+    // Suggested moves' Play: d plays now - and it's Rap's song.
+    const d = h.tierItems().S.find((v) => v.videoId === 'd');
+    h.dispatch(playSongNow('S', d));
+    expect(playingId()).toBe('d');
+    expect(focus().focusedCategory).toBe('Rap');
+    rateKey(2);
+    expect(h.tierOf('d')).toBe('A');
+    expectPlayerAgreesWithBoard();
+    h.undo();
+    expect(h.tierOf('d')).toBe('S');
+    expectPlayerAgreesWithBoard();
+
+    // Back on Pop and on Rap: boards, player and YouTube agree.
+    await h.open('Pop');
+    expect(h.tierOf('p')).toBe('S');
+    next(); // p, the rest of Pop's queue
+    expect(playingId()).not.toBe('d');
+    await h.open('Rap');
+    expect(h.tierOf('d')).toBe('S');
+    expect(invariantViolations(yt, { expected: { Rap: h.shown() } })).toEqual([]);
+    await h.goHome();
+    expect(homeCard('Rap').counts).toEqual(youtubeCounts('Rap'));
+    expect(sidebarTotals()).toEqual(youtubeTotals());
+  });
+
+  // fix/board-drafts (per-board drafts) is changing this right now: opening
+  // another board replaces the loaded board's draft, so an edit staged on
+  // the duel's board is gone when you come back.
+  it.fails("a staged edit on the duel's board survives a visit to the playing song's board", async () => {
+    await start(ACCOUNT, 'Pop');
+    await playTile('p');
+    await openDuel('Rap');
+    h.move('f', 'C');
+    await h.duelMove('d', 'S');
+    expect(h.staged()).toEqual([expect.objectContaining({ kind: 'move', to: 'C' })]);
+    await h.open('Pop');
+    await openDuel('Rap');
+    expect(h.tierOf('f')).toBe('C');
+    expect(h.staged()).toEqual([expect.objectContaining({ kind: 'move', to: 'C' })]);
   });
 });

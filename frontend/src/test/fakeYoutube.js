@@ -239,6 +239,10 @@ export class FakeYoutube {
     }
     if (method === 'get' && url === '/api/settings') return ok(config, '', 204);
     if (method === 'put' && url === '/api/settings') return ok(config, body);
+    // A board no one has duelled on yet (the duel hub renders it).
+    if (method === 'post' && url.startsWith('/api/duels/analysis')) {
+      return ok(config, { certainty: 0, duelsTotal: 0, onFence: 0, activeSession: null, borders: [], songs: [], suggestions: [], tierOrders: {} });
+    }
     if (url.startsWith('/api/duels/')) return ok(config, {});
     throw httpError(config, 404, `fake YouTube: no route for ${method.toUpperCase()} ${url}`);
   }
