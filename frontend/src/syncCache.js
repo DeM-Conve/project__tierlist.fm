@@ -2,6 +2,7 @@ import { queryKeys } from './api/queryKeys';
 import { SESSION_START } from './api/boardCache';
 import { bumpItemCounts, playlistItemsQuery } from './api/queries';
 import { recordDeleted, recordInserted } from './api/pushLedger';
+import { announceWrites } from './api/pushBroadcast';
 import { touchedPlaylists } from './syncPlan';
 import { itemIdsRebased } from './store/itemIds';
 import { syncFailuresRecorded } from './store/tiersSlice';
@@ -292,4 +293,6 @@ export async function recordPush(queryClient, { state, plan, results, tierGroups
   }
   unsure.forEach((id) => queryClient.invalidateQueries({ queryKey: itemKey(id), refetchType: 'none' }));
   bumpItemCounts(queryClient, counts);
+  // Other tabs holding these playlists re-read them before their next push.
+  announceWrites(queryClient, touched);
 }

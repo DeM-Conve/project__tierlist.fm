@@ -11,7 +11,7 @@
 // tier-sync answers in the new per-result contract:
 // { videoId, success, inserted, removed, newItemId?, step?, error? } (fix/sync-backend).
 
-const ok = (config, data, status = 200) => ({ data, status, statusText: 'OK', headers: {}, config, request: {} });
+const ok = (config, data, status = 200, headers = {}) => ({ data, status, statusText: 'OK', headers, config, request: {} });
 
 function httpError(config, status, detail) {
   const err = new Error(`Request failed with status code ${status}`);
@@ -39,6 +39,11 @@ export class FakeYoutube {
     this.nextPlaylist = 1;
     this.faults = []; // [{ op, videoId?, playlistId?, itemId?, status, reason, times }]
     this.requestFaults = []; // [{ method, url, status, detail, times }]
+    // The account's settings row (SettingsController): null until the first
+    // save; every save bumps `version`, the row's ETag. A save quoting an
+    // older version is refused with 412, like the backend.
+    this.settings = null;
+    this.settingsVersion = 0;
     this.log = []; // every request: { method, url, body }
     this.syncCalls = []; // every tier-sync: { payload, response }
     for (const [title, videoIds] of Object.entries(playlists)) this.addPlaylist(title, videoIds);
@@ -249,8 +254,19 @@ export class FakeYoutube {
       const videoId = decodeURIComponent(m[1]);
       return ok(config, { videoId, title: this.title(videoId), channelTitle: `Artist ${videoId}`, thumbnail: null });
     }
-    if (method === 'get' && url === '/api/settings') return ok(config, '', 204);
-    if (method === 'put' && url === '/api/settings') return ok(config, body);
+    if (method === 'get' && url === '/api/settings') {
+      if (!this.settings) return ok(config, '', 204);
+      return ok(config, this.settings, 200, { etag: `"${this.settingsVersion}"` });
+    }
+    if (method === 'put' && url === '/api/settings') {
+      const header = (name) => config.headers?.get?.(name) ?? config.headers?.[name];
+      const ifMatch = header('If-Match');
+      const fresh = header('If-None-Match') === '*' ? !this.settings : ifMatch === `"${this.settingsVersion}"`;
+      if (!fresh) throw httpError(config, 412, 'Your settings were changed somewhere else');
+      this.settings = body;
+      this.settingsVersion += 1;
+      return ok(config, body, 200, { etag: `"${this.settingsVersion}"` });
+    }
     // A board no one has duelled on yet (the duel hub renders it).
     if (method === 'post' && url.startsWith('/api/duels/analysis')) {
       return ok(config, { certainty: 0, duelsTotal: 0, onFence: 0, activeSession: null, borders: [], songs: [], suggestions: [], tierOrders: {} });

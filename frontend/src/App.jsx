@@ -91,6 +91,7 @@ import LoginView from './components/LoginView';
 import { setLoggedIn, setPlaylists } from './store/authSlice';
 import { detectedNaming } from './store/namingSlice';
 import { useSettingsSync } from './api/useSettingsSync';
+import { useOtherTabWrites } from './api/pushBroadcast';
 import { clearBoardCache } from './api/boardCache';
 import { detectNaming } from './naming';
 import { setCurrentCategory, setHomeQuery, setSidebarQuery, setMobileSidebarOpen, showSidebarView, setSidebarCollapsed } from './store/viewSlice';
@@ -236,6 +237,8 @@ export default function App() {
 
   // Settings live in Postgres per account; localStorage is only a cache.
   const { ready: settingsReady } = useSettingsSync(authData?.loggedIn === true);
+  // Another tab's writes make this tab's playlist item ids stale.
+  useOtherTabWrites();
 
   // First run for this account: adopt the naming (template + tier names)
   // that fits the user's existing playlists (no-op once one has been chosen -

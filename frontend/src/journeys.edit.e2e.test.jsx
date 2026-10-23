@@ -5,6 +5,7 @@
 // the boards, the staged changes and YouTube agree at the end
 // (src/test/syncInvariants.js).
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { waitFor } from '@testing-library/react';
 import { FakeYoutube } from './test/fakeYoutube';
 import { mountApp, unmount, youtubeBoards } from './test/syncHarness';
 import { invariantViolations } from './test/syncInvariants';
@@ -51,7 +52,14 @@ async function reload(board) {
   if (board) await h.open(board);
   return h;
 }
-afterEach(() => vi.clearAllMocks());
+afterEach(async () => {
+  vi.clearAllMocks();
+  // An unmounted app still saves its settings on the way out (debounced
+  // save, flushed on unmount) - let that finish against its own fake
+  // YouTube before the next test installs another one on the shared axios.
+  unmount();
+  await new Promise((r) => setTimeout(r, 50));
+});
 
 // What YouTube holds must be what the boards show: the open board (as
 // shown now) plus `others` ({ board: { tier: ids } }); nothing duplicated,
@@ -389,5 +397,61 @@ describe('journey 4: a push fails mid-journey, then navigate, reload, retry', ()
     await reload('Rap');
     // YouTube has the song in S and A now; the user put it in A.
     expect(h.tierOf('a')).toBe('A');
+  });
+});
+
+describe('journey 5: two tabs on the same account', () => {
+  // Tab A is `h`; tab B a second app mounted beside it.
+  async function twoTabs(board = 'Rap') {
+    await start(ACCOUNT, board);
+    const b = await mountApp(yt, { secondTab: true });
+    if (board) await b.open(board);
+    return b;
+  }
+
+  it('staged edits in one tab, a push of other songs in the other: both land', async () => {
+    const b = await twoTabs();
+    h.move('d', 'B');
+    b.move('a', 'A');
+    await b.push();
+    await h.push();
+    expect(youtubeBoards(yt).Rap).toEqual({ S: ['b', 'c'], A: ['e', 'a'], B: ['f', 'd'], C: [], D: ['g'], TODO: ['h', 'i'] });
+  });
+
+  it('the same song moved and pushed in both tabs: never on YouTube twice, and the second tab says why', async () => {
+    const b = await twoTabs();
+    h.move('a', 'A');
+    await h.push();
+    b.move('a', 'C');
+    await b.push();
+    expect(invariantViolations(yt, { universe: everySong })).toEqual([]);
+    expect(youtubeBoards(yt).Rap.A).toContain('a');
+    // Tab B's move wasn't made: it's still staged, with the reason.
+    expect(selectStagedFailures(b.state)).toEqual([expect.objectContaining({ kind: 'move', to: 'C' })]);
+  });
+
+  it('a song removed in one tab is not brought back by a move pushed from the other', async () => {
+    const b = await twoTabs();
+    h.remove('b');
+    await h.push();
+    b.move('b', 'A');
+    await b.push();
+    expect(youtubeBoards(yt).Rap.A).toEqual(['d', 'e']);
+    expect(Object.values(youtubeBoards(yt).Rap).flat()).not.toContain('b');
+  });
+
+  it('settings changed in both tabs: neither overwrites the other', async () => {
+    const b = await twoTabs(null);
+    await waitFor(() => expect(yt.settings).not.toBeNull());
+    h.dispatch(setTheme('paper'));
+    await waitFor(() => expect(yt.settings.appearance.theme).toBe('paper'), { timeout: 3000 });
+    b.dispatch(setNaming({ template: '{category} {tier}', tierLabels: LABELS, tierDisplayNames: { ...NO_SHOWN, A: 'Great' } }));
+    await waitFor(() => expect(yt.settings.naming.tierDisplayNames.A).toBe('Great'), { timeout: 3000 });
+    expect(yt.settings.appearance.theme).toBe('paper');
+    h.dispatch(setTierPalette('heat'));
+    await waitFor(() => expect(yt.settings.appearance.tierPalette).toBe('heat'), { timeout: 3000 });
+    expect(yt.settings.naming.tierDisplayNames.A).toBe('Great');
+    expect(yt.settings.appearance.theme).toBe('paper');
+    expect(h.state.naming.tierDisplayNames.A).toBe('Great');
   });
 });

@@ -129,7 +129,11 @@ scripts/backup.sh / scripts/restore.sh    # database backup / restore
     undo/redo, staged transfers, sync failures), and settles changes whose item
     is gone: delete-only ones and moves already in their target are applied as
     done, the rest stay staged with "This song is no longer in that playlist on
-    YouTube". A read that fails stops the push. Push status resets per run
+    YouTube". A read that fails stops the push. Other tabs of the browser
+    write too: every playlist write (`recordPush`, Add songs' add / remove)
+    is announced over a BroadcastChannel (`api/pushBroadcast.js`), and each
+    other tab marks those playlists invalidated, so its next push re-reads
+    them instead of sending ids that tab already deleted. Push status resets per run
     (`syncStatus.js`).
     `useTierBoardQueries` waits on `isPending` (not `isLoading`): during restore
     nothing fetches, and `isLoading` "loaded" empty tiers.

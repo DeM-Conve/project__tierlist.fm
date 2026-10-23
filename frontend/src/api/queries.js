@@ -5,6 +5,7 @@ import { BOARD_TIERS } from '../tiers';
 import { queryKeys } from './queryKeys';
 import { claimBoardCache } from './boardCache';
 import { reconcileItems } from './pushLedger';
+import { announceWrites } from './pushBroadcast';
 
 // Also hands the board cache to the signed-in account before anything can
 // read it: another account's cached playlists are dropped right here, before
@@ -235,6 +236,7 @@ export function useAddToPlaylistMutation() {
         old ? [...old, { ...video, ...item, channelTitle: item.channelTitle ?? video.channelTitle }] : old
       );
       bumpItemCount(queryClient, playlistId, 1);
+      announceWrites(queryClient, [playlistId]);
     },
   });
 }
@@ -265,6 +267,7 @@ export function useRemovePlaylistItemMutation() {
     onSuccess: (_, { playlistId, itemId }) => {
       queryClient.setQueryData(queryKeys.playlistItems(playlistId), (old) => old?.filter((v) => v.id !== itemId));
       bumpItemCount(queryClient, playlistId, -1);
+      announceWrites(queryClient, [playlistId]);
     },
   });
 }
