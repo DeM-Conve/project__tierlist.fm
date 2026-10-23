@@ -554,7 +554,8 @@ export default function PlayerDock({
                   radius="xl"
                   size={btnSize}
                   onClick={onShuffleUpcoming}
-                  disabled={!queue?.upcoming?.length}
+                  // Like the queue panel's: nothing to shuffle with under two.
+                  disabled={(queue?.upcoming?.length ?? 0) < 2}
                   aria-label="Shuffle up next"
                   title="Shuffle up next"
                 >

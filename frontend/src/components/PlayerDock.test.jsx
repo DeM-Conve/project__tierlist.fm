@@ -60,7 +60,7 @@ function dock(props = {}) {
     </>,
     { store }
   );
-  return { store, root: view.container.querySelector('.player-dock') };
+  return { store, root: view.container.querySelector('.player-dock'), unmount: view.unmount };
 }
 
 beforeEach(() => {
@@ -235,5 +235,17 @@ describe('PlayerDock keys inside a modal or menu, and held keys', () => {
     fireEvent.keyDown(window, { key: 'ArrowRight', code: 'ArrowRight' });
     fireEvent.keyDown(window, { key: 'ArrowRight', code: 'ArrowRight', repeat: true });
     expect(h.player.seekTo).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('PlayerDock mini bar shuffle', () => {
+  const button = (root) => root.querySelector('[aria-label="Shuffle up next"]');
+  it('is off with fewer than two songs up next (as in the queue panel), on with two', () => {
+    const one = { history: [], current: entry, upcoming: [{ ...entry, key: 'k2' }], contextLabel: '' };
+    const { root, unmount } = dock({ queue: one });
+    expect(button(root)).toBeDisabled();
+    unmount();
+    const two = { ...one, upcoming: [{ ...entry, key: 'k2' }, { ...entry, key: 'k3' }] };
+    expect(button(dock({ queue: two }).root)).not.toBeDisabled();
   });
 });
