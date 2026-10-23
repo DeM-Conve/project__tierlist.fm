@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { queryKeys } from './queryKeys';
 
@@ -36,9 +36,14 @@ export function announceWrites(queryClient, playlistIds) {
   if (ids.length) channel()?.postMessage({ from: tabId(queryClient), playlistIds: ids });
 }
 
-// Mounted once per tab (App).
-export function useOtherTabWrites() {
+// Mounted once per tab (App). `onWrites(playlistIds)`: called after the
+// invalidation (App redraws the open board when it's among them).
+export function useOtherTabWrites(onWrites) {
   const queryClient = useQueryClient();
+  const handler = useRef(onWrites);
+  useEffect(() => {
+    handler.current = onWrites;
+  });
   useEffect(() => {
     if (typeof BroadcastChannel === 'undefined') return undefined;
     const ch = new BroadcastChannel(CHANNEL);
@@ -48,6 +53,7 @@ export function useOtherTabWrites() {
       for (const id of data.playlistIds) {
         queryClient.invalidateQueries({ queryKey: queryKeys.playlistItems(id), refetchType: 'none' });
       }
+      handler.current?.(data.playlistIds);
     };
     return () => ch.close();
   }, [queryClient]);

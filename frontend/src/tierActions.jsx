@@ -15,6 +15,7 @@ import {
   setTierForCategory,
   setLoadedCategory,
   setAwaitingRefresh,
+  setLoadedPlaylists,
   transfersOverlaid,
   applySyncedMoves,
   transfersApplied,
@@ -232,7 +233,8 @@ export const transferWithFeedback = ({ video, fromCategory, fromTier }, toTier, 
 // (from the board cache) - its dataUpdatedAt, so landBoardRefresh can tell
 // the fresh copy when it arrives.
 // `rebase`: the open board itself is laid over newer data (landBoardRefresh).
-export const loadBoard = ({ category, data, refreshingSince = null, rebase = false }) => (dispatch, getState) => {
+// `playlists`: which playlists the data was read from (useLoadTierBoard).
+export const loadBoard = ({ category, data, refreshingSince = null, rebase = false, playlists = null }) => (dispatch, getState) => {
   const { tiers, transfers } = getState();
   if (tiers.loadedCategory) {
     dispatch(transfersCommitted(effectiveTransfers(transfers.list, tiers.loadedCategory, tiers.tierItems)));
@@ -250,6 +252,7 @@ export const loadBoard = ({ category, data, refreshingSince = null, rebase = fal
   }
   dispatch(transfersOverlaid({ category, transfers: getState().transfers.list }));
   dispatch(setLoadedCategory(category));
+  dispatch(setLoadedPlaylists(playlists));
   dispatch(setAwaitingRefresh(refreshingSince == null ? null : { category, since: refreshingSince }));
 };
 
@@ -268,8 +271,8 @@ export const restoreDraft = (category, kept) => (dispatch, getState) => {
     if (m.kind === 'move' ? now === m.to : now === REMOVED_TIER || now === undefined) return [];
     const { song } = songLabel(m.video);
     const what = m.kind === 'move' ? `${tierName(m.from)} → ${tierName(m.to)}` : `removal from ${tierName(m.from)}`;
-    const where = now ? `it’s in ${tierName(now)} there now` : 'it’s no longer on this board';
-    return [{ key: `${m.video.id ?? m.video.videoId}-${m.kind}`, title: m.video.title, text: `"${song}" changed on YouTube since you staged ${what} - ${where}, so that change was dropped.` }];
+    const where = now ? `on YouTube it’s in ${tierName(now)} now` : 'it’s no longer on this board';
+    return [{ key: `${m.video.id ?? m.video.videoId}-${m.kind}`, title: m.video.title, text: `"${song}": the staged ${what} no longer applies - ${where}, so it was dropped.` }];
   });
   if (notes.length) dispatch(notesAdded({ category, notes }));
 };
@@ -287,16 +290,19 @@ export const landBoardRefresh = ({ category, data, dataUpdatedAt }) => (dispatch
   dispatch(setAwaitingRefresh(null));
   if (!data || dataUpdatedAt <= awaitingRefresh.since) return;
   if (!selectHasLocalEdits(getState())) {
-    dispatch(loadBoard({ category, data }));
+    dispatch(loadBoard({ category, data, playlists: getState().tiers.loadedPlaylists }));
     return;
   }
   // Edited already (or a draft kept from before the reload): the edits are
   // laid over the fresh copy like a kept draft - unless something was
   // written to YouTube from this board since it loaded or a push is under
   // way, which this refresh (started before) may not show yet.
-  const { wroteSinceLoad, syncStatus } = getState().tiers;
-  if (wroteSinceLoad || syncStatus === 'syncing') return;
-  dispatch(loadBoard({ category, data, rebase: true }));
+  // (`after`: a refresh asked for after a write elsewhere - another tab's
+  // push - is newer than this board's own writes, which every read is
+  // reconciled with anyway: pushLedger.)
+  const { wroteSinceLoad, syncStatus, loadedPlaylists } = getState().tiers;
+  if ((wroteSinceLoad && !awaitingRefresh.after) || syncStatus === 'syncing') return;
+  dispatch(loadBoard({ category, data, rebase: true, playlists: loadedPlaylists }));
 };
 
 // A push came back (`results`: the backend's per-item results for

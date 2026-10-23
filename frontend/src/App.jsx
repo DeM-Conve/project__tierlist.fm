@@ -97,6 +97,7 @@ import { setLoggedIn, setPlaylists } from './store/authSlice';
 import { detectedNaming } from './store/namingSlice';
 import { useSettingsSync } from './api/useSettingsSync';
 import { useOtherTabWrites } from './api/pushBroadcast';
+import { queryKeys } from './api/queryKeys';
 import { clearBoardCache } from './api/boardCache';
 import { detectNaming } from './naming';
 import { setCurrentCategory, setHomeQuery, setSidebarQuery, setMobileSidebarOpen, showSidebarView, setSidebarCollapsed } from './store/viewSlice';
@@ -165,6 +166,8 @@ function useLoadTierBoard(category, tiers) {
   // The drafts saved on this device are read first: a board never loads
   // over its own saved draft.
   const draftsReady = useSelector((s) => s.drafts.hydrated);
+  const loadedPlaylists = useSelector((s) => s.tiers.loadedPlaylists);
+  const playlists = tiers ? BOARD_TIERS.map((t) => tiers[t]?.id ?? '').join('|') : null;
   const board = useTierBoardQueries(category, tiers);
   const { data, isLoading, dataUpdatedAt, isStale, isFetching, refreshError } = board;
   const boardLoading = !tiers || isLoading || loadedCategory !== category || !draftsReady;
@@ -184,7 +187,11 @@ function useLoadTierBoard(category, tiers) {
     // data, and the board stayed blank until you navigated away and back.
     if (!tiers || !data || !draftsReady) return;
     if (loadedCategory !== category) {
-      dispatch(loadBoard({ category, data, refreshingSince: isStale || isFetching ? dataUpdatedAt : null }));
+      dispatch(loadBoard({ category, data, playlists, refreshingSince: isStale || isFetching ? dataUpdatedAt : null }));
+    } else if (loadedPlaylists && playlists !== loadedPlaylists) {
+      // The naming changed which playlists make this board (a tier gained,
+      // lost or swapped): rebuilt from them, its draft laid over.
+      dispatch(loadBoard({ category, data, playlists, rebase: true }));
     } else if (awaitingRefresh && !isFetching) {
       // Settled: fresh data arrived, or the refetch failed (or there's
       // nothing left to refresh). Stale, idle and no error means the
@@ -192,7 +199,7 @@ function useLoadTierBoard(category, tiers) {
       const settled = dataUpdatedAt > awaitingRefresh.since || refreshError || !isStale;
       if (settled) dispatch(landBoardRefresh({ category, data, dataUpdatedAt }));
     }
-  }, [data, tiers, category, loadedCategory, awaitingRefresh, isStale, isFetching, dataUpdatedAt, refreshError, draftsReady, dispatch]);
+  }, [data, tiers, category, loadedCategory, awaitingRefresh, isStale, isFetching, dataUpdatedAt, refreshError, draftsReady, playlists, loadedPlaylists, dispatch]);
 
   // The top-of-page progress bar while switching boards (skeletons show in
   // TierRow while `loading`; this is the accompanying visual feedback).
@@ -248,7 +255,19 @@ export default function App() {
   // Settings live in Postgres per account; localStorage is only a cache.
   const { ready: settingsReady } = useSettingsSync(authData?.loggedIn === true);
   // Another tab's writes make this tab's playlist item ids stale.
-  useOtherTabWrites();
+  // Another tab wrote to the open board's playlists: read them again and
+  // redraw the board, its unpushed draft laid over (landBoardRefresh).
+  const appStore = useStore();
+  const appQueryClient = useQueryClient();
+  useOtherTabWrites((playlistIds) => {
+    const state = appStore.getState();
+    const category = state.tiers.loadedCategory;
+    const ids = Object.values(selectTierGroups(state)[category] || {}).map((p) => p.id);
+    const touched = ids.filter((id) => playlistIds.includes(id));
+    if (!touched.length) return;
+    dispatch(setAwaitingRefresh({ category, since: Date.now(), after: true }));
+    touched.forEach((id) => appQueryClient.invalidateQueries({ queryKey: queryKeys.playlistItems(id) }));
+  });
 
   // First run for this account: adopt the naming (template + tier names)
   // that fits the user's existing playlists (no-op once one has been chosen -

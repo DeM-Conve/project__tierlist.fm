@@ -214,19 +214,41 @@ function restoreDraftInto(state, draft, category, liveTransfers) {
     return next ? { ...v, id: next } : v;
   };
   const lost = (v) => (v.transfer != null ? !live(v) : !!goneIn[ownerOf.get(v.id)]?.has(v.id));
+  // A tier whose playlist is gone (a naming change) keeps only what was
+  // moved into it - still staged, and held back by the push with the reason.
   const tiersNow = new Set([...Object.keys(fresh.originalTierItems), REMOVED_TIER]);
-  const keepTiers = (board) => Object.fromEntries(Object.entries(board || {}).filter(([t]) => tiersNow.has(t)));
-  const shownTiers = keepTiers(mapBoard(draft.tierItems, repoint));
-  state.tierItems = withoutVideos(shownTiers, lost);
-  state.undoStack = (draft.undoStack || []).map((b) => keepTiers(mapBoard(b, repoint)));
-  state.redoStack = (draft.redoStack || []).map((b) => keepTiers(mapBoard(b, repoint)));
+  const keepTiers = (board) =>
+    Object.fromEntries(Object.entries(board || {}).filter(([t, list]) => tiersNow.has(t) || (list || []).length));
+  state.tierItems = keepTiers(withoutVideos(mapBoard(draft.tierItems, repoint), lost));
+  state.undoStack = (draft.undoStack || []).map((b) => mapBoard(b, repoint));
+  state.redoStack = (draft.redoStack || []).map((b) => mapBoard(b, repoint));
+  // The draft's hidden copies still on YouTube stay hidden (and staged for
+  // deletion): above all a half-done move's old copy - shown again, the
+  // auto-dedupe would keep the higher tier and silently undo the move.
+  const hidden = new Set();
+  for (const [tier, list] of Object.entries(draft.duplicateCopies || {})) {
+    for (const v of list || []) {
+      const id = renamedIn[tier]?.[v.id] ?? v.id;
+      if (!fresh.originalTierItems[tier] || goneIn[tier]?.has(v.id)) continue;
+      hidden.add(id);
+      if ((state.duplicateCopies[tier] || []).some((x) => x.id === id)) continue;
+      const copy = (state.originalTierItems[tier] || []).find((x) => x.id === id) ?? { ...v, id };
+      state.duplicateCopies[tier] = [...(state.duplicateCopies[tier] || []), copy];
+      state.originalTierItems[tier] = (state.originalTierItems[tier] || []).filter((x) => x.id !== id);
+      if (!state.originalTierItems[tier].some((x) => x.videoId === v.videoId)) {
+        const left = (state.originalTierOf[v.videoId] || []).filter((t) => t !== tier);
+        if (left.length) state.originalTierOf[v.videoId] = left;
+        else delete state.originalTierOf[v.videoId];
+      }
+    }
+  }
   // What YouTube has that the draft doesn't show anywhere (by item id).
   const shownIds = new Set(Object.values(state.tierItems).flat().map((v) => v.id));
   const leaving = new Set(liveTransfers.filter((t) => t.fromCategory === category).map((t) => t.id));
   const gained = [];
   for (const [tier, list] of Object.entries(fresh.originalTierItems)) {
     list.forEach((v, i) => {
-      if (shownIds.has(v.id) || leaving.has(transferId(v))) return;
+      if (shownIds.has(v.id) || hidden.has(v.id) || leaving.has(transferId(v))) return;
       // The draft shows the song in this tier under another copy: the
       // fresh copy is the same song, nothing to add.
       if ((state.tierItems[tier] || []).some((x) => x.videoId === v.videoId && !x.transfer)) return;
@@ -237,6 +259,7 @@ function restoreDraftInto(state, draft, category, liveTransfers) {
     });
   }
   for (const tier of Object.keys(fresh.originalTierItems)) state.tierItems[tier] ??= [];
+  for (const tier of Object.keys(state.tierItems)) state.tierItems[tier] = state.tierItems[tier].filter((v) => !hidden.has(v.id) || v.transfer);
   rebaseHistory(state, { lost, gained });
 }
 
@@ -291,6 +314,10 @@ const tiersSlice = createSlice({
     // push, an Add songs filing): a background refresh started before it
     // may not show it, so it is never laid under the board (landBoardRefresh).
     wroteSinceLoad: false,
+    // Which playlists the loaded board was built from (one id per tier, see
+    // useLoadTierBoard): a naming change that changes them reloads the board
+    // over its draft.
+    loadedPlaylists: null,
   },
   reducers: {
     resetTierBoard: (state, action) => {
@@ -316,6 +343,9 @@ const tiersSlice = createSlice({
     // refetch starts - see the useLoadTierBoard hook in App.jsx.
     setLoadedCategory: (state, action) => {
       state.loadedCategory = action.payload;
+    },
+    setLoadedPlaylists: (state, action) => {
+      state.loadedPlaylists = action.payload;
     },
     setAwaitingRefresh: (state, action) => {
       state.awaitingRefresh = action.payload;
@@ -681,6 +711,7 @@ export const {
   draftRestored,
   setLoadedCategory,
   setAwaitingRefresh,
+  setLoadedPlaylists,
   setTierForCategory,
   setTierItems,
   boardClosed,

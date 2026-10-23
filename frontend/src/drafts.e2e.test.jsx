@@ -9,6 +9,7 @@ import { FakeYoutube } from './test/fakeYoutube';
 import { mountApp, unmount, youtubeBoards } from './test/syncHarness';
 import { invariantViolations } from './test/syncInvariants';
 import { memoryDraftStorage, setDraftStorage } from './api/draftStore';
+import { setNaming } from './store/namingSlice';
 
 vi.mock('./components/PendingChanges', () => import('./test/boardProbe'));
 vi.mock('@mantine/notifications', () => ({ notifications: { show: vi.fn(), hide: vi.fn() }, Notifications: () => null }));
@@ -112,6 +113,26 @@ describe('several boards', () => {
   });
 });
 
+describe('a naming change with the board open', () => {
+  it('rebuilds the board from its new playlists, the staged change kept', async () => {
+    const yt = new FakeYoutube({ ...ACCOUNT, 'Rap Great': ['z'] });
+    const h = await mountApp(yt);
+    await h.open('Rap');
+    h.move('h', 'S');
+    // Settings -> Playlist naming: tier A is now named "Great".
+    const tierLabels = { S: 'S', A: 'Great', B: 'B', C: 'C', D: 'D', TODO: 'TODO' };
+    h.dispatch(setNaming({ template: '{category} {tier}', tierLabels, tierDisplayNames: { S: null, A: null, B: null, C: null, D: null, TODO: null } }));
+    await waitFor(() => expect(h.shown().A).toEqual(['z']));
+    await h.settle();
+    expect(h.tierOf('h')).toBe('S');
+    expect(h.staged()).toEqual([expect.objectContaining({ kind: 'move', from: 'TODO', to: 'S' })]);
+    await h.push();
+    expect(yt.videos('Rap S')).toEqual(['a', 'b', 'h']);
+    expect(yt.videos('Rap Great')).toEqual(['z']);
+    unmount();
+  });
+});
+
 describe('across a reload', () => {
   it('staged drafts come back, on their boards, with their undo history', async () => {
     const yt = new FakeYoutube(ACCOUNT);
@@ -155,7 +176,7 @@ describe('across a reload', () => {
     await h.open('Rap');
     expect(h.tierOf('h')).toBe('A');
     expect(h.staged()).toEqual([]);
-    expect(await screen.findByText(/Song h.*changed on YouTube since you staged TODO → S.*dropped/)).toBeInTheDocument();
+    expect(await screen.findByText(/Song h.*TODO → S no longer applies - on YouTube it’s in A now.*dropped/)).toBeInTheDocument();
     expect(await h.push()).toBeNull();
     expectYoutube(yt, { Rap: { S: ['a', 'b'], A: ['c', 'h'], TODO: ['i'] } }, null, { duplicates: false });
     unmount();

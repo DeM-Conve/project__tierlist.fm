@@ -14,6 +14,7 @@ import { setTheme, setTierPalette } from './store/appearanceSlice';
 import { expandPlayer, setFocusedVideo } from './store/focusSlice';
 import { selectStagedFailures } from './store/selectors';
 import { NO_TARGET_REASON } from './syncCache';
+import { memoryDraftStorage } from './api/draftStore';
 
 vi.mock('./components/PendingChanges', () => import('./test/boardProbe'));
 vi.mock('@mantine/notifications', () => ({ notifications: { show: vi.fn(), hide: vi.fn() }, Notifications: () => null }));
@@ -38,17 +39,20 @@ const ACCOUNT = {
 let yt;
 let h;
 let everySong;
+// This device's saved drafts (IndexedDB in the app), kept across reload().
+let storage;
 async function start(account = ACCOUNT, board = 'Rap') {
   everySong = [...new Set(Object.values(account).flat())];
   yt = new FakeYoutube(account);
-  h = await mountApp(yt);
+  storage = memoryDraftStorage();
+  h = await mountApp(yt, { draftStorage: storage });
   if (board) await h.open(board);
   return h;
 }
 // A page reload: a new session over the same YouTube.
 async function reload(board) {
   unmount();
-  h = await mountApp(yt);
+  h = await mountApp(yt, { draftStorage: storage });
   if (board) await h.open(board);
   return h;
 }
@@ -272,19 +276,25 @@ describe('journey 3: Settings changed while changes are staged and a song plays'
     h.move('a', 'TODO');
     h.move('h', 'S');
     await h.go('/settings?tab=naming');
-    // "Rap TODO" is no longer a to-do list under the new name.
+    // "Rap TODO" is no longer a to-do list under the new name: the board is
+    // rebuilt from its new playlists (fix/board-drafts), its draft laid over.
+    // h's move came from a list that's no longer on the board - dropped, and
+    // the board says so.
     saveNaming(h, { tierLabels: { ...LABELS, TODO: 'Inbox' } });
     await h.open('Rap');
+    expect(h.tierOf('h')).toBeUndefined();
+    expect(await h.screen.findByText(/Song h.*TODO → S no longer applies/)).toBeInTheDocument();
     await h.push();
     expect(invariantViolations(yt, { universe: everySong })).toEqual([]);
-    expect(youtubeBoards(yt).Rap.S).toEqual(['a', 'b', 'c', 'h']);
+    expect(youtubeBoards(yt).Rap.S).toEqual(['a', 'b', 'c']);
     // Not sent, and it says why until it's moved somewhere else.
     expect(selectStagedFailures(h.state)).toEqual([
       expect.objectContaining({ kind: 'move', to: 'TODO', failure: { step: 'insert', error: NO_TARGET_REASON } }),
     ]);
     expect(h.state.tiers.syncStatus).toBe('partial');
     h.move('a', 'D');
-    expectInSync(await h.push());
+    // (The board has no to-do list now: "Rap TODO" is just another playlist.)
+    expect(invariantViolations(yt, { universe: everySong, sync: await h.push() })).toEqual([]);
     expect(youtubeBoards(yt).Rap.D).toEqual(['g', 'a']);
   });
 
@@ -370,7 +380,7 @@ describe('journey 4: a push fails mid-journey, then navigate, reload, retry', ()
   // next push, so after a failed push on Rap every other board's bar says
   // "Sync failed" with nothing staged there to retry (and opening Pop also
   // drops Rap's failed changes - the per-board drafts issue).
-  it.fails('a failed push on one board does not say "Sync failed" on another board with nothing staged', async () => {
+  it('a failed push on one board does not say "Sync failed" on another board with nothing staged', async () => {
     await start();
     yt.failRequest({ url: '/api/tier-sync', status: 503 });
     h.move('a', 'A');
@@ -389,7 +399,7 @@ describe('journey 4: a push fails mid-journey, then navigate, reload, retry', ()
   // Options: keep the most recently added copy (the backend would have to
   // return each item's playlist-item publishedAt), or remember a half-done
   // move's leftover delete on this device across reloads.
-  it.fails('added but not removed, then reloaded before the retry: the song stays where it was moved', async () => {
+  it('added but not removed, then reloaded before the retry: the song stays where it was moved', async () => {
     await start();
     yt.inject({ op: 'delete', videoId: 'a', status: 500, times: 4 });
     h.move('a', 'A');
@@ -422,22 +432,40 @@ describe('journey 5: two tabs on the same account', () => {
     const b = await twoTabs();
     h.move('a', 'A');
     await h.push();
+    // Tab B hears of the push and redraws its board (fix/board-drafts): the
+    // song is in A there too, so B's move is from A.
+    await waitFor(() => expect(b.tierOf('a')).toBe('A'));
+    await b.settle();
     b.move('a', 'C');
     await b.push();
     expect(invariantViolations(yt, { universe: everySong })).toEqual([]);
-    expect(youtubeBoards(yt).Rap.A).toContain('a');
-    // Tab B's move wasn't made: it's still staged, with the reason.
-    expect(selectStagedFailures(b.state)).toEqual([expect.objectContaining({ kind: 'move', to: 'C' })]);
+    expect(youtubeBoards(yt).Rap.C).toEqual(['a']);
+    expect(selectStagedFailures(b.state)).toEqual([]);
   });
 
   it('a song removed in one tab is not brought back by a move pushed from the other', async () => {
     const b = await twoTabs();
     h.remove('b');
     await h.push();
-    b.move('b', 'A');
-    await b.push();
+    // Tab B redraws without it: there's nothing left to move.
+    await waitFor(() => expect(b.tierOf('b')).toBeUndefined());
+    await b.settle();
+    expect(await b.push()).toBeNull();
     expect(youtubeBoards(yt).Rap.A).toEqual(['d', 'e']);
     expect(Object.values(youtubeBoards(yt).Rap).flat()).not.toContain('b');
+  });
+
+  it('a tab with its own staged change redraws after the other tab pushes, keeping it', async () => {
+    const b = await twoTabs();
+    b.move('d', 'B');
+    h.move('a', 'A');
+    await h.push();
+    await waitFor(() => expect(b.tierOf('a')).toBe('A'));
+    await b.settle();
+    expect(b.tierOf('d')).toBe('B');
+    expect(b.staged()).toEqual([expect.objectContaining({ kind: 'move', to: 'B' })]);
+    await b.push();
+    expect(youtubeBoards(yt).Rap).toEqual({ S: ['b', 'c'], A: ['e', 'a'], B: ['f', 'd'], C: [], D: ['g'], TODO: ['h', 'i'] });
   });
 
   it('settings changed in both tabs: neither overwrites the other', async () => {

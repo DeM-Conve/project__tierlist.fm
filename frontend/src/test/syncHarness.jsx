@@ -62,7 +62,8 @@ export async function mountApp(yt, { path = '/', secondTab = false, draftStorage
   // A freshly mounted app is a new session (a page load): the push ledger is
   // module state, and each fake YouTube starts its item ids over.
   if (!secondTab) resetPushLedger();
-  setDraftStorage(draftStorage);
+  // (A second tab shares the first one's device storage.)
+  if (!secondTab) setDraftStorage(draftStorage);
   api.defaults.adapter = yt.adapter;
   const store = makeStore();
   const queryClient = createQueryClient();
@@ -202,7 +203,7 @@ export class Harness {
   }
 
   async logout() {
-    await act(async () => fireEvent.click(screen.getByRole('button', { name: /Log out/ })));
+    await act(async () => fireEvent.click(this.screen.getByRole('button', { name: /Log out/ })));
     await waitFor(() => {
       if (this.state.auth.loggedIn !== false) throw new Error('still logged in');
     });

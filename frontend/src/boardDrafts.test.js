@@ -61,7 +61,7 @@ describe('leaving a board with staged changes', () => {
     expect(ids('S')).toEqual(['a', 'b']);
     expect(ids('A')).toEqual(['c', 't1']);
     expect(selectPendingMoves(state())).toEqual([]);
-    expect(state().drafts.notes.Rock).toEqual([expect.objectContaining({ text: expect.stringMatching(/Song t1.*dropped/) })]);
+    expect(state().drafts.notes.Rock).toEqual([expect.objectContaining({ text: expect.stringMatching(/Song t1.*no longer applies.*dropped/) })]);
   });
 
   it('a change already done on YouTube needs no note', () => {

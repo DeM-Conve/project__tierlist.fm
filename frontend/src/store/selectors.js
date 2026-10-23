@@ -194,8 +194,16 @@ export function pendingMovesOfBoard(board) {
 
 // Is a kept board worth keeping as a draft: an undo step or a change the
 // user made (auto-staged duplicate removals come back with the data).
+// A hidden copy of a song the board shows in another tier is a half-done
+// move's leftover delete (applySyncedMoves' `inserted`): it's kept too - the
+// fresh data alone would show the song twice and keep the higher copy.
+const hasLeftoverDeletes = (board) =>
+  Object.entries(board.duplicateCopies || {}).some(([tier, list]) =>
+    (list || []).some((v) => !(board.tierItems?.[tier] || []).some((x) => x.videoId === v.videoId))
+  );
 export const boardHasEdits = (board) =>
-  !!board && ((board.undoStack || []).length > 0 || pendingMovesOfBoard(board).some((m) => m.kind !== 'dedupe'));
+  !!board &&
+  ((board.undoStack || []).length > 0 || pendingMovesOfBoard(board).some((m) => m.kind !== 'dedupe') || hasLeftoverDeletes(board));
 
 export const selectDuelPool = createSelector([selectTierItems], (tierItems) =>
   TIER_ORDER.flatMap((t) => tierItems[t] || [])
