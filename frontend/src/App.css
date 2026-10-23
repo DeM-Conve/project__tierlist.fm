@@ -262,6 +262,8 @@
 .player-queue-head { padding-right: 44px; } /* room for the minimize button */
 .queue-row-remove { opacity: 0; transition: opacity 0.1s ease; }
 .queue-row:hover .queue-row-remove, .queue-row-remove:focus-visible { opacity: 1; }
+/* No hover on a touch screen: the × is always shown there (a media query - no Mantine prop). */
+@media (hover: none) { .queue-row-remove { opacity: 1; } }
 /* Queue cover doubles as the play button: its ▶ overlay shows on hover (a :hover state - Mantine has no prop for it). */
 .queue-thumb-play { opacity: 0; transition: opacity 0.1s ease; }
 .queue-thumb:hover .queue-thumb-play, .queue-thumb:focus-visible .queue-thumb-play { opacity: 1; }
