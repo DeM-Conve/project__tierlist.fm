@@ -7,6 +7,7 @@ import { errorMessage } from '../api/client';
 import { selectTierGroups } from '../store/selectors';
 import { recordAction, revertAction } from '../store/addSongsSlice';
 import { addSyncedVideo, removeSyncedVideo } from '../store/tiersSlice';
+import { cancelTransfer } from '../tierActions';
 import { openFocus } from '../store/focusSlice';
 import { songLabel } from '../tierUtils';
 
@@ -144,6 +145,11 @@ export function useAddSongsActions(addSongs) {
       };
       await removeMutation.mutateAsync(now);
       pendingAdds.delete(entry.video.videoId);
+      // Sent on to another board since (staged, not pushed): that playlist
+      // item is gone now, so the song isn't on its way anywhere - drop the
+      // transfer, or Push would add the song back to the other board.
+      const staged = store.getState().transfers.list.find((t) => t.id === now.itemId);
+      if (staged) dispatch(cancelTransfer(staged));
       if (store.getState().tiers.loadedCategory === entry.category) {
         const tier = Object.keys(board).find((t) => board[t].id === now.playlistId) ?? entry.tier;
         dispatch(removeSyncedVideo({ tier, videoId: entry.video.videoId, itemId: now.itemId }));

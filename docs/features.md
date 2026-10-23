@@ -31,7 +31,7 @@
 - **`Ctrl+V` with a link on any page** (outside a text box) adds it and opens Add songs; anything that isn't a link says so.
 - Each added song becomes a card: cover (click / `Enter` to listen in the mini player), song + artist, the **board guessed from the artist** (from boards already loaded this session; else where the last one went - remembered across reloads on this device; `b` / the picker changes it) and big tier buttons: `Shift+1`-`5` (same key as rating anywhere else; plain digits still seek) puts it straight into that tier on YouTube, `t` "Later" = the board's TODO list. `s` skips, `x` removes it from the waiting list, `/` or `a` back to the input. Putting the playing song in a tier plays the next waiting one.
 - A song it knows is already in a tier shows "Already in <board> · <tier>" with Open it / Dismiss; one that slips through is auto-deduped when its board is opened.
-- "Waiting" strip (click to jump) and an "Added this session" list with per-row Undo; `u` / `Ctrl+Z` / the toast's Undo takes the last one out of its playlist again.
+- "Waiting" strip (click to jump) and an "Added this session" list with per-row Undo; `u` / `Ctrl+Z` / the toast's Undo takes the last one out of its playlist again - and if it was since sent on to another board (staged, not pushed), that move is dropped too, so a push never adds it back.
 - Errors say what YouTube actually said (daily quota used up, login expired, video not found) instead of a generic failure.
 
 ## Sidebar
