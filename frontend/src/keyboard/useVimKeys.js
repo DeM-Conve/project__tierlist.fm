@@ -8,12 +8,27 @@ import { youtubeUrl } from '../tierUtils';
 import { selectPlayerCoversPage } from '../store/selectors';
 import { parentOf } from '../upLevel';
 import './sequence';
+import { focusInOverlay } from './overlay';
 
 const board = (category, rest = '') => `/tier/${encodeURIComponent(category)}${rest}`;
 
 // App-wide Vimium-style keys (react-hotkeys-hook: `>` joins a sequence; form
 // fields are ignored by default). Page-level keys (board search, player,
 // Add songs, duel) stay in their own components - see shortcuts.js for the list.
+// A Vim key that stands down while focus is in a modal or menu (its keys
+// are its own: `a` mustn't navigate away under the "?" list). `f` (link
+// hints) is bound plainly - labelling a modal's buttons is useful.
+// Same (keys, callback, options | deps, deps) shape as useHotkeys. The
+// callback checks too: react-hotkeys-hook skips ignoreEventWhen for `g>h`
+// style sequences.
+function useVimKey(keys, callback, options, deps) {
+  const own = Array.isArray(options) ? {} : options ?? {};
+  const guarded = (e, handler) => {
+    if (!focusInOverlay()) callback(e, handler);
+  };
+  return useHotkeys(keys, guarded, { ignoreEventWhen: focusInOverlay, ...own }, Array.isArray(options) ? options : deps);
+}
+
 export function useVimKeys({ hintsRef, canvasRef, categories, currentCategory, playingCategory, playingVideoId, hasTodo }) {
   const navigate = useNavigate();
   const go = (path) => (e) => {
@@ -32,19 +47,19 @@ export function useVimKeys({ hintsRef, canvasRef, categories, currentCategory, p
     },
     { enabled: !playerCoversPage },
   );
-  useHotkeys('o', (e) => {
+  useVimKey('o', (e) => {
     e.preventDefault();
     spotlight.open();
   });
 
-  useHotkeys('g>h', go('/'));
-  useHotkeys('a', (e) => {
+  useVimKey('g>h', go('/'));
+  useVimKey('a', (e) => {
     e.preventDefault();
     navigate('/add', { state: { focusInput: true } });
   });
-  useHotkeys('g>s', go('/settings'));
-  useHotkeys('g>p', (e) => playingCategory && go(board(playingCategory))(e), deps);
-  useHotkeys('g>b', (e) => currentCategory && go(board(currentCategory))(e), deps);
+  useVimKey('g>s', go('/settings'));
+  useVimKey('g>p', (e) => playingCategory && go(board(playingCategory))(e), deps);
+  useVimKey('g>b', (e) => currentCategory && go(board(currentCategory))(e), deps);
   // Vimium's "go up": one level up (upLevel.js - the same target as every
   // page's "← parent" crumb). Home has no parent.
   // Alt+← (the primary key, shown on every crumb - VS Code's Go Back) does
@@ -56,13 +71,13 @@ export function useVimKeys({ hintsRef, canvasRef, categories, currentCategory, p
     e.preventDefault();
     navigate(up.to);
   };
-  useHotkeys('g>u', goUp, [pathname]);
-  useHotkeys('alt+left', goUp, [pathname]);
-  useHotkeys('g>d', (e) => currentCategory && go(board(currentCategory, '/duel'))(e), deps);
-  useHotkeys('g>t', (e) => currentCategory && hasTodo && go(board(currentCategory, `/t/${TODO_TIER}`))(e), deps);
+  useVimKey('g>u', goUp, [pathname]);
+  useVimKey('alt+left', goUp, [pathname]);
+  useVimKey('g>d', (e) => currentCategory && go(board(currentCategory, '/duel'))(e), deps);
+  useVimKey('g>t', (e) => currentCategory && hasTodo && go(board(currentCategory, `/t/${TODO_TIER}`))(e), deps);
   // The page canvas scrolls, not the window (see layout/canvas.js).
-  useHotkeys('g>g', () => canvasRef.current?.scrollTo({ top: 0, behavior: 'smooth' }));
-  useHotkeys('shift+g', () =>
+  useVimKey('g>g', () => canvasRef.current?.scrollTo({ top: 0, behavior: 'smooth' }));
+  useVimKey('shift+g', () =>
     canvasRef.current?.scrollTo({ top: canvasRef.current.scrollHeight, behavior: 'smooth' })
   );
 
@@ -74,12 +89,12 @@ export function useVimKeys({ hintsRef, canvasRef, categories, currentCategory, p
     e.preventDefault();
     el.scrollBy({ top: (dir * el.clientHeight) / 2, behavior: 'smooth' });
   };
-  useHotkeys('ctrl+d', halfPage(1), { enabled: !playerCoversPage });
-  useHotkeys('ctrl+u', halfPage(-1), { enabled: !playerCoversPage });
+  useVimKey('ctrl+d', halfPage(1), { enabled: !playerCoversPage });
+  useVimKey('ctrl+u', halfPage(-1), { enabled: !playerCoversPage });
 
   // Vimium's "g i": focus the page's first text box (Home's filter, a tier
   // page's filter, Add songs' link box, Settings' template...).
-  useHotkeys(
+  useVimKey(
     'g>i',
     (e) => {
       const input = canvasRef.current?.querySelector(
@@ -93,7 +108,7 @@ export function useVimKeys({ hintsRef, canvasRef, categories, currentCategory, p
   );
 
   // Previous / next board, in sidebar order (from anywhere: the first/last).
-  useHotkeys(
+  useVimKey(
     ['[', ']'],
     (e) => {
       if (!categories.length) return;
@@ -108,11 +123,11 @@ export function useVimKeys({ hintsRef, canvasRef, categories, currentCategory, p
   );
 
   // Back / forward, like Vimium's H / L.
-  useHotkeys('shift+h', () => navigate(-1));
-  useHotkeys('shift+l', () => navigate(1));
+  useVimKey('shift+h', () => navigate(-1));
+  useVimKey('shift+l', () => navigate(1));
 
   // Copy the playing song's YouTube link (else this page's address).
-  useHotkeys(
+  useVimKey(
     'y>y',
     () => {
       const url = playingVideoId ? youtubeUrl(playingVideoId) : window.location.href;

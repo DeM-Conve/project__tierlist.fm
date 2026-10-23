@@ -25,6 +25,7 @@ import QueuePanel from './QueuePanel';
 import EmbeddedPlayer from './EmbeddedPlayer';
 import { usePlayerTime } from './usePlayerTime';
 import { isSequenceKey } from '../keyboard/sequence';
+import { focusInOverlay } from '../keyboard/overlay';
 import { useDevicePref } from '../settings';
 
 // Renders in 'expanded' (full-screen modal), 'mini' (YouTube-Music-style
@@ -230,13 +231,19 @@ export default function PlayerDock({
       const active = document.activeElement;
       const isTyping =
         active?.tagName === 'INPUT' || active?.tagName === 'TEXTAREA' || active?.isContentEditable;
-      if (isTyping) return;
+      if (isTyping || focusInOverlay()) return;
       // Ctrl/Cmd-K opens the command palette, Alt-anything is a browser/OS
       // shortcut - e.key is still just 'k' either way, so without this
       // check e.g. Cmd+K would open the palette *and* expand the dock at
       // the same time. Shift is allowed through (shift+digit reassigns a
       // tier below).
       if (e.ctrlKey || e.metaKey || e.altKey) return;
+      // A held key repeats: one press, one action - only seeking (the
+      // expanded view's arrows) may run on while held.
+      if (e.repeat && !(expanded && (e.key === 'ArrowLeft' || e.key === 'ArrowRight'))) {
+        if (e.key === ' ' || e.code === 'Space') e.preventDefault();
+        return;
+      }
 
       if (e.key === 'Escape') {
         if (expanded) onMinimize();

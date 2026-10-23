@@ -133,3 +133,37 @@ describe('useVimKeys g u', () => {
     expect(screen.getByTestId('where')).toHaveTextContent(/^\/$/);
   });
 });
+
+// A focused element inside a modal / menu, like the "?" list or a song's
+// "..." menu, removed after the test.
+function focusInside(role) {
+  const box = document.createElement('div');
+  box.setAttribute('role', role);
+  const button = document.createElement('button');
+  box.appendChild(button);
+  document.body.appendChild(box);
+  button.focus();
+  return () => box.remove();
+}
+
+describe('useVimKeys inside a modal or menu', () => {
+  it.each(['dialog', 'menu'])('a navigation key does nothing while focus is in a %s', (role) => {
+    setup({ path: '/settings' });
+    const remove = focusInside(role);
+    fireEvent.keyDown(document.activeElement, { key: 'a', code: 'KeyA' });
+    fireEvent.keyDown(document.activeElement, { key: 'g', code: 'KeyG' });
+    fireEvent.keyDown(document.activeElement, { key: 'h', code: 'KeyH' });
+    expect(screen.getByTestId('where')).toHaveTextContent(/^\/settings$/);
+    remove();
+    fireEvent.keyDown(document, { key: 'a', code: 'KeyA' });
+    expect(screen.getByTestId('where')).toHaveTextContent(/^\/add$/);
+  });
+
+  it('f still labels the modal’s own buttons', () => {
+    const { open } = setup();
+    const remove = focusInside('dialog');
+    fireEvent.keyDown(document.activeElement, { key: 'f', code: 'KeyF' });
+    remove();
+    expect(open).toHaveBeenCalledTimes(1);
+  });
+});

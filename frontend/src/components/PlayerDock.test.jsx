@@ -64,6 +64,8 @@ function dock(props = {}) {
 }
 
 beforeEach(() => {
+  // Volume / mute are remembered per device - start each test unmuted.
+  localStorage.clear();
   h.renders.queue = 0;
   h.renders.chip = 0;
   h.player = {
@@ -184,5 +186,54 @@ describe('PlayerDock repeat all', () => {
     fireEvent.keyDown(window, { key: 'l', code: 'KeyL' });
     expect(h.embed.onEnded).toBeUndefined();
     expect(onNext).not.toHaveBeenCalled();
+  });
+});
+
+describe('PlayerDock keys inside a modal or menu, and held keys', () => {
+  function focusInside(role) {
+    const box = document.createElement('div');
+    box.setAttribute('role', role);
+    const button = document.createElement('button');
+    box.appendChild(button);
+    document.body.appendChild(box);
+    button.focus();
+    return () => box.remove();
+  }
+
+  it.each(['dialog', 'menu'])('takes no keys while focus is in a %s (Esc closes it, not the player)', (role) => {
+    const onMinimize = vi.fn();
+    const onFloat = vi.fn();
+    dock({ mode: 'expanded', onMinimize, onFloat, queue: { history: [], current: entry, upcoming: [], contextLabel: '' } });
+    const remove = focusInside(role);
+    for (const [key, code] of [[' ', 'Space'], ['Escape', 'Escape'], ['j', 'KeyJ'], ['m', 'KeyM'], ['5', 'Digit5']]) {
+      fireEvent.keyDown(document.activeElement, { key, code });
+    }
+    remove();
+    expect(onMinimize).not.toHaveBeenCalled();
+    expect(h.player.pauseVideo).not.toHaveBeenCalled();
+    expect(h.player.mute).not.toHaveBeenCalled();
+    expect(h.player.seekTo).not.toHaveBeenCalled();
+    fireEvent.keyDown(window, { key: 'Escape', code: 'Escape' });
+    expect(onMinimize).toHaveBeenCalledTimes(1);
+  });
+
+  it('a held key acts once (Space, l)', () => {
+    const onNext = vi.fn();
+    dock({ hasNext: true, onNext });
+    fireEvent.keyDown(window, { key: ' ', code: 'Space' });
+    fireEvent.keyDown(window, { key: ' ', code: 'Space', repeat: true });
+    fireEvent.keyDown(window, { key: 'l', code: 'KeyL' });
+    fireEvent.keyDown(window, { key: 'l', code: 'KeyL', repeat: true });
+    expect(h.player.pauseVideo).toHaveBeenCalledTimes(1);
+    expect(h.player.playVideo).not.toHaveBeenCalled();
+    expect(onNext).toHaveBeenCalledTimes(1);
+  });
+
+  it('held arrows keep seeking in the expanded view', () => {
+    h.player.getCurrentTime = () => 30;
+    dock({ mode: 'expanded', queue: { history: [], current: entry, upcoming: [], contextLabel: '' } });
+    fireEvent.keyDown(window, { key: 'ArrowRight', code: 'ArrowRight' });
+    fireEvent.keyDown(window, { key: 'ArrowRight', code: 'ArrowRight', repeat: true });
+    expect(h.player.seekTo).toHaveBeenCalledTimes(2);
   });
 });
