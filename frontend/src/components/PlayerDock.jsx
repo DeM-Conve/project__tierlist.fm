@@ -330,10 +330,15 @@ export default function PlayerDock({
     held,
   ]);
 
+  // Asks the player what it's doing (1 playing, 3 buffering) rather than
+  // trusting isPlaying, which can lag behind it (a blocked autoplay, a
+  // just-loaded video) - so one press always does the right thing.
   function togglePlay() {
     const player = playerRef.current;
     if (!player) return;
-    if (isPlaying) player.pauseVideo?.();
+    const state = player.getPlayerState?.();
+    const playing = state === undefined ? isPlaying : state === 1 || state === 3;
+    if (playing) player.pauseVideo?.();
     else player.playVideo?.();
   }
 

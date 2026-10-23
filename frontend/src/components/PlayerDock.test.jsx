@@ -79,6 +79,14 @@ describe('PlayerDock keys', () => {
     expect(h.player.pauseVideo).toHaveBeenCalledTimes(1);
   });
 
+  it('Space plays a video that isn\'t playing although the dock last heard "playing" (blocked autoplay)', () => {
+    h.player.getPlayerState = () => 5; // cued
+    dock();
+    fireEvent.keyDown(window, { key: ' ', code: 'Space' });
+    expect(h.player.playVideo).toHaveBeenCalledTimes(1);
+    expect(h.player.pauseVideo).not.toHaveBeenCalled();
+  });
+
   it('leaves a key the page already took (defaultPrevented) to the page', () => {
     dock();
     const claimM = (e) => e.key === 'm' && e.preventDefault();

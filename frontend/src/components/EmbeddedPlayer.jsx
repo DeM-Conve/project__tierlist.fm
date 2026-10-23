@@ -53,7 +53,11 @@ export default function EmbeddedPlayer({ videoId, autoplay = true, onEnded, onPl
             if (cancelled) return;
             if (e.data === window.YT.PlayerState.ENDED) onEndedRef.current?.();
             if (e.data === window.YT.PlayerState.PLAYING) onPlayingChangeRef.current?.(true);
-            if (e.data === window.YT.PlayerState.PAUSED) onPlayingChangeRef.current?.(false);
+            // Ended (or cued, when the browser blocks autoplay) isn't playing
+            // either - else a Pause button shows over a stopped video.
+            if ([window.YT.PlayerState.PAUSED, window.YT.PlayerState.ENDED, window.YT.PlayerState.CUED].includes(e.data)) {
+              onPlayingChangeRef.current?.(false);
+            }
           },
         },
       });
