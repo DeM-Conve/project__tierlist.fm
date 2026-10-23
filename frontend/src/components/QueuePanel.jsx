@@ -6,6 +6,7 @@ import { useVirtualizer } from '@tanstack/react-virtual';
 import { Play, Shuffle, X } from 'lucide-react';
 import { EqualizerMark, TierChip } from './TierBits';
 import { queueMove, queueSlot } from '../queueTimeline';
+import { queueContextText, useTierName } from '../tierLabels';
 
 // A queue row is 6px + a 40px cover + 6px, plus a 2px gap below it. Exact,
 // so only the playing song's row (which carries the "Up next" header) is
@@ -109,7 +110,9 @@ const Row = memo(function Row({ entry, section, index, dimmed, isCurrent, onPlay
 // screen are rendered. The playing song is a drag-disabled row, so a drop
 // above it lands in history and below it in Up next (queueTimeline.js).
 export default function QueuePanel({ queue, current, onJump, onRemove, onMove, onShuffle }) {
-  const { history, upcoming, contextLabel } = queue;
+  const { history, upcoming } = queue;
+  const tierName = useTierName();
+  const contextLabel = queueContextText(queue.contextLabel, tierName);
   const viewportRef = useRef(null);
   const H = history.length;
   const rows = useMemo(() => [...history, current, ...upcoming], [history, current, upcoming]);

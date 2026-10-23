@@ -10,7 +10,7 @@ import { mountApp, unmount, youtubeBoards } from './test/syncHarness';
 import { invariantViolations } from './test/syncInvariants';
 import { setNaming } from './store/namingSlice';
 import { setTheme, setTierPalette } from './store/appearanceSlice';
-import { setFocusedVideo } from './store/focusSlice';
+import { expandPlayer, setFocusedVideo } from './store/focusSlice';
 import { selectStagedFailures } from './store/selectors';
 import { NO_TARGET_REASON } from './syncCache';
 
@@ -247,6 +247,16 @@ describe('journey 3: Settings changed while changes are staged and a song plays'
     await h.open('Rap');
     expect(h.staged()).toHaveLength(2);
     expectInSync(await h.push());
+  });
+
+  it('a tier shown under a new name: the player says where it plays from by that name', async () => {
+    await start();
+    h.probe().ctx.playFrom('A');
+    h.dispatch(expandPlayer());
+    expect(h.screen.getByText('Rap · A')).toBeInTheDocument();
+    await h.go('/settings?tab=naming');
+    saveNaming(h, { tierDisplayNames: { ...NO_SHOWN, A: 'Great' } });
+    expect(await h.screen.findByText('Rap · Great')).toBeInTheDocument();
   });
 
   it('the to-do name changed with a move to TODO staged: the push never loses the song', async () => {

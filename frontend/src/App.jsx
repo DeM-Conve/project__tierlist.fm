@@ -592,7 +592,7 @@ function Layout() {
         queue: pool.map((e) => e.video.videoId),
         entries: focusSequence,
         category: currentCategory,
-        label: tier ? `${currentCategory} · ${tierName(tier)}` : currentCategory,
+        label: { board: currentCategory, tier },
       })
     );
   }
@@ -625,7 +625,7 @@ function Layout() {
         queue: todo.map((e) => e.video.videoId),
         entries: focusSequence,
         category: currentCategory,
-        label: `${currentCategory} · ${tierName(TODO_TIER)}`,
+        label: { board: currentCategory, tier: TODO_TIER },
         triage: true,
       })
     );
@@ -653,7 +653,7 @@ function Layout() {
         videoId: first.video.videoId,
         entries: focusSequence,
         category: currentCategory,
-        label: `${currentCategory}${tier ? ` · ${tierName(tier)}` : ''} · shuffle`,
+        label: { board: currentCategory, tier, shuffle: true },
       })
     );
   }

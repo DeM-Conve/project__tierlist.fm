@@ -27,3 +27,12 @@ export function useTierName() {
   const d = useSelector((s) => s.naming.tierDisplayNames);
   return (slot) => nameOf(slot, l, d);
 }
+
+// What the player says it plays from ("Rap · A · shuffle"). A board's tier
+// is kept as its slot ({ board, tier, shuffle }) and named when shown, so
+// renaming the tier in Settings renames it in the player too; any other
+// context (Add songs) is plain text.
+export function queueContextText(label, name = tierName) {
+  if (!label || typeof label === 'string') return label || null;
+  return [label.board, label.tier && name(label.tier), label.shuffle && 'shuffle'].filter(Boolean).join(' · ');
+}
