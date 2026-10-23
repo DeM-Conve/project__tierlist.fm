@@ -105,6 +105,13 @@ export const selectPendingMoves = createSelector(
       video.id == null ? undefined : BOARD_TIERS.find((t) => (originalTierItems?.[t] || []).some((v) => v.id === video.id));
     const multiDone = new Set();
     const stillIn = (t, videoId) => (tierItems[t] || []).some((v) => v.videoId === videoId);
+    // Songs sent here from another board (staged transfers): the tier each
+    // was dropped on. A board that already had the song keeps it there - its
+    // own copy goes, like any copy the user dragged a song away from.
+    const arrived = new Map();
+    for (const tier of BOARD_TIERS) {
+      for (const v of tierItems[tier] || []) if (v.transfer && !arrived.has(v.videoId)) arrived.set(v.videoId, tier);
+    }
     // A hidden copy (the same playlist listing it twice, or the old copy a
     // half-done push left behind) is kept wherever the board has the song.
     for (const tier of BOARD_TIERS) {
@@ -119,6 +126,10 @@ export const selectPendingMoves = createSelector(
         if (video.transfer) continue;
         const originalTiers = originalTierOf[video.videoId];
         if (!originalTiers) continue;
+        if (arrived.has(video.videoId)) {
+          moves.push({ kind: 'dedupe', video, tier, keptTier: arrived.get(video.videoId) });
+          continue;
+        }
 
         if (originalTiers.length > 1) {
           // A song on YouTube in several of this board's tiers: the copy the

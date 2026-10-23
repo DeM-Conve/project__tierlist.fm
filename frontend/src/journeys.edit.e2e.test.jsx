@@ -180,6 +180,30 @@ describe('journey 2: send a song to another board, change your mind there, push'
     expectInSync(await h.push(), { others: { Pop: { S: ['p', 'q', 'a'], TODO: ['s'] } } });
   });
 
+  it('sent to a board that already has the song: it is not listed there twice', async () => {
+    await start({ ...ACCOUNT, 'Rap B': ['f', 'p'] });
+    await h.transfer('p', 'Pop', 'A');
+    // Pop already has p in S: it goes where it was dropped, and Pop's own
+    // copy is staged for removal (greyed "Duplicate" on the board) - the
+    // push leaves YouTube with one copy on Pop.
+    expect(h.staged()).toEqual([
+      expect.objectContaining({ kind: 'dedupe', tier: 'S', keptTier: 'A' }),
+      expect.objectContaining({ kind: 'transfer', toCategory: 'Pop', toTier: 'A' }),
+    ]);
+    const sync = await h.push();
+    expect(youtubeBoards(yt).Pop).toEqual({ S: ['q'], A: ['r', 'p'], TODO: ['s'] });
+    expectInSync(sync, { others: { Rap: { B: ['f'] } } });
+  });
+
+  it('sent to a board that already has the song, then the drop undone: nothing is staged', async () => {
+    await start({ ...ACCOUNT, 'Rap B': ['f', 'p'] });
+    await h.transfer('p', 'Pop', 'A');
+    h.undo();
+    expect(h.staged()).toEqual([]);
+    expect(await h.push()).toBeNull();
+    expectInSync(null, { others: { Rap: { B: ['f', 'p'] } } });
+  });
+
   it('sent away, a move of its own staged on the old board, then put back from the review', async () => {
     await start();
     h.move('d', 'B');
