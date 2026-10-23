@@ -50,7 +50,9 @@ describe('render cost on a 333-song board', () => {
   it('a sidebar filter keystroke re-renders the sidebar, not the board', async () => {
     const h = await mountApp(new FakeYoutube(account()));
     await measure('open 333-song board', () => h.open('Big'));
-    await measure('move one song S -> A', async () => h.move(h.tierItems().S[3].videoId, 'A'));
+    const move = await measure('move one song S -> A', async () => h.move(h.tierItems().S[3].videoId, 'A'));
+    // Only the two rows the song left and joined (×2 commits) - was all 6.
+    expect(move.count('TierRow')).toBeLessThanOrEqual(4);
     const input = rtl.screen.getByPlaceholderText('Filter boards…');
     const key = await measure('sidebar filter keystroke', async () => {
       await rtl.act(async () => rtl.fireEvent.change(input, { target: { value: 'r' } }));
@@ -88,10 +90,14 @@ describe('render cost on a 333-song board', () => {
     await h.open('Big');
     await rtl.act(async () => rtl.fireEvent.keyDown(document, { key: '/', code: 'Slash' }));
     const find = await rtl.screen.findByPlaceholderText('/search titles...');
-    const k1 = await measure('Find keystroke (board)', async () => {
-      await rtl.act(async () => rtl.fireEvent.change(find, { target: { value: 'v00000001' } }));
+    const k1 = await measure('Find keystroke (board, 100 matches)', async () => {
+      await rtl.act(async () => rtl.fireEvent.change(find, { target: { value: '/v00000000' } }));
+    });
+    const k2 = await measure('Find next keystroke (board, 100 -> 10 matches)', async () => {
+      await rtl.act(async () => rtl.fireEvent.change(find, { target: { value: '/v000000001' } }));
     });
     expect(k1.renders).toBeGreaterThan(0);
+    expect(k2.renders).toBeGreaterThan(0);
   }, 60000);
 
   it('typing in the tier page filter', async () => {

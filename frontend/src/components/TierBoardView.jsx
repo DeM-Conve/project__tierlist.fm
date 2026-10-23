@@ -1,4 +1,4 @@
-import { useCallback, useDeferredValue, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { memo, useCallback, useDeferredValue, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { tierName } from '../tierLabels';
 import { useDispatch, useSelector } from 'react-redux';
 import {
@@ -52,12 +52,18 @@ function DropIndicator({ bar }) {
   );
 }
 
+// No search: one constant, so matchedKeys (and the rows' memo) hold still
+// while the board changes.
+const NO_MATCHES = [];
+
 // One tier row. Shows `lines` lines of tiles (the board sizes that so every
 // row together fills the screen) and folds the rest into a "+N" tile - so
 // the whole board fits on one screen, however big a tier gets. The chevron
 // column on the right expands the row in place to every song (and folds it
 // back); "+N" and the tier label open the tier's list page.
-function TierRow({
+// Memoised: a move redraws the two rows it touched, not all six (their
+// other props are stable - see pendingRemovalKeys and NO_MATCHES below).
+const TierRow = memo(function TierRow({
   tier,
   tiers,
   items,
@@ -344,7 +350,7 @@ function TierRow({
       </Tooltip>
     </Box>
   );
-}
+});
 
 export default function TierBoardView({
   category,
@@ -384,10 +390,13 @@ export default function TierBoardView({
   const total = tiers.reduce((sum, t) => sum + counts[t], 0);
   const todoCount = tierItems[TODO_TIER]?.length ?? 0;
   const hasVideos = total + todoCount > 0;
-  const pendingRemovalKeys = useMemo(
-    () => new Set(pendingMoves.filter((m) => m.kind === 'dedupe' && m.tier !== m.keptTier).map((m) => `${m.tier}:${m.video.videoId}`)),
-    [pendingMoves]
-  );
+  // Keyed by content: pendingMoves is a new array on every move, and a new
+  // Set each time redrew every (memoised) row.
+  const pendingRemovalKey = pendingMoves
+    .filter((m) => m.kind === 'dedupe' && m.tier !== m.keptTier)
+    .map((m) => `${m.tier}:${m.video.videoId}`)
+    .join('\n');
+  const pendingRemovalKeys = useMemo(() => new Set(pendingRemovalKey ? pendingRemovalKey.split('\n') : []), [pendingRemovalKey]);
 
   // Fit the board to the screen: measure what's left of the viewport under
   // the header (and above the mini player / footer), turn it into tile
@@ -475,7 +484,7 @@ export default function TierBoardView({
   // wraps hundreds of tiles - the box keeps up with typing, the rows follow.
   const queryText = useDeferredValue(searchQuery.slice(1));
   const matches = useMemo(() => {
-    if (!queryText.trim()) return [];
+    if (!queryText.trim()) return NO_MATCHES;
     return searchableEntries.filter((e) => videoMatches(e.video, queryText));
   }, [searchableEntries, queryText]);
 

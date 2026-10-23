@@ -1,4 +1,4 @@
-import { Suspense, lazy, memo, useEffect, useMemo, useRef, useState } from 'react';
+import { Suspense, lazy, memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { tierName } from './tierLabels';
 import { useDispatch, useSelector, useStore } from 'react-redux';
 import { useQueryClient } from '@tanstack/react-query';
@@ -1104,6 +1104,8 @@ function TierBoardPage() {
   // "Add a TODO list": link an existing playlist first, create as a fallback.
   const [addingTodo, setAddingTodo] = useState(false);
   const base = `/tier/${encodeURIComponent(category)}`;
+  // Stable: the board's rows are memoised and take it.
+  const openTier = useCallback((t) => navigate(`${base}/t/${t}`), [navigate, base]);
 
   return (
     <BoardShell error={error} onRetry={retry} refreshError={refreshError} onRetryRefresh={retryRefresh}>
@@ -1137,7 +1139,7 @@ function TierBoardPage() {
         onPlayFrom={playFrom}
         onShufflePlay={startShufflePlay}
         onStartDuel={() => navigate(`${base}/duel`)}
-        onOpenTier={(t) => navigate(`${base}/t/${t}`)}
+        onOpenTier={openTier}
         onAddMissingTiers={(tiers) =>
           tiers.length === 1 && tiers[0] === TODO_TIER ? setAddingTodo(true) : setAddingTiers(tiers)
         }
