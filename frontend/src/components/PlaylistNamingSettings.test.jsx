@@ -62,6 +62,19 @@ describe('Playlist naming', () => {
     expect(within(preview()).getByText('Fix the template / tier names above to see what matches.')).toBeInTheDocument();
   });
 
+  // The server (and Postgres' CHECK) refuse these - flagged before Save, not
+  // a "Couldn't save" toast after a 400.
+  it('a tier name the database would refuse says why and can’t be saved', () => {
+    draw();
+    const tier2 = screen.getByRole('textbox', { name: 'Tier 2' });
+    fireEvent.change(tier2, { target: { value: 'S²' } });
+    expect(screen.getByText('Same as S')).toBeInTheDocument();
+    expect(saveButton()).toBeDisabled();
+    fireEvent.change(tier2, { target: { value: '①' } });
+    expect(screen.getByText("Needs a plain letter or digit - ① or ² don't count")).toBeInTheDocument();
+    expect(saveButton()).toBeDisabled();
+  });
+
   it('Save applies the naming and renames nothing on YouTube', () => {
     const post = vi.spyOn(api, 'post');
     const put = vi.spyOn(api, 'put');
