@@ -62,32 +62,34 @@ The user's finding: every feature works alone, but moving between them is incohe
 from Settings, open another board, come back - the rating is gone). Each journey below runs end to
 end through the real App over the fake YouTube (`src/test/syncHarness.jsx`) and must leave the
 boards, the pending bar, the player, the rail and YouTube agreeing with each other.
-- [~] Staged changes survive navigation: per-board drafts, one global pending bar, auto-dedupes
-  shown apart, rating the playing song from any page stages on its own board (`fix/board-drafts`)
+- [x] Staged changes survive navigation: per-board drafts, one global pending bar, auto-dedupes
+  shown apart, rating the playing song from any page stages on its own board, drafts kept across
+  reloads per account (`fix/board-drafts`, `src/drafts.e2e.test.jsx`)
 - [x] Play from board A, browse to B / Home / Settings / Duels, rate / remove / skip from the player
   (`qa/journeys-player`, `src/journeys.player.e2e.test.jsx`: the player's tier is read live from its
   board, each queued song keeps its own board, no rating for a song that left its board, triage only
   advances on its own board)
 - [x] Duel on A while the player plays a song from B; suggested Move pushes; back on B
-  (`qa/journeys-player`; a staged edit on A is still lost on the way to B - `it.fails`, `fix/board-drafts`)
+  (`qa/journeys-player`; a staged edit on A kept on the way to B - `fix/board-drafts`)
 - [x] Add songs into A and B, then drag them, undo, push, reload (`qa/journeys-edit`,
   `src/journeys.edit.e2e.test.jsx`: undoing a filing now also drops its staged move to another board)
 - [x] Drag a song to another board via the sidebar, change your mind on the target board, push
   (`qa/journeys-edit`: a song sent to a board that already has it is no longer pushed twice)
 - [x] Change naming / tier names / theme in Settings with staged changes and a playing song
   (`qa/journeys-edit`: a move into a tier that lost its playlist is held back instead of deleting the
-  song; the player names its tier by the current name. Still open: the loaded board keeps showing a
-  tier the naming no longer has until it's reloaded - `loadBoard`, for `fix/board-drafts`)
-- [x] Push failure (quota) mid-journey, then navigate, reload, retry (`qa/journeys-edit`; two
-  `it.fails`: "Sync failed" shows on every other board - global bar, `fix/board-drafts`; a half-done
-  move reloaded before its retry is auto-deduped back to the higher tier - open question below)
+  song; the player names its tier by the current name. `fix/board-drafts`: a naming change that changes
+  the open board's playlists rebuilds it, its draft laid over)
+- [x] Push failure (quota) mid-journey, then navigate, reload, retry (`qa/journeys-edit`;
+  `fix/board-drafts`: one global bar, so no other board says "Sync failed" with nothing staged; a
+  half-done move's leftover delete is kept in the saved draft, so a reload keeps the move)
 - [x] Two browser tabs on the same account (staged changes, settings, pushes) (`qa/journeys-edit`:
   playlist writes are announced to other tabs, whose next push re-reads them - no duplicate, no
-  removed song back; settings already merge on 412. The other tab's board isn't redrawn until reload)
-- [~] Every page's counts (sidebar, header bar, rail, pending bar, Home cards) agree at every step
-  (`qa/journeys-player`: a push now updates the sidebar / Home / off-board rail counts; with changes
-  staged, the sidebar and Home cards still count YouTube while the board and rail count the draft -
-  `it.fails`, for `fix/board-drafts`)
+  removed song back; settings already merge on 412. `fix/board-drafts`: the other tab's open board is
+  redrawn, its draft laid over)
+- [x] Every page's counts (sidebar, header bar, rail, pending bar, Home cards) agree at every step
+  (`qa/journeys-player`: a push now updates the sidebar / Home / off-board rail counts;
+  `fix/board-drafts`: a board with unpushed changes is counted as its draft everywhere, with an
+  "unpushed" dot)
 
 ## Follow-ups
 - [x] Frontend tier-name validation matches the backend's (no "①", "S²" = "S") (`fix/tier-label-parity`, merged, deployed 2026-10-23)
@@ -95,10 +97,11 @@ boards, the pending bar, the player, the rail and YouTube agreeing with each oth
 - [ ] Duel session start analyses the board twice (~30 ms on 333 songs)
 
 ## Open questions for the user
-- [!] A push that added a song to its new tier but couldn't delete the old copy, then a reload:
-  the board finds it in both tiers and auto-dedupes to the higher one, undoing the move. Keep the
-  most recently added copy instead (backend returns each item's added-at), or remember the leftover
-  delete on this device? (test: "added but not removed, then reloaded before the retry", `it.fails`)
+- [x] A push that added a song to its new tier but couldn't delete the old copy, then a reload:
+  the board found it in both tiers and auto-deduped to the higher one, undoing the move. Decided:
+  remember the leftover delete on this device - it's part of the saved draft (`fix/board-drafts`;
+  the test "added but not removed, then reloaded before the retry" passes). A different browser
+  still auto-dedupes it the documented way.
 - [!] `scripts/restore.sh` run without hl's COMPOSE_* variables restores into a fresh standalone db, not hl's - refuse when no project is set and an `hl-*` project is running?
 - [!] Add songs: Enter always means "listen", even on a focused button - pass Enter through after Tab (keyboard focus) only?
 - [!] Pasting non-link text outside a text box is silently ignored - show a message everywhere?
@@ -110,9 +113,11 @@ boards, the pending bar, the player, the rail and YouTube agreeing with each oth
 - [!] Duels: "Don't know one of them" (`s`) always skips song B - add a way to say it's song A?
 - [!] Duels: 2-minute grace to answer the last duel after time runs out - right length?
 - [!] Shift+digit rating: the player and Tier Rail number only the tiers a board has (no S tier -> Shift+1 = A), Add songs always uses fixed S-D. Which should it be?
-- [!] Opening another board silently drops the open board's staged (unpushed) moves - only
-  dragging to another board warns. Keep a draft per board, or confirm before leaving?
-  (test: "keeps the staged moves of the board left behind", `it.fails`)
+- [x] Opening another board silently dropped the open board's staged (unpushed) moves.
+  Decided (the user, 2026-10-23): **a draft per board** - unpushed changes belong to their
+  board and never vanish on navigation; one global pending bar pushes every board's; auto-dedupes
+  shown apart; rating the playing song stages it on its own board; drafts survive a reload
+  (`fix/board-drafts`; the test "keeps the staged moves of the board left behind" passes now).
 - [x] `useBoardDropOpen` counted auto-dedupes as staged changes (fixed in qa/boards).
 - [!] Big tiers: a tile's full title is now the browser's native tooltip (fast), not Mantine's. OK?
 - [!] Tier page keeps its filter text when switching tier tabs - clear it instead?
