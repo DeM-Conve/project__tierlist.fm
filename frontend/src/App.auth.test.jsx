@@ -101,6 +101,15 @@ describe('the playlists list failing to load', () => {
     expect(refetch).toHaveBeenCalled();
   });
 
+  it('a board whose login expired offers Log in again', async () => {
+    h.auth = loggedIn;
+    h.playlists = { data: undefined, refetch: vi.fn(), isFetching: false,
+      error: { response: { status: 401, data: { detail: 'You’re not logged in (or your login expired) - log in again.' } } } };
+    renderApp('/tier/Rap');
+    expect(await screen.findByText('Couldn’t load this board')).toBeInTheDocument();
+    expect(within(document.querySelector('main')).getByRole('button', { name: 'Log in again' })).toBeInTheDocument();
+  });
+
   it('the side panel says so too, with Retry - not placeholders forever', async () => {
     const refetch = vi.fn();
     h.auth = loggedIn;

@@ -1034,11 +1034,19 @@ function BoardRefreshNotice({ error, onRetry }) {
   );
 }
 
+// The login expired (401) or lacks the YouTube permission (403): Retry
+// can't fix that - logging in again can.
+const needsLogin = (error) => [401, 403].includes(error?.response?.status);
+const relogin = () => (window.location.href = `${API_BASE}/oauth2/authorization/google`);
+
 function BoardLoadError({ error, onRetry }) {
   return (
     <Alert color="red" title="Couldn’t load this board">
       {errorMessage(error, 'The app couldn’t load this board’s playlists from YouTube.')}
-      <Box mt="sm"><Button size="compact-sm" variant="default" onClick={onRetry}>Retry</Button></Box>
+      <Flex mt="sm" gap="sm">
+        <Button size="compact-sm" variant="default" onClick={onRetry}>Retry</Button>
+        {needsLogin(error) && <Button size="compact-sm" onClick={relogin}>Log in again</Button>}
+      </Flex>
     </Alert>
   );
 }
@@ -1080,7 +1088,7 @@ function HomePage() {
       }
       retrying={retryingPlaylists}
       onRetry={() => retryPlaylists()}
-      onRelogin={() => (window.location.href = `${API_BASE}/oauth2/authorization/google`)}
+      onRelogin={relogin}
       hiddenCount={allPlaylists && tierPlaylists ? allPlaylists.length - tierPlaylists.length : 0}
       onOpenNaming={() => navigate('/settings?tab=naming')}
       tierGroups={tierGroups}
