@@ -57,6 +57,22 @@ Status: `[ ]` not started · `[~]` in progress · `[x]` verified · `[!]` needs 
 - [x] Settings ETag flow, migrations, playlists rename/create, tier-sync contract
 - [x] Backup / restore scripts work under hl
 
+## 7. Cross-feature journeys (started 2026-10-23)
+The user's finding: every feature works alone, but moving between them is incoherent (rate a song
+from Settings, open another board, come back - the rating is gone). Each journey below runs end to
+end through the real App over the fake YouTube (`src/test/syncHarness.jsx`) and must leave the
+boards, the pending bar, the player, the rail and YouTube agreeing with each other.
+- [~] Staged changes survive navigation: per-board drafts, one global pending bar, auto-dedupes
+  shown apart, rating the playing song from any page stages on its own board (`fix/board-drafts`)
+- [ ] Play from board A, browse to B / Home / Settings / Duels, rate / remove / skip from the player
+- [ ] Duel on A while the player plays a song from B; suggested Move pushes; back on B
+- [ ] Add songs into A and B, then drag them, undo, push, reload
+- [ ] Drag a song to another board via the sidebar, change your mind on the target board, push
+- [ ] Change naming / tier names / theme in Settings with staged changes and a playing song
+- [ ] Push failure (quota) mid-journey, then navigate, reload, retry
+- [ ] Two browser tabs on the same account (staged changes, settings, pushes)
+- [ ] Every page's counts (sidebar, header bar, rail, pending bar, Home cards) agree at every step
+
 ## Follow-ups
 - [x] Frontend tier-name validation matches the backend's (no "①", "S²" = "S") (`fix/tier-label-parity`, merged, deployed 2026-10-23)
 - [ ] Find with a one-letter query on a 300-song board still renders ~5000 components (input stays responsive)
