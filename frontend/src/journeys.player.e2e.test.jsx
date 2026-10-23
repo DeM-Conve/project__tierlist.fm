@@ -397,6 +397,23 @@ describe("journey 2: duel on one board while the player plays another's song", (
   });
 });
 
+describe('journey 1: rate away from the board, then browse', () => {
+  // The user's own report. fix/board-drafts (per-board drafts; rating the
+  // playing song stages on its own board) is changing this right now:
+  // opening another board replaces the draft, so the rating is gone.
+  it.fails('a rating made on Settings is still there after visiting another board', async () => {
+    await start();
+    await playTile('a');
+    await goto('/settings');
+    rateKey(2);
+    expect(h.tierOf('a')).toBe('A');
+    await h.open('Pop');
+    await h.open('Rap');
+    expect(h.tierOf('a')).toBe('A');
+    expect(h.staged()).toEqual([expect.objectContaining({ kind: 'move', to: 'A' })]);
+  });
+});
+
 describe('journey 1: a queue mixing two boards', () => {
   it('shuffle, repeat all and the wrap keep every song on its own board', async () => {
     await start();
