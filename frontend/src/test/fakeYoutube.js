@@ -229,7 +229,13 @@ export class FakeYoutube {
 
   route(config, method, url, body) {
     let m;
-    if (method === 'get' && url === '/api/auth/status') return ok(config, { loggedIn: true, userId: this.userId });
+    if (method === 'get' && url === '/api/auth/status') {
+      return ok(config, this.loggedOut ? { loggedIn: false } : { loggedIn: true, userId: this.userId });
+    }
+    if (method === 'post' && url === '/api/auth/logout') {
+      this.loggedOut = true;
+      return ok(config, '', 204);
+    }
     if (method === 'get' && url === '/api/playlists') {
       return ok(config, [...this.playlists.values()].map((p) => ({ id: p.id, title: p.title, thumbnail: null, itemCount: p.items.length })));
     }

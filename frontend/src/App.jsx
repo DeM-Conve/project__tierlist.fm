@@ -36,7 +36,9 @@ import PendingChanges from './components/PendingChanges';
 import { applySyncOutcome, discardAll, discardBoard, landBoardRefresh, loadBoard, moveWithFeedback, syncRequestFailed } from './tierActions';
 import { boardScope } from './store/boardScope';
 import { ShellActionsContext } from './layout/shellActions';
-import { notesDismissed } from './store/draftsSlice';
+import { draftsCleared, notesDismissed } from './store/draftsSlice';
+import { useDraftPersistence } from './api/useDraftPersistence';
+import { clearDrafts } from './api/draftStore';
 import { buildSyncPlan, resolveItemIds, songMoves } from './syncPlan';
 import { preparePush, recordPush } from './syncCache';
 import { preparedStatus, syncStatusRun, worstStatus } from './syncStatus';
@@ -159,9 +161,12 @@ function useLoadTierBoard(category, tiers) {
   const dispatch = useDispatch();
   const loadedCategory = useSelector((s) => s.tiers.loadedCategory);
   const awaitingRefresh = useSelector((s) => s.tiers.awaitingRefresh);
+  // The drafts saved on this device are read first: a board never loads
+  // over its own saved draft.
+  const draftsReady = useSelector((s) => s.drafts.hydrated);
   const board = useTierBoardQueries(category, tiers);
   const { data, isLoading, dataUpdatedAt, isStale, isFetching, refreshError } = board;
-  const boardLoading = !tiers || isLoading || loadedCategory !== category;
+  const boardLoading = !tiers || isLoading || loadedCategory !== category || !draftsReady;
   // The playlists list itself couldn't load (a refresh / deep link straight
   // onto a board): there's no board to load yet - say why and offer Retry,
   // never skeletons (and a progress bar) forever.
@@ -176,7 +181,7 @@ function useLoadTierBoard(category, tiers) {
     // a refresh / deep link straight onto a board). Without this guard the
     // empty result from "no tiers yet" got marked as this board's loaded
     // data, and the board stayed blank until you navigated away and back.
-    if (!tiers || !data) return;
+    if (!tiers || !data || !draftsReady) return;
     if (loadedCategory !== category) {
       dispatch(loadBoard({ category, data, refreshingSince: isStale || isFetching ? dataUpdatedAt : null }));
     } else if (awaitingRefresh && !isFetching) {
@@ -186,7 +191,7 @@ function useLoadTierBoard(category, tiers) {
       const settled = dataUpdatedAt > awaitingRefresh.since || refreshError || !isStale;
       if (settled) dispatch(landBoardRefresh({ category, data, dataUpdatedAt }));
     }
-  }, [data, tiers, category, loadedCategory, awaitingRefresh, isStale, isFetching, dataUpdatedAt, refreshError, dispatch]);
+  }, [data, tiers, category, loadedCategory, awaitingRefresh, isStale, isFetching, dataUpdatedAt, refreshError, draftsReady, dispatch]);
 
   // The top-of-page progress bar while switching boards (skeletons show in
   // TierRow while `loading`; this is the accompanying visual feedback).
@@ -235,6 +240,9 @@ export default function App() {
   useEffect(() => {
     if (playlistsData) dispatch(setPlaylists(playlistsData));
   }, [playlistsData, dispatch]);
+
+  // Unpushed board drafts survive a reload, per account (api/draftStore.js).
+  useDraftPersistence(authData?.loggedIn === true, authData?.userId);
 
   // Settings live in Postgres per account; localStorage is only a cache.
   const { ready: settingsReady } = useSettingsSync(authData?.loggedIn === true);
@@ -710,8 +718,11 @@ function Layout() {
       return;
     }
     queryClient.clear();
-    // This device forgets the account's cached playlists too.
+    // This device forgets the account's cached playlists and its unpushed
+    // drafts too.
     clearBoardCache();
+    clearDrafts();
+    dispatch(draftsCleared());
     dispatch(setLoggedIn(false));
     dispatch(setPlaylists(null));
     dispatch(boardClosed());

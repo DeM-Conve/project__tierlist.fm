@@ -22,6 +22,9 @@ import { BOARD_TIERS, REMOVED_TIER } from '../tiers';
 import { parseTitle } from '../naming';
 import { useAddSongsActions } from '../addSongs/useAddSongsActions';
 import { boardProbe } from './boardProbe';
+import { setDraftStorage } from '../api/draftStore';
+import { openFocus } from '../store/focusSlice';
+import { selectBoardsChanges, selectFocusSequence } from '../store/selectors';
 
 // Each mounted app (a browser tab) has its own router: `nav` is the one
 // the Harness drives.
@@ -53,10 +56,13 @@ export function youtubeBoards(yt) {
 // second browser tab on the same account (its own store, query cache and
 // router; the fake YouTube and the axios instance are shared). The push
 // ledger is module state, so tabs share it (a real tab's is its own).
-export async function mountApp(yt, { path = '/', secondTab = false } = {}) {
+// `draftStorage`: where unpushed drafts are saved (api/draftStore.js) - pass
+// the same memoryDraftStorage() to a second mountApp to model a reload.
+export async function mountApp(yt, { path = '/', secondTab = false, draftStorage = null } = {}) {
   // A freshly mounted app is a new session (a page load): the push ledger is
   // module state, and each fake YouTube starts its item ids over.
   if (!secondTab) resetPushLedger();
+  setDraftStorage(draftStorage);
   api.defaults.adapter = yt.adapter;
   const store = makeStore();
   const queryClient = createQueryClient();
@@ -160,6 +166,46 @@ export class Harness {
   // Any route (Settings, a duel page...), the way a link would go there.
   navigate(path) {
     this.nav.current(path);
+  }
+
+  async goTo(path) {
+    await act(async () => this.nav.current(path));
+  }
+
+  // A tile's click on the open board: plays it in the dock (App's openFocus).
+  play(videoId) {
+    const tier = this.tierOf(videoId);
+    const sequence = selectFocusSequence(this.state);
+    this.dispatch(openFocus({ tier, videoId, queue: sequence.map((e) => e.video.videoId), entries: sequence, category: this.board, label: this.board }));
+  }
+
+  // Every board's staged changes, as the global bar counts them.
+  boards() {
+    return selectBoardsChanges(this.state).map((g) => ({ category: g.category, changes: g.changes.length, dedupes: g.dedupes.length }));
+  }
+
+  // The bar's label ("1 change on Rap · review").
+  barText() {
+    return this.screen.queryByRole('button', { name: /· review$/ })?.textContent ?? null;
+  }
+
+  // The Tier Rail's "Rate" button for the playing song (Home, Settings, any page).
+  async rateFromRail(tierLabel) {
+    const button = this.screen.getByRole('button', { name: new RegExp(`^Rate ".*" → ${tierLabel}$`) });
+    await act(async () => fireEvent.click(button));
+  }
+
+  // The kept (not open) board's draft: { [tier]: videoId[] }.
+  keptBoard(board) {
+    const t = this.state.drafts.boards[board]?.tierItems;
+    return t && Object.fromEntries(BOARD_TIERS.filter((k) => t[k]).map((k) => [k, t[k].map((v) => v.videoId)]));
+  }
+
+  async logout() {
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: /Log out/ })));
+    await waitFor(() => {
+      if (this.state.auth.loggedIn !== false) throw new Error('still logged in');
+    });
   }
 
   dispatch(action) {
