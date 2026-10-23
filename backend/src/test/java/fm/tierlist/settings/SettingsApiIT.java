@@ -2,7 +2,6 @@ package fm.tierlist.settings;
 
 import fm.tierlist.PostgresIT;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
@@ -264,10 +263,8 @@ class SettingsApiIT extends PostgresIT {
         assertThat(jdbc.queryForObject("SELECT count(*) FROM user_settings", Integer.class)).isZero();
     }
 
+    // Only the frontend keys: never an enum's ordinal (see FrontendKeys).
     @Test
-    @Disabled("BUG (minor): Boot's ObjectMapper leaves FAIL_ON_NUMBERS_FOR_ENUMS off, so an enum option sent as a "
-        + "number (or numeric string) is read as the Java constant's ordinal: {\"theme\": 0} saves tokyo, "
-        + "{\"tierPalette\": \"2\"} saves heat. Only frontend keys should be accepted (400 otherwise).")
     void anOptionSentAsANumberIs400() throws Exception {
         mvc.perform(save(alice, body("0", "\"blue\"", "\"2\"", LABELS, "null", "null", "{}"))
                 .header(HttpHeaders.IF_NONE_MATCH, "*"))
@@ -299,23 +296,17 @@ class SettingsApiIT extends PostgresIT {
             .andExpect(jsonPath("$.status").value(400));
     }
 
+    // Half a migration (the current template, no tier names) is a 400, not a 500.
     @Test
-    @Disabled("BUG: SettingsDto.NamingDto.isMigratingFromDistinct() NPEs when migratingFrom equals the template and "
-        + "migratingFromTierLabels is null; Bean Validation wraps it in a ValidationException, so this half-a-migration "
-        + "body is a 500 instead of the 400 its sibling cases get.")
     void halfAMigrationFromTheCurrentTemplateIs400() throws Exception {
         mvc.perform(save(alice, body("\"tokyo\"", "\"blue\"", "\"vivid\"", LABELS, "\"{category} {tier}\"", "null", "{}"))
                 .header(HttpHeaders.IF_NONE_MATCH, "*"))
             .andExpect(status().isBadRequest());
     }
 
+    // The validator and the database's CHECKs agree: a name Postgres would
+    // refuse is a 400 up front, never a 412 the frontend retries forever.
     @Test
-    @Disabled("BUG: @TierLabel and the DB's tier_label_valid / tier_labels_distinct disagree on characters Java folds "
-        + "with NFKD but Postgres' [[:alnum:]] doesn't count: a tier named \"①\" (circled 1) or \"²\" passes "
-        + "validation (words -> \"1\"/\"2\") but fails the naming_tier_labels_valid CHECK, and \"S²\" vs \"S\" are "
-        + "distinct to Java but equal to naming_tier_labels_distinct. The DataIntegrityViolationException is then "
-        + "turned into 412 'Settings changed elsewhere' by SettingsExceptionHandler, so the frontend refetches, "
-        + "rebases and retries a save that can never succeed. Expected: 400 (validator and CHECK in step).")
     void aTierNameTheDatabaseWouldRefuseIs400Not412() throws Exception {
         for (String labels : new String[] {
             "{\"S\": \"S\", \"A\": \"A\", \"B\": \"B\", \"C\": \"C\", \"D\": \"D\", \"TODO\": \"①\"}",

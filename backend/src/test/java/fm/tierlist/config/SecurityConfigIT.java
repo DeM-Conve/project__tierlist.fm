@@ -47,6 +47,9 @@ class SecurityConfigIT extends PostgresIT {
     @Autowired
     FilterChainProxy filterChain;
 
+    @Autowired
+    org.springframework.boot.autoconfigure.web.ServerProperties server;
+
     @BeforeEach
     void clean() {
         jdbc.update("DELETE FROM app_user");
@@ -177,5 +180,15 @@ class SecurityConfigIT extends PostgresIT {
                 .header(HttpHeaders.ORIGIN, FRONTEND)
                 .header(HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD, "PATCH"))
             .andExpect(status().isForbidden());
+    }
+
+    // CSRF is off, so the session cookie must not ride along on another
+    // site's form POST: SameSite=Lax (still sent on Google's GET redirect
+    // back after login), and never readable by scripts.
+    @Test
+    void theSessionCookieIsLaxAndHttpOnly() {
+        var cookie = server.getServlet().getSession().getCookie();
+        assertThat(cookie.getSameSite()).isEqualTo(org.springframework.boot.web.server.Cookie.SameSite.LAX);
+        assertThat(cookie.getHttpOnly()).isTrue();
     }
 }

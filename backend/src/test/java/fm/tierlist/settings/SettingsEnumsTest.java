@@ -2,7 +2,6 @@ package fm.tierlist.settings;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.exc.InvalidFormatException;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -92,15 +91,15 @@ class SettingsEnumsTest {
         assertThatThrownBy(() -> json.readValue("\"VIVID\"", TierPalette.class)).isInstanceOf(InvalidFormatException.class);
     }
 
+    // Only the frontend keys: a number (or numeric string) is never read as
+    // the constant's ordinal.
     @Test
-    @Disabled("BUG (minor): Jackson's default FAIL_ON_NUMBERS_FOR_ENUMS=false still reads a bare JSON number as the "
-        + "constant's ordinal, @JsonValue or not - {\"theme\": 0} (or \"0\") is accepted as tokyo and {\"tierPalette\": 2} as heat, "
-        + "so the API does not only speak the frontend keys, and reordering a Java enum silently changes what a "
-        + "number means. Out-of-range numbers are refused. Fix: spring.jackson.deserialization.fail-on-numbers-for-enums=true "
-        + "(see SettingsApiIT for the HTTP side).")
     void aBareNumberIsNotAnOption() {
         assertThatThrownBy(() -> json.readValue("0", Theme.class)).isInstanceOf(InvalidFormatException.class);
         assertThatThrownBy(() -> json.readValue("\"0\"", Theme.class)).isInstanceOf(InvalidFormatException.class);
         assertThatThrownBy(() -> json.readValue("2", TierPalette.class)).isInstanceOf(InvalidFormatException.class);
+        assertThatThrownBy(() -> json.readValue("1", Accent.class)).isInstanceOf(InvalidFormatException.class);
+        assertThatThrownBy(() -> json.readValue("0", ActivityItem.class)).isInstanceOf(InvalidFormatException.class);
+        assertThatThrownBy(() -> json.readValue("1", TierBorderMode.class)).isInstanceOf(InvalidFormatException.class);
     }
 }

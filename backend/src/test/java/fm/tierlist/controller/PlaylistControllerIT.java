@@ -3,7 +3,6 @@ package fm.tierlist.controller;
 import fm.tierlist.PostgresIT;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -740,11 +739,11 @@ class PlaylistControllerIT extends PostgresIT {
             .andExpect(jsonPath("$.applied").value(1))
             .andExpect(jsonPath("$.total").value(4))
             .andExpect(jsonPath("$.results[0].success").value(false))
-            .andExpect(jsonPath("$.results[0].error").value("Playlist not found"))
+            .andExpect(jsonPath("$.results[0].error").value("This playlist no longer exists on YouTube."))
             .andExpect(jsonPath("$.results[1].success").value(false))
-            .andExpect(jsonPath("$.results[1].error").value(containsString("403")))
+            .andExpect(jsonPath("$.results[1].error").value("YouTube refused the request: forbidden"))
             .andExpect(jsonPath("$.results[2].success").value(false))
-            .andExpect(jsonPath("$.results[2].error").value(containsString("503")))
+            .andExpect(jsonPath("$.results[2].error").value("YouTube had a temporary problem - try again."))
             .andExpect(jsonPath("$.results[3].id").value("PL4"))
             .andExpect(jsonPath("$.results[3].success").value(true));
     }
@@ -789,10 +788,114 @@ class PlaylistControllerIT extends PostgresIT {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.applied").value(1))
             .andExpect(jsonPath("$.results[0].success").value(false))
-            .andExpect(jsonPath("$.results[0].error").value(containsString("403")))
+            .andExpect(jsonPath("$.results[0].error").value(containsString("daily API quota")))
             .andExpect(jsonPath("$.results[0].id").doesNotExist())
             .andExpect(jsonPath("$.results[1].success").value(true))
             .andExpect(jsonPath("$.results[1].id").value("PLok"));
+    }
+
+    // Per-playlist failures read like every other YouTube error (YoutubeError):
+    // plain language, never the HTTP client's raw exception text.
+    @Test
+    void renameAndCreateFailuresAreInPlainLanguage() throws Exception {
+        youtube.expect(requestTo(YT + "/playlists?part=snippet&id=PLq"))
+            .andRespond(withStatus(HttpStatus.FORBIDDEN).contentType(MediaType.APPLICATION_JSON)
+                .body(youtubeError(403, "quotaExceeded", "quota")));
+        youtube.expect(requestTo(YT + "/playlists?part=snippet&id=PLexp"))
+            .andRespond(withStatus(HttpStatus.UNAUTHORIZED).contentType(MediaType.APPLICATION_JSON)
+                .body(youtubeError(401, "authError", "Invalid Credentials")));
+        youtube.expect(requestTo(YT + "/playlists?part=snippet&id=PLscope"))
+            .andRespond(withStatus(HttpStatus.FORBIDDEN).contentType(MediaType.APPLICATION_JSON)
+                .body(youtubeError(403, "insufficientPermissions", "Insufficient Permission")));
+        youtube.expect(requestTo(YT + "/playlists?part=snippet&id=PLnet")).andRespond(withException(new IOException("Connection refused")));
+        expectGet(YT + "/playlists?part=snippet&id=PLgone", "{\"items\": [{\"id\": \"PLgone\", \"snippet\": {\"title\": \"Old\"}}]}");
+        youtube.expect(requestTo(YT + "/playlists?part=snippet"))
+            .andExpect(method(HttpMethod.PUT))
+            .andRespond(withStatus(HttpStatus.NOT_FOUND).contentType(MediaType.APPLICATION_JSON)
+                .body(youtubeError(404, "playlistNotFound", "Playlist not found")));
+
+        mvc.perform(json(post("/api/playlists/rename"), """
+                [{"id": "PLq", "title": "A"}, {"id": "PLexp", "title": "B"}, {"id": "PLscope", "title": "C"},
+                 {"id": "PLnet", "title": "D"}, {"id": "PLgone", "title": "E"}]"""))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.applied").value(0))
+            .andExpect(jsonPath("$.results[0].error").value(containsString("daily API quota")))
+            .andExpect(jsonPath("$.results[1].error").value(containsString("log out and back in")))
+            .andExpect(jsonPath("$.results[2].error").value(containsString("tick the YouTube permission")))
+            .andExpect(jsonPath("$.results[3].error").value(containsString("Couldn't reach YouTube")))
+            .andExpect(jsonPath("$.results[4].error").value("This playlist no longer exists on YouTube."));
+    }
+
+    @Test
+    void createFailuresAreInPlainLanguage() throws Exception {
+        youtube.expect(requestTo(YT + "/playlists?part=snippet,status"))
+            .andExpect(content().json("{\"snippet\": {\"title\": \"Rap S\"}}"))
+            .andRespond(withException(new IOException("Connection refused")));
+        youtube.expect(ExpectedCount.times(PlaylistController.WRITE_ATTEMPTS), requestTo(YT + "/playlists?part=snippet,status"))
+            .andExpect(content().json("{\"snippet\": {\"title\": \"Rap A\"}}"))
+            .andRespond(withStatus(HttpStatus.CONFLICT).contentType(MediaType.APPLICATION_JSON)
+                .body(youtubeError(409, "SERVICE_UNAVAILABLE", "The operation was aborted.")));
+
+        mvc.perform(json(post("/api/playlists/create"), "[{\"title\": \"Rap S\"}, {\"title\": \"Rap A\"}]"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.applied").value(0))
+            .andExpect(jsonPath("$.results[0].error").value("Couldn't reach YouTube - check the connection and try again."))
+            .andExpect(jsonPath("$.results[1].error").value(containsString("busy")))
+            .andExpect(jsonPath("$.results[1].error").value(org.hamcrest.Matchers.not(containsString("409"))));
+    }
+
+    // ---- bad bodies ---------------------------------------------------------
+
+    // A body the frontend would never send is a 400 ProblemDetail saying
+    // what's wrong - before any YouTube call, never a bare 500.
+    @Test
+    void badBodiesAre400ProblemDetailsAndCallNothing() throws Exception {
+        youtube.expect(ExpectedCount.never(), requestTo(org.hamcrest.Matchers.startsWith(YT)));
+        String[][] cases = {
+            {"/api/playlists/PL1/items", "{}"},
+            {"/api/playlists/PL1/items", "{\"videoId\": \" \"}"},
+            {"/api/playlists/PL1/items", "{\"videoId\": {\"x\": 1}}"},
+            {"/api/playlists/PL1/items", ""},
+            {"/api/tier-sync", "[null]"},
+            {"/api/tier-sync", "[{\"videoId\": {\"x\": 1}, \"toPlaylistId\": \"PL1\"}]"},
+            {"/api/tier-sync", "[{\"videoId\": \"v\", \"toPlaylistId\": [\"PL1\"]}]"},
+            {"/api/tier-sync", "{\"videoId\": \"v\"}"},
+            {"/api/tier-sync", "not json"},
+            {"/api/playlists/rename", "[{}]"},
+            {"/api/playlists/rename", "[{\"id\": \"PL1\"}]"},
+            {"/api/playlists/rename", "[{\"id\": \"PL1\", \"title\": \"  \"}]"},
+            {"/api/playlists/rename", "[{\"id\": 5, \"title\": \"Rap S\"}]"},
+            {"/api/playlists/rename", "[null]"},
+            {"/api/playlists/create", "[{}]"},
+            {"/api/playlists/create", "[{\"title\": [\"Rap S\"]}]"},
+            {"/api/playlists/create", "[{\"title\": \"Rap S\", \"privacyStatus\": \"secret\"}]"},
+            {"/api/playlists/create", "null"},
+        };
+        for (String[] c : cases) {
+            mvc.perform(json(post(c[0]), c[1]))
+                .andExpect(r -> assertThat(r.getResponse().getStatus()).as(c[0] + " " + c[1]).isEqualTo(400))
+                .andExpect(r -> assertThat(r.getResponse().getContentType()).as(c[0] + " " + c[1])
+                    .isEqualTo(MediaType.APPLICATION_PROBLEM_JSON_VALUE));
+        }
+        mvc.perform(json(post("/api/playlists/rename"), "[{\"id\": \"PL1\"}]"))
+            .andExpect(jsonPath("$.detail").value("Row 1: title is missing."));
+    }
+
+    // Ids from the browser go to YouTube as one escaped parameter each: they
+    // can't add parameters of their own, and odd characters aren't a 500.
+    @Test
+    void idsAreSentToYoutubeEscaped() throws Exception {
+        expectGet(itemsUrl("PL%201%26mine%3Dtrue"), "{\"items\": []}");
+        expectGet(YT + "/videos?part=snippet&id=v%26id%3Dx&fields=" + PlaylistController.VIDEO_FIELDS, "{\"items\": []}");
+        expectGet(YT + "/playlists?part=snippet&id=PL%23x", "{\"items\": []}");
+        youtube.expect(requestTo(YT + "/playlistItems?id=I%26x%3Dy")).andExpect(method(HttpMethod.DELETE)).andRespond(withNoContent());
+
+        mvc.perform(get("/api/playlists/{id}/items", "PL 1&mine=true").with(signedIn()))
+            .andExpect(status().isOk()).andExpect(jsonPath("$", hasSize(0)));
+        mvc.perform(get("/api/videos/{id}", "v&id=x").with(signedIn())).andExpect(status().isNotFound());
+        mvc.perform(json(post("/api/playlists/rename"), "[{\"id\": \"PL#x\", \"title\": \"Rap S\"}]"))
+            .andExpect(jsonPath("$.results[0].error").value("This playlist no longer exists on YouTube."));
+        mvc.perform(delete("/api/playlist-items/{id}", "I&x=y").with(signedIn())).andExpect(status().isNoContent());
     }
 
     // ---- auth ---------------------------------------------------------------
@@ -814,6 +917,36 @@ class PlaylistControllerIT extends PostgresIT {
             .andExpect(status().isUnauthorized());
     }
 
+    // Signed in, but the session holds no YouTube authorization any more
+    // (e.g. Google refused to renew it): the same 401 ProblemDetail as an
+    // expired login - never a 302 to Google's login page, which an API call
+    // (axios, cross-origin to accounts.google.com) can only fail on.
+    @Test
+    void aSessionWithoutYoutubeAuthorizationIsA401NotARedirectToGoogle() throws Exception {
+        RequestPostProcessor noClient = org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors
+            .authentication(new org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken(
+                new org.springframework.security.oauth2.core.user.DefaultOAuth2User(
+                    org.springframework.security.core.authority.AuthorityUtils.createAuthorityList("OAUTH2_USER"),
+                    java.util.Map.of("sub", "alice"), "sub"),
+                org.springframework.security.core.authority.AuthorityUtils.createAuthorityList("OAUTH2_USER"), "google"));
+        for (MockHttpServletRequestBuilder request : new MockHttpServletRequestBuilder[] {
+            get("/api/playlists"),
+            get("/api/playlists/PL1/items"),
+            get("/api/videos/vid1"),
+            post("/api/playlists/PL1/items").contentType(MediaType.APPLICATION_JSON).content("{\"videoId\": \"v\"}"),
+            delete("/api/playlist-items/ITEM1"),
+            post("/api/tier-sync").contentType(MediaType.APPLICATION_JSON).content("[]"),
+            post("/api/playlists/rename").contentType(MediaType.APPLICATION_JSON).content("[]"),
+            post("/api/playlists/create").contentType(MediaType.APPLICATION_JSON).content("[]"),
+        }) {
+            mvc.perform(request.with(noClient))
+                .andExpect(status().isUnauthorized())
+                .andExpect(r -> assertThat(r.getResponse().getHeader(HttpHeaders.LOCATION)).isNull())
+                .andExpect(r -> assertThat(r.getResponse().getContentType()).isEqualTo(MediaType.APPLICATION_PROBLEM_JSON_VALUE))
+                .andExpect(jsonPath("$.detail").value(containsString("log out and back in")));
+        }
+    }
+
     @Test
     void authStatusIsPublicAndSaysWhetherYouAreLoggedIn() throws Exception {
         mvc.perform(get("/api/auth/status"))
@@ -826,17 +959,51 @@ class PlaylistControllerIT extends PostgresIT {
             .andExpect(jsonPath("$.userId").value("alice"));
     }
 
+    // No answer at all (connection refused, timeout, DNS) on any read: a 502
+    // ProblemDetail that says so - never a bare 500 with no detail.
     @Test
-    @Disabled("BUG: YouTube unreachable (connection refused / timeout / DNS -> ResourceAccessException) is not an "
-        + "HttpStatusCodeException, so YoutubeErrorHandler never sees it: the request fails with an unhandled "
-        + "ServletException -> a bare 500 from Boot's error page with no plain-language `detail`, against the "
-        + "'a failed load must say why' rule. Expected: 502 ProblemDetail saying YouTube couldn't be reached.")
     void youtubeBeingUnreachableIsA502SayingSo() throws Exception {
         youtube.expect(requestTo(YT + "/playlists?part=snippet,contentDetails&mine=true&maxResults=50&fields=" + PlaylistController.PLAYLIST_FIELDS))
             .andRespond(withException(new IOException("Connection refused")));
+        youtube.expect(requestTo(itemsUrl("PL1"))).andRespond(withException(new IOException("Read timed out")));
+        youtube.expect(requestTo(YT + "/videos?part=snippet&id=vid1&fields=" + PlaylistController.VIDEO_FIELDS))
+            .andRespond(withException(new IOException("UnknownHost")));
+        youtube.expect(requestTo(YT + "/playlistItems?part=snippet")).andRespond(withException(new IOException("reset")));
 
-        mvc.perform(get("/api/playlists").with(signedIn()))
+        for (MockHttpServletRequestBuilder request : new MockHttpServletRequestBuilder[] {
+            get("/api/playlists").with(signedIn()),
+            get("/api/playlists/PL1/items").with(signedIn()),
+            get("/api/videos/vid1").with(signedIn()),
+            json(post("/api/playlists/PL1/items"), "{\"videoId\": \"vid1\"}"),
+        }) {
+            mvc.perform(request)
+                .andExpect(status().isBadGateway())
+                .andExpect(r -> assertThat(r.getResponse().getContentType()).isEqualTo(MediaType.APPLICATION_PROBLEM_JSON_VALUE))
+                .andExpect(jsonPath("$.status").value(502))
+                .andExpect(jsonPath("$.detail").value(containsString("Couldn't reach YouTube")));
+        }
+    }
+
+    // A delete is retried on network failures; still unreachable after the
+    // last try is the same 502.
+    @Test
+    void aDeleteThatNeverReachesYoutubeIsA502AfterTheRetries() throws Exception {
+        youtube.expect(ExpectedCount.times(PlaylistController.WRITE_ATTEMPTS), requestTo(YT + "/playlistItems?id=ITEM1"))
+            .andRespond(withException(new IOException("Connection refused")));
+
+        mvc.perform(delete("/api/playlist-items/ITEM1").with(signedIn()))
             .andExpect(status().isBadGateway())
-            .andExpect(jsonPath("$.detail").isNotEmpty());
+            .andExpect(jsonPath("$.detail").value(containsString("Couldn't reach YouTube")));
+    }
+
+    // An answer that isn't the JSON the app expects (a proxy's HTML error
+    // page with a 200, say) is a 502 too.
+    @Test
+    void anUnreadableYoutubeAnswerIsA502SayingSo() throws Exception {
+        youtube.expect(requestTo(itemsUrl("PL1"))).andRespond(withSuccess("<html>oops</html>", MediaType.APPLICATION_JSON));
+
+        mvc.perform(get("/api/playlists/PL1/items").with(signedIn()))
+            .andExpect(status().isBadGateway())
+            .andExpect(jsonPath("$.detail").value(containsString("couldn't read")));
     }
 }

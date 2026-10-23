@@ -11,7 +11,6 @@ import jakarta.validation.Validation;
 import jakarta.validation.Validator;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
 import java.util.HashMap;
@@ -248,10 +247,6 @@ class SettingsDtoTest {
     }
 
     @Test
-    @Disabled("BUG: isMigratingFromDistinct() dereferences migratingFromTierLabels without a null check. A body whose "
-        + "migratingFrom equals the current template but has migratingFromTierLabels: null (half a migration) throws a "
-        + "NullPointerException inside Bean Validation (jakarta.validation.ValidationException) instead of reporting "
-        + "the isMigrationComplete violation - the PUT becomes a 500, not a 400. See SettingsApiIT for the HTTP side.")
     void halfAMigrationFromTheCurrentTemplateIsAViolationNotACrash() {
         Set<ConstraintViolation<NamingDto>> result =
             validator.validate(naming("{category} {tier}", DEFAULT, "{category} {tier}", null, Map.of()));

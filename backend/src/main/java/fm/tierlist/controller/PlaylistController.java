@@ -25,9 +25,13 @@ import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.HttpServerErrorException;
 import org.springframework.web.client.HttpStatusCodeException;
 import org.springframework.web.client.ResourceAccessException;
+import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
+import org.springframework.web.server.ResponseStatusException;
+import org.springframework.web.util.UriUtils;
 
 import java.net.URI;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -116,7 +120,7 @@ public class PlaylistController {
     ) {
         List<Map<String, Object>> allItems = fetchAllPages(
             client,
-            apiBase + "/playlistItems?part=snippet,contentDetails&playlistId=" + id + "&maxResults=50&fields=" + ITEM_FIELDS
+            apiBase + "/playlistItems?part=snippet,contentDetails&playlistId=" + param(id) + "&maxResults=50&fields=" + ITEM_FIELDS
         );
 
         return toVideos(allItems);
@@ -128,7 +132,7 @@ public class PlaylistController {
             @PathVariable String videoId,
             @RegisteredOAuth2AuthorizedClient("google") OAuth2AuthorizedClient client
     ) {
-        Map<String, Object> body = callYoutubeApi(client, apiBase + "/videos?part=snippet&id=" + videoId + "&fields=" + VIDEO_FIELDS);
+        Map<String, Object> body = callYoutubeApi(client, apiBase + "/videos?part=snippet&id=" + param(videoId) + "&fields=" + VIDEO_FIELDS);
         List<Map<String, Object>> items = (List<Map<String, Object>>) body.get("items");
         if (items == null || items.isEmpty()) return ResponseEntity.notFound().build();
         Map<String, Object> snippet = (Map<String, Object>) items.get(0).get("snippet");
@@ -151,7 +155,9 @@ public class PlaylistController {
             @RequestBody Map<String, String> body,
             @RegisteredOAuth2AuthorizedClient("google") OAuth2AuthorizedClient client
     ) {
-        return toVideo(insertPlaylistItem(client, id, body.get("videoId")));
+        String videoId = body == null ? null : body.get("videoId");
+        if (videoId == null || videoId.isBlank()) throw badRequest("Send the video to add as {\"videoId\": \"...\"}.");
+        return toVideo(insertPlaylistItem(client, id, videoId));
     }
 
     @DeleteMapping("/api/playlist-items/{itemId}")
@@ -217,6 +223,7 @@ public class PlaylistController {
             @RequestBody List<Map<String, Object>> moves,
             @RegisteredOAuth2AuthorizedClient("google") OAuth2AuthorizedClient client
     ) {
+        checkRows(moves, List.of(), List.of("videoId", "fromItemId", "toPlaylistId", "fromPlaylistId"));
         int[] repeats = new int[moves.size()]; // index of the earlier row this one repeats, or -1
         Map<String, Integer> firstRow = new HashMap<>();
         List<Integer> toRun = new ArrayList<>();
@@ -359,6 +366,59 @@ public class PlaylistController {
         return error.detail();
     }
 
+    static final String PLAYLIST_GONE = "This playlist no longer exists on YouTube.";
+
+    // Logs one failed playlist rename / create (YouTube's status / reason and
+    // the playlist id - never the token or a title) and says in plain words
+    // what went wrong: the same mapping as a failed request (YoutubeError),
+    // made specific where a playlist write tells us more. Never the raw
+    // exception text.
+    static String playlistWriteFailure(String what, String playlist, RuntimeException e) {
+        if (e instanceof HttpStatusCodeException http) {
+            YoutubeError error = YoutubeError.of(http);
+            log.warn("playlist {} failed for {}: YouTube {} ({}): {}",
+                what, playlist, error.youtubeStatus(), error.reason(), error.message());
+            if ("playlistNotFound".equals(error.reason())) return PLAYLIST_GONE;
+            if (error.youtubeStatus() == 409) return "YouTube was busy with this playlist and gave up - try again.";
+            if (error.youtubeStatus() >= 500) return "YouTube had a temporary problem - try again.";
+            return error.detail();
+        }
+        log.warn("playlist {} failed for {}: {}", what, playlist, e.toString());
+        if (e instanceof RestClientException rest) return YoutubeError.noAnswer(rest);
+        return "Something went wrong talking to YouTube - try again.";
+    }
+
+    static final List<String> PRIVACY = List.of("private", "unlisted", "public");
+
+    // A batch body the frontend would never send - a null row, a field that
+    // isn't text, a required one missing - is a 400 ProblemDetail saying
+    // which, before anything is sent to YouTube (it used to be a bare 500
+    // from a NullPointer / ClassCastException mid-batch).
+    static void checkRows(List<Map<String, Object>> rows, List<String> required, List<String> optional) {
+        for (int i = 0; i < rows.size(); i++) {
+            Map<String, Object> row = rows.get(i);
+            if (row == null) throw badRequest("Row " + (i + 1) + " is empty.");
+            for (String field : required) {
+                if (text(row.get(field)) == null) throw badRequest("Row " + (i + 1) + ": " + field + " is missing.");
+            }
+            for (String field : optional) {
+                Object value = row.get(field);
+                if (value != null && !(value instanceof String)) throw badRequest("Row " + (i + 1) + ": " + field + " must be text.");
+            }
+        }
+    }
+
+    private static ResponseStatusException badRequest(String detail) {
+        return new ResponseStatusException(HttpStatus.BAD_REQUEST, detail);
+    }
+
+    // An id from the browser, as one query-parameter value: every reserved
+    // character escaped, so it can't add parameters ("&mine=true") or make
+    // an invalid URI (a space - a 500).
+    static String param(String value) {
+        return UriUtils.encode(value, StandardCharsets.UTF_8);
+    }
+
     private static String text(Object value) {
         return value instanceof String s && !s.isBlank() ? s : null;
     }
@@ -384,6 +444,7 @@ public class PlaylistController {
             @RequestBody List<Map<String, Object>> renames,
             @RegisteredOAuth2AuthorizedClient("google") OAuth2AuthorizedClient client
     ) {
+        checkRows(renames, List.of("id", "title"), List.of());
         List<Map<String, Object>> results = YoutubeBatch.run(renames, WRITE_PARALLELISM, rename -> rename.get("id"), rename -> {
             String id = (String) rename.get("id");
             String title = (String) rename.get("title");
@@ -391,9 +452,14 @@ public class PlaylistController {
             result.put("id", id);
             result.put("title", title);
             try {
-                Map<String, Object> body = callYoutubeApi(client, apiBase + "/playlists?part=snippet&id=" + id);
-                List<Map<String, Object>> items = (List<Map<String, Object>>) body.get("items");
-                if (items == null || items.isEmpty()) throw new IllegalStateException("Playlist not found");
+                Map<String, Object> body = callYoutubeApi(client, apiBase + "/playlists?part=snippet&id=" + param(id));
+                List<Map<String, Object>> items = body == null ? null : (List<Map<String, Object>>) body.get("items");
+                if (items == null || items.isEmpty()) {
+                    log.warn("playlist rename failed for {}: YouTube has no such playlist", id);
+                    result.put("success", false);
+                    result.put("error", PLAYLIST_GONE);
+                    return result;
+                }
                 Map<String, Object> snippet = new LinkedHashMap<>((Map<String, Object>) items.get(0).get("snippet"));
                 Map<String, Object> newSnippet = new LinkedHashMap<>();
                 newSnippet.put("title", title);
@@ -401,9 +467,9 @@ public class PlaylistController {
                 if (snippet.get("defaultLanguage") != null) newSnippet.put("defaultLanguage", snippet.get("defaultLanguage"));
                 sendJson(client, HttpMethod.PUT, apiBase + "/playlists?part=snippet", Map.of("id", id, "snippet", newSnippet));
                 result.put("success", true);
-            } catch (Exception e) {
+            } catch (RuntimeException e) {
                 result.put("success", false);
-                result.put("error", e.getMessage());
+                result.put("error", playlistWriteFailure("rename", id, e));
             }
             return result;
         });
@@ -420,10 +486,17 @@ public class PlaylistController {
             @RequestBody List<Map<String, Object>> playlists,
             @RegisteredOAuth2AuthorizedClient("google") OAuth2AuthorizedClient client
     ) {
+        checkRows(playlists, List.of("title"), List.of("privacyStatus"));
+        for (Map<String, Object> playlist : playlists) {
+            Object privacy = playlist.get("privacyStatus");
+            if (privacy != null && !PRIVACY.contains(privacy)) {
+                throw badRequest("privacyStatus must be one of " + PRIVACY + ".");
+            }
+        }
         // Each new playlist is its own key: nothing else writes to it yet.
         List<Map<String, Object>> results = YoutubeBatch.run(playlists, WRITE_PARALLELISM, playlist -> new Object(), playlist -> {
             String title = (String) playlist.get("title");
-            Object privacy = playlist.getOrDefault("privacyStatus", "private");
+            Object privacy = Objects.requireNonNullElse(playlist.get("privacyStatus"), "private");
             Map<String, Object> result = new LinkedHashMap<>();
             result.put("title", title);
             try {
@@ -435,9 +508,9 @@ public class PlaylistController {
                 );
                 result.put("id", created != null ? created.get("id") : null);
                 result.put("success", true);
-            } catch (Exception e) {
+            } catch (RuntimeException e) {
                 result.put("success", false);
-                result.put("error", e.getMessage());
+                result.put("error", playlistWriteFailure("create", "a new playlist", e));
             }
             return result;
         });
@@ -474,7 +547,7 @@ public class PlaylistController {
         headers.setBearerAuth(client.getAccessToken().getTokenValue());
         HttpEntity<Void> entity = new HttpEntity<>(headers);
         retryTransient(() -> restTemplate.exchange(
-            apiBase + "/playlistItems?id=" + playlistItemId,
+            URI.create(apiBase + "/playlistItems?id=" + param(playlistItemId)),
             HttpMethod.DELETE,
             entity,
             Void.class
@@ -548,7 +621,7 @@ public class PlaylistController {
         headers.setBearerAuth(client.getAccessToken().getTokenValue());
         RequestEntity<Void> request = new RequestEntity<>(headers, HttpMethod.GET, URI.create(url));
         ResponseEntity<Map> response = restTemplate.exchange(request, Map.class);
-        return response.getBody();
+        return response.getBody() != null ? response.getBody() : Map.of(); // an empty answer reads as "nothing there"
     }
 
     private String extractThumbnail(Map<String, Object> thumbnails) {

@@ -4,6 +4,8 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.client.HttpStatusCodeException;
+import org.springframework.web.client.ResourceAccessException;
+import org.springframework.web.client.RestClientException;
 
 // What a failed YouTube Data API call means, in one place: YouTube's own
 // status / reason / message, the status the app answers with, and a
@@ -33,11 +35,21 @@ record YoutubeError(int youtubeStatus, String reason, String message, HttpStatus
         };
         String detail = switch (status) {
             case TOO_MANY_REQUESTS -> "YouTube's daily API quota for this app is used up - it resets at midnight Pacific time.";
-            case UNAUTHORIZED -> "Your YouTube login expired - log out and back in.";
+            case UNAUTHORIZED -> LOGIN_EXPIRED;
             case NOT_FOUND -> "YouTube says that doesn't exist (or it's private).";
             case FORBIDDEN -> "This app wasn't given access to your YouTube account - log in again and tick the YouTube permission on Google's screen.";
             default -> "YouTube refused the request" + (message != null ? ": " + message : ".");
         };
         return new YoutubeError(youtubeStatus, reason, message, status, detail);
+    }
+
+    static final String LOGIN_EXPIRED = "Your YouTube login expired - log out and back in.";
+    static final String UNREACHABLE = "Couldn't reach YouTube - check the connection and try again.";
+    static final String UNREADABLE = "YouTube sent an answer the app couldn't read - try again.";
+
+    // The plain-language sentence for a YouTube call that got no usable HTTP
+    // answer (no YouTube status to map): unreachable, or an unreadable body.
+    static String noAnswer(RestClientException e) {
+        return e instanceof ResourceAccessException ? UNREACHABLE : UNREADABLE;
     }
 }

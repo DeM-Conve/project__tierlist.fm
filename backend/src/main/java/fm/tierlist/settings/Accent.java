@@ -1,6 +1,8 @@
 package fm.tierlist.settings;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonValue;
+import com.fasterxml.jackson.databind.exc.InvalidFormatException;
 
 // Accent colours - frontend/src/themes.js ACCENTS.
 // Constant names are the labels of the Postgres enum `accent_option` (V1 migration);
@@ -24,5 +26,11 @@ public enum Accent {
     @JsonValue
     public String key() {
         return key;
+    }
+
+    // By key only - never a number (see FrontendKeys).
+    @JsonCreator
+    static Accent fromKey(String key) throws InvalidFormatException {
+        return FrontendKeys.parse(Accent.class, Accent::key, key);
     }
 }

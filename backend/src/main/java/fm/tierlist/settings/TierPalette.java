@@ -1,6 +1,8 @@
 package fm.tierlist.settings;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonValue;
+import com.fasterxml.jackson.databind.exc.InvalidFormatException;
 
 // Tier colour sets - frontend/src/themes.js TIER_PALETTES.
 // Constant names are the labels of the Postgres enum `tier_palette_option` (V1 migration);
@@ -19,5 +21,11 @@ public enum TierPalette {
     @JsonValue
     public String key() {
         return key;
+    }
+
+    // By key only - never a number (see FrontendKeys).
+    @JsonCreator
+    static TierPalette fromKey(String key) throws InvalidFormatException {
+        return FrontendKeys.parse(TierPalette.class, TierPalette::key, key);
     }
 }
