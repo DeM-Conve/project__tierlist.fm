@@ -236,6 +236,29 @@ class DuelApiIT extends PostgresIT {
         call(post(BOARD + "/sessions/" + sid + "/skips"), skipBody, alice).andExpect(status().isConflict());
     }
 
+    // The clock ran out while the user listened: the duel on screen still
+    // counts (and can be undone and answered again), but no new one comes.
+    @Test
+    void theLastDuelCanBeAnsweredJustAfterTimeIsUp() throws Exception {
+        JsonNode s = start("SMART_MIX");
+        String sid = s.get("id").asText();
+        String a = s.get("matchup").get("a").asText();
+        String b = s.get("matchup").get("b").asText();
+        now = now.plus(Duration.ofMinutes(5)).plusSeconds(20);
+        JsonNode after = verdict(sid, a, b, "A");
+        assertThat(after.get("duels")).hasSize(1);
+        assertThat(after.get("done").asBoolean()).isTrue();
+        JsonNode undone = ok(call(post(BOARD + "/sessions/" + sid + "/undo"), seenBody(sid), alice).andExpect(status().isOk()));
+        assertThat(undone.get("matchup").get("a").asText()).isEqualTo(a);
+        verdict(sid, a, b, "B");
+        now = now.plus(DuelSession.ANSWER_GRACE);
+        call(post(BOARD + "/sessions/" + sid + "/verdicts"),
+            "{\"layout\": %s, \"a\": \"%s\", \"b\": \"%s\", \"verdict\": \"A\", \"seenDuels\": 1}".formatted(layout(), a, b), alice)
+            .andExpect(status().isConflict());
+        JsonNode summary = ok(call(post(BOARD + "/sessions/" + sid + "/end"), layoutBody(), alice).andExpect(status().isOk()));
+        assertThat(summary.get("seconds").asLong()).isEqualTo(300);
+    }
+
     @Test
     void aNewSessionEndsTheOpenOne() throws Exception {
         String first = start("SMART_MIX").get("id").asText();

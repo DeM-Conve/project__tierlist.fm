@@ -31,4 +31,21 @@ class DuelSessionTest {
         assertThat(s.getMinutes()).isEqualTo(2);
         assertThat(s.getCertaintyStart()).isEqualTo(0.5, org.assertj.core.api.Assertions.within(1e-6));
     }
+
+    @Test
+    void theDuelOnScreenWhenTimeRunsOutCanStillBeAnswered() {
+        DuelSession s = new DuelSession("u", "Rap", Focus.SMART_MIX, 2, t0, 0.5);
+        assertThat(s.isOpen(t0.plusSeconds(130))).isFalse();
+        assertThat(s.takesAnswers(t0.plusSeconds(130))).isTrue();
+        assertThat(s.takesAnswers(t0.plusSeconds(120).plus(DuelSession.ANSWER_GRACE))).isFalse();
+        s.end(t0.plusSeconds(60));
+        assertThat(s.takesAnswers(t0.plusSeconds(61))).isFalse();
+    }
+
+    @Test
+    void aSessionEndedLongAfterItsTimeWasUpLastedItsLength() {
+        DuelSession s = new DuelSession("u", "Rap", Focus.SMART_MIX, 5, t0, 0.5);
+        s.end(t0.plusSeconds(3600));
+        assertThat(s.getEndedAt()).isEqualTo(s.endsAt());
+    }
 }

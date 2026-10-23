@@ -172,9 +172,11 @@ public class DuelService {
         Instant now = clock.instant();
         openSession(userId, board).ifPresent(s -> s.end(now));
         DuelHistory history = history(userId, board, layout);
-        double certainty = engineFor(userId).engine().analyze(layout, history, now).certainty();
-        DuelSession s = sessions.save(new DuelSession(userId, board, req.focus(), req.minutes(), now, certainty));
-        return view(s, layout, history, null);
+        DuelEngine engine = engineFor(userId).engine();
+        // One analysis serves both: the certainty the session starts from and its first duel.
+        BoardAnalysis a = engine.analyze(layout, history, now);
+        DuelSession s = sessions.save(new DuelSession(userId, board, req.focus(), req.minutes(), now, a.certainty()));
+        return view(s, engine, a, history, null);
     }
 
     @Transactional
@@ -184,7 +186,8 @@ public class DuelService {
 
     @Transactional
     public SessionDto verdict(String userId, String board, UUID id, DuelDtos.VerdictRequest req) {
-        DuelSession s = openSessionOrThrow(userId, board, id);
+        DuelSession s = session(userId, board, id);
+        if (!s.takesAnswers(clock.instant())) throw new DuelSessionClosedException();
         requireSeen(s, req.seenDuels());
         BoardLayout layout = req.layout().toLayout();
         Map<String, String> tierOf = layout.tierOf();
@@ -311,21 +314,24 @@ public class DuelService {
     }
 
     private SessionDto view(DuelSession s, BoardLayout layout, DuelHistory history, Duel rematch) {
-        Instant now = clock.instant();
         DuelEngine engine = engineFor(s.getUserId()).engine();
-        BoardAnalysis a = engine.analyze(layout, history, now);
+        return view(s, engine, engine.analyze(layout, history, clock.instant()), history, rematch);
+    }
+
+    private SessionDto view(DuelSession s, DuelEngine engine, BoardAnalysis a, DuelHistory history, Duel rematch) {
+        Instant now = clock.instant();
         List<Duel> mine = history.duels().stream().filter(d -> s.getId().equals(d.session())).toList();
         List<String> skipped = skips.findByIdSessionId(s.getId()).stream().map(DuelSkip::getVideoId).toList();
         Optional<Matchup> next = Optional.empty();
-        if (s.isOpen(now)) {
-            if (rematch != null && a.song(rematch.a()) != null && a.song(rematch.b()) != null) {
-                next = Optional.of(Matchup.of(a, rematch.a(), rematch.b()));
-            } else {
-                long seed = s.getId().getMostSignificantBits() ^ (31L * mine.size() + skipped.size());
-                SessionContext ctx = new SessionContext(s.getFocus(), mine, Set.copyOf(skipped),
-                    history.duels(), new Random(seed));
-                next = engine.next(a, ctx);
-            }
+        // An undone verdict's pair is asked again - also in the grace after
+        // the time is up (see DuelSession.takesAnswers); a new duel only while open.
+        if (rematch != null && s.takesAnswers(now) && a.song(rematch.a()) != null && a.song(rematch.b()) != null) {
+            next = Optional.of(Matchup.of(a, rematch.a(), rematch.b()));
+        } else if (s.isOpen(now)) {
+            long seed = s.getId().getMostSignificantBits() ^ (31L * mine.size() + skipped.size());
+            SessionContext ctx = new SessionContext(s.getFocus(), mine, Set.copyOf(skipped),
+                history.duels(), new Random(seed));
+            next = engine.next(a, ctx);
         }
         MatchupDto matchup = next.map(m -> MatchupDto.from(m, a)).orElse(null);
         DuelDtos.PreviousDto previous = mine.isEmpty() ? null : previous(mine.get(mine.size() - 1), a);
