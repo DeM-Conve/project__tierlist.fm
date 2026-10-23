@@ -7,7 +7,11 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { renderProfiler } from './test/renderProfiler';
 import { FakeYoutube } from './test/fakeYoutube';
 import { mountApp, unmount } from './test/syncHarness';
+import { openFocus, playNextInQueue } from './store/focusSlice';
+import { selectFocusSequence } from './store/selectors';
 
+// The YouTube iframe: a stand-in that's ready at once.
+vi.mock('./components/EmbeddedPlayer', () => ({ default: () => <div data-testid="embed" /> }));
 vi.mock('@mantine/notifications', () => ({ notifications: { show: vi.fn(), hide: vi.fn(), update: vi.fn() }, Notifications: () => null }));
 
 const TIERS = ['S', 'A', 'B', 'C', 'D'];
@@ -22,7 +26,10 @@ function account() {
   return a;
 }
 
-const WATCH = ['Layout', 'Sidebar', 'TierBoardPage', 'TierBoardView', 'TierRow', 'TierRail', 'PendingChanges', 'CommandPalette'];
+// jsdom has no scrolling; the queue scrolls its current song into view.
+if (!Element.prototype.scrollTo) Element.prototype.scrollTo = function () {};
+
+const WATCH = ['Layout', 'PlayerDock', 'QueuePanel', 'Sidebar', 'TierBoardPage', 'TierBoardView', 'TierRow', 'TierRail', 'PendingChanges', 'CommandPalette'];
 const lines = [];
 async function measure(label, fn) {
   renderProfiler.start();
@@ -54,5 +61,23 @@ describe('render cost on a 333-song board', () => {
     expect(key.count('TierBoardPage')).toBe(0);
     expect(key.count('TierRow')).toBe(0);
     expect(key.renders).toBeLessThan(900);
+  }, 60000);
+
+  it('with the player open: a move, the next song, a keystroke', async () => {
+    const h = await mountApp(new FakeYoutube(account()));
+    await h.open('Big');
+    const seq = selectFocusSequence(h.state);
+    h.dispatch(openFocus({ tier: 'S', videoId: seq[0].video.videoId, queue: seq.map((e) => e.video.videoId), entries: seq, category: 'Big', label: 'Big' }));
+    const move = await measure('[playing] move one song S -> A', async () => h.move(h.tierItems().S[3].videoId, 'A'));
+    await measure('[playing] next song', async () => h.dispatch(playNextInQueue()));
+    const input = rtl.screen.getByPlaceholderText('Filter boards…');
+    const key = await measure('[playing] sidebar filter keystroke', async () => {
+      await rtl.act(async () => rtl.fireEvent.change(input, { target: { value: 'r' } }));
+    });
+    // The dock and its queue only redraw for the player's own changes (was
+    // once per Layout render: 1065 -> 712 renders per keystroke here).
+    expect(move.count('PlayerDock')).toBe(0);
+    expect(key.count('PlayerDock')).toBe(0);
+    expect(key.count('QueuePanel')).toBe(0);
   }, 60000);
 });

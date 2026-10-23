@@ -1,4 +1,4 @@
-import { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react';
+import { Suspense, lazy, memo, useEffect, useMemo, useRef, useState } from 'react';
 import { tierName } from './tierLabels';
 import { useDispatch, useSelector, useStore } from 'react-redux';
 import { useQueryClient } from '@tanstack/react-query';
@@ -39,6 +39,8 @@ import { preparedStatus, syncStatusRun } from './syncStatus';
 import { dragEnded, transfersDiscarded } from './store/transfersSlice';
 import TierBoardView from './components/TierBoardView';
 import PlayerDock from './components/PlayerDock';
+// Memoised here (see Layout's dockActions): its props are kept stable.
+const MemoPlayerDock = memo(PlayerDock);
 import CommandPalette from './components/CommandPalette';
 // Pages most visits never open first load on demand, so the app's first
 // paint (home / a board) doesn't wait on their code - and are fetched in
@@ -743,6 +745,40 @@ function Layout() {
   }, []);
   const outletContext = useMemo(() => ({ ...stableActions, addSongs }), [stableActions, addSongs]);
 
+  // The dock is memoised (MemoPlayerDock): its props only change when the
+  // player's own state does, so a board edit or a sidebar keystroke no
+  // longer re-renders it and its queue.
+  const dockQueue = useMemo(
+    () => ({ history: queueHistory, current: queueCurrent, upcoming: queueUpcoming, contextLabel }),
+    [queueHistory, queueCurrent, queueUpcoming, contextLabel]
+  );
+  latestActions.current.changeFocusedTier = changeFocusedTier;
+  latestActions.current.queueUpcoming = queueUpcoming;
+  const dockActions = useMemo(
+    () => ({
+      onCycleRepeat: () => dispatch(cycleRepeat()),
+      onStop: () => dispatch(closeFocusAction()),
+      onMinimize: () => dispatch(minimizePlayer()),
+      onExpand: () => dispatch(expandPlayer()),
+      onFloat: () => dispatch(floatPlayer()),
+      onPrev: () => dispatch(playPrevInQueue()),
+      onNext: () => dispatch(playNextInQueue()),
+      onChangeTier: (tier) => latestActions.current.changeFocusedTier(tier),
+      onJump: (section, index) => dispatch(jumpInQueue({ section, index })),
+      onRemove: (key) => dispatch(removeFromQueue(key)),
+      onMoveInQueue: (from, to) => dispatch(moveInQueue({ from, to })),
+      onShuffleUpcoming: () => {
+        const keys = latestActions.current.queueUpcoming.map((e) => e.key);
+        for (let i = keys.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [keys[i], keys[j]] = [keys[j], keys[i]];
+        }
+        dispatch(reorderUpcoming(keys));
+      },
+    }),
+    [dispatch]
+  );
+
   return (
     // The shell is a fixed-height column: the body row (sidebar | canvas |
     // rail) above the player dock's own row. The mini dock takes real space
@@ -868,7 +904,7 @@ function Layout() {
       </Flex>
 
       {focusedVideoData && (
-        <PlayerDock
+        <MemoPlayerDock
           mode={playerMode}
           video={focusedVideoData}
           currentTier={focusedVideo.tier}
@@ -876,28 +912,10 @@ function Layout() {
           hasPrev={queueHistory.length > 0}
           hasNext={queueUpcoming.length > 0}
           repeatMode={repeatMode}
-          onCycleRepeat={() => dispatch(cycleRepeat())}
           isShuffling={isShuffling}
           isTriage={isTriage}
-          onStop={() => dispatch(closeFocusAction())}
-          onMinimize={() => dispatch(minimizePlayer())}
-          onExpand={() => dispatch(expandPlayer())}
-          onFloat={() => dispatch(floatPlayer())}
-          onPrev={() => dispatch(playPrevInQueue())}
-          onNext={() => dispatch(playNextInQueue())}
-          onChangeTier={changeFocusedTier}
-          queue={{ history: queueHistory, current: queueCurrent, upcoming: queueUpcoming, contextLabel }}
-          onJump={(section, index) => dispatch(jumpInQueue({ section, index }))}
-          onRemove={(key) => dispatch(removeFromQueue(key))}
-          onMoveInQueue={(from, to) => dispatch(moveInQueue({ from, to }))}
-          onShuffleUpcoming={() => {
-            const keys = queueUpcoming.map((e) => e.key);
-            for (let i = keys.length - 1; i > 0; i--) {
-              const j = Math.floor(Math.random() * (i + 1));
-              [keys[i], keys[j]] = [keys[j], keys[i]];
-            }
-            dispatch(reorderUpcoming(keys));
-          }}
+          queue={dockQueue}
+          {...dockActions}
         />
       )}
 
