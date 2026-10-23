@@ -145,8 +145,8 @@ describe('staged changes on duel pages', () => {
     renderApp(path);
     await screen.findByRole('navigation', { name: 'Activity bar' });
     act(() => { store.dispatch(moveWithFeedback([{ fromTier: 'S', toTier: 'A', videoId: 'stagedvid01', dropIndex: null }])); });
-    if (shown) expect(await screen.findByText('1 change staged · review')).toBeInTheDocument();
-    else expect(screen.queryByText(/staged · review/)).not.toBeInTheDocument();
+    if (shown) expect(await screen.findByText('1 change on Rap · review')).toBeInTheDocument();
+    else expect(screen.queryByText(/· review/)).not.toBeInTheDocument();
   });
 });
 

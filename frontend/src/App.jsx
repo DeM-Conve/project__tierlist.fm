@@ -33,11 +33,14 @@ import TierRail from './components/TierRail';
 import { CANVAS_TOP, CANVAS_X, PART_GAP, SHELL_Y } from './layout/spacing';
 import { CanvasContext } from './layout/canvas';
 import PendingChanges from './components/PendingChanges';
-import { applySyncOutcome, landBoardRefresh, loadBoard, moveWithFeedback, syncRequestFailed } from './tierActions';
+import { applySyncOutcome, discardAll, discardBoard, landBoardRefresh, loadBoard, moveWithFeedback, syncRequestFailed } from './tierActions';
+import { boardScope } from './store/boardScope';
+import { ShellActionsContext } from './layout/shellActions';
+import { notesDismissed } from './store/draftsSlice';
 import { buildSyncPlan, resolveItemIds, songMoves } from './syncPlan';
 import { preparePush, recordPush } from './syncCache';
-import { preparedStatus, syncStatusRun } from './syncStatus';
-import { dragEnded, transfersDiscarded } from './store/transfersSlice';
+import { preparedStatus, syncStatusRun, worstStatus } from './syncStatus';
+import { dragEnded } from './store/transfersSlice';
 import TierBoardView from './components/TierBoardView';
 import PlayerDock from './components/PlayerDock';
 // The shell's parts are memoised here (their callbacks come from Layout's
@@ -96,10 +99,8 @@ import { clearBoardCache } from './api/boardCache';
 import { detectNaming } from './naming';
 import { setCurrentCategory, setHomeQuery, setSidebarQuery, setMobileSidebarOpen, showSidebarView, setSidebarCollapsed } from './store/viewSlice';
 import {
-  setTierItems,
+  boardClosed,
   itemIdsResolved,
-  discardTierChanges,
-  setSyncStatus,
   setAwaitingRefresh,
 } from './store/tiersSlice';
 import {
@@ -122,7 +123,7 @@ import {
   selectTierPlaylists,
   selectTierCategories,
   selectPendingMoves,
-  selectStagedChanges,
+  selectBoardsChanges,
   selectTransfers,
   selectPlayingVideoIdOnBoard,
   selectFocusSequence,
@@ -274,10 +275,10 @@ export default function App() {
         <Route path="playlist/:id" element={<PlaylistRedirect />} />
         <Route path="tier/:category" element={<TierBoardPage />} />
         <Route path="tier/:category/t/:tier" element={<TierFocusPage />} />
-        <Route path="tier/:category/duel" element={<DuelPage view={DuelHub} staged />} />
+        <Route path="tier/:category/duel" element={<DuelPage view={DuelHub} />} />
         <Route path="tier/:category/duel/play/:sessionId" element={<DuelPage view={DuelMatch} />} />
-        <Route path="tier/:category/duel/moves" element={<DuelPage view={DuelMoves} staged />} />
-        <Route path="tier/:category/duel/done/:sessionId" element={<DuelPage view={DuelWrap} staged />} />
+        <Route path="tier/:category/duel/moves" element={<DuelPage view={DuelMoves} />} />
+        <Route path="tier/:category/duel/done/:sessionId" element={<DuelPage view={DuelWrap} />} />
         <Route path="add" element={<AddSongsPage />} />
         <Route path="settings" element={<SettingsPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
@@ -372,7 +373,8 @@ function Layout() {
 
   const tierGroups = useSelector(selectTierGroups);
   const tierCategories = useSelector(selectTierCategories);
-  const stagedCount = useSelector(selectStagedChanges).length;
+  const stagedGroups = useSelector(selectBoardsChanges);
+  const stagedCount = stagedGroups.reduce((n, g) => n + g.changes.length + g.dedupes.length, 0);
   const focusSequence = useSelector(selectFocusSequence);
   // A song dragged to another board unmounts its own tile on the way (the
   // sidebar opens that board), so its dragend never arrives - end the drag
@@ -392,6 +394,7 @@ function Layout() {
   const currentCategory = tierMatch ? decodeURIComponent(tierMatch.params.category) : null;
   const tierPageMatch = useMatch('/tier/:category/t/:tier');
   const duelMatch = useMatch('/tier/:category/duel/*');
+  const matchupMatch = useMatch('/tier/:category/duel/play/:sessionId');
   const addMatch = useMatch('/add');
   const focusedCategory = useSelector((s) => s.focus.focusedCategory);
   // The Tier Rail is global like the player: on a board page it shows that
@@ -481,33 +484,58 @@ function Layout() {
   // Pushes run one at a time, each planned from the store as it is when it
   // starts - so a second push (another Move on Suggested moves while one is
   // in flight) never re-sends what the first already applied.
-  // `videoIds`: push only those songs' staged moves (Suggested moves' Move /
-  // its Undo) and leave every other staged edit staged.
+  // `syncChanges(category, { videoIds })`: one board's staged changes (and
+  // the staged transfers) - with `videoIds`, only those songs' moves
+  // (Suggested moves' Move / its Undo), every other staged edit stays.
+  // `pushAll()`: Push on the bar - every board's changes, each board planned
+  // from its own draft (open or kept, boardScope), the transfers with the
+  // first.
   const store = useStore();
   const pushChain = useRef(Promise.resolve());
   function syncChanges(category, { videoIds } = {}) {
-    pushChain.current = pushChain.current.then(() => runSync(category, videoIds));
+    pushChain.current = pushChain.current.then(() => runPushes([{ category, videoIds, withTransfers: !videoIds }]));
+    return pushChain.current;
+  }
+  function pushAll() {
+    pushChain.current = pushChain.current.then(() => {
+      const state = store.getState();
+      const open = state.tiers.loadedCategory;
+      const kept = selectBoardsChanges(state)
+        .filter((g) => g.category !== open && state.drafts.boards[g.category])
+        .map((g) => g.category);
+      const boards = open ? [open, ...kept] : kept;
+      return runPushes(boards.map((category, i) => ({ category, withTransfers: i === 0 })));
+    });
     return pushChain.current;
   }
   // Each push's own token: a status reset timer only resets the status its
   // own push set (a later push may have set the same value).
   const syncRun = useRef(0);
-  async function runSync(category, videoIds) {
-    // The changes to push, as the store has them now.
-    const planNow = () => {
-      const state = store.getState();
-      let moves = selectPendingMoves(state);
-      let staged = selectTransfers(state);
-      if (videoIds) {
-        moves = songMoves(moves, videoIds);
-        staged = [];
-      }
-      if (!moves.length && !staged.length) return null;
-      return buildSyncPlan(moves, staged, selectTierGroups(state), category);
-    };
-    if (!planNow()) return;
+  async function runPushes(runs) {
+    const planned = runs.filter((r) => planFor(r));
+    if (!planned.length) return;
     const finish = syncStatusRun(dispatch, syncRun);
     finish('syncing');
+    let status = 'idle';
+    for (const r of planned) status = worstStatus(status, await pushBoard(r));
+    finish(status);
+  }
+  // The changes to push for one board, as the store has them now.
+  function planFor({ category, videoIds, withTransfers }) {
+    const state = boardScope(category, store.dispatch, store.getState).getState();
+    let moves = selectPendingMoves(state);
+    let staged = withTransfers ? selectTransfers(state) : [];
+    if (videoIds) moves = songMoves(moves, videoIds);
+    if (!moves.length && !staged.length) return null;
+    return buildSyncPlan(moves, staged, selectTierGroups(state), category);
+  }
+  // One board's push, against that board wherever it is (boardScope - its
+  // ids checked, its outcome applied to its own draft). -> its status.
+  async function pushBoard(run) {
+    const { category } = run;
+    const scope = boardScope(category, store.dispatch, store.getState);
+    const planNow = () => planFor(run);
+    if (!planNow()) return 'idle';
     const groups = selectTierGroups(store.getState());
     let plan = null;
 
@@ -517,39 +545,34 @@ function Layout() {
       // re-point the ids and settle changes whose item is gone first
       // (syncCache.js preparePush).
       const next = await preparePush(queryClient, {
-        dispatch,
-        getState: store.getState,
+        dispatch: scope.dispatch,
+        getState: scope.getState,
         tierGroups: groups,
         category,
         planNow,
       });
       plan = next.plan;
-      if (!plan) {
-        finish(preparedStatus(next));
-        return;
-      }
+      if (!plan) return preparedStatus(next);
 
       const result = await tierSyncMutation.mutateAsync(plan.payload);
 
       // Apply what actually happened (per-item, from the backend's own
-      // results) straight to the local draft, rather than clearing it and
+      // results) straight to the board's draft, rather than clearing it and
       // waiting on a refetch of YouTube's playlist API to reflect the
       // change - that refetch can lag behind the write that just happened,
       // which used to leave the just-synced duplicate/moved video sitting on
       // screen looking unsynced. Moved songs take their new item ids, a
       // half-done move keeps only its delete staged, failures keep their
       // reason - see tierActions' applySyncOutcome.
-      const outcome = dispatch(applySyncOutcome(plan, result.results));
+      const outcome = scope.dispatch(applySyncOutcome(plan, result.results));
       const finishedStatus = Object.keys(outcome.failures).length || next.skipped ? 'partial' : 'done';
 
       // The touched playlists' cached items get what the push did written
       // into them (not a refetch, which can lag behind it and used to bring
       // deleted item ids back) - see syncCache.js recordPush. Runs after
       // applySyncOutcome, so it reads the new item ids from the store.
-      await recordPush(queryClient, { state: store.getState(), plan, results: result.results, tierGroups: groups, category });
+      await recordPush(queryClient, { state: scope.getState(), plan, results: result.results, tierGroups: groups, category });
       if (plan.transfers.length) queryClient.invalidateQueries({ queryKey: ['playlists'] });
-
-      finish(finishedStatus);
 
       // Inserts YouTube returned no id for: find them in a fresh copy of
       // the playlist, so the next push deletes the right item.
@@ -557,23 +580,23 @@ function Layout() {
         const playlistIds = [...new Set(outcome.unknownIds.map((u) => u.playlistId))];
         const lists = await Promise.allSettled(playlistIds.map((id) => fetchPlaylistItems(id)));
         const itemsOf = Object.fromEntries(playlistIds.map((id, i) => [id, lists[i].value ?? []]));
-        dispatch(itemIdsResolved(resolveItemIds(outcome.unknownIds, itemsOf)));
+        scope.dispatch(itemIdsResolved(resolveItemIds(outcome.unknownIds, itemsOf)));
       }
+      return finishedStatus;
     } catch (e) {
       // The request may have half-happened: every touched playlist is
       // re-read before the next push.
-      if (plan) await recordPush(queryClient, { state: store.getState(), plan, results: null, tierGroups: groups, category }).catch(() => {});
+      if (plan) await recordPush(queryClient, { state: scope.getState(), plan, results: null, tierGroups: groups, category }).catch(() => {});
       // A failed id check has no plan yet: blame the changes it was for.
       const failedPlan = plan ?? planNow();
-      if (failedPlan) dispatch(syncRequestFailed(failedPlan, errorMessage(e, 'The app couldn’t reach the server - nothing was changed.')));
-      finish('error');
+      if (failedPlan) scope.dispatch(syncRequestFailed(failedPlan, errorMessage(e, 'The app couldn’t reach the server - nothing was changed.')));
+      return 'error';
     }
   }
 
-  // Discard drops this board's edits and every staged transfer.
-  function discardChanges() {
-    dispatch(discardTierChanges());
-    dispatch(transfersDiscarded());
+  // Discard on one board (the review list), or everything (the bar).
+  function discardChanges(category) {
+    dispatch(category ? discardBoard(category) : discardAll());
   }
 
   function moveVideoToTier(fromTier, toTier, videoId, dropIndex) {
@@ -664,7 +687,12 @@ function Layout() {
   function changeFocusedTier(newTier) {
     if (!focusedVideo || newTier === focusedVideo.tier) return;
     // moveWithFeedback also re-points focusedVideo.tier at the new tier.
-    moveVideoToTier(focusedVideo.tier, newTier, focusedVideo.videoId, null);
+    // The change goes to the playing song's own board, open or not.
+    dispatch(
+      moveWithFeedback([{ fromTier: focusedVideo.tier, toTier: newTier, videoId: focusedVideo.videoId, dropIndex: null }], {
+        category: focusedCategory,
+      })
+    );
   }
 
   async function logout() {
@@ -686,8 +714,7 @@ function Layout() {
     clearBoardCache();
     dispatch(setLoggedIn(false));
     dispatch(setPlaylists(null));
-    dispatch(setTierItems({}));
-    dispatch(setSyncStatus('idle'));
+    dispatch(boardClosed());
     dispatch(closeFocusAction());
     spotlight.close();
     navigate('/', { replace: true });
@@ -778,24 +805,27 @@ function Layout() {
         label: `Start a duel on ${currentCategory}`,
         action: () => navigate(`/tier/${encodeURIComponent(currentCategory)}/duel`),
       });
-      if (stagedCount > 0) {
+    }
+    if (stagedCount > 0) {
+      list.push({
+        id: 'action-sync',
+        section: 'Actions',
+        label: `Push staged changes to YouTube (${stagedCount} pending)`,
+        keywords: ['sync', 'push', 'save'],
+        action: () => pushAll(),
+      });
+      for (const g of stagedGroups.filter((x) => x.changes.length)) {
         list.push({
-          id: 'action-sync',
+          id: `action-discard-${g.category}`,
           section: 'Actions',
-          label: `Sync ${currentCategory} to YouTube (${stagedCount} pending)`,
-          action: () => syncChanges(currentCategory),
-        });
-        list.push({
-          id: 'action-discard',
-          section: 'Actions',
-          label: `Discard changes on ${currentCategory}`,
-          action: () => discardChanges(),
+          label: `Discard changes on ${g.category}`,
+          action: () => discardChanges(g.category),
         });
       }
     }
     return list;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tierCategories, tierPlaylists, currentCategory, stagedCount, tierGroups, focusSequence]);
+  }, [tierCategories, tierPlaylists, currentCategory, stagedCount, stagedGroups, tierGroups, focusSequence]);
 
   // What pages get from the shell (useOutletContext). One object for the
   // Layout's life: a new one each render re-rendered the whole page (a
@@ -804,12 +834,13 @@ function Layout() {
   // (Set during render, like sidebarCollapsedRef: a page may call one from
   // its own mount effect, which runs before this component's effects.)
   const latestActions = useRef(null);
-  latestActions.current = { syncChanges, discardChanges, moveVideoToTier, openFocus, startShufflePlay, playFrom, handleAddLinks, addSongsActions };
+  latestActions.current = { syncChanges, pushAll, discardChanges, moveVideoToTier, openFocus, startShufflePlay, playFrom, handleAddLinks, addSongsActions };
   const stableActions = useMemo(() => {
     const call = (name) => (...args) => latestActions.current[name](...args);
     const addSong = (name) => (...args) => latestActions.current.addSongsActions[name](...args);
     return {
       syncChanges: call('syncChanges'),
+      pushAll: call('pushAll'),
       pushSongs: (category, videoIds) => latestActions.current.syncChanges(category, { videoIds }),
       discardChanges: call('discardChanges'),
       moveVideoToTier: call('moveVideoToTier'),
@@ -885,6 +916,7 @@ function Layout() {
     // Mantine AppShell: AppShell fixes its footer at a static height and
     // collapses it with a transform, which would re-anchor the dock's own
     // fixed expanded/floating modes to the footer box.
+    <ShellActionsContext.Provider value={outletContext}>
     <Flex direction="column" h="100dvh">
       <Affix position={{ top: 14, left: 14 }} hiddenFrom="md" zIndex={30}>
         <ActionIcon
@@ -1001,6 +1033,9 @@ function Layout() {
         </Group>
 
         {railCategory && <MemoTierRail category={railCategory} activeTier={tierPageMatch?.params.tier} />}
+        {/* Every board's unpushed changes, on every page but a duel
+            matchup (whose own clips and keys hold the screen). */}
+        {!matchupMatch && <PendingChanges />}
       </Flex>
 
       {focusedVideoData && (
@@ -1023,6 +1058,7 @@ function Layout() {
       <LinkHints ref={hintsRef} />
       <ShortcutsModal opened={shortcutsOpened} onClose={shortcutsHandlers.close} />
     </Flex>
+    </ShellActionsContext.Provider>
   );
 }
 
@@ -1066,17 +1102,38 @@ function useBoardPage(category) {
 // (The Tier Rail itself is global - mounted in Layout, see railCategory.)
 // A board whose playlists couldn't be read says why (never skeletons forever).
 // One shown from the board cache whose refresh failed stays up, with a note.
-function BoardShell({ children, error, onRetry, refreshError, onRetryRefresh }) {
-  return (
+function BoardShell({ category, children, error, onRetry, refreshError, onRetryRefresh }) {
+  return error ? <BoardLoadError error={error} onRetry={onRetry} /> : (
     <>
-      {error ? <BoardLoadError error={error} onRetry={onRetry} /> : (
-        <>
-          {refreshError && <BoardRefreshNotice error={refreshError} onRetry={onRetryRefresh} />}
-          {children}
-        </>
-      )}
-      <PendingChanges />
+      {refreshError && <BoardRefreshNotice error={refreshError} onRetry={onRetryRefresh} />}
+      <BoardDraftNotes category={category} />
+      {children}
     </>
+  );
+}
+
+// Staged changes of this board that no longer applied when it was opened
+// again over fresh YouTube data (tierActions.restoreDraft) - dropped, and
+// said so here until dismissed.
+function BoardDraftNotes({ category }) {
+  const dispatch = useDispatch();
+  const notes = useSelector((s) => s.drafts.notes[category]);
+  if (!notes?.length) return null;
+  return (
+    <Alert color="yellow" variant="light" mb="sm" p="2xs" title={`${notes.length === 1 ? 'A staged change' : `${notes.length} staged changes`} no longer applied`}>
+      <Flex gap="2xs" justify="space-between" align="flex-start">
+        <Box>
+          {notes.map((n) => (
+            <Text key={n.key} fz="sm" role="note">
+              {n.text}
+            </Text>
+          ))}
+        </Box>
+        <Button size="compact-sm" variant="subtle" color="gray" onClick={() => dispatch(notesDismissed(category))}>
+          Dismiss
+        </Button>
+      </Flex>
+    </Alert>
   );
 }
 
@@ -1194,7 +1251,7 @@ function TierBoardPage() {
   const openTier = useCallback((t) => navigate(`${base}/t/${t}`), [navigate, base]);
 
   return (
-    <BoardShell error={error} onRetry={retry} refreshError={refreshError} onRetryRefresh={retryRefresh}>
+    <BoardShell category={category} error={error} onRetry={retry} refreshError={refreshError} onRetryRefresh={retryRefresh}>
       {addingTodo && (
         <TodoListModal
           category={category}
@@ -1251,7 +1308,7 @@ function TierFocusPage() {
   }, [isLoading, tiers, tier, base, navigate]);
 
   return (
-    <BoardShell error={error} onRetry={retry} refreshError={refreshError} onRetryRefresh={retryRefresh}>
+    <BoardShell category={category} error={error} onRetry={retry} refreshError={refreshError} onRetryRefresh={retryRefresh}>
       <TierFocusView
         category={category}
         tier={tier}
@@ -1271,10 +1328,8 @@ function TierFocusPage() {
 
 // Every duel screen (hub, matchup, moves, summary): the board loaded the same
 // way the tier list loads it (deep links work), then the screen itself.
-// `staged`: the page shows the board's staged-changes bar (review / Push,
-// Shift+P) like a board page - a Move on Suggested moves is staged, so it has
-// to be visible and pushable right there. The matchup leaves it out.
-function DuelPage({ view: View, staged = false }) {
+// (The staged-changes bar is the Layout's, on every page but the matchup.)
+function DuelPage({ view: View }) {
   const category = useCategoryParam();
   const { sessionId } = useParams();
   const { isLoading, error, retry } = useBoardPage(category);
@@ -1286,7 +1341,6 @@ function DuelPage({ view: View, staged = false }) {
       <Suspense fallback={<Center py="xl"><Loader size="sm" /></Center>}>
         <View category={category} sessionId={sessionId} boardLoading={isLoading} base={`/tier/${encodeURIComponent(category)}`} />
       </Suspense>
-      {staged && <PendingChanges />}
     </>
   );
 }

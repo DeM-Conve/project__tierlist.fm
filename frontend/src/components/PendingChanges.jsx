@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useState } from 'react';
 import { tierName } from '../tierLabels';
 import { useDispatch, useSelector } from 'react-redux';
-import { useOutletContext } from 'react-router-dom';
 import { ActionIcon, Box, Button, Group, Image, Kbd, Modal, Paper, ScrollArea, Stack, Text, Tooltip } from '@mantine/core';
 import { useHotkeys, useMediaQuery } from '@mantine/hooks';
 import { AlertTriangle, ArrowRight, Trash2, Undo2 } from 'lucide-react';
-import { selectStagedChanges, selectStagedFailures } from '../store/selectors';
-import { cancelTransfer, moveWithFeedback } from '../tierActions';
+import { selectBoardsChanges, selectStagedFailures } from '../store/selectors';
+import { cancelTransfer, discardAll, discardBoard, moveWithFeedback } from '../tierActions';
+import { useShellActions } from '../layout/shellActions';
 import { songLabel } from '../tierUtils';
 import { TierChip } from './TierBits';
 
@@ -142,40 +142,94 @@ function ChangeRow({ move, first, onRevert, failure }) {
   );
 }
 
-function ReviewChangesModal({ opened, onClose, moves, syncStatus, onPush, onDiscard }) {
+// What the bar says: the user's own changes first ("3 changes on Rap",
+// "5 changes on 2 boards"), then auto-staged duplicates apart ("1 duplicate
+// to clean up") - a board with only those must not look like the user staged
+// something.
+function pendingSummary(groups, { compact = false } = {}) {
+  const changes = groups.reduce((n, g) => n + g.changes.length, 0);
+  const dedupes = groups.reduce((n, g) => n + g.dedupes.length, 0);
+  const boards = groups.filter((g) => g.changes.length);
+  const dupText = dedupes ? plural(dedupes, 'duplicate') + ' to clean up' : '';
+  if (!changes) return { changes, dedupes, boards: groups.length, text: compact ? `${dedupes} to clean up` : dupText };
+  if (compact) return { changes, dedupes, boards: boards.length, text: `${changes} staged` };
+  const where = boards.length === 1 ? boards[0].category : `${boards.length} boards`;
+  const text = `${plural(changes, 'change')} on ${where}${dupText ? ` · ${dupText}` : ''}`;
+  return { changes, dedupes, boards: groups.length, text };
+}
+
+function ReviewChangesModal({ opened, onClose, groups, syncStatus, onPush }) {
   const dispatch = useDispatch();
   const failures = useSelector(selectStagedFailures);
   const failureOf = new Map(failures.map((f) => [changeKey(f), f.failure]));
   const syncing = syncStatus === 'syncing';
+  const total = groups.reduce((n, g) => n + g.changes.length + g.dedupes.length, 0);
 
   useEffect(() => {
-    if (opened && moves.length === 0) onClose(); // everything put back / pushed
-  }, [opened, moves.length, onClose]);
+    if (opened && total === 0) onClose(); // everything put back / pushed
+  }, [opened, total, onClose]);
 
-  const revert = (m) =>
+  // A change is put back on its own board, open or not.
+  const revert = (m, category) =>
     m.kind === 'transfer'
       ? dispatch(cancelTransfer(m))
-      : dispatch(moveWithFeedback([{ fromTier: m.to, toTier: m.from, videoId: m.video.videoId }]));
+      : dispatch(moveWithFeedback([{ fromTier: m.to, toTier: m.from, videoId: m.video.videoId }], { category }));
 
+  const { text } = pendingSummary(groups);
   return (
-    <Modal
-      opened={opened}
-      onClose={onClose}
-      centered
-      size={560}
-      radius="lg"
-      title={<Text fw={800}>{plural(moves.length, 'change')} to push</Text>}
-    >
+    <Modal opened={opened} onClose={onClose} centered size={600} radius="lg" title={<Text fw={800}>{text} to push</Text>}>
       <Stack gap="md">
-        <ScrollArea.Autosize mah="min(55vh, 480px)" offsetScrollbars="present" type="auto">
-          <Stack gap={0}>
-            {moves.map((m, i) => (
-              <ChangeRow key={changeKey(m)} move={m} first={i === 0} onRevert={() => revert(m)} failure={failureOf.get(changeKey(m))} />
+        <ScrollArea.Autosize mah="min(60vh, 520px)" offsetScrollbars="present" type="auto">
+          <Stack gap="lg">
+            {groups.map((g) => (
+              // One board's changes: what you staged, then the duplicates the
+              // app found on it (auto-staged), each with the board's Discard.
+              <Box key={g.category} component="section" aria-label={`${g.category} changes`}>
+                <Group justify="space-between" wrap="nowrap" gap="sm" pb="4xs" style={{ borderBottom: '1px solid var(--border)' }}>
+                  <Box miw={0}>
+                    <Text fw={700} fz="lg" truncate="end">
+                      {g.category}
+                    </Text>
+                    <Text fz="xs" c="dimmed">
+                      {[g.changes.length && plural(g.changes.length, 'change'), g.dedupes.length && `${plural(g.dedupes.length, 'duplicate')} to clean up`]
+                        .filter(Boolean)
+                        .join(' · ')}
+                    </Text>
+                  </Box>
+                  <Button
+                    size="compact-sm"
+                    variant="subtle"
+                    color="gray"
+                    onClick={() => dispatch(discardBoard(g.category))}
+                    disabled={syncing || !g.changes.length}
+                    aria-label={`Discard changes on ${g.category}`}
+                  >
+                    Discard
+                  </Button>
+                </Group>
+                <Stack gap={0}>
+                  {g.changes.map((m, i) => (
+                    <ChangeRow key={changeKey(m)} move={m} first={i === 0} onRevert={() => revert(m, g.category)} failure={failureOf.get(changeKey(m))} />
+                  ))}
+                </Stack>
+                {g.dedupes.length > 0 && (
+                  <>
+                    <Text fz="xs" fw={700} c="dimmed" tt="uppercase" pt="2xs">
+                      Duplicates to clean up (found by the app)
+                    </Text>
+                    <Stack gap={0}>
+                      {g.dedupes.map((m, i) => (
+                        <ChangeRow key={changeKey(m)} move={m} first={i === 0} failure={failureOf.get(changeKey(m))} />
+                      ))}
+                    </Stack>
+                  </>
+                )}
+              </Box>
             ))}
           </Stack>
         </ScrollArea.Autosize>
         <Group justify="flex-end" gap="xs">
-          <Button variant="default" onClick={onDiscard} disabled={syncing}>
+          <Button variant="default" onClick={() => dispatch(discardAll())} disabled={syncing}>
             Discard all
           </Button>
           <Button onClick={onPush} loading={syncing} rightSection={<Kbd size="xs">⇧P</Kbd>}>
@@ -187,20 +241,20 @@ function ReviewChangesModal({ opened, onClose, moves, syncStatus, onPush, onDisc
   );
 }
 
-// Floating "unsaved changes" bar, shown on every page of a board (tier
-// list, tier focus, duel) - staged edits are the one thing that needs
-// a decision, so they sit above everything (and above the mini player)
-// instead of competing with page buttons. Also owns Shift+P, so the
-// shortcut works on every one of those pages, not just the tier list.
+// The one staged-changes bar, on every page (bottom-centre, above the mini
+// player): every board's unpushed changes, wherever you are. Review lists
+// them by board; Push sends every board's (each planned from its own draft);
+// Discard drops them all. Also owns Shift+P. Hidden only on a duel matchup.
 export default function PendingChanges() {
-  const { syncChanges, discardChanges } = useOutletContext();
-  const moves = useSelector(selectStagedChanges);
+  const dispatch = useDispatch();
+  const { pushAll } = useShellActions();
+  const groups = useSelector(selectBoardsChanges);
   const syncStatus = useSelector((s) => s.tiers.syncStatus);
-  const category = useSelector((s) => s.view.currentCategory);
   const [reviewOpen, setReviewOpen] = useState(false);
   const closeReview = useCallback(() => setReviewOpen(false), []);
   const compact = useMediaQuery('(max-width: 62em)');
-  const count = moves.length;
+  const summary = pendingSummary(groups, { compact });
+  const count = summary.changes + summary.dedupes;
   const failedCount = useSelector(selectStagedFailures).length;
 
   // Shift+P pushes (Mantine useHotkeys: exact modifiers, and it ignores
@@ -210,9 +264,9 @@ export default function PendingChanges() {
     [
       'shift+P',
       (e) => {
-        if (count === 0 || !category) return;
+        if (count === 0) return;
         e.preventDefault();
-        syncChanges(category);
+        pushAll?.();
       },
       { preventDefault: false },
     ],
@@ -222,14 +276,7 @@ export default function PendingChanges() {
 
   return (
     <>
-      <ReviewChangesModal
-        opened={reviewOpen}
-        onClose={closeReview}
-        moves={moves}
-        syncStatus={syncStatus}
-        onPush={() => syncChanges(category)}
-        onDiscard={discardChanges}
-      />
+      <ReviewChangesModal opened={reviewOpen} onClose={closeReview} groups={groups} syncStatus={syncStatus} onPush={() => pushAll?.()} />
       {showBar && (
         <Paper
           withBorder
@@ -255,12 +302,12 @@ export default function PendingChanges() {
             <Box
               w={8}
               h={8}
-              bg={count > 0 ? 'accent' : syncStatus === 'done' ? 'teal' : 'red'}
+              bg={summary.changes > 0 ? 'accent' : count > 0 ? 'gray' : syncStatus === 'done' ? 'teal' : 'red'}
               style={{ borderRadius: '50%', flexShrink: 0 }}
             />
             {count > 0 ? (
               <Button variant="subtle" color="gray" c="var(--text)" px="3xs" onClick={() => setReviewOpen(true)}>
-                {compact ? `${count} staged` : `${count} change${count === 1 ? '' : 's'} staged · review`}
+                {compact ? summary.text : `${summary.text} · review`}
               </Button>
             ) : (
               <Text size="sm" fw={600} pr="sm">
@@ -279,14 +326,14 @@ export default function PendingChanges() {
                 <Button
                   variant="default"
                   size={compact ? 'xs' : 'sm'}
-                  onClick={discardChanges}
+                  onClick={() => dispatch(discardAll())}
                   disabled={syncStatus === 'syncing'}
                 >
-                  Discard
+                  {summary.boards > 1 ? 'Discard all' : 'Discard'}
                 </Button>
                 <Button
                   size={compact ? 'xs' : 'sm'}
-                  onClick={() => syncChanges(category)}
+                  onClick={() => pushAll?.()}
                   disabled={syncStatus === 'syncing'}
                   loading={syncStatus === 'syncing'}
                   rightSection={compact ? null : <Kbd size="xs">⇧P</Kbd>}

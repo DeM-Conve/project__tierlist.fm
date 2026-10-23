@@ -19,3 +19,7 @@ export function syncStatusRun(dispatch, counter, delay = 2500) {
     }, delay);
   };
 }
+
+// Several boards pushed in one go end on the worst of their statuses.
+const RANK = { idle: 0, done: 1, partial: 2, error: 3 };
+export const worstStatus = (a, b) => (RANK[b] > RANK[a] ? b : a);

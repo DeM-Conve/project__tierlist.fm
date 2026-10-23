@@ -1,6 +1,5 @@
 import { useMemo } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { useOutletContext } from 'react-router-dom';
 import { notifications } from '@mantine/notifications';
 import { selectDuelLayout } from '../store/selectors';
 import { applyOrderWithFeedback, moveWithFeedback } from '../tierActions';
@@ -9,6 +8,7 @@ import { errorMessage } from '../api/client';
 import { useDuelDecisionMutation, useDuelLockMutation } from '../api/queries';
 import { dropIndexByScore } from './duelText';
 import { TIER_ORDER } from '../tiers';
+import { useShellActions } from '../layout/shellActions';
 
 // What every duel page needs about the open board: its songs (by id), names,
 // the layout the API wants, and the actions on suggested moves. Moves go
@@ -21,7 +21,7 @@ export function useDuelBoard(category) {
   const duelLayout = useSelector(selectDuelLayout);
   const decision = useDuelDecisionMutation(category);
   const lock = useDuelLockMutation(category);
-  const pushSongs = useOutletContext()?.pushSongs;
+  const pushSongs = useShellActions().pushSongs;
   const push = (videoIds) => pushSongs?.(category, videoIds);
 
   const videoMap = useMemo(() => {

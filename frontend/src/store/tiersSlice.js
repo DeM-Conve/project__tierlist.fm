@@ -342,6 +342,8 @@ const tiersSlice = createSlice({
         if (!existing.includes(tier)) state.originalTierOf[v.videoId] = [...existing, tier];
       });
     },
+    // Logout: no board is open any more (and no undo history is left).
+    boardClosed: () => tiersSlice.getInitialState(),
     setTierItems: (state, action) => {
       state.redoStack = [];
       state.tierItems = action.payload;
@@ -681,6 +683,7 @@ export const {
   setAwaitingRefresh,
   setTierForCategory,
   setTierItems,
+  boardClosed,
   applySyncedMoves,
   itemIdsResolved,
   addSyncedVideo,

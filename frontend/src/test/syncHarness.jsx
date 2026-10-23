@@ -265,7 +265,7 @@ export class Harness {
   }
 
   async discard() {
-    const button = this.screen.queryByRole('button', { name: 'Discard' });
+    const button = this.screen.queryByRole('button', { name: /^Discard( all)?$/ });
     if (button) await act(async () => fireEvent.click(button));
   }
 }
