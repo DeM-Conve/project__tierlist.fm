@@ -206,15 +206,17 @@ export const selectFocusedVideoData = (state) => state.focus.current?.video ?? n
 // when it was queued, and a song dragged since (or put back by Discard /
 // undo, or a fresh copy of the board) is somewhere else now. Reading the
 // snapshot, the player and the rail showed the old tier and rating it did
-// nothing (a move "from" a tier the song wasn't in). Off its board, or for a
-// song no longer on it, the snapshot is all there is.
+// nothing (a move "from" a tier the song wasn't in). Off its board the
+// snapshot is all there is. A song that's no longer on its loaded board
+// (removed and pushed, dragged to another board) has no tier (null): there's
+// nothing there to rate.
 const LIVE_TIERS = [...BOARD_TIERS, REMOVED_TIER];
 export const selectPlayingSong = createSelector(
   [selectFocusedVideo, selectFocusedCategory, selectLoadedCategory, selectTierItems],
   (focusedVideo, focusedCategory, loadedCategory, tierItems) => {
     if (!focusedVideo || focusedCategory !== loadedCategory) return focusedVideo;
-    const tier = LIVE_TIERS.find((t) => (tierItems[t] || []).some((v) => v.videoId === focusedVideo.videoId));
-    return !tier || tier === focusedVideo.tier ? focusedVideo : { ...focusedVideo, tier };
+    const tier = LIVE_TIERS.find((t) => (tierItems[t] || []).some((v) => v.videoId === focusedVideo.videoId)) ?? null;
+    return tier === focusedVideo.tier ? focusedVideo : { ...focusedVideo, tier };
   }
 );
 
@@ -224,11 +226,12 @@ export const selectPlayingSong = createSelector(
 // loaded in `tiersSlice.tierItems` (the pills/shift+digit shortcut write
 // there). That stays true on Home / Settings / playlist pages after leaving
 // the board - only opening a *different* board replaces it, and then the
-// controls hide rather than silently no-op.
+// controls hide rather than silently no-op. The same for a song that has
+// left its board (selectPlayingSong's tier is null).
 export const selectFocusedAvailableTiers = createSelector(
-  [selectFocusedVideo, selectFocusedCategory, selectLoadedCategory, selectTierGroups],
-  (focusedVideo, focusedCategory, loadedCategory, tierGroups) =>
-    focusedVideo && focusedCategory && focusedCategory === loadedCategory
+  [selectPlayingSong, selectFocusedCategory, selectLoadedCategory, selectTierGroups],
+  (playing, focusedCategory, loadedCategory, tierGroups) =>
+    playing?.tier && focusedCategory && focusedCategory === loadedCategory
       ? TIER_ORDER.filter((t) => tierGroups[focusedCategory]?.[t])
       : []
 );

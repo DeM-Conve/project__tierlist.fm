@@ -44,7 +44,9 @@ export default function TierRail({ category, activeTier }) {
   // Rating writes into tierItems, so it needs this board to be the loaded one
   // (it still is after leaving it for Home/Settings; not after opening another).
   const loaded = loadedCategory === category;
-  const playingHere = focusedVideo && focusedCategory === category && loaded ? focusedVideo : null;
+  // (A song no longer on its board - pushed away, dragged to another board -
+  // has no tier: there's nothing to rate.)
+  const playingHere = focusedVideo?.tier && focusedCategory === category && loaded ? focusedVideo : null;
 
   function actionFor(tier) {
     if (playingHere && playingVideo) {

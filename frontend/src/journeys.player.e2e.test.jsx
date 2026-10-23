@@ -379,3 +379,30 @@ describe("journey 2: duel on one board while the player plays another's song", (
     expect(h.staged()).toEqual([expect.objectContaining({ kind: 'move', to: 'C' })]);
   });
 });
+
+describe('journey 1: the playing song leaves its board', () => {
+  it('removed and pushed: nothing offers to rate a song YouTube no longer has', async () => {
+    await start();
+    await playTile('b');
+    key('Delete');
+    expect(h.tierOf('b')).toBe(REMOVED_TIER);
+    await h.push();
+    expect(youtubeBoards(yt).Rap.S).toEqual(['a', 'c']);
+    expect(h.tierOf('b')).toBeUndefined();
+    expect(selectFocusedAvailableTiers(h.state)).toEqual([]);
+    expect(rail().mode).toBe('Tiers');
+    expect(rail().playingOn).toBeNull();
+  });
+
+  it('dragged to another board: its old board stops rating it', async () => {
+    await start();
+    await playTile('a');
+    await h.transfer('a', 'Pop', 'A');
+    await h.goHome(); // the rail follows the playing song's board (Rap)
+    await h.open('Rap');
+    expect(h.tierOf('a')).toBeUndefined();
+    expect(selectFocusedAvailableTiers(h.state)).toEqual([]);
+    expect(rail().mode).toBe('Tiers');
+    expect(rail().playingOn).toBeNull();
+  });
+});
