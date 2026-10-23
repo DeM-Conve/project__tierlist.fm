@@ -11,6 +11,7 @@ import { mountApp, youtubeBoards } from './test/syncHarness';
 import { invariantViolations } from './test/syncInvariants';
 import { minimizePlayer } from './store/focusSlice';
 import { playSongNow, queueSong } from './queueActions';
+import { discardBoard } from './tierActions';
 import { selectFocusedAvailableTiers, selectPlayingSong } from './store/selectors';
 import { BOARD_TIERS, REMOVED_TIER, TIER_ORDER } from './tiers';
 
@@ -214,10 +215,12 @@ describe('journey 1: play from one board, browse, drive the player', () => {
     expect(rail().mode).toBe('Rate');
     rateKey(2);
     expect(h.tierOf('p')).toBe('A');
-    // Back on Rap's song: Pop's player controls are gone again.
+    // Back on Rap's song: the rail is Pop's again (Tiers), and the player
+    // rates Rap's song on Rap's own board, kept while Pop is open
+    // (fix/board-drafts: rating the playing song stages on its own board).
     prev();
     expect(playingId()).toBe('a');
-    expect(selectFocusedAvailableTiers(h.state)).toEqual([]);
+    expect(selectFocusedAvailableTiers(h.state)).toEqual(['S', 'A', 'B', 'C', 'D']);
     expect(rail().mode).toBe('Tiers');
   });
 });
@@ -289,11 +292,9 @@ describe('journey 3: counts agree after a push', () => {
     expect(sidebarTotals()).toEqual(youtubeTotals());
   });
 
-  // fix/board-drafts (per-board drafts, one global pending bar) owns what a
-  // staged change shows away from its board. Today the board, its header and
-  // the rail count the draft, while the sidebar and the Home cards count
-  // YouTube - on Home both are on screen at once (the rail beside the card).
-  it.fails('a staged change: the Home card and the sidebar agree with the rail', async () => {
+  // A board with unpushed changes is counted as its draft shows it
+  // everywhere (the user's call), marked with an "unpushed" dot.
+  it('a staged change: the Home card and the sidebar agree with the rail', async () => {
     await start();
     await playTile('a');
     h.remove('g');
@@ -304,6 +305,10 @@ describe('journey 3: counts agree after a push', () => {
     expect(rail().counts).toMatchObject({ S: 4, B: 0, D: 0, TODO: 2 });
     expect(homeCard('Rap').counts).toMatchObject({ S: 4, B: 0, D: 0, TODO: 2 });
     expect(sidebarTotals().Rap).toBe(6);
+    expect(screen.getAllByRole('img', { name: 'Unpushed changes' }).length).toBeGreaterThan(0);
+    await h.push();
+    expect(sidebarTotals()).toEqual(youtubeTotals());
+    expect(screen.queryByRole('img', { name: 'Unpushed changes' })).toBeNull();
   });
 
   it("a duel page's Move: the sidebar and Home follow", async () => {
@@ -320,13 +325,16 @@ describe('journey 1: browsing other boards while a song plays', () => {
     await start();
     await playTile('a');
     await h.open('Pop');
-    // Pop is open: the rail is Pop's tiers, the keys don't rate Rap's song
-    // on Pop's board, Pop's tiles don't light up.
+    // Pop is open: the rail is Pop's tiers, Pop's tiles don't light up, and
+    // the keys rate Rap's song on Rap's own board (kept while Pop is open),
+    // never on Pop's.
     expect(rail()).toMatchObject({ mode: 'Tiers', playingOn: null, counts: { S: 2, A: 1, TODO: 1 } });
     rateKey(2);
-    key('Delete');
     expect(h.staged()).toEqual([]);
-    expect(focus().focusedVideo).toMatchObject({ videoId: 'a', tier: 'S' });
+    expect(h.keptBoard('Rap').A).toEqual(['d', 'e', 'a']);
+    expect(focus().focusedVideo).toMatchObject({ videoId: 'a', tier: 'A' });
+    h.dispatch(discardBoard('Rap'));
+    expect(selectPlayingSong(h.state)).toMatchObject({ videoId: 'a', tier: 'S' });
     // Next / prev walk Rap's queue, still Rap's songs.
     next();
     expect(playingId()).toBe('b');
@@ -344,10 +352,8 @@ describe("journey 2: duel on one board while the player plays another's song", (
     await start(ACCOUNT, 'Pop');
     await playTile('p');
     await openDuel('Rap');
-    // Rap is loaded now: Pop's song can't be rated here.
-    expect(selectFocusedAvailableTiers(h.state)).toEqual([]);
-    rateKey(2);
-    expect(h.staged()).toEqual([]);
+    // Rap is loaded now: Pop's song is rated on Pop's own (kept) board.
+    expect(selectFocusedAvailableTiers(h.state)).toEqual(['S', 'A']);
 
     await h.duelMove('d', 'S');
     expect(youtubeBoards(yt).Rap.S).toContain('d');
@@ -383,7 +389,7 @@ describe("journey 2: duel on one board while the player plays another's song", (
   // fix/board-drafts (per-board drafts) is changing this right now: opening
   // another board replaces the loaded board's draft, so an edit staged on
   // the duel's board is gone when you come back.
-  it.fails("a staged edit on the duel's board survives a visit to the playing song's board", async () => {
+  it("a staged edit on the duel's board survives a visit to the playing song's board", async () => {
     await start(ACCOUNT, 'Pop');
     await playTile('p');
     await openDuel('Rap');
@@ -401,7 +407,7 @@ describe('journey 1: rate away from the board, then browse', () => {
   // The user's own report. fix/board-drafts (per-board drafts; rating the
   // playing song stages on its own board) is changing this right now:
   // opening another board replaces the draft, so the rating is gone.
-  it.fails('a rating made on Settings is still there after visiting another board', async () => {
+  it('a rating made on Settings is still there after visiting another board', async () => {
     await start();
     await playTile('a');
     await goto('/settings');
@@ -433,10 +439,11 @@ describe('journey 1: a queue mixing two boards', () => {
     for (let i = 0; i < 6; i++) {
       seen.push(playingId());
       expect(focus().focusedCategory).toBe(boardOf[playingId()]);
-      // Pop is loaded: only Pop's song is rated here, by the rail and the keys.
+      // Pop is loaded: the rail rates only Pop's song; the keys rate each
+      // song on its own board (Rap's is kept while Pop is open).
       const onPop = boardOf[playingId()] === 'Pop';
       expect(rail().mode).toBe(onPop ? 'Rate' : 'Tiers');
-      expect(selectFocusedAvailableTiers(h.state).length > 0).toBe(onPop);
+      expect(selectFocusedAvailableTiers(h.state).length > 0).toBe(true);
       next();
     }
     expect(new Set(seen)).toEqual(new Set(['d', 'e', 'r']));

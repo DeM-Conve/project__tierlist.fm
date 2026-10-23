@@ -358,3 +358,33 @@ export const selectStagedFailures = createSelector(
   (changes, failures) =>
     changes.flatMap((c) => (failures?.[c.video.id] ? [{ ...c, failure: failures[c.video.id] }] : []))
 );
+
+// The boards as counted on screen away from the board itself (side panel,
+// Home cards): YouTube's numbers - except for a board with unpushed changes,
+// which shows what its draft shows (what the user sees on the board and the
+// rail), each of its playlists marked `unpushed` (the user's call: a small
+// "unpushed" dot, never two different numbers for one board on screen).
+const selectOpenBoardKept = createSelector(
+  [(s) => s.tiers.tierItems, (s) => s.tiers.originalTierOf, (s) => s.tiers.duplicateCopies, (s) => s.tiers.originalTierItems],
+  (tierItems, originalTierOf, duplicateCopies, originalTierItems) => ({ tierItems, originalTierOf, duplicateCopies, originalTierItems })
+);
+export const selectShownTierGroups = createSelector(
+  [selectTierGroups, selectLoadedCategory, selectOpenBoardKept, selectKeptBoards, selectTransferList],
+  (groups, loadedCategory, openBoard, kept, transfers) => {
+    const boards = { ...kept };
+    if (loadedCategory) boards[loadedCategory] = openBoard;
+    const moved = new Set(transfers.flatMap((t) => [t.fromCategory, t.toCategory]));
+    let out = groups;
+    for (const [category, board] of Object.entries(boards)) {
+      const changed = pendingMovesOfBoard(board).some((m) => m.kind !== 'dedupe');
+      if (!groups[category] || !(changed || moved.has(category))) continue;
+      const tiers = {};
+      for (const [tier, playlist] of Object.entries(groups[category])) {
+        tiers[tier] = { ...playlist, itemCount: board.tierItems?.[tier]?.length ?? playlist.itemCount, unpushed: true };
+      }
+      if (out === groups) out = { ...groups };
+      out[category] = tiers;
+    }
+    return out;
+  }
+);

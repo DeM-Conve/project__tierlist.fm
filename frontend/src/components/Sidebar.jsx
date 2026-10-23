@@ -17,7 +17,7 @@ import {
 import { Home, Keyboard, LayoutList, ListMusic, ListPlus, LogOut, Search, Settings, Swords } from 'lucide-react';
 import { BOARD_TIERS, TIER_ORDER } from '../tiers';
 import { boardPath, duelPath, useBoardContextMenu } from '../boardMenu';
-import { TierChip } from './TierBits';
+import { TierChip, UnpushedDot } from './TierBits';
 import { exampleTitle } from '../naming';
 import { useDispatch, useSelector } from 'react-redux';
 import { DragDropContext, Draggable, Droppable } from '@hello-pangea/dnd';
@@ -87,9 +87,12 @@ function BoardLink({ category, tiers, active }) {
         onFocus={() => prefetchBoard(tiers)}
         label={
           <Group justify="space-between" wrap="nowrap" gap="3xs">
-            <Text fz="lg" truncate="end">
-              {category}
-            </Text>
+            <Group gap="3xs" wrap="nowrap" miw={0}>
+              <Text fz="lg" truncate="end">
+                {category}
+              </Text>
+              <UnpushedDot tiers={tiers} />
+            </Group>
             <Text className="board-row-meta" fz="md" c={hovering ? undefined : MUTED} style={{ fontVariantNumeric: 'tabular-nums' }}>
               {total}
             </Text>

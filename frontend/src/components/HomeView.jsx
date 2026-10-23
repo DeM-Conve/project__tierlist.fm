@@ -27,7 +27,7 @@ import { exampleTitle } from '../naming';
 import { useSelector } from 'react-redux';
 import { selectNaming } from '../store/selectors';
 import { useTierName } from '../tierLabels';
-import { EqualizerMark, TierChip } from './TierBits';
+import { EqualizerMark, TierChip, UnpushedDot } from './TierBits';
 import { TIER_INK } from '../tierUtils';
 import PageHeader from './PageHeader';
 import { SECTION_GAP } from '../layout/spacing';
@@ -57,9 +57,12 @@ function BoardCard({ category, tiers, onOpen, onDuel }) {
     >
       <UnstyledButton onClick={onOpen} w="100%" aria-label={`Open ${category}`}>
         <Group justify="space-between" mb="xs" wrap="nowrap">
-          <Text ff="var(--font-display)" fw={700} fz="lg" truncate="end">
-            {category}
-          </Text>
+          <Group gap="3xs" wrap="nowrap" miw={0}>
+            <Text ff="var(--font-display)" fw={700} fz="lg" truncate="end">
+              {category}
+            </Text>
+            <UnpushedDot tiers={tiers} />
+          </Group>
           <Text fz="xs" c="dimmed" style={{ whiteSpace: 'nowrap' }}>
             {total} videos
           </Text>

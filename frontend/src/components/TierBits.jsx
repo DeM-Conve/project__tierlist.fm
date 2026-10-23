@@ -374,3 +374,14 @@ export const TierTile = memo(function TierTile({
     </Box>
   );
 });
+
+// A board with unpushed changes: the counts shown for it away from the board
+// are its draft's (selectors.selectShownTierGroups), marked with this dot.
+export function UnpushedDot({ tiers }) {
+  if (!Object.values(tiers || {}).some((p) => p?.unpushed)) return null;
+  return (
+    <Tooltip label="Unpushed changes - the counts include them" withArrow openDelay={200}>
+      <Box w={6} h={6} bg="accent" role="img" aria-label="Unpushed changes" style={{ borderRadius: '50%', flexShrink: 0 }} />
+    </Tooltip>
+  );
+}

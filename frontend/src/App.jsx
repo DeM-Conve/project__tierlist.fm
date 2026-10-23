@@ -126,6 +126,7 @@ import {
   selectTierCategories,
   selectPendingMoves,
   selectBoardsChanges,
+  selectShownTierGroups,
   selectTransfers,
   selectPlayingVideoIdOnBoard,
   selectFocusSequence,
@@ -380,6 +381,8 @@ function Layout() {
   const playerMode = useSelector((s) => s.focus.playerMode);
 
   const tierGroups = useSelector(selectTierGroups);
+  // Counted as each board's draft shows it while it has unpushed changes.
+  const shownGroups = useSelector(selectShownTierGroups);
   const tierCategories = useSelector(selectTierCategories);
   const stagedGroups = useSelector(selectBoardsChanges);
   const stagedCount = stagedGroups.reduce((n, g) => n + g.changes.length + g.dedupes.length, 0);
@@ -948,7 +951,7 @@ function Layout() {
           query={query}
           onQueryChange={sidebarActions.onQueryChange}
           tierCategories={tierCategories}
-          tierGroups={tierGroups}
+          tierGroups={shownGroups}
           playlistCount={tierPlaylists?.length ?? 0}
           waitingCount={addSongs.list.length}
           loading={tierPlaylists === null}
@@ -994,7 +997,7 @@ function Layout() {
                 query={query}
                 onQueryChange={sidebarActions.onQueryChange}
                 tierCategories={tierCategories}
-                tierGroups={tierGroups}
+                tierGroups={shownGroups}
                 playlistCount={tierPlaylists?.length ?? 0}
                 loading={tierPlaylists === null}
                 loadError={playlistsLoadError}
@@ -1193,7 +1196,8 @@ function HomePage() {
   const allPlaylists = useSelector((s) => s.auth.playlists);
   const tierPlaylists = useSelector(selectTierPlaylists);
   const query = useSelector((s) => s.view.homeQuery);
-  const tierGroups = useSelector(selectTierGroups);
+  // Boards with unpushed changes are counted as their drafts show them.
+  const tierGroups = useSelector(selectShownTierGroups);
   const tierCategories = useSelector(selectTierCategories);
   const focusedCategory = useSelector((s) => s.focus.focusedCategory);
   const playingVideo = useSelector(selectFocusedVideoData);
