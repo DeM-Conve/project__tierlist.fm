@@ -313,7 +313,7 @@ export default function DuelMoves({ category, boardLoading, base }) {
   const play = () => current && !playingHere && dispatch(playSongNow(current.from, board.videoOf(current.song)));
 
   const move = (s, opts) => {
-    board.accept(s, muOf, opts);
+    if (!board.accept(s, muOf, opts)) return;
     setDecided((d) => ({ ...d, [s.song]: { s, kind: 'move', lean: isLeaning(s) } }));
   };
   // Move all: every sure move, pushed to YouTube together.

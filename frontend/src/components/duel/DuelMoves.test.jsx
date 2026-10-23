@@ -1,7 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, screen, waitFor, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import DuelMoves from './DuelMoves';
 import { IDS, analysis, renderDuel, suggestion } from '../../test/duelFixtures';
+import { moveWithFeedback } from '../../tierActions';
 
 vi.mock('@mantine/notifications', () => ({ notifications: { show: vi.fn(), hide: vi.fn() } }));
 
@@ -355,5 +356,25 @@ describe('DuelMoves', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Sort A by score' }));
     expect(store.getState().tiers.tierItems.A.map((v) => v.videoId)).toEqual([IDS.mid2, IDS.mid]);
     expect(tierOf(store, IDS.low)).toBe('B');
+  });
+
+  it('a Move on a row a step behind the board moves the song from where it is now', () => {
+    const store = page();
+    // Dragged B -> S by hand while the list (B -> A) is on screen.
+    act(() => { store.dispatch(moveWithFeedback([{ fromTier: 'B', toTier: 'S', videoId: IDS.low }])); });
+    expect(tierOf(store, IDS.low)).toBe('S');
+    fireEvent.click(screen.getAllByRole('button', { name: 'Move' })[0]);
+    expect(tierOf(store, IDS.low)).toBe('A');
+    expect(h.push).toHaveBeenCalledWith('Rock', [IDS.low]);
+  });
+
+  it('a Move for a song no longer in a ranked tier moves nothing and says so', () => {
+    const store = page();
+    act(() => { store.dispatch(moveWithFeedback([{ fromTier: 'B', toTier: 'TODO', videoId: IDS.low }])); });
+    fireEvent.click(screen.getAllByRole('button', { name: 'Move' })[0]);
+    expect(tierOf(store, IDS.low)).toBe('TODO');
+    expect(h.decision).not.toHaveBeenCalled();
+    expect(h.push).not.toHaveBeenCalled();
+    expect(within(screen.getByTestId('moves-main')).queryByText('Moved to A')).not.toBeInTheDocument();
   });
 });

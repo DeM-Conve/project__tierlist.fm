@@ -8,6 +8,7 @@ import { songLabel } from '../tierUtils';
 import { errorMessage } from '../api/client';
 import { useDuelDecisionMutation, useDuelLockMutation } from '../api/queries';
 import { dropIndexByScore } from './duelText';
+import { TIER_ORDER } from '../tiers';
 
 // What every duel page needs about the open board: its songs (by id), names,
 // the layout the API wants, and the actions on suggested moves. Moves go
@@ -35,14 +36,29 @@ export function useDuelBoard(category) {
   const failed = (err) =>
     notifications.show({ color: 'red', title: 'Couldn’t save that', message: errorMessage(err, 'The app couldn’t reach the server.') });
 
+  // The ranked tier a song is in on the board right now (null: on the to-do
+  // list or no longer on the board).
+  const rankedTierOf = (id) => TIER_ORDER.find((t) => tierItems[t]?.some((v) => v.videoId === id)) ?? null;
+
   // Move: the move (placed among its new tier by score), recorded. Several at
   // once (Move all) push together: pass push = false and call pushNow(ids).
+  // The song moves from wherever it is now - a list shown a step behind the
+  // board (you dragged it meanwhile) still moves it, never a silent no-op.
+  // Returns false when there's nothing to move (the song left the ranked tiers).
   function accept(s, muOf, { push: pushIt = true } = {}) {
-    const target = (tierItems[s.to] || []).map((v) => v.videoId).filter((id) => id !== s.song);
-    const dropIndex = dropIndexByScore(target, muOf(s.song) ?? -Infinity, muOf);
-    dispatch(moveWithFeedback([{ fromTier: s.from, toTier: s.to, videoId: s.song, dropIndex }]));
+    const at = rankedTierOf(s.song);
+    if (!at) {
+      notifications.show({ title: 'That song isn’t in a ranked tier any more', message: `${nameOf(s.song)} - nothing was moved.` });
+      return false;
+    }
+    if (at !== s.to) {
+      const target = (tierItems[s.to] || []).map((v) => v.videoId).filter((id) => id !== s.song);
+      const dropIndex = dropIndexByScore(target, muOf(s.song) ?? -Infinity, muOf);
+      dispatch(moveWithFeedback([{ fromTier: at, toTier: s.to, videoId: s.song, dropIndex }]));
+    }
     decision.mutate({ videoId: s.song, decision: 'ACCEPTED', from: s.from, to: s.to, confidence: s.confidence }, { onError: failed });
     if (pushIt) push([s.song]);
+    return true;
   }
 
   function keep(s) {
@@ -51,8 +67,9 @@ export function useDuelBoard(category) {
 
   // Take back a Move (move it back where it was) or a Keep.
   function undo(s, wasMove) {
-    if (wasMove) {
-      dispatch(moveWithFeedback([{ fromTier: s.to, toTier: s.from, videoId: s.song }]));
+    const at = wasMove ? rankedTierOf(s.song) : null;
+    if (at && at !== s.from) {
+      dispatch(moveWithFeedback([{ fromTier: at, toTier: s.from, videoId: s.song }]));
       push([s.song]);
     }
     decision.mutate({ videoId: s.song, decision: null }, { onError: failed });
