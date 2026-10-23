@@ -197,6 +197,26 @@ function useSecondsLeft(endsAt) {
   return endsAt ? Math.max(0, Math.round((new Date(endsAt).getTime() - now) / 1000)) : 0;
 }
 
+// The session clock's pieces each tick on their own (once a second), so the
+// matchup page around them - both players, the session list - doesn't
+// re-render every second.
+function TimeLeft({ endsAt }) {
+  const secondsLeft = useSecondsLeft(endsAt);
+  return (
+    <Text fz="md" fw={700} c="dimmed" style={{ flexShrink: 0 }}>{secondsLeft > 0 ? `~${Math.ceil(secondsLeft / 60)} min left` : 'Time’s up'}</Text>
+  );
+}
+
+function TimeBar({ endsAt, minutes }) {
+  const secondsLeft = useSecondsLeft(endsAt);
+  const elapsed = Math.max(1, minutes * 60 - secondsLeft);
+  return <Progress value={Math.min(100, (elapsed / (minutes * 60)) * 100)} size="md" radius="xl" />;
+}
+
+function NothingLeftTitle({ endsAt }) {
+  return <Title order={2}>{useSecondsLeft(endsAt) > 0 ? 'Nothing left worth asking.' : 'Time’s up.'}</Title>;
+}
+
 // The matchup: hear both hooks, give a five-step verdict, see what it did.
 export default function DuelMatch({ category, sessionId, boardLoading, base }) {
   const dispatch = useDispatch();
@@ -224,7 +244,6 @@ export default function DuelMatch({ category, sessionId, boardLoading, base }) {
   // Sides whose video can't be played here, by video id (a new pair starts clean).
   const [blocked, setBlocked] = useState({});
   const [answered, setAnswered] = useState(null); // the matchup just answered, until "Next duel"
-  const secondsLeft = useSecondsLeft(session.data?.endsAt);
 
   const s = session.data;
   const m = s?.matchup;
@@ -437,7 +456,6 @@ export default function DuelMatch({ category, sessionId, boardLoading, base }) {
   }
 
   const gain = s.certainty - s.certaintyStart;
-  const elapsed = Math.max(1, s.minutes * 60 - secondsLeft);
   const shown = answered ?? m;
   const pairKey = `${shown?.a}|${shown?.b}`;
   const prev = s.previous;
@@ -485,9 +503,9 @@ export default function DuelMatch({ category, sessionId, boardLoading, base }) {
           <Text fz="md" fw={700} truncate="end">
             Certainty <Text span c="accent" inherit>{gain >= 0 ? '+' : '−'}{pct(Math.abs(gain))}</Text> · {s.duels.length} duels
           </Text>
-          <Text fz="md" fw={700} c="dimmed" style={{ flexShrink: 0 }}>{secondsLeft > 0 ? `~${Math.ceil(secondsLeft / 60)} min left` : 'Time’s up'}</Text>
+          <TimeLeft endsAt={s.endsAt} />
         </Group>
-        <Progress value={Math.min(100, (elapsed / (s.minutes * 60)) * 100)} size="md" radius="xl" />
+        <TimeBar endsAt={s.endsAt} minutes={s.minutes} />
       </>,
       <>
         <Button variant="default" onClick={takeBack} disabled={!s.duels.length || busy} rightSection={<Kbd size="xs">U</Kbd>}>Undo</Button>
@@ -497,7 +515,7 @@ export default function DuelMatch({ category, sessionId, boardLoading, base }) {
     main: !shown ? (
       <Paper withBorder radius="lg" p="md">
         <Stack align="center" gap="sm">
-          <Title order={2}>{secondsLeft > 0 ? 'Nothing left worth asking.' : 'Time’s up.'}</Title>
+          <NothingLeftTitle endsAt={s.endsAt} />
           <Text c="dimmed">{s.duels.length} duels this session. See what they settled.</Text>
           <Button onClick={finish} loading={end.isPending}>See the summary</Button>
         </Stack>

@@ -114,6 +114,42 @@ class DuelEngineTest {
         assertThat(placed.toDo()).doesNotContain(song).contains(id("TD", 1));
     }
 
+    // Old duels against songs removed from the board since (deleted on
+    // YouTube, moved to another board) still count for the songs that are
+    // left; the removed songs themselves get no state, suggestion or tier order.
+    @Test
+    void duelsAgainstSongsNoLongerOnTheBoardStillCount() {
+        String song = id("A", 3);
+        List<Duel> log = beats(song, "S", 6);
+        Map<String, List<String>> songs = new java.util.LinkedHashMap<>(board.songs());
+        List<String> s = new ArrayList<>(songs.get("S"));
+        s.remove(id("S", 0));
+        s.remove(id("S", 1));
+        songs.put("S", s);
+        BoardLayout smaller = new BoardLayout(board.rankedTiers(), "TODO", songs);
+        // The removed songs' starting scores are stored from before (DuelService keeps them).
+        DuelHistory history = new DuelHistory(engine.newPriors(board, Map.of()), log, Map.of(), Set.of());
+        BoardAnalysis a = engine.analyze(smaller, history, Boards.T0.plusSeconds(10_000));
+        assertThat(a.song(id("S", 0))).isNull();
+        assertThat(a.song(song).duels()).hasSize(6);
+        Suggestion up = a.suggestions().stream().filter(x -> x.song().equals(song)).findFirst().orElseThrow();
+        assertThat(up.to()).isEqualTo("S");
+        assertThat(a.suggestions()).noneMatch(x -> x.song().equals(id("S", 0)));
+        assertThat(a.tierOrders().values()).allSatisfy(ids -> assertThat(ids).doesNotContain(id("S", 0), id("S", 1)));
+        // A song moved to another tier since its duels is analysed in its new tier.
+        Map<String, List<String>> moved = new java.util.LinkedHashMap<>(board.songs());
+        List<String> sTier = new ArrayList<>(moved.get("S"));
+        sTier.add(song);
+        moved.put("S", sTier);
+        List<String> aTier = new ArrayList<>(moved.get("A"));
+        aTier.remove(song);
+        moved.put("A", aTier);
+        BoardLayout after = new BoardLayout(board.rankedTiers(), "TODO", moved);
+        BoardAnalysis b = engine.analyze(after, history, Boards.T0.plusSeconds(10_000));
+        assertThat(b.song(song).tier()).isEqualTo("S");
+        assertThat(b.suggestions()).noneMatch(x -> x.song().equals(song) && x.to().equals("S"));
+    }
+
     @Test
     void lockedSongsAreNeverSuggested() {
         String song = id("A", 3);

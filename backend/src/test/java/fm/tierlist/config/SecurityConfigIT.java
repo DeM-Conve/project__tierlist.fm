@@ -120,13 +120,13 @@ class SecurityConfigIT extends PostgresIT {
     // not a login redirect, a 405 or an empty body.
     @Test
     void signedOutApiCallsGetA401ProblemDetailForEveryMethod() throws Exception {
-        mvc.perform(post("/api/duels/Rap/analysis").contentType(MediaType.APPLICATION_JSON).content("{}"))
+        mvc.perform(post("/api/duels/analysis?board=Rap").contentType(MediaType.APPLICATION_JSON).content("{}"))
             .andExpect(status().isUnauthorized())
             .andExpect(header().doesNotExist(HttpHeaders.LOCATION))
             .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
             .andExpect(jsonPath("$.status").value(401))
             .andExpect(jsonPath("$.detail").value(org.hamcrest.Matchers.containsString("log in again")))
-            .andExpect(jsonPath("$.instance").value("/api/duels/Rap/analysis"));
+            .andExpect(jsonPath("$.instance").value("/api/duels/analysis"));
         mvc.perform(get("/api/playlists"))
             .andExpect(status().isUnauthorized())
             .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))

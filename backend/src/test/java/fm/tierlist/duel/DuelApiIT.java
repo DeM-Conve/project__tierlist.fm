@@ -47,7 +47,12 @@ class DuelApiIT extends PostgresIT {
     private Instant now = Instant.parse("2026-10-01T12:00:00Z");
     private final RequestPostProcessor alice = oidcLogin().idToken(t -> t.subject("alice"));
     private final RequestPostProcessor bob = oidcLogin().idToken(t -> t.subject("bob"));
-    private static final String BOARD = "/api/duels/Rap Board";
+    private static final String BOARD = "Rap Board";
+
+    // The duel API's URL for `board` (a query parameter - any characters).
+    private static java.net.URI at(String board, String path) {
+        return java.net.URI.create("/api/duels" + path + "?board=" + java.net.URLEncoder.encode(board, java.nio.charset.StandardCharsets.UTF_8).replace("+", "%20"));
+    }
 
     private static String id(String tier, int i) {
         return String.format("%-3s%08d", tier, i).replace(' ', '_');
@@ -80,7 +85,7 @@ class DuelApiIT extends PostgresIT {
 
     private JsonNode start(String focus) throws Exception {
         String body = "{\"layout\": %s, \"focus\": \"%s\", \"minutes\": 5}".formatted(layout(), focus);
-        return ok(call(post(BOARD + "/sessions"), body, alice).andExpect(status().isCreated()));
+        return ok(call(post(at(BOARD, "/sessions")), body, alice).andExpect(status().isCreated()));
     }
 
     private int seen(String session) {
@@ -89,7 +94,7 @@ class DuelApiIT extends PostgresIT {
 
     private JsonNode verdict(String session, String a, String b, String v) throws Exception {
         String body = "{\"layout\": %s, \"a\": \"%s\", \"b\": \"%s\", \"verdict\": \"%s\", \"seenDuels\": %d}".formatted(layout(), a, b, v, seen(session));
-        return ok(call(post(BOARD + "/sessions/" + session + "/verdicts"), body, alice).andExpect(status().isOk()));
+        return ok(call(post(at(BOARD, "/sessions/" + session + "/verdicts")), body, alice).andExpect(status().isOk()));
     }
 
     private String seenBody(String session) {
@@ -115,24 +120,24 @@ class DuelApiIT extends PostgresIT {
         assertThat(after.get("previous").get("a").get("id").asText()).isEqualTo(a);
         assertThat(after.get("matchup")).isNotNull();
 
-        JsonNode undone = ok(call(post(BOARD + "/sessions/" + sid + "/undo"), seenBody(sid), alice).andExpect(status().isOk()));
+        JsonNode undone = ok(call(post(at(BOARD, "/sessions/" + sid + "/undo")), seenBody(sid), alice).andExpect(status().isOk()));
         assertThat(undone.get("duels")).isEmpty();
         assertThat(undone.get("matchup").get("a").asText()).isEqualTo(a);
         assertThat(undone.get("matchup").get("b").asText()).isEqualTo(b);
-        assertThat(ok(call(post(BOARD + "/sessions/" + sid + "/undo"), seenBody(sid), alice)).get("duels")).isEmpty();
+        assertThat(ok(call(post(at(BOARD, "/sessions/" + sid + "/undo")), seenBody(sid), alice)).get("duels")).isEmpty();
 
         String skipBody = "{\"layout\": %s, \"videoId\": \"%s\", \"seenDuels\": 0}".formatted(layout(), a);
-        JsonNode skipped = ok(call(post(BOARD + "/sessions/" + sid + "/skips"), skipBody, alice).andExpect(status().isOk()));
+        JsonNode skipped = ok(call(post(at(BOARD, "/sessions/" + sid + "/skips")), skipBody, alice).andExpect(status().isOk()));
         assertThat(skipped.get("skipped").get(0).asText()).isEqualTo(a);
         assertThat(skipped.get("matchup").get("a").asText()).isNotEqualTo(a);
-        call(post(BOARD + "/sessions/" + sid + "/skips"), skipBody, alice).andExpect(status().isOk());
+        call(post(at(BOARD, "/sessions/" + sid + "/skips")), skipBody, alice).andExpect(status().isOk());
 
-        JsonNode analysis = ok(call(post(BOARD + "/analysis"), layoutBody(), alice).andExpect(status().isOk()));
+        JsonNode analysis = ok(call(post(at(BOARD, "/analysis")), layoutBody(), alice).andExpect(status().isOk()));
         assertThat(analysis.get("activeSession").asText()).isEqualTo(sid);
         assertThat(analysis.get("borders")).hasSize(4);
         assertThat(jdbc.queryForObject("SELECT count(*) FROM duel_prior", Integer.class)).isEqualTo(25);
 
-        JsonNode resumed = ok(call(post(BOARD + "/sessions/" + sid), layoutBody(), alice).andExpect(status().isOk()));
+        JsonNode resumed = ok(call(post(at(BOARD, "/sessions/" + sid)), layoutBody(), alice).andExpect(status().isOk()));
         assertThat(resumed.get("id").asText()).isEqualTo(sid);
     }
 
@@ -142,7 +147,7 @@ class DuelApiIT extends PostgresIT {
     // them, and the old session still reads fine.
     @Test
     void toDoSongsAreNeverPartOfDuels() throws Exception {
-        call(post(BOARD + "/analysis"), layoutBody(), alice).andExpect(status().isOk());
+        call(post(at(BOARD, "/analysis")), layoutBody(), alice).andExpect(status().isOk());
         String old = "00000000-0000-0000-0000-0000000000bb";
         jdbc.update("INSERT INTO duel_session (id, user_id, board, focus, minutes, started_at, certainty_start) "
             + "VALUES (?::uuid, 'alice', 'Rap Board', 'PLACE_TODO', 5, ?, 0.5)", old, java.sql.Timestamp.from(now));
@@ -154,7 +159,7 @@ class DuelApiIT extends PostgresIT {
         }
         now = now.plusSeconds(30);
 
-        JsonNode a = ok(call(post(BOARD + "/analysis"), layoutBody(), alice).andExpect(status().isOk()));
+        JsonNode a = ok(call(post(at(BOARD, "/analysis")), layoutBody(), alice).andExpect(status().isOk()));
         assertThat(a.get("activeSession").asText()).isEqualTo(old);
         assertThat(a.get("duelsTotal").asInt()).isEqualTo(16);
         assertThat(a.has("unplaced")).isFalse();
@@ -164,30 +169,30 @@ class DuelApiIT extends PostgresIT {
         assertThat(jdbc.queryForObject("SELECT count(*) FROM duel_prior WHERE video_id LIKE 'TD%'", Integer.class)).isZero();
 
         // The old Place TODO session resumes (as Smart mix) without a to-do song in it.
-        JsonNode resumed = ok(call(post(BOARD + "/sessions/" + old), layoutBody(), alice).andExpect(status().isOk()));
+        JsonNode resumed = ok(call(post(at(BOARD, "/sessions/" + old)), layoutBody(), alice).andExpect(status().isOk()));
         assertThat(resumed.get("duels")).hasSize(16);
         assertThat(resumed.get("previous").isNull()).isTrue();
         assertThat(resumed.get("matchup").toString()).doesNotContain(id("TD", 0), id("TD", 1));
         String todoVerdict = "{\"layout\": %s, \"a\": \"%s\", \"b\": \"%s\", \"verdict\": \"A\", \"seenDuels\": 16}".formatted(layout(), id("TD", 0), id("B", 0));
-        call(post(BOARD + "/sessions/" + old + "/verdicts"), todoVerdict, alice).andExpect(status().isBadRequest());
-        JsonNode summary = ok(call(post(BOARD + "/sessions/" + old + "/end"), layoutBody(), alice).andExpect(status().isOk()));
+        call(post(at(BOARD, "/sessions/" + old + "/verdicts")), todoVerdict, alice).andExpect(status().isBadRequest());
+        JsonNode summary = ok(call(post(at(BOARD, "/sessions/" + old + "/end")), layoutBody(), alice).andExpect(status().isOk()));
         assertThat(summary.get("newMoves").toString()).doesNotContain(id("TD", 0), id("TD", 1));
         assertThat(summary.has("placed")).isFalse();
 
         // Nothing new can be started in Place TODO, and no move starts from the to-do list.
-        call(post(BOARD + "/sessions"), "{\"layout\": %s, \"focus\": \"PLACE_TODO\", \"minutes\": 5}".formatted(layout()), alice)
+        call(post(at(BOARD, "/sessions")), "{\"layout\": %s, \"focus\": \"PLACE_TODO\", \"minutes\": 5}".formatted(layout()), alice)
             .andExpect(status().isBadRequest());
-        call(put(BOARD + "/decisions/" + id("TD", 0)), "{\"from\": \"TODO\", \"to\": \"A\", \"confidence\": 0.9, \"decision\": \"ACCEPTED\"}", alice)
+        call(put(at(BOARD, "/decisions/" + id("TD", 0))), "{\"from\": \"TODO\", \"to\": \"A\", \"confidence\": 0.9, \"decision\": \"ACCEPTED\"}", alice)
             .andExpect(status().isBadRequest());
     }
 
     @Test
     void aSongMovedToAnotherTierStartsFromThatTier() throws Exception {
-        call(post(BOARD + "/analysis"), layoutBody(), alice).andExpect(status().isOk());
+        call(post(at(BOARD, "/analysis")), layoutBody(), alice).andExpect(status().isOk());
         double before = jdbc.queryForObject("SELECT mu FROM duel_prior WHERE video_id = ?", Double.class, id("C", 2));
         // C_2 dragged up to S on the board (staged): the layout says so.
         String moved = layout().replace("\"" + id("C", 2) + "\", ", "").replace("\"S\": [", "\"S\": [\"" + id("C", 2) + "\", ");
-        call(post(BOARD + "/analysis"), "{\"layout\": " + moved + "}", alice).andExpect(status().isOk());
+        call(post(at(BOARD, "/analysis")), "{\"layout\": " + moved + "}", alice).andExpect(status().isOk());
         assertThat(jdbc.queryForObject("SELECT tier::text FROM duel_prior WHERE video_id = ?", String.class, id("C", 2))).isEqualTo("S");
         assertThat(jdbc.queryForObject("SELECT mu FROM duel_prior WHERE video_id = ?", Double.class, id("C", 2))).isGreaterThan(before + 6);
         assertThat(jdbc.queryForObject("SELECT count(*) FROM duel_prior", Integer.class)).isEqualTo(25);
@@ -202,12 +207,12 @@ class DuelApiIT extends PostgresIT {
         verdict(sid, id("B", 1), id("B", 0), "TOO_CLOSE");
         verdict(sid, id("B", 0), id("B", 1), "TOO_CLOSE");
         now = now.plusSeconds(90);
-        JsonNode summary = ok(call(post(BOARD + "/sessions/" + sid + "/end"), layoutBody(), alice).andExpect(status().isOk()));
+        JsonNode summary = ok(call(post(at(BOARD, "/sessions/" + sid + "/end")), layoutBody(), alice).andExpect(status().isOk()));
         assertThat(summary.get("duels").asInt()).isEqualTo(4);
         assertThat(summary.get("seconds").asLong()).isEqualTo(90);
         assertThat(summary.get("upset").get("winner").asText()).isEqualTo(id("D", 0));
         assertThat(summary.get("undecided")).hasSize(1);
-        call(post(BOARD + "/sessions/" + sid + "/verdicts"),
+        call(post(at(BOARD, "/sessions/" + sid + "/verdicts")),
             "{\"layout\": %s, \"a\": \"%s\", \"b\": \"%s\", \"verdict\": \"A\", \"seenDuels\": 4}".formatted(layout(), id("A", 0), id("B", 0)), alice)
             .andExpect(status().isConflict());
     }
@@ -216,12 +221,12 @@ class DuelApiIT extends PostgresIT {
     void aRepeatedOrStaleWriteIsRefusedNotRecordedTwice() throws Exception {
         String sid = start("SMART_MIX").get("id").asText();
         String body = "{\"layout\": %s, \"a\": \"%s\", \"b\": \"%s\", \"verdict\": \"A\", \"seenDuels\": 0}".formatted(layout(), id("A", 0), id("B", 0));
-        call(post(BOARD + "/sessions/" + sid + "/verdicts"), body, alice).andExpect(status().isOk());
-        call(post(BOARD + "/sessions/" + sid + "/verdicts"), body, alice)
+        call(post(at(BOARD, "/sessions/" + sid + "/verdicts")), body, alice).andExpect(status().isOk());
+        call(post(at(BOARD, "/sessions/" + sid + "/verdicts")), body, alice)
             .andExpect(status().isConflict())
             .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.stale").value(true));
         assertThat(seen(sid)).isEqualTo(1);
-        call(post(BOARD + "/sessions/" + sid + "/undo"), "{\"layout\": " + layout() + ", \"seenDuels\": 0}", alice).andExpect(status().isConflict());
+        call(post(at(BOARD, "/sessions/" + sid + "/undo")), "{\"layout\": " + layout() + ", \"seenDuels\": 0}", alice).andExpect(status().isConflict());
         assertThat(seen(sid)).isEqualTo(1);
     }
 
@@ -229,11 +234,34 @@ class DuelApiIT extends PostgresIT {
     void timeIsUpAfterTheSessionLength() throws Exception {
         String sid = start("SMART_MIX").get("id").asText();
         now = now.plus(Duration.ofMinutes(6));
-        JsonNode s = ok(call(post(BOARD + "/sessions/" + sid), layoutBody(), alice).andExpect(status().isOk()));
+        JsonNode s = ok(call(post(at(BOARD, "/sessions/" + sid)), layoutBody(), alice).andExpect(status().isOk()));
         assertThat(s.get("done").asBoolean()).isTrue();
         assertThat(s.get("matchup").isNull()).isTrue();
         String skipBody = "{\"layout\": %s, \"videoId\": \"%s\", \"seenDuels\": 0}".formatted(layout(), id("TD", 0));
-        call(post(BOARD + "/sessions/" + sid + "/skips"), skipBody, alice).andExpect(status().isConflict());
+        call(post(at(BOARD, "/sessions/" + sid + "/skips")), skipBody, alice).andExpect(status().isConflict());
+    }
+
+    // The clock ran out while the user listened: the duel on screen still
+    // counts (and can be undone and answered again), but no new one comes.
+    @Test
+    void theLastDuelCanBeAnsweredJustAfterTimeIsUp() throws Exception {
+        JsonNode s = start("SMART_MIX");
+        String sid = s.get("id").asText();
+        String a = s.get("matchup").get("a").asText();
+        String b = s.get("matchup").get("b").asText();
+        now = now.plus(Duration.ofMinutes(5)).plusSeconds(20);
+        JsonNode after = verdict(sid, a, b, "A");
+        assertThat(after.get("duels")).hasSize(1);
+        assertThat(after.get("done").asBoolean()).isTrue();
+        JsonNode undone = ok(call(post(at(BOARD, "/sessions/" + sid + "/undo")), seenBody(sid), alice).andExpect(status().isOk()));
+        assertThat(undone.get("matchup").get("a").asText()).isEqualTo(a);
+        verdict(sid, a, b, "B");
+        now = now.plus(DuelSession.ANSWER_GRACE);
+        call(post(at(BOARD, "/sessions/" + sid + "/verdicts")),
+            "{\"layout\": %s, \"a\": \"%s\", \"b\": \"%s\", \"verdict\": \"A\", \"seenDuels\": 1}".formatted(layout(), a, b), alice)
+            .andExpect(status().isConflict());
+        JsonNode summary = ok(call(post(at(BOARD, "/sessions/" + sid + "/end")), layoutBody(), alice).andExpect(status().isOk()));
+        assertThat(summary.get("seconds").asLong()).isEqualTo(300);
     }
 
     @Test
@@ -247,7 +275,7 @@ class DuelApiIT extends PostgresIT {
     void oneSongIsNoLongerAFocus() throws Exception {
         // The One song mode was removed: its focus is refused like any unknown value.
         String body = "{\"layout\": %s, \"focus\": \"ONE_SONG\", \"songId\": \"%s\", \"minutes\": 5}".formatted(layout(), id("C", 2));
-        call(post(BOARD + "/sessions"), body, alice).andExpect(status().isBadRequest());
+        call(post(at(BOARD, "/sessions")), body, alice).andExpect(status().isBadRequest());
         assertThat(jdbc.queryForObject("SELECT count(*) FROM duel_session", Integer.class)).isZero();
     }
 
@@ -256,23 +284,23 @@ class DuelApiIT extends PostgresIT {
         String sid = start("SMART_MIX").get("id").asText();
         String song = id("A", 2);
         for (int i = 0; i < 5; i++) verdict(sid, song, id("S", i), "A_CLEARLY");
-        JsonNode a = ok(call(post(BOARD + "/analysis"), layoutBody(), alice));
+        JsonNode a = ok(call(post(at(BOARD, "/analysis")), layoutBody(), alice));
         assertThat(a.get("suggestions").toString()).contains(song);
         assertThat(a.get("tierOrders").has("A")).isTrue();
 
-        call(put(BOARD + "/locks/" + song), "", alice).andExpect(status().isNoContent());
-        call(put(BOARD + "/locks/" + song), "", alice).andExpect(status().isNoContent());
-        assertThat(ok(call(post(BOARD + "/analysis"), layoutBody(), alice)).get("suggestions").toString()).doesNotContain(song);
-        call(delete(BOARD + "/locks/" + song), "", alice).andExpect(status().isNoContent());
+        call(put(at(BOARD, "/locks/" + song)), "", alice).andExpect(status().isNoContent());
+        call(put(at(BOARD, "/locks/" + song)), "", alice).andExpect(status().isNoContent());
+        assertThat(ok(call(post(at(BOARD, "/analysis")), layoutBody(), alice)).get("suggestions").toString()).doesNotContain(song);
+        call(delete(at(BOARD, "/locks/" + song)), "", alice).andExpect(status().isNoContent());
 
         String keep = "{\"from\": \"A\", \"to\": \"S\", \"confidence\": 0.9, \"decision\": \"KEPT\"}";
-        call(put(BOARD + "/decisions/" + song), keep, alice).andExpect(status().isNoContent());
+        call(put(at(BOARD, "/decisions/" + song)), keep, alice).andExpect(status().isNoContent());
         assertThat(jdbc.queryForObject("SELECT duels_at_decision FROM duel_decision", Integer.class)).isEqualTo(5);
-        assertThat(ok(call(post(BOARD + "/analysis"), layoutBody(), alice)).get("suggestions").toString()).doesNotContain(song);
-        call(delete(BOARD + "/decisions/" + song), "", alice).andExpect(status().isNoContent());
-        assertThat(ok(call(post(BOARD + "/analysis"), layoutBody(), alice)).get("suggestions").toString()).contains(song);
+        assertThat(ok(call(post(at(BOARD, "/analysis")), layoutBody(), alice)).get("suggestions").toString()).doesNotContain(song);
+        call(delete(at(BOARD, "/decisions/" + song)), "", alice).andExpect(status().isNoContent());
+        assertThat(ok(call(post(at(BOARD, "/analysis")), layoutBody(), alice)).get("suggestions").toString()).contains(song);
 
-        call(put(BOARD + "/decisions/" + song), "{\"from\": \"A\", \"to\": \"TODO\", \"confidence\": 0.9, \"decision\": \"KEPT\"}", alice)
+        call(put(at(BOARD, "/decisions/" + song)), "{\"from\": \"A\", \"to\": \"TODO\", \"confidence\": 0.9, \"decision\": \"KEPT\"}", alice)
             .andExpect(status().isBadRequest());
     }
 
@@ -281,44 +309,44 @@ class DuelApiIT extends PostgresIT {
         String sid = start("SMART_MIX").get("id").asText();
         String song = id("A", 2);
         for (int i = 0; i < 3; i++) verdict(sid, song, id("S", i), "A_CLEARLY");
-        JsonNode a = ok(call(post(BOARD + "/analysis"), layoutBody(), alice));
+        JsonNode a = ok(call(post(at(BOARD, "/analysis")), layoutBody(), alice));
         assertThat(a.get("suggestions").toString()).doesNotContain(song);
         JsonNode lean = a.get("leaning").get(0);
         assertThat(lean.get("song").asText()).isEqualTo(song);
         assertThat(lean.get("to").asText()).isEqualTo("S");
         assertThat(lean.get("unmet").toString()).contains("\"kind\":\"DUELS\"", "\"have\":3.0", "\"need\":4.0");
 
-        call(put(BOARD + "/locks/" + song), "", alice).andExpect(status().isNoContent());
-        assertThat(ok(call(post(BOARD + "/analysis"), layoutBody(), alice)).get("leaning").toString()).doesNotContain(song);
+        call(put(at(BOARD, "/locks/" + song)), "", alice).andExpect(status().isNoContent());
+        assertThat(ok(call(post(at(BOARD, "/analysis")), layoutBody(), alice)).get("leaning").toString()).doesNotContain(song);
     }
 
     @Test
     void renamingABoardTakesItsDuelHistoryAlong() throws Exception {
         String sid = start("SMART_MIX").get("id").asText();
         verdict(sid, id("A", 0), id("B", 0), "A");
-        call(put(BOARD + "/locks/" + id("A", 0)), "", alice).andExpect(status().isNoContent());
-        call(put(BOARD + "/decisions/" + id("B", 0)), "{\"from\": \"B\", \"to\": \"A\", \"confidence\": 0.9, \"decision\": \"KEPT\"}", alice)
+        call(put(at(BOARD, "/locks/" + id("A", 0))), "", alice).andExpect(status().isNoContent());
+        call(put(at(BOARD, "/decisions/" + id("B", 0))), "{\"from\": \"B\", \"to\": \"A\", \"confidence\": 0.9, \"decision\": \"KEPT\"}", alice)
             .andExpect(status().isNoContent());
-        call(post(BOARD + "/rename"), "{\"to\": \"Hip Hop\"}", alice).andExpect(status().isNoContent());
+        call(post(at(BOARD, "/rename")), "{\"to\": \"Hip Hop\"}", alice).andExpect(status().isNoContent());
         assertThat(jdbc.queryForList("SELECT DISTINCT board FROM duel_session", String.class)).containsExactly("Hip Hop");
         assertThat(jdbc.queryForList("SELECT DISTINCT board FROM duel_prior", String.class)).containsExactly("Hip Hop");
         assertThat(jdbc.queryForObject("SELECT board FROM duel_lock", String.class)).isEqualTo("Hip Hop");
         assertThat(jdbc.queryForObject("SELECT board FROM duel_decision", String.class)).isEqualTo("Hip Hop");
-        JsonNode moved = ok(call(post("/api/duels/Hip Hop/sessions/" + sid), layoutBody(), alice).andExpect(status().isOk()));
+        JsonNode moved = ok(call(post(at("Hip Hop", "/sessions/" + sid)), layoutBody(), alice).andExpect(status().isOk()));
         assertThat(moved.get("duels")).hasSize(1);
-        call(post("/api/duels/Hip Hop/rename"), "{\"to\": \"Hip Hop\"}", alice).andExpect(status().isNoContent());
-        call(post("/api/duels/Hip Hop/rename"), "{\"to\": \"  \"}", alice).andExpect(status().isBadRequest());
+        call(post(at("Hip Hop", "/rename")), "{\"to\": \"Hip Hop\"}", alice).andExpect(status().isNoContent());
+        call(post(at("Hip Hop", "/rename")), "{\"to\": \"  \"}", alice).andExpect(status().isBadRequest());
     }
 
     @Test
     void renamingOntoABoardWithHistoryMerges() throws Exception {
-        call(post(BOARD + "/analysis"), layoutBody(), alice).andExpect(status().isOk());
-        call(post("/api/duels/Other/analysis"), layoutBody(), alice).andExpect(status().isOk());
-        call(put(BOARD + "/locks/" + id("A", 0)), "", alice).andExpect(status().isNoContent());
-        call(put("/api/duels/Other/locks/" + id("A", 0)), "", alice).andExpect(status().isNoContent());
-        call(put(BOARD + "/decisions/" + id("B", 0)), "{\"from\": \"B\", \"to\": \"A\", \"confidence\": 0.9, \"decision\": \"KEPT\"}", alice);
-        call(put("/api/duels/Other/decisions/" + id("B", 0)), "{\"from\": \"B\", \"to\": \"S\", \"confidence\": 0.9, \"decision\": \"ACCEPTED\"}", alice);
-        call(post(BOARD + "/rename"), "{\"to\": \"Other\"}", alice).andExpect(status().isNoContent());
+        call(post(at(BOARD, "/analysis")), layoutBody(), alice).andExpect(status().isOk());
+        call(post(at("Other", "/analysis")), layoutBody(), alice).andExpect(status().isOk());
+        call(put(at(BOARD, "/locks/" + id("A", 0))), "", alice).andExpect(status().isNoContent());
+        call(put(at("Other", "/locks/" + id("A", 0))), "", alice).andExpect(status().isNoContent());
+        call(put(at(BOARD, "/decisions/" + id("B", 0))), "{\"from\": \"B\", \"to\": \"A\", \"confidence\": 0.9, \"decision\": \"KEPT\"}", alice);
+        call(put(at("Other", "/decisions/" + id("B", 0))), "{\"from\": \"B\", \"to\": \"S\", \"confidence\": 0.9, \"decision\": \"ACCEPTED\"}", alice);
+        call(post(at(BOARD, "/rename")), "{\"to\": \"Other\"}", alice).andExpect(status().isNoContent());
         assertThat(jdbc.queryForObject("SELECT count(*) FROM duel_prior WHERE board = 'Other'", Integer.class)).isEqualTo(25);
         assertThat(jdbc.queryForObject("SELECT count(*) FROM duel_prior WHERE board <> 'Other'", Integer.class)).isZero();
         assertThat(jdbc.queryForObject("SELECT count(*) FROM duel_lock", Integer.class)).isEqualTo(1);
@@ -327,26 +355,82 @@ class DuelApiIT extends PostgresIT {
 
     @Test
     void boardNamesAreChecked() throws Exception {
-        call(post("/api/duels/" + "x".repeat(201) + "/analysis"), layoutBody(), alice).andExpect(status().isBadRequest());
-        call(post("/api/duels/%20/analysis"), layoutBody(), alice).andExpect(status().isBadRequest());
+        call(post(at("x".repeat(201), "/analysis")), layoutBody(), alice).andExpect(status().isBadRequest());
+        call(post(at(" ", "/analysis")), layoutBody(), alice).andExpect(status().isBadRequest());
+    }
+
+    // A board is named by its playlists' {category}, free text: slashes,
+    // percent signs, semicolons and the like reach the API URL-encoded.
+    @Test
+    void boardNamesWithAnyCharacterWork() throws Exception {
+        List<String> failed = new ArrayList<>();
+        for (String name : List.of("AC/DC", "100% Hits", "R&B; Soul", "Lo-fi #2?", "Back\\slash", "Rock+Pop", "Rap Board")) {
+            int code = mvc.perform(post(at(name, "/analysis")).with(alice).contentType(MediaType.APPLICATION_JSON).content(layoutBody()))
+                .andReturn().getResponse().getStatus();
+            if (code != 200) failed.add(name + " -> " + code);
+        }
+        assertThat(failed).isEmpty();
+    }
+
+    // A big board end to end (HTTP, Postgres, engine): 335 ranked songs and
+    // 1,500 duels in the log - the hub's analysis and a verdict stay quick.
+    @Test
+    void aBigBoardStaysQuick() throws Exception {
+        StringBuilder b = new StringBuilder("{\"layout\": {\"tiers\": {");
+        String[] tiers = {"S", "A", "B", "C", "D"};
+        List<String> all = new ArrayList<>();
+        for (int t = 0; t < tiers.length; t++) {
+            List<String> ids = new ArrayList<>();
+            for (int i = 0; i < 67; i++) {
+                ids.add("\"" + id(tiers[t], i) + "\"");
+                all.add(id(tiers[t], i));
+            }
+            b.append(t > 0 ? ", " : "").append('"').append(tiers[t]).append("\": [").append(String.join(", ", ids)).append(']');
+        }
+        String big = b.append("}}}").toString();
+        String sid = ok(call(post(at(BOARD, "/sessions")), big.replace("}}}", "}}, \"focus\": \"SMART_MIX\", \"minutes\": 15}"), alice)
+            .andExpect(status().isCreated())).get("id").asText();
+        java.util.Random r = new java.util.Random(3);
+        String[] verdicts = {"A_CLEARLY", "A", "TOO_CLOSE", "B", "B_CLEARLY"};
+        List<Object[]> rows = new ArrayList<>();
+        for (int i = 0; i < 1500; i++) {
+            String x = all.get(r.nextInt(all.size()));
+            String y = all.get(r.nextInt(all.size()));
+            if (!x.equals(y)) rows.add(new Object[] {sid, x, y, verdicts[r.nextInt(5)], java.sql.Timestamp.from(now.minusSeconds(3000 - i))});
+        }
+        jdbc.batchUpdate("INSERT INTO duel (session_id, video_a, video_b, verdict, created_at) VALUES (?::uuid, ?, ?, ?::duel_verdict, ?)", rows);
+        for (int i = 0; i < 2; i++) call(post(at(BOARD, "/analysis")), big, alice).andExpect(status().isOk()); // warm up
+        long t0 = System.nanoTime();
+        call(post(at(BOARD, "/analysis")), big, alice).andExpect(status().isOk());
+        long analysis = (System.nanoTime() - t0) / 1_000_000;
+        JsonNode s = ok(call(post(at(BOARD, "/sessions/" + sid)), big, alice).andExpect(status().isOk()));
+        String a = s.get("matchup").get("a").asText();
+        String bb = s.get("matchup").get("b").asText();
+        String v = big.replace("}}}", "}}, \"a\": \"%s\", \"b\": \"%s\", \"verdict\": \"A\", \"seenDuels\": %d}".formatted(a, bb, seen(sid)));
+        t0 = System.nanoTime();
+        call(post(at(BOARD, "/sessions/" + sid + "/verdicts")), v, alice).andExpect(status().isOk());
+        long verdict = (System.nanoTime() - t0) / 1_000_000;
+        System.out.printf("API, 335 songs / %d duels: analysis %d ms, verdict %d ms%n", rows.size(), analysis, verdict);
+        assertThat(analysis).isLessThan(1500);
+        assertThat(verdict).isLessThan(1500);
     }
 
     @Test
     void sessionsBelongToTheirUserAndBoard() throws Exception {
         String sid = start("SMART_MIX").get("id").asText();
-        call(post(BOARD + "/sessions/" + sid), layoutBody(), bob).andExpect(status().isNotFound());
-        call(post("/api/duels/Other/sessions/" + sid), layoutBody(), alice).andExpect(status().isNotFound());
+        call(post(at(BOARD, "/sessions/" + sid)), layoutBody(), bob).andExpect(status().isNotFound());
+        call(post(at("Other", "/sessions/" + sid)), layoutBody(), alice).andExpect(status().isNotFound());
     }
 
     @Test
     void rejectsWhatTheFrontendNeverSends() throws Exception {
-        call(post(BOARD + "/analysis"), "{\"layout\": {\"tiers\": {\"S\": [\"bad id\"]}}}", alice).andExpect(status().isBadRequest());
+        call(post(at(BOARD, "/analysis")), "{\"layout\": {\"tiers\": {\"S\": [\"bad id\"]}}}", alice).andExpect(status().isBadRequest());
         String sid = start("SMART_MIX").get("id").asText();
         String same = "{\"layout\": %s, \"a\": \"%s\", \"b\": \"%s\", \"verdict\": \"A\", \"seenDuels\": 0}".formatted(layout(), id("A", 0), id("A", 0));
-        call(post(BOARD + "/sessions/" + sid + "/verdicts"), same, alice).andExpect(status().isBadRequest());
+        call(post(at(BOARD, "/sessions/" + sid + "/verdicts")), same, alice).andExpect(status().isBadRequest());
         String offBoard = "{\"layout\": %s, \"a\": \"%s\", \"b\": \"zzzzzzzzzzz\", \"verdict\": \"A\", \"seenDuels\": 0}".formatted(layout(), id("A", 0));
-        call(post(BOARD + "/sessions/" + sid + "/verdicts"), offBoard, alice).andExpect(status().isBadRequest());
-        call(post(BOARD + "/sessions"), "{\"layout\": %s, \"focus\": \"SMART_MIX\", \"minutes\": 99}".formatted(layout()), alice)
+        call(post(at(BOARD, "/sessions/" + sid + "/verdicts")), offBoard, alice).andExpect(status().isBadRequest());
+        call(post(at(BOARD, "/sessions")), "{\"layout\": %s, \"focus\": \"SMART_MIX\", \"minutes\": 99}".formatted(layout()), alice)
             .andExpect(status().isBadRequest());
     }
 

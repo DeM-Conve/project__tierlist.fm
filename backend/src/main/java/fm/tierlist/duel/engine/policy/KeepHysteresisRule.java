@@ -8,12 +8,14 @@ import java.util.Optional;
 
 // No flip-flopping: after "Keep", the song is only suggested again once
 // `freshDuels` (5) duels since then point the same way - wins for a move up,
-// losses for a move down.
+// losses for a move down. A Keep answers the song *in the tier it was kept
+// in*: once the song is in another tier (moved by hand, or a Move), a move
+// out of that tier is a new question and the old Keep no longer holds it back.
 public record KeepHysteresisRule(int freshDuels) implements SuggestionRule {
     @Override
     public Optional<Shortfall> shortfall(Candidate c) {
         Decision d = c.decision();
-        if (d == null || d.kind() != Decision.Kind.KEPT) return Optional.empty();
+        if (d == null || d.kind() != Decision.Kind.KEPT || !d.from().equals(c.from())) return Optional.empty();
         List<Duel> duels = c.song().duels();
         List<Duel> since = duels.subList(Math.min(d.duelsAtDecision(), duels.size()), duels.size());
         String id = c.song().id();

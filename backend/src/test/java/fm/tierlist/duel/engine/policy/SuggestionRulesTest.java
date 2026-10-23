@@ -60,6 +60,9 @@ class SuggestionRulesTest {
         assertThat(new KeepHysteresisRule(5).allows(candidate(wins("A", 8), 0.9, kept, false))).isFalse();
         assertThat(new KeepHysteresisRule(5).allows(candidate(wins("A", 9), 0.9, kept, false))).isTrue();
         Decision accepted = new Decision(Decision.Kind.ACCEPTED, "B", "A", 4);
+        // Kept in C, but the song is in B now (moved since): a move out of B is a new question.
+        Decision keptElsewhere = new Decision(Decision.Kind.KEPT, "C", "B", 4);
+        assertThat(new KeepHysteresisRule(5).shortfall(candidate(wins("A", 4), 0.9, keptElsewhere, false))).isEmpty();
         assertThat(new KeepHysteresisRule(5).allows(candidate(List.of(), 0.9, accepted, false))).isTrue();
     }
 

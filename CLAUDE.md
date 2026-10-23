@@ -259,7 +259,7 @@ category.
   log, never stored. `fm.tierlist.duel` is the layered rest: entities/repositories on
   the `duel_session`, `duel`, `duel_skip`, `duel_prior`, `duel_decision`, `duel_lock`
   tables (V1), `DuelService` (history in, engine, results out), `DuelController`
-  (`/api/duels/{board}/...`; reads are POSTs carrying the browser's board layout,
+  (`/api/duels/...?board=<name>` - the board a query parameter, never a path segment: names with `/`, `%`, `;`, `\` were refused there; reads are POSTs carrying the browser's board layout,
   staged edits included). The frontend's duel screens (`components/duel/`) only show
   what the API returns - add ranking logic to the engine, never to the frontend.
   **A suggested Move pushes at once** (the user's call: "move should mean literal

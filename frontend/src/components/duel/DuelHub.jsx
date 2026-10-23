@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useHotkeys } from 'react-hotkeys-hook';
 import {
@@ -15,6 +15,7 @@ import { MoveRow } from './DuelMoves';
 import PageHeader from '../PageHeader';
 import { SECTION_GAP } from '../../layout/spacing';
 import { useDevicePref } from '../../settings';
+import { enterStarts } from '../../duel/hubEnter';
 
 // Values are settings.js DEVICE_UI.duelMinutes' - keep in step.
 const LENGTHS = [
@@ -44,8 +45,23 @@ export default function DuelHub({ category, boardLoading, base }) {
   // The session length is remembered on this device (settings.js DEVICE_UI);
   // the focus starts on Smart mix each time - the others depend on the board.
   const [minutes, setMinutes] = useDevicePref('duelMinutes');
-  const [focus, setFocus] = useState('SMART_MIX');
+  const [picked, setFocus] = useState('SMART_MIX');
   const data = analysis.data;
+  // Borderlines only needs songs on the fence: with none (after a refresh),
+  // the session is Smart mix again rather than one with nothing to ask.
+  const focus = picked === 'BORDERLINES' && data && !data.onFence ? 'SMART_MIX' : picked;
+
+  // Moves still to make: a suggestion whose song has left its `from` tier
+  // since (a Move here, while the fresh analysis loads) isn't offered again.
+  const { tierItems } = board;
+  const ready = useMemo(() => {
+    if (!data) return [];
+    const where = new Map();
+    Object.entries(tierItems).forEach(([t, list]) => list?.forEach((v) => where.has(v.videoId) || where.set(v.videoId, t)));
+    return data.suggestions.filter((s) => where.get(s.song) === s.from);
+  }, [data, tierItems]);
+  const muById = useMemo(() => new Map((data?.songs ?? []).map((x) => [x.id, x.mu])), [data]);
+  const muOf = (id) => muById.get(id);
 
   const canStart = data && !start.isPending;
   function begin() {
@@ -55,7 +71,8 @@ export default function DuelHub({ category, boardLoading, base }) {
       { onSuccess: (s) => navigate(`${base}/duel/play/${s.id}`) }
     );
   }
-  useHotkeys('enter', begin, { preventDefault: true }, [canStart, focus, minutes]);
+  useHotkeys('enter', begin, { preventDefault: true, enableOnFormTags: true, ignoreEventWhen: (e) => !enterStarts(e.target) },
+    [canStart, focus, minutes, board.duelLayout]);
 
   if (analysis.isError) {
     return (
@@ -67,8 +84,6 @@ export default function DuelHub({ category, boardLoading, base }) {
       </Container>
     );
   }
-
-  const muOf = (id) => data?.songs.find((x) => x.id === id)?.mu;
 
   return (
     <Container className="duel-view" fluid px={0} py={0}>
@@ -99,8 +114,8 @@ export default function DuelHub({ category, boardLoading, base }) {
           <StatCard label="Board certainty" loading={!data} value={data && pct(data.certainty)} aside={data ? `${data.duelsTotal} duels so far` : ''}>
             <Text fz="md" c="dimmed">How sure the model is that each song sits in the right tier.</Text>
           </StatCard>
-          <StatCard label="Moves waiting" loading={!data} value={data?.suggestions.length} highlight={data?.suggestions.length > 0}
-            aside={data ? `${data.suggestions.filter((s) => s.confidence >= 0.9).length} at ≥90% confidence` : ''}
+          <StatCard label="Moves waiting" loading={!data} value={data && ready.length} highlight={ready.length > 0}
+            aside={data ? `${ready.filter((s) => s.confidence >= 0.9).length} at ≥90% confidence` : ''}
             onClick={data ? () => navigate(`${base}/duel/moves`) : undefined}>
             <Text fz="md" fw={600}>Review suggestions →</Text>
           </StatCard>
@@ -131,7 +146,7 @@ export default function DuelHub({ category, boardLoading, base }) {
           <Title order={2}>What should this session sharpen?</Title>
           <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md">
             {focusCards(data, Number(minutes)).map((c) => (
-              <UnstyledButton key={c.focus} disabled={c.disabled} onClick={() => setFocus(c.focus)}
+              <UnstyledButton key={c.focus} data-duel-focus={c.focus} disabled={c.disabled} onClick={() => setFocus(c.focus)}
                 style={{ opacity: c.disabled && data ? 0.5 : 1 }}>
                 <Paper withBorder radius="lg" p="md" h="100%" className={c.disabled ? undefined : 'duel-card'}
                   style={{
@@ -159,14 +174,14 @@ export default function DuelHub({ category, boardLoading, base }) {
           </SimpleGrid>
         </Stack>
 
-        {data?.suggestions.length > 0 && (
+        {ready.length > 0 && (
           <Stack gap="md">
             <Group justify="space-between" align="baseline">
               <Title order={2}>Ready to move</Title>
-              <Anchor component={Link} to={`${base}/duel/moves`} fw={700} fz="md">Review all {data.suggestions.length} →</Anchor>
+              <Anchor component={Link} to={`${base}/duel/moves`} fw={700} fz="md">Review all {ready.length} →</Anchor>
             </Group>
             <Paper withBorder radius="lg" style={{ overflow: 'hidden' }}>
-              {data.suggestions.slice(0, 3).map((s) => (
+              {ready.slice(0, 3).map((s) => (
                 <MoveRow key={s.song} s={s} board={board}
                   detail={`won ${s.wins} of ${s.wins + s.losses + s.draws}`}
                   onSelect={() => navigate(`${base}/duel/moves`)}

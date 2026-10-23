@@ -74,7 +74,20 @@ public class DuelSession {
         return endedAt == null && now.isBefore(endsAt());
     }
 
+    // How long after the time is up the duel that was on screen can still be
+    // answered (or its answer taken back and given again): the clock ran out
+    // while you listened - that verdict still counts. No new duel is offered.
+    static final Duration ANSWER_GRACE = Duration.ofMinutes(2);
+
+    public boolean takesAnswers(Instant now) {
+        return endedAt == null && now.isBefore(endsAt().plus(ANSWER_GRACE));
+    }
+
+    // Ended at `at`, but never later than the time was up: a session left
+    // open and ended (or summarised) much later still lasted its length.
     void end(Instant at) {
-        if (endedAt == null) endedAt = at.isBefore(startedAt) ? startedAt : at;
+        if (endedAt != null) return;
+        Instant last = at.isAfter(endsAt()) ? endsAt() : at;
+        endedAt = last.isBefore(startedAt) ? startedAt : last;
     }
 }

@@ -266,13 +266,19 @@ export default function DuelMoves({ category, boardLoading, base }) {
   // page opened with. Every Move changes the layout, and the engine re-analyses
   // it (tier borders shift, other songs can cross the bar) - that fresher
   // analysis is offered with a notice instead of replacing the rows under you.
+  // Only a fresh analysis is pinned: a cached one being refreshed (back from
+  // a session, whose verdicts made it stale) or the previous layout's shown
+  // while the new one loads is displayed until the fresh one lands, never
+  // pinned - else its refresh read as "Your moves changed the suggestions".
   const latest = analysis.data;
+  const fresh = !!latest && !analysis.isPlaceholderData && (analysis.isFetchedAfterMount || !analysis.isStale);
   const [pinned, setPinned] = useState(null); // { category, data }
-  if (latest && pinned?.category !== category) setPinned({ category, data: latest });
+  if (fresh && pinned?.category !== category) setPinned({ category, data: latest });
   const data = pinned?.category === category ? pinned.data : latest;
-  const changes = suggestionChanges(data, latest, decided);
+  const changes = suggestionChanges(data, fresh ? latest : data, decided);
   const updateList = () => setPinned({ category, data: latest });
-  const muOf = (id) => data?.songs.find((x) => x.id === id)?.mu;
+  const muById = useMemo(() => new Map((data?.songs ?? []).map((x) => [x.id, x.mu])), [data]);
+  const muOf = (id) => muById.get(id);
 
   // Decided rows stay listed (with Undo), in the list they came from, after the analysis drops them.
   const [rows, leaningRows] = useMemo(() => {
@@ -296,7 +302,9 @@ export default function DuelMoves({ category, boardLoading, base }) {
   // leaning moves are never selected, so nothing about them reads as a suggestion.
   const browsable = shown;
   const current = browsable.find((s) => s.song === selected) ?? browsable[0];
-  const sure = rows.filter((s) => !decided[s.song] && s.confidence >= 0.9);
+  const [locked, setLocked] = useState({});
+  // Move all never moves a song you just locked in its tier.
+  const sure = rows.filter((s) => !decided[s.song] && !locked[s.song] && s.confidence >= 0.9);
 
   // Play hands the song to the player dock (plays now, the queue carries on
   // after it) - one player, its shortcuts and tier chips, never a second
@@ -305,7 +313,7 @@ export default function DuelMoves({ category, boardLoading, base }) {
   const play = () => current && !playingHere && dispatch(playSongNow(current.from, board.videoOf(current.song)));
 
   const move = (s, opts) => {
-    board.accept(s, muOf, opts);
+    if (!board.accept(s, muOf, opts)) return;
     setDecided((d) => ({ ...d, [s.song]: { s, kind: 'move', lean: isLeaning(s) } }));
   };
   // Move all: every sure move, pushed to YouTube together.
@@ -321,7 +329,6 @@ export default function DuelMoves({ category, boardLoading, base }) {
     board.undo(s, decided[s.song]?.kind === 'move');
     setDecided((d) => Object.fromEntries(Object.entries(d).filter(([song]) => song !== s.song)));
   };
-  const [locked, setLocked] = useState({});
   const toggleLock = (id) => {
     const next = !locked[id];
     board.setLocked(id, next);
@@ -333,14 +340,17 @@ export default function DuelMoves({ category, boardLoading, base }) {
     const next = browsable[Math.max(0, Math.min(browsable.length - 1, i + step))];
     if (next) setSelected(next.song);
   };
-  useHotkeys('down', () => browse(1), { preventDefault: true }, [browsable, current]);
-  useHotkeys('up', () => browse(-1), { preventDefault: true }, [browsable, current]);
   // preventDefault marks these keys as the page's: the player dock skips
-  // them (here m = move, l = lock, not mute / next track).
-  useHotkeys('m', () => current && !decided[current.song] && move(current), { preventDefault: true }, [current, decided]);
-  useHotkeys('x', () => current && !decided[current.song] && keep(current), { preventDefault: true }, [current, decided]);
-  useHotkeys('l', () => current && toggleLock(current.song), { preventDefault: true }, [current, locked]);
-  useHotkeys('p', play, { preventDefault: true }, [current, playingHere]);
+  // them (here m = move, l = lock, not mute / next track). Only while there
+  // is a ready move to act on - with none, the arrows scroll the page and
+  // m / l / p are the dock's again.
+  const keysOn = { preventDefault: true, enabled: !!current };
+  useHotkeys('down', () => browse(1), keysOn, [browsable, current]);
+  useHotkeys('up', () => browse(-1), keysOn, [browsable, current]);
+  useHotkeys('m', () => current && !decided[current.song] && move(current), keysOn, [current, decided]);
+  useHotkeys('x', () => current && !decided[current.song] && keep(current), keysOn, [current, decided]);
+  useHotkeys('l', () => current && toggleLock(current.song), keysOn, [current, locked]);
+  useHotkeys('p', play, keysOn, [current, playingHere]);
 
   if (analysis.isError && !data) {
     return (

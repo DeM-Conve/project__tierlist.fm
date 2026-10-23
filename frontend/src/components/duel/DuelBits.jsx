@@ -70,6 +70,29 @@ export function ScoreMap({ analysis, nameOf, height = 150 }) {
     return { dots, bands, lo, hi };
   }, [analysis, height]);
 
+  // The dots are built once per analysis: hovering one (a state change
+  // here) re-renders only the tooltip, never all of a big board's dots.
+  const dotElements = useMemo(() => dots.map((d) => (
+    <Box
+      key={d.id}
+      pos="absolute"
+      left={`${d.left}%`}
+      top={d.top}
+      w={10}
+      h={10}
+      data-testid="score-dot"
+      onMouseEnter={() => setHover(d)}
+      onMouseLeave={() => setHover(null)}
+      style={{
+        marginLeft: -5,
+        borderRadius: '50%',
+        background: TIER_COLORS[d.tier],
+        boxShadow: d.onFence ? '0 0 0 2px var(--surface), 0 0 0 4px var(--text)' : '0 0 0 2px var(--surface)',
+        cursor: 'default',
+      }}
+    />
+  )), [dots]);
+
   return (
     <Box pos="relative" h={height}>
       {/* Bands: a CSS flex row has no Mantine prop equivalent for percentage-positioned stripes. */}
@@ -79,25 +102,7 @@ export function ScoreMap({ analysis, nameOf, height = 150 }) {
             style={{ background: `color-mix(in srgb, ${TIER_COLORS[b.tier]} 13%, transparent)`, borderRight: '1px dashed var(--border)' }} />
         ))}
       </Box>
-      {dots.map((d) => (
-        <Box
-          key={d.id}
-          pos="absolute"
-          left={`${d.left}%`}
-          top={d.top}
-          w={10}
-          h={10}
-          onMouseEnter={() => setHover(d)}
-          onMouseLeave={() => setHover(null)}
-          style={{
-            marginLeft: -5,
-            borderRadius: '50%',
-            background: TIER_COLORS[d.tier],
-            boxShadow: d.onFence ? '0 0 0 2px var(--surface), 0 0 0 4px var(--text)' : '0 0 0 2px var(--surface)',
-            cursor: 'default',
-          }}
-        />
-      ))}
+      {dotElements}
       {hover && (
         <Paper pos="absolute" left={`${hover.left}%`} top={Math.max(0, hover.top - 34)} px="2xs" py="4xs" shadow="sm" withBorder
           style={{ transform: 'translateX(-50%)', pointerEvents: 'none', whiteSpace: 'nowrap', zIndex: 2 }}>
