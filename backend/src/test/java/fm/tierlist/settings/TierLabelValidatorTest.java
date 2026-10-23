@@ -23,6 +23,20 @@ class TierLabelValidatorTest {
         assertThat(validator.isValid(label, null)).isFalse();
     }
 
+    // Only NFKD makes these a digit; the database's [[:alnum:]] doesn't count
+    // them, so its CHECK would refuse the save.
+    @ParameterizedTest
+    @ValueSource(strings = {"\u2460", "\u00b2", "(\u2460)"})
+    void rejectsNamesWhoseOnlyDigitTheDatabaseDoesNotCount(String label) {
+        assertThat(validator.isValid(label, null)).isFalse();
+    }
+
+    @Test
+    void theDatabasesReadingOfANameDropsWhatItDoesNotCountAsAlnum() {
+        assertThat(TierLabelValidator.databaseWords("S\u00b2")).isEqualTo("s");
+        assertThat(TierLabelValidator.databaseWords("(**To do**)")).isEqualTo("to do");
+    }
+
     @ParameterizedTest
     @ValueSource(strings = {"\tS", "S\n", "\u2003S"})
     void rejectsAnySurroundingWhitespaceNotJustSpaces(String label) {

@@ -222,16 +222,16 @@ class DatabaseConstraintsIT extends PostgresIT {
     }
 
     // Wherever both sides decide, @TierLabel / isDistinct and the SQL functions agree
-    // (see SettingsApiIT for the characters where they don't).
+    // - including characters only NFKD turns into a digit.
     @ParameterizedTest
-    @ValueSource(strings = {"S", "T1", "(**TODO**)", "À faire", "to-do", "A+", " S", "S ", "(**)", "+", "{tier}", "a}", "一", "Ⅻ"})
+    @ValueSource(strings = {"S", "T1", "(**TODO**)", "À faire", "to-do", "A+", " S", "S ", "(**)", "+", "{tier}", "a}", "一", "Ⅻ", "\u2460", "\u00b2", "\u0663", "\uff15", "(\u2460)"})
     void theJavaAndSqlTierNameRulesAgree(String label) {
         boolean java = new TierLabelValidator().isValid(label, null);
         assertThat(jdbc.queryForObject("SELECT tier_label_valid(?)", Boolean.class, label)).as(label).isEqualTo(java);
     }
 
     @ParameterizedTest
-    @CsvSource(delimiter = '|', value = {"S|s|false", "TODO|(**todo**)|false", "to do|to-do|false", "S|A|true", "T1|T2|true"})
+    @CsvSource(delimiter = '|', value = {"S|s|false", "TODO|(**todo**)|false", "to do|to-do|false", "S|A|true", "T1|T2|true", "S|S\u00b2|false", "A|A\u2460|false"})
     void theJavaAndSqlDistinctnessRulesAgree(String one, String other, boolean distinct) {
         assertThat(new SettingsDto.TierLabelsDto(one, other, "B", "C", "D", "TODO").isDistinct()).isEqualTo(distinct);
         assertThat(jdbc.queryForObject("SELECT tier_labels_distinct(?, ?, 'B', 'C', 'D', 'TODO')", Boolean.class, one, other))

@@ -143,8 +143,10 @@ public record SettingsDto(
         // indistinguishable in a playlist name.
         @AssertTrue(message = "tier names must all differ")
         boolean isDistinct() {
-            List<String> all = Stream.of(s, a, b, c, d, todo).filter(Objects::nonNull).map(TierLabelValidator::words).toList();
-            return all.stream().distinct().count() == all.size();
+            List<String> labels = Stream.of(s, a, b, c, d, todo).filter(Objects::nonNull).toList();
+            // Distinct as the frontend compares them, and as the database does.
+            return labels.stream().map(TierLabelValidator::words).distinct().count() == labels.size()
+                && labels.stream().map(TierLabelValidator::databaseWords).distinct().count() == labels.size();
         }
 
         static TierLabelsDto from(TierLabels l) {

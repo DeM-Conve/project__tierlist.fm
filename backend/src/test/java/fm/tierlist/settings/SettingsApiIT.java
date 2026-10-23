@@ -2,7 +2,6 @@ package fm.tierlist.settings;
 
 import fm.tierlist.PostgresIT;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
@@ -305,13 +304,9 @@ class SettingsApiIT extends PostgresIT {
             .andExpect(status().isBadRequest());
     }
 
+    // The validator and the database's CHECKs agree: a name Postgres would
+    // refuse is a 400 up front, never a 412 the frontend retries forever.
     @Test
-    @Disabled("BUG: @TierLabel and the DB's tier_label_valid / tier_labels_distinct disagree on characters Java folds "
-        + "with NFKD but Postgres' [[:alnum:]] doesn't count: a tier named \"①\" (circled 1) or \"²\" passes "
-        + "validation (words -> \"1\"/\"2\") but fails the naming_tier_labels_valid CHECK, and \"S²\" vs \"S\" are "
-        + "distinct to Java but equal to naming_tier_labels_distinct. The DataIntegrityViolationException is then "
-        + "turned into 412 'Settings changed elsewhere' by SettingsExceptionHandler, so the frontend refetches, "
-        + "rebases and retries a save that can never succeed. Expected: 400 (validator and CHECK in step).")
     void aTierNameTheDatabaseWouldRefuseIs400Not412() throws Exception {
         for (String labels : new String[] {
             "{\"S\": \"S\", \"A\": \"A\", \"B\": \"B\", \"C\": \"C\", \"D\": \"D\", \"TODO\": \"①\"}",
