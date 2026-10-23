@@ -39,12 +39,12 @@ Status: `[ ]` not started · `[~]` in progress · `[x]` verified · `[!]` needs 
 - [x] Tier borders setting (learned / my own ranges) end to end
 - [x] Engine correctness (backend unit tests), TODO songs never in duels
 
-## 4. App shell, Home, Add songs, Settings (`qa/shell`)
-- [~] Login / auth errors, load-failure cards (never skeleton forever)
-- [ ] Home & playlists, Sidebar (filter, prefetch, board counts, spring-loaded open)
-- [ ] Add songs flow
-- [ ] Settings: playlist naming (matching preview), appearance (themes/accents/palettes), duels, activity bar order
-- [ ] Routing, PWA, theming in light + dark, phone width
+## 4. App shell, Home, Add songs, Settings (`qa/shell`, merged, deployed 2026-10-23)
+- [x] Login / auth errors, load-failure cards (never skeleton forever)
+- [x] Home & playlists, Sidebar (filter, prefetch, board counts, spring-loaded open)
+- [x] Add songs flow
+- [x] Settings: playlist naming (matching preview), appearance (themes/accents/palettes), duels, activity bar order
+- [x] Routing, PWA, theming in light + dark, phone width
 
 ## 5. Performance (`qa/perf`)
 - [~] Cold start and board open time, bundle/chunk sizes, lazy pages
@@ -58,6 +58,12 @@ Status: `[ ]` not started · `[~]` in progress · `[x]` verified · `[!]` needs 
 - [ ] Backup / restore scripts work under hl
 
 ## Open questions for the user
+- [!] Add songs: Enter always means "listen", even on a focused button - pass Enter through after Tab (keyboard focus) only?
+- [!] Pasting non-link text outside a text box is silently ignored - show a message everywhere?
+- [!] Add songs page is capped at 1100px wide (against "pages are full width") - keep so tier targets don't stretch?
+- [!] Leaving Settings -> Playlist naming with unsaved changes gives no warning - ask first?
+- [!] Hand-linked to-do lists aren't counted in the naming page's "Matching playlists" counts - count them?
+- [!] Activity bar icons have two tab stops each (icon + drag handle) - accept?
 - [!] Duels: a locked song can't be unlocked after leaving the page (nowhere lists locks). Add an unlock place?
 - [!] Duels: "Don't know one of them" (`s`) always skips song B - add a way to say it's song A?
 - [!] Duels: 2-minute grace to answer the last duel after time runs out - right length?
