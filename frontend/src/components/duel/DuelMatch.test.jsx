@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, screen, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, screen, within } from '@testing-library/react';
 import DuelMatch from './DuelMatch';
 import { CanvasContext } from '../../layout/canvas';
 import { IDS, renderDuel, song } from '../../test/duelFixtures';
@@ -9,6 +9,7 @@ vi.mock('@mantine/notifications', () => ({ notifications: { show: vi.fn(), hide:
 // as started from the player's own controls.
 vi.mock('../EmbeddedPlayer', () => ({
   default: ({ videoId, onBlocked, onPlayingChange }) => (
+    h.playerRenders++,
     <>
       <button type="button" onClick={onBlocked}>{`block ${videoId}`}</button>
       <button type="button" onClick={() => onPlayingChange?.(true)}>{`play ${videoId}`}</button>
@@ -16,7 +17,7 @@ vi.mock('../EmbeddedPlayer', () => ({
   ),
 }));
 
-const h = vi.hoisted(() => ({ session: null, error: null, spies: {} }));
+const h = vi.hoisted(() => ({ session: null, error: null, spies: {}, playerRenders: 0 }));
 vi.mock('../../api/queries', () => ({
   useDuelSessionQuery: () => ({ data: h.session, isError: !!h.error, error: h.error, refetch: h.refetch ?? vi.fn() }),
   useDuelVerdictMutation: () => ({ mutate: h.spies.verdict, isPending: false }),
@@ -394,5 +395,20 @@ describe('DuelMatch', () => {
     expect(store.getState().focus.playerHeld).toBe(true);
     cleanup();
     expect(store.getState().focus.playerHeld).toBe(false);
+  });
+
+  it('the session clock ticks on its own: the players and the page around it don\'t re-render every second', () => {
+    vi.useFakeTimers();
+    try {
+      h.session = { ...h.session, endsAt: new Date(Date.now() + 61_000).toISOString() };
+      page();
+      expect(screen.getByText('~2 min left')).toBeInTheDocument();
+      const before = h.playerRenders;
+      act(() => vi.advanceTimersByTime(3000));
+      expect(screen.getByText('~1 min left')).toBeInTheDocument();
+      expect(h.playerRenders).toBe(before);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
