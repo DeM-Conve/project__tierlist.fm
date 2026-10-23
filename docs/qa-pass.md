@@ -19,16 +19,16 @@ Status: `[ ]` not started · `[~]` in progress · `[x]` verified · `[!]` needs 
 - [x] Deep sync test harness + fuzzing, cross-tier dedupe rule, Add songs undo id (`test/sync-harness`, merged, deployed 2026-10-22)
 - [x] Undo/redo after a push never drops or revives a song (`fix/undo-after-push`, merged, deployed 2026-10-22)
 
-## 1. Boards (`qa/boards`)
-- [~] Tier boards: layout, fit-to-screen, +N / show all, empty tiers, counts, header bar
-- [ ] Tier page (full list), Find (`/`), filter, play/shuffle per tier
-- [ ] Tier Rail: drop targets, counts, Remove bin, playing-song drag
-- [ ] Drag-and-drop UX (within tier, between tiers, to rail, to sidebar board) - not sync logic
-- [ ] TODO list: triage, to-do list linking modal, counts
-- [ ] Big boards (300+ songs) stay smooth: render cost, virtualization, drag lag
+## 1. Boards (`qa/boards`, merged, deployed 2026-10-23)
+- [x] Tier boards: layout, fit-to-screen, +N / show all, empty tiers, counts, header bar
+- [x] Tier page (full list), Find (`/`), filter, play/shuffle per tier
+- [x] Tier Rail: drop targets, counts, Remove bin, playing-song drag
+- [x] Drag-and-drop UX (within tier, between tiers, to rail, to sidebar board) - not sync logic
+- [x] TODO list: triage, to-do list linking modal, counts
+- [x] Big boards (300+ songs) stay smooth: render cost, virtualization, drag lag
 
 ## 2. Player & navigation (`qa/player`)
-- [ ] Player dock: expanded / mini / floating, never remounts, survives navigation
+- [~] Player dock: expanded / mini / floating, never remounts, survives navigation
 - [ ] Queue panel, shuffle play, repeat, volume, seek, rate chips, Remove from player
 - [ ] Keyboard shortcuts (full list) + shortcuts modal + link hints
 - [ ] Command palette
@@ -61,5 +61,8 @@ Status: `[ ]` not started · `[~]` in progress · `[x]` verified · `[!]` needs 
 - [!] Opening another board silently drops the open board's staged (unpushed) moves - only
   dragging to another board warns. Keep a draft per board, or confirm before leaving?
   (test: "keeps the staged moves of the board left behind", `it.fails`)
-- [!] `useBoardDropOpen` counts auto-dedupes as staged changes, so a board with duplicates
-  can't drag songs to another board until pushed.
+- [x] `useBoardDropOpen` counted auto-dedupes as staged changes (fixed in qa/boards).
+- [!] Big tiers: a tile's full title is now the browser's native tooltip (fast), not Mantine's. OK?
+- [!] Tier page keeps its filter text when switching tier tabs - clear it instead?
+- [!] Custom to-do name reads "Add a Inbox list" - reword?
+- [!] Dropping a song from another board onto this board's Remove bin does nothing (by design) - keep?
