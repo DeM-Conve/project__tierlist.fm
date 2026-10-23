@@ -128,6 +128,7 @@ import {
   selectVideoLookup,
   selectFocusedVideoData,
   selectFocusedAvailableTiers,
+  selectPlayingSong,
   selectNaming,
 } from './store/selectors';
 import { api, API_BASE, errorMessage } from './api/client';
@@ -360,7 +361,8 @@ function Layout() {
   const playlistsLoadError = tierPlaylists === null && playlistsError
     ? errorMessage(playlistsError, 'The app couldn’t reach YouTube.')
     : null;
-  const focusedVideo = useSelector((s) => s.focus.focusedVideo);
+  // Its tier read live from its board (the queue's own is a snapshot).
+  const focusedVideo = useSelector(selectPlayingSong);
   const isShuffling = useSelector((s) => s.focus.isShuffling);
   const isTriage = useSelector((s) => s.focus.isTriage);
   const playerMode = useSelector((s) => s.focus.playerMode);

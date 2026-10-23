@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { Box, Divider, Image, Stack, Text, Tooltip, UnstyledButton } from '@mantine/core';
 import { Trash2 } from 'lucide-react';
 import { BOARD_TIERS, REMOVED_TIER, TIER_COLORS, TODO_TIER } from '../tiers';
-import { selectFocusedVideoData, selectTierGroups } from '../store/selectors';
+import { selectFocusedVideoData, selectPlayingSong, selectTierGroups } from '../store/selectors';
 import { moveWithFeedback, useTierDnd } from '../tierActions';
 import { EqualizerMark } from './TierBits';
 import { TIER_INK } from '../tierUtils';
@@ -34,7 +34,7 @@ export default function TierRail({ category, activeTier }) {
   const loadedCategory = useSelector((s) => s.tiers.loadedCategory);
   const tierGroups = useSelector(selectTierGroups);
   const tierItems = useSelector((s) => s.tiers.tierItems);
-  const focusedVideo = useSelector((s) => s.focus.focusedVideo);
+  const focusedVideo = useSelector(selectPlayingSong);
   const focusedCategory = useSelector((s) => s.focus.focusedCategory);
   const playingVideo = useSelector(selectFocusedVideoData);
   const dnd = useTierDnd();

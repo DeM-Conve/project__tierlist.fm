@@ -138,6 +138,11 @@ export class Harness {
     await act(async () => nav.current('/'));
   }
 
+  // Any route (Settings, a duel page...), the way a link would go there.
+  navigate(path) {
+    nav.current(path);
+  }
+
   dispatch(action) {
     let r;
     act(() => {

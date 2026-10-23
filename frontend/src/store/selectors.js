@@ -201,6 +201,23 @@ export const selectVideoLookup = createSelector([selectFocusSequence], (sequence
 // keeps playing while you browse other boards.
 export const selectFocusedVideoData = (state) => state.focus.current?.video ?? null;
 
+// The playing song as { tier, videoId }, its tier read from its board while
+// that board is the loaded one - the queue entry's tier is a snapshot from
+// when it was queued, and a song dragged since (or put back by Discard /
+// undo, or a fresh copy of the board) is somewhere else now. Reading the
+// snapshot, the player and the rail showed the old tier and rating it did
+// nothing (a move "from" a tier the song wasn't in). Off its board, or for a
+// song no longer on it, the snapshot is all there is.
+const LIVE_TIERS = [...BOARD_TIERS, REMOVED_TIER];
+export const selectPlayingSong = createSelector(
+  [selectFocusedVideo, selectFocusedCategory, selectLoadedCategory, selectTierItems],
+  (focusedVideo, focusedCategory, loadedCategory, tierItems) => {
+    if (!focusedVideo || focusedCategory !== loadedCategory) return focusedVideo;
+    const tier = LIVE_TIERS.find((t) => (tierItems[t] || []).some((v) => v.videoId === focusedVideo.videoId));
+    return !tier || tier === focusedVideo.tier ? focusedVideo : { ...focusedVideo, tier };
+  }
+);
+
 // Rating targets are the ranked tiers only (Shift+1-5 stay S..D); a song
 // goes back to TODO via the Tier Rail, a menu or a drag.
 // Tier reassignment only works while the playing video's board is the one
