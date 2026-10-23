@@ -41,7 +41,8 @@ class DuelQueryCountIT extends PostgresIT {
     EntityManagerFactory emf;
 
     private final RequestPostProcessor carol = oidcLogin().idToken(t -> t.subject("carol"));
-    private static final String BOARD = "/api/duels/Big Board";
+    // The board is a query parameter (?board=), never a path segment.
+    private static final String BOARD_QUERY = "?board=Big%20Board";
     private Statistics stats;
 
     // 60 songs in each ranked tier + 33 to-do = 333.
@@ -80,19 +81,19 @@ class DuelQueryCountIT extends PostgresIT {
     @Test
     void aBigBoardsDuelRequestsCostAFewStatementsEach() throws Exception {
         String layoutBody = "{\"layout\": " + layout() + "}";
-        Cost first = measure(post(BOARD + "/analysis"), layoutBody, 200);
-        Cost again = measure(post(BOARD + "/analysis"), layoutBody, 200);
-        Cost start = measure(post(BOARD + "/sessions"),
+        Cost first = measure(post("/api/duels/analysis" + BOARD_QUERY), layoutBody, 200);
+        Cost again = measure(post("/api/duels/analysis" + BOARD_QUERY), layoutBody, 200);
+        Cost start = measure(post("/api/duels/sessions" + BOARD_QUERY),
             "{\"layout\": %s, \"focus\": \"SMART_MIX\", \"minutes\": 5}".formatted(layout()), 201);
         String sid = start.body().get("id").asText();
         Cost verdict = null;
         for (int i = 0; i < 20; i++) {
             JsonNode m = (verdict == null ? start : verdict).body().get("matchup");
-            verdict = measure(post(BOARD + "/sessions/" + sid + "/verdicts"),
+            verdict = measure(post("/api/duels/sessions/" + sid + "/verdicts" + BOARD_QUERY),
                 "{\"layout\": %s, \"a\": \"%s\", \"b\": \"%s\", \"verdict\": \"A\", \"seenDuels\": %d}"
                     .formatted(layout(), m.get("a").asText(), m.get("b").asText(), i), 200);
         }
-        Cost end = measure(post(BOARD + "/sessions/" + sid + "/end"), layoutBody, 200);
+        Cost end = measure(post("/api/duels/sessions/" + sid + "/end" + BOARD_QUERY), layoutBody, 200);
         System.out.printf("DUEL-SQL first analysis %d stmts %d ms | analysis %d stmts %d ms | start %d stmts %d ms"
                 + " | 20th verdict %d stmts %d ms | end %d stmts %d ms%n",
             first.statements(), first.ms(), again.statements(), again.ms(), start.statements(), start.ms(),
