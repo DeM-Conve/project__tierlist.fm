@@ -102,8 +102,9 @@ export class Harness {
     return within(this.container);
   }
 
+  // navigate() inside act, awaited.
   async go(path) {
-    await act(async () => this.nav.current(path));
+    await act(async () => this.navigate(path));
   }
 
   get state() {
@@ -158,7 +159,7 @@ export class Harness {
 
   // Any route (Settings, a duel page...), the way a link would go there.
   navigate(path) {
-    nav.current(path);
+    this.nav.current(path);
   }
 
   dispatch(action) {
