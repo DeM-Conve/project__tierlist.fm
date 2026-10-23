@@ -104,7 +104,8 @@ public record SettingsDto(
 
         @AssertTrue(message = "the naming being migrated from must differ from the current one")
         boolean isMigratingFromDistinct() {
-            return migratingFrom == null
+            // Half a migration is isMigrationComplete's to report, not a crash here.
+            return migratingFrom == null || migratingFromTierLabels == null
                 || !(migratingFrom.equals(template) && migratingFromTierLabels.equals(tierLabels));
         }
     }

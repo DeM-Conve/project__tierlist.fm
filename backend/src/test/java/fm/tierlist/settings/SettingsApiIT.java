@@ -297,10 +297,8 @@ class SettingsApiIT extends PostgresIT {
             .andExpect(jsonPath("$.status").value(400));
     }
 
+    // Half a migration (the current template, no tier names) is a 400, not a 500.
     @Test
-    @Disabled("BUG: SettingsDto.NamingDto.isMigratingFromDistinct() NPEs when migratingFrom equals the template and "
-        + "migratingFromTierLabels is null; Bean Validation wraps it in a ValidationException, so this half-a-migration "
-        + "body is a 500 instead of the 400 its sibling cases get.")
     void halfAMigrationFromTheCurrentTemplateIs400() throws Exception {
         mvc.perform(save(alice, body("\"tokyo\"", "\"blue\"", "\"vivid\"", LABELS, "\"{category} {tier}\"", "null", "{}"))
                 .header(HttpHeaders.IF_NONE_MATCH, "*"))
