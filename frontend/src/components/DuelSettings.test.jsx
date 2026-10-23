@@ -110,10 +110,25 @@ describe('DuelSettings', () => {
     await waitFor(() => expect(input('T1')).toHaveValue('500'));
   });
 
-  it('follows the account row when it loads', () => {
+  it('follows the account row when it loads', async () => {
     const store = page();
     act(() => store.dispatch(settingsLoaded({ duels: { tierBorders: 'custom', tierMinimums: { S: 450, A: 350, B: 250, C: 150 } } })));
     expect(screen.getByRole('radio', { name: /My own ranges/ })).toBeChecked();
+    // The form shows the account's ranges, in use - not this browser's older copy, offered for Save.
+    await waitFor(() => expect(input('T1')).toHaveValue('450'));
+    expect(screen.getByText('In use')).toBeInTheDocument();
+    expect(save()).toBeDisabled();
+  });
+
+  it('Reset with no saved ranges goes back to where the form started (the board\'s learned borders)', async () => {
+    h.analysis = analysis({ borders: [{ upper: 'S', lower: 'A', score: 30 }, { upper: 'A', lower: 'B', score: 23 }] });
+    page({ board: true });
+    fireEvent.click(screen.getByRole('radio', { name: /My own ranges/ }));
+    await waitFor(() => expect(input('T1')).toHaveValue('300'));
+    type('T1', 310);
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Reset' })).toBeEnabled());
+    fireEvent.click(screen.getByRole('button', { name: 'Reset' }));
+    await waitFor(() => expect(input('T1')).toHaveValue('300'));
   });
 
   it('previews how the open board would fall, starting from its learned borders', async () => {

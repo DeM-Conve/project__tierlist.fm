@@ -58,9 +58,15 @@ export default function DuelSettings() {
         : { values, errors: {} };
     },
   });
-  // No ranges of your own yet: start from the borders learned on the open board.
+  // The form follows the account's ranges while you aren't editing: the
+  // saved row can land after the page opened (this browser's boot copy came
+  // first, or another device saved) - else it showed stale ranges as "not in
+  // use" and Save would have put them back. No ranges of your own yet: start
+  // from the borders learned on the open board.
   useEffect(() => {
-    if (!saved.tierMinimums && analysis?.borders && !formState.isDirty) reset(minimumsFromBorders(analysis.borders));
+    if (formState.isDirty) return;
+    if (saved.tierMinimums) reset(saved.tierMinimums);
+    else if (analysis?.borders) reset(minimumsFromBorders(analysis.borders));
   }, [analysis, saved.tierMinimums, formState.isDirty, reset]);
 
   const values = useWatch({ control });
@@ -179,7 +185,7 @@ export default function DuelSettings() {
             <Text fz="xs" c="dimmed" mr="auto">
               {inUse ? 'In use' : 'Not in use until you save'}
             </Text>
-            <Button variant="subtle" color="gray" onClick={() => reset(saved.tierMinimums ?? DEFAULT_MINIMUMS)} disabled={!formState.isDirty}>
+            <Button variant="subtle" color="gray" onClick={() => reset(saved.tierMinimums ?? undefined)} disabled={!formState.isDirty}>
               Reset
             </Button>
             <Button leftSection={<Check size={15} />} onClick={save} disabled={!valid || inUse}>
