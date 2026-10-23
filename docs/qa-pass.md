@@ -46,18 +46,24 @@ Status: `[ ]` not started · `[~]` in progress · `[x]` verified · `[!]` needs 
 - [x] Settings: playlist naming (matching preview), appearance (themes/accents/palettes), duels, activity bar order
 - [x] Routing, PWA, theming in light + dark, phone width
 
-## 5. Performance (`qa/perf`)
-- [~] Cold start and board open time, bundle/chunk sizes, lazy pages
-- [ ] Re-render hot spots (selectors, memoization), drag frame rate
-- [ ] YouTube quota / request count per action, board cache behaviour
-- [ ] Backend endpoint latency, N+1 queries, compression
+## 5. Performance (`qa/perf`, merged, deployed 2026-10-23)
+- [x] Cold start and board open time, bundle/chunk sizes, lazy pages
+- [x] Re-render hot spots (selectors, memoization), drag frame rate
+- [x] YouTube quota / request count per action, board cache behaviour
+- [x] Backend endpoint latency, N+1 queries, compression
 
-## 6. Backend & API (`qa/backend`)
-- [~] Every endpoint: auth required, input validation, ProblemDetail errors
-- [ ] Settings ETag flow, migrations, playlists rename/create, tier-sync contract
-- [ ] Backup / restore scripts work under hl
+## 6. Backend & API (`qa/backend`, merged, deployed 2026-10-23)
+- [x] Every endpoint: auth required, input validation, ProblemDetail errors
+- [x] Settings ETag flow, migrations, playlists rename/create, tier-sync contract
+- [x] Backup / restore scripts work under hl
+
+## Follow-ups
+- [~] Frontend tier-name validation matches the backend's (no "①", "S²" = "S") (`fix/tier-label-parity`)
+- [ ] Find with a one-letter query on a 300-song board still renders ~5000 components (input stays responsive)
+- [ ] Duel session start analyses the board twice (~30 ms on 333 songs)
 
 ## Open questions for the user
+- [!] `scripts/restore.sh` run without hl's COMPOSE_* variables restores into a fresh standalone db, not hl's - refuse when no project is set and an `hl-*` project is running?
 - [!] Add songs: Enter always means "listen", even on a focused button - pass Enter through after Tab (keyboard focus) only?
 - [!] Pasting non-link text outside a text box is silently ignored - show a message everywhere?
 - [!] Add songs page is capped at 1100px wide (against "pages are full width") - keep so tier targets don't stretch?
