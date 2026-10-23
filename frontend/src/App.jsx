@@ -346,6 +346,12 @@ function Layout() {
     else if (!sidebarCollapsed && panel.isCollapsed()) panel.resize(openSizeRef.current);
   }, [sidebarCollapsed, narrow, sidebarPanelRef]);
   const tierPlaylists = useSelector(selectTierPlaylists);
+  // The playlists list failed (and nothing cached is shown): the side panel
+  // says so instead of showing placeholders forever.
+  const { error: playlistsError, refetch: retryPlaylists } = usePlaylistsQuery(true);
+  const playlistsLoadError = tierPlaylists === null && playlistsError
+    ? errorMessage(playlistsError, 'The app couldn’t reach YouTube.')
+    : null;
   const focusedVideo = useSelector((s) => s.focus.focusedVideo);
   const isShuffling = useSelector((s) => s.focus.isShuffling);
   const isTriage = useSelector((s) => s.focus.isTriage);
@@ -799,6 +805,8 @@ function Layout() {
           playlistCount={tierPlaylists?.length ?? 0}
           waitingCount={addSongs.list.length}
           loading={tierPlaylists === null}
+          loadError={playlistsLoadError}
+          onRetry={() => retryPlaylists()}
           onSelectSettings={() => navigate('/settings')}
           onOpenShortcuts={shortcutsHandlers.open}
           onLogout={logout}
@@ -842,6 +850,8 @@ function Layout() {
                 tierGroups={tierGroups}
                 playlistCount={tierPlaylists?.length ?? 0}
                 loading={tierPlaylists === null}
+                loadError={playlistsLoadError}
+                onRetry={() => retryPlaylists()}
                 view={sidebarView}
               />
                 </Box>

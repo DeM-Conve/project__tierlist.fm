@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { Provider } from 'react-redux';
 import { MemoryRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -95,8 +95,19 @@ describe('the playlists list failing to load', () => {
     h.playlists = { data: undefined, error: quota, refetch, isFetching: false };
     renderApp(path);
     expect(await screen.findByText('Couldn’t load this board')).toBeInTheDocument();
-    expect(screen.getByText(/daily API quota/)).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
+    const page = within(document.querySelector('main'));
+    expect(page.getByText(/daily API quota/)).toBeInTheDocument();
+    fireEvent.click(page.getByRole('button', { name: 'Retry' }));
+    expect(refetch).toHaveBeenCalled();
+  });
+
+  it('the side panel says so too, with Retry - not placeholders forever', async () => {
+    const refetch = vi.fn();
+    h.auth = loggedIn;
+    h.playlists = { data: undefined, error: quota, refetch, isFetching: false };
+    renderApp('/settings');
+    const nav = await screen.findByText(/Couldn’t load your playlists\./);
+    fireEvent.click(within(nav.parentElement).getByRole('button', { name: 'Retry' }));
     expect(refetch).toHaveBeenCalled();
   });
 
@@ -104,8 +115,8 @@ describe('the playlists list failing to load', () => {
     h.auth = loggedIn;
     h.playlists = { data: undefined, error: quota, refetch: vi.fn(), isFetching: false };
     renderApp('/');
-    expect(await screen.findByText(/daily API quota/)).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Log in again' })).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: 'Log in again' })).toBeInTheDocument();
+    expect(within(document.querySelector('main')).getByText(/daily API quota/)).toBeInTheDocument();
   });
 });
 

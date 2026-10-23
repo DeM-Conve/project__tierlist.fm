@@ -38,7 +38,9 @@ import { SECTION_GAP } from '../layout/spacing';
 function BoardCard({ category, tiers, onOpen, onDuel }) {
   const present = BOARD_TIERS.filter((t) => tiers[t]);
   const counts = Object.fromEntries(present.map((t) => [t, tiers[t].itemCount ?? 0]));
-  const total = present.reduce((n, t) => n + counts[t], 0);
+  // Ranked songs only, like the sidebar's and the board header's totals - the
+  // to-do list has its own line (it isn't part of the board's ranking).
+  const total = present.filter((t) => TIER_ORDER.includes(t)).reduce((n, t) => n + counts[t], 0);
   const max = Math.max(1, ...present.map((t) => counts[t]));
 
   return (
