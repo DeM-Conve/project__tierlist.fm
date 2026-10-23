@@ -5,12 +5,15 @@ import { POLL_MS } from './usePlayerTime';
 import { holdPlayer, releasePlayer } from '../store/focusSlice';
 import { makeStore, renderWithApp } from '../test/render';
 
-const h = vi.hoisted(() => ({ player: null, renders: { queue: 0, chip: 0 } }));
+const h = vi.hoisted(() => ({ player: null, embed: null, renders: { queue: 0, chip: 0 } }));
 // A stand-in YouTube player: ready (and playing) as soon as it mounts.
 vi.mock('./EmbeddedPlayer', async () => {
   const { useEffect } = await import('react');
   return {
-    default: function FakeEmbed({ onPlayerReady, onPlayingChange }) {
+    default: function FakeEmbed(props) {
+      const { onPlayerReady, onPlayingChange } = props;
+      // The latest props, so a test can fire the player's own events.
+      h.embed = props;
       useEffect(() => {
         onPlayerReady(h.player);
         onPlayingChange(true);
@@ -141,5 +144,37 @@ describe('PlayerDock progress poll (no per-second re-renders)', () => {
     fireEvent.keyDown(window, { key: '5', code: 'Digit5' });
     expect(h.player.seekTo).toHaveBeenCalledWith(50, true);
     expect(root.querySelector('.player-dock-progress').style.width).toBe('50%');
+  });
+});
+
+describe('PlayerDock repeat all', () => {
+  it('a one-song queue replays when it ends, instead of stopping', () => {
+    const onNext = vi.fn();
+    dock({ repeatMode: 'all', onNext });
+    act(() => h.embed.onEnded());
+    expect(h.player.seekTo).toHaveBeenCalledWith(0, true);
+    expect(h.player.playVideo).toHaveBeenCalled();
+    expect(onNext).not.toHaveBeenCalled();
+  });
+
+  it('at the end of the queue Next and l wrap to the top', () => {
+    const onNext = vi.fn();
+    const { root } = dock({ repeatMode: 'all', hasPrev: true, onNext });
+    const next = root.querySelector('[aria-label="Next"]');
+    expect(next).not.toBeDisabled();
+    fireEvent.click(next);
+    fireEvent.keyDown(window, { key: 'l', code: 'KeyL' });
+    expect(onNext).toHaveBeenCalledTimes(2);
+    act(() => h.embed.onEnded());
+    expect(onNext).toHaveBeenCalledTimes(3);
+  });
+
+  it('with repeat off the end of the queue stays put', () => {
+    const onNext = vi.fn();
+    const { root } = dock({ hasPrev: true, onNext });
+    expect(root.querySelector('[aria-label="Next"]')).toBeDisabled();
+    fireEvent.keyDown(window, { key: 'l', code: 'KeyL' });
+    expect(h.embed.onEnded).toBeUndefined();
+    expect(onNext).not.toHaveBeenCalled();
   });
 });

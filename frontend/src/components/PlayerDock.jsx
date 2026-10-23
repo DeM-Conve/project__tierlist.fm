@@ -174,6 +174,11 @@ export default function PlayerDock({
   // Repeat lives in focusSlice (off -> all -> one, YouTube Music's cycle):
   // repeat-all has to wrap the queue itself, which is App's state.
   const repeatOne = repeatMode === 'one';
+  // Repeat all at the end of the queue: Next (and l) wraps to the top, as
+  // playNextInQueue does. A queue of one song has nothing to wrap to, so
+  // repeat all just replays it when it ends.
+  const canNext = hasNext || (repeatMode === 'all' && hasPrev);
+  const loopsAlone = repeatOne || (repeatMode === 'all' && !hasNext && !hasPrev);
   const expanded = mode === 'expanded';
   // "Floating corner" mode: an in-page floating box pinned to the bottom-right
   // corner, the way YouTube Music's own in-app miniplayer works. This is
@@ -262,7 +267,7 @@ export default function PlayerDock({
         if (hasPrev) onPrev();
       } else if (e.key === 'ArrowRight' || e.key === 'l') {
         e.preventDefault();
-        if (hasNext) onNext();
+        if (canNext) onNext();
       } else if (e.key === ' ' || e.code === 'Space') {
         e.preventDefault();
         togglePlay();
@@ -312,7 +317,7 @@ export default function PlayerDock({
     onPrev,
     onNext,
     hasPrev,
-    hasNext,
+    canNext,
     availableTiers,
     currentTier,
     onChangeTier,
@@ -489,7 +494,7 @@ export default function PlayerDock({
                 <EmbeddedPlayer
                   key={video.videoId}
                   videoId={video.videoId}
-                  onEnded={repeatOne ? replayCurrent : hasNext || repeatMode === 'all' ? onNext : undefined}
+                  onEnded={loopsAlone ? replayCurrent : canNext ? onNext : undefined}
                   onPlayerReady={(p) => {
                     playerRef.current = p;
                     // A new EmbeddedPlayer instance mounts per video (its own
@@ -568,7 +573,7 @@ export default function PlayerDock({
                   <RotateCw size={iconSize} />
                 </ActionIcon>
               )}
-              <ActionIcon variant="subtle" color="gray" radius="xl" size={btnSize} onClick={onNext} disabled={!hasNext} aria-label="Next" title="Next (l)">
+              <ActionIcon variant="subtle" color="gray" radius="xl" size={btnSize} onClick={onNext} disabled={!canNext} aria-label="Next" title="Next (l)">
                 <SkipForward size={iconSize} fill="currentColor" />
               </ActionIcon>
               <ActionIcon
