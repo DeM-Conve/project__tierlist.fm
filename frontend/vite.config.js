@@ -44,7 +44,7 @@ export default defineConfig({
           groups: [
             { name: 'react', test: /node_modules[\\/](react|react-dom|scheduler|react-router|react-router-dom|react-redux|@reduxjs|redux|immer|reselect)[\\/]/, priority: 30 },
             { name: 'mantine', test: /node_modules[\\/](@mantine|mantine-contextmenu|@floating-ui|react-remove-scroll|react-textarea-autosize)/, priority: 20 },
-            { name: 'vendor', test: /node_modules[\\/](@tanstack|axios|idb-keyval|lucide-react|colord|react-resizable-panels|react-hotkeys-hook|@bprogress)[\\/]/, priority: 10 },
+            { name: 'vendor', test: /node_modules[\\/](@tanstack|axios|idb-keyval|lucide-react|colord|react-resizable-panels|react-hotkeys-hook|@bprogress|@hello-pangea|css-box-model|raf-schd)[\\/]/, priority: 10 },
           ],
         },
       },
