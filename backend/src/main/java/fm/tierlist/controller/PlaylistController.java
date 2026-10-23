@@ -28,8 +28,10 @@ import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.server.ResponseStatusException;
+import org.springframework.web.util.UriUtils;
 
 import java.net.URI;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -118,7 +120,7 @@ public class PlaylistController {
     ) {
         List<Map<String, Object>> allItems = fetchAllPages(
             client,
-            apiBase + "/playlistItems?part=snippet,contentDetails&playlistId=" + id + "&maxResults=50&fields=" + ITEM_FIELDS
+            apiBase + "/playlistItems?part=snippet,contentDetails&playlistId=" + param(id) + "&maxResults=50&fields=" + ITEM_FIELDS
         );
 
         return toVideos(allItems);
@@ -130,7 +132,7 @@ public class PlaylistController {
             @PathVariable String videoId,
             @RegisteredOAuth2AuthorizedClient("google") OAuth2AuthorizedClient client
     ) {
-        Map<String, Object> body = callYoutubeApi(client, apiBase + "/videos?part=snippet&id=" + videoId + "&fields=" + VIDEO_FIELDS);
+        Map<String, Object> body = callYoutubeApi(client, apiBase + "/videos?part=snippet&id=" + param(videoId) + "&fields=" + VIDEO_FIELDS);
         List<Map<String, Object>> items = (List<Map<String, Object>>) body.get("items");
         if (items == null || items.isEmpty()) return ResponseEntity.notFound().build();
         Map<String, Object> snippet = (Map<String, Object>) items.get(0).get("snippet");
@@ -409,6 +411,13 @@ public class PlaylistController {
         return new ResponseStatusException(HttpStatus.BAD_REQUEST, detail);
     }
 
+    // An id from the browser, as one query-parameter value: every reserved
+    // character escaped, so it can't add parameters ("&mine=true") or make
+    // an invalid URI (a space - a 500).
+    static String param(String value) {
+        return UriUtils.encode(value, StandardCharsets.UTF_8);
+    }
+
     private static String text(Object value) {
         return value instanceof String s && !s.isBlank() ? s : null;
     }
@@ -442,7 +451,7 @@ public class PlaylistController {
             result.put("id", id);
             result.put("title", title);
             try {
-                Map<String, Object> body = callYoutubeApi(client, apiBase + "/playlists?part=snippet&id=" + id);
+                Map<String, Object> body = callYoutubeApi(client, apiBase + "/playlists?part=snippet&id=" + param(id));
                 List<Map<String, Object>> items = body == null ? null : (List<Map<String, Object>>) body.get("items");
                 if (items == null || items.isEmpty()) {
                     log.warn("playlist rename failed for {}: YouTube has no such playlist", id);
@@ -537,7 +546,7 @@ public class PlaylistController {
         headers.setBearerAuth(client.getAccessToken().getTokenValue());
         HttpEntity<Void> entity = new HttpEntity<>(headers);
         retryTransient(() -> restTemplate.exchange(
-            apiBase + "/playlistItems?id=" + playlistItemId,
+            URI.create(apiBase + "/playlistItems?id=" + param(playlistItemId)),
             HttpMethod.DELETE,
             entity,
             Void.class

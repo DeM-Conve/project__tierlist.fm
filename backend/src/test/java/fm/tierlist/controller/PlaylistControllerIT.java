@@ -881,6 +881,23 @@ class PlaylistControllerIT extends PostgresIT {
             .andExpect(jsonPath("$.detail").value("Row 1: title is missing."));
     }
 
+    // Ids from the browser go to YouTube as one escaped parameter each: they
+    // can't add parameters of their own, and odd characters aren't a 500.
+    @Test
+    void idsAreSentToYoutubeEscaped() throws Exception {
+        expectGet(itemsUrl("PL%201%26mine%3Dtrue"), "{\"items\": []}");
+        expectGet(YT + "/videos?part=snippet&id=v%26id%3Dx&fields=" + PlaylistController.VIDEO_FIELDS, "{\"items\": []}");
+        expectGet(YT + "/playlists?part=snippet&id=PL%23x", "{\"items\": []}");
+        youtube.expect(requestTo(YT + "/playlistItems?id=I%26x%3Dy")).andExpect(method(HttpMethod.DELETE)).andRespond(withNoContent());
+
+        mvc.perform(get("/api/playlists/{id}/items", "PL 1&mine=true").with(signedIn()))
+            .andExpect(status().isOk()).andExpect(jsonPath("$", hasSize(0)));
+        mvc.perform(get("/api/videos/{id}", "v&id=x").with(signedIn())).andExpect(status().isNotFound());
+        mvc.perform(json(post("/api/playlists/rename"), "[{\"id\": \"PL#x\", \"title\": \"Rap S\"}]"))
+            .andExpect(jsonPath("$.results[0].error").value("This playlist no longer exists on YouTube."));
+        mvc.perform(delete("/api/playlist-items/{id}", "I&x=y").with(signedIn())).andExpect(status().isNoContent());
+    }
+
     // ---- auth ---------------------------------------------------------------
 
     @Test
