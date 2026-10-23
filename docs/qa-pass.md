@@ -58,7 +58,7 @@ Status: `[ ]` not started · `[~]` in progress · `[x]` verified · `[!]` needs 
 - [x] Backup / restore scripts work under hl
 
 ## Follow-ups
-- [~] Frontend tier-name validation matches the backend's (no "①", "S²" = "S") (`fix/tier-label-parity`)
+- [x] Frontend tier-name validation matches the backend's (no "①", "S²" = "S") (`fix/tier-label-parity`, merged, deployed 2026-10-23)
 - [ ] Find with a one-letter query on a 300-song board still renders ~5000 components (input stays responsive)
 - [ ] Duel session start analyses the board twice (~30 ms on 333 songs)
 
