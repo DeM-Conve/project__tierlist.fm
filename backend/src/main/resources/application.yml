@@ -14,6 +14,13 @@ server:
         # Under a sub-path the session cookie is scoped to it, so apps sharing
         # one host don't overwrite each other's JSESSIONID. Empty = "/".
         path: ${TIERLIST_BASE_PATH:}
+        # CSRF protection is off (a JSON API on one origin), so the cookie is
+        # what keeps another site from writing as the user: SameSite=Lax means
+        # a cross-site form POST (to /api/auth/logout, say) carries no
+        # session. Google's redirect back after login is a top-level GET, which
+        # Lax still sends the cookie on. Never readable by page scripts.
+        same-site: lax
+        http-only: true
   # gzip API responses: a big board's items are hundreds of KB of JSON that
   # shrink ~8x. Done here too, not only in nginx, for a dev setup that calls
   # this port directly. (Default threshold: responses over 2 KB.)
