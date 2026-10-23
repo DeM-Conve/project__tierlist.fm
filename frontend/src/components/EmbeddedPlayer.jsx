@@ -31,7 +31,8 @@ export default function EmbeddedPlayer({ videoId, autoplay = true, onEnded, onPl
     const mountEl = document.createElement('div');
     mountEl.style.width = '100%';
     mountEl.style.height = '100%';
-    containerRef.current?.appendChild(mountEl);
+    const container = containerRef.current;
+    container?.appendChild(mountEl);
 
     loadYouTubeApi().then((YT) => {
       if (cancelled) return;
@@ -72,7 +73,7 @@ export default function EmbeddedPlayer({ videoId, autoplay = true, onEnded, onPl
       }
       playerRef.current = null;
       onPlayerReadyRef.current?.(null);
-      if (containerRef.current) containerRef.current.innerHTML = '';
+      if (container) container.innerHTML = '';
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [videoId]);
