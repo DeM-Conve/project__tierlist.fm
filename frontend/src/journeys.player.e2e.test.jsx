@@ -252,6 +252,16 @@ describe('journey 1: triage keeps going wherever you rate from', () => {
     );
     expect(headerTotal()).toBe(TIER_ORDER.reduce((n, t) => n + (boardCounts()[t] ?? 0), 0));
   });
+
+  it("rating another board's copy of the triage song doesn't skip the triage", async () => {
+    // h and i are in both boards' to-do lists.
+    await start({ ...ACCOUNT, 'Pop TODO': ['s', 'h', 'i'] });
+    await playTier('TODO'); // Rap triage: h, i, j
+    await h.open('Pop');
+    h.move('h', 'S'); // Pop's own copy, rated on Pop
+    expect(playingId()).toBe('h');
+    expect(focus().isTriage).toBe(true);
+  });
 });
 
 describe('journey 3: counts agree after a push', () => {

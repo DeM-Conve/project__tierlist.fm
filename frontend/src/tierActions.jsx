@@ -67,9 +67,11 @@ function resyncFocusedTier(dispatch, getState) {
 // been given a tier - from the player, the rail, a menu, anywhere - move on
 // to the next song in the TODO queue.
 function advanceTriage(dispatch, getState, moves) {
-  const { focus } = getState();
+  const { focus, tiers } = getState();
   const fv = focus.focusedVideo;
-  if (!focus.isTriage || !fv) return;
+  // Only an edit on the triage's own board: the same song in another
+  // board's to-do list, rated there, is a different playlist item.
+  if (!focus.isTriage || !fv || focus.focusedCategory !== tiers.loadedCategory) return;
   const rated = moves.some((m) => m.videoId === fv.videoId && m.fromTier === TODO_TIER && m.toTier !== TODO_TIER);
   if (!rated) return;
   // Skip songs already rated some other way (e.g. dragged on the board).
