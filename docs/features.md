@@ -21,7 +21,7 @@
 
 ## Home & playlists
 - `/` is **Home**: every board drawn as a mini tier list (tier chip + that tier playlist's cover + a bar sized by its video count), with Open / Duel on each card; a "Now playing" card (with a link back to rate it on its board) while the player is active; then every tier playlist as a card (tier badge + board name). Playlists not following the naming template are never listed.
-- A board card's song total counts ranked songs only (the to-do list is separate), matching the sidebar and the board header.
+- A board card's song total counts ranked songs only (the to-do list is separate), matching the sidebar and the board header. A push (Push, a duel page's Move) updates the cards' and the sidebar's counts at once, without re-reading the playlists.
 - Home's filter box and the sidebar's board filter are independent - typing in one never filters the other.
 - (Replaced) the old "redirect to the first board on first login" - Home now leads with your boards, which is what that redirect existed for.
 - Opening a playlist (Home card, command palette) opens **its tier page** (`/tier/<board>/t/<tier>`) - the same list with the player, shuffle, drag-to-reorder and tier chips; there's no separate read-only playlist view. Old `/playlist/<id>` links redirect there.

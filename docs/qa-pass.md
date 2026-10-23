@@ -64,14 +64,21 @@ end through the real App over the fake YouTube (`src/test/syncHarness.jsx`) and 
 boards, the pending bar, the player, the rail and YouTube agreeing with each other.
 - [~] Staged changes survive navigation: per-board drafts, one global pending bar, auto-dedupes
   shown apart, rating the playing song from any page stages on its own board (`fix/board-drafts`)
-- [ ] Play from board A, browse to B / Home / Settings / Duels, rate / remove / skip from the player
-- [ ] Duel on A while the player plays a song from B; suggested Move pushes; back on B
+- [x] Play from board A, browse to B / Home / Settings / Duels, rate / remove / skip from the player
+  (`qa/journeys-player`, `src/journeys.player.e2e.test.jsx`: the player's tier is read live from its
+  board, each queued song keeps its own board, no rating for a song that left its board, triage only
+  advances on its own board)
+- [x] Duel on A while the player plays a song from B; suggested Move pushes; back on B
+  (`qa/journeys-player`; a staged edit on A is still lost on the way to B - `it.fails`, `fix/board-drafts`)
 - [ ] Add songs into A and B, then drag them, undo, push, reload
 - [ ] Drag a song to another board via the sidebar, change your mind on the target board, push
 - [ ] Change naming / tier names / theme in Settings with staged changes and a playing song
 - [ ] Push failure (quota) mid-journey, then navigate, reload, retry
 - [ ] Two browser tabs on the same account (staged changes, settings, pushes)
-- [ ] Every page's counts (sidebar, header bar, rail, pending bar, Home cards) agree at every step
+- [~] Every page's counts (sidebar, header bar, rail, pending bar, Home cards) agree at every step
+  (`qa/journeys-player`: a push now updates the sidebar / Home / off-board rail counts; with changes
+  staged, the sidebar and Home cards still count YouTube while the board and rail count the draft -
+  `it.fails`, for `fix/board-drafts`)
 
 ## Follow-ups
 - [x] Frontend tier-name validation matches the backend's (no "①", "S²" = "S") (`fix/tier-label-parity`, merged, deployed 2026-10-23)

@@ -397,6 +397,35 @@ describe("journey 2: duel on one board while the player plays another's song", (
   });
 });
 
+describe('journey 1: a queue mixing two boards', () => {
+  it('shuffle, repeat all and the wrap keep every song on its own board', async () => {
+    await start();
+    await playTier('A'); // d, e
+    await h.open('Pop');
+    const r = h.tierItems().A.find((v) => v.videoId === 'r');
+    h.dispatch(queueSong('A', r, 'end'));
+    act(() => {
+      fireEvent.click(screen.getByRole('button', { name: 'Shuffle up next' }));
+    });
+    act(() => {
+      fireEvent.click(screen.getByRole('button', { name: 'Repeat: off' }));
+    });
+    expect(focus().repeatMode).toBe('all');
+    const boardOf = { d: 'Rap', e: 'Rap', r: 'Pop' };
+    const seen = [];
+    for (let i = 0; i < 6; i++) {
+      seen.push(playingId());
+      expect(focus().focusedCategory).toBe(boardOf[playingId()]);
+      // Pop is loaded: only Pop's song is rated here, by the rail and the keys.
+      const onPop = boardOf[playingId()] === 'Pop';
+      expect(rail().mode).toBe(onPop ? 'Rate' : 'Tiers');
+      expect(selectFocusedAvailableTiers(h.state).length > 0).toBe(onPop);
+      next();
+    }
+    expect(new Set(seen)).toEqual(new Set(['d', 'e', 'r']));
+  });
+});
+
 describe('journey 1: the playing song leaves its board', () => {
   it('removed and pushed: nothing offers to rate a song YouTube no longer has', async () => {
     await start();
