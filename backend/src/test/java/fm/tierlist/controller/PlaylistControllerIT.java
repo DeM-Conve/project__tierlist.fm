@@ -739,11 +739,11 @@ class PlaylistControllerIT extends PostgresIT {
             .andExpect(jsonPath("$.applied").value(1))
             .andExpect(jsonPath("$.total").value(4))
             .andExpect(jsonPath("$.results[0].success").value(false))
-            .andExpect(jsonPath("$.results[0].error").value("Playlist not found"))
+            .andExpect(jsonPath("$.results[0].error").value("This playlist no longer exists on YouTube."))
             .andExpect(jsonPath("$.results[1].success").value(false))
-            .andExpect(jsonPath("$.results[1].error").value(containsString("403")))
+            .andExpect(jsonPath("$.results[1].error").value("YouTube refused the request: forbidden"))
             .andExpect(jsonPath("$.results[2].success").value(false))
-            .andExpect(jsonPath("$.results[2].error").value(containsString("503")))
+            .andExpect(jsonPath("$.results[2].error").value("YouTube had a temporary problem - try again."))
             .andExpect(jsonPath("$.results[3].id").value("PL4"))
             .andExpect(jsonPath("$.results[3].success").value(true));
     }
@@ -788,10 +788,60 @@ class PlaylistControllerIT extends PostgresIT {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.applied").value(1))
             .andExpect(jsonPath("$.results[0].success").value(false))
-            .andExpect(jsonPath("$.results[0].error").value(containsString("403")))
+            .andExpect(jsonPath("$.results[0].error").value(containsString("daily API quota")))
             .andExpect(jsonPath("$.results[0].id").doesNotExist())
             .andExpect(jsonPath("$.results[1].success").value(true))
             .andExpect(jsonPath("$.results[1].id").value("PLok"));
+    }
+
+    // Per-playlist failures read like every other YouTube error (YoutubeError):
+    // plain language, never the HTTP client's raw exception text.
+    @Test
+    void renameAndCreateFailuresAreInPlainLanguage() throws Exception {
+        youtube.expect(requestTo(YT + "/playlists?part=snippet&id=PLq"))
+            .andRespond(withStatus(HttpStatus.FORBIDDEN).contentType(MediaType.APPLICATION_JSON)
+                .body(youtubeError(403, "quotaExceeded", "quota")));
+        youtube.expect(requestTo(YT + "/playlists?part=snippet&id=PLexp"))
+            .andRespond(withStatus(HttpStatus.UNAUTHORIZED).contentType(MediaType.APPLICATION_JSON)
+                .body(youtubeError(401, "authError", "Invalid Credentials")));
+        youtube.expect(requestTo(YT + "/playlists?part=snippet&id=PLscope"))
+            .andRespond(withStatus(HttpStatus.FORBIDDEN).contentType(MediaType.APPLICATION_JSON)
+                .body(youtubeError(403, "insufficientPermissions", "Insufficient Permission")));
+        youtube.expect(requestTo(YT + "/playlists?part=snippet&id=PLnet")).andRespond(withException(new IOException("Connection refused")));
+        expectGet(YT + "/playlists?part=snippet&id=PLgone", "{\"items\": [{\"id\": \"PLgone\", \"snippet\": {\"title\": \"Old\"}}]}");
+        youtube.expect(requestTo(YT + "/playlists?part=snippet"))
+            .andExpect(method(HttpMethod.PUT))
+            .andRespond(withStatus(HttpStatus.NOT_FOUND).contentType(MediaType.APPLICATION_JSON)
+                .body(youtubeError(404, "playlistNotFound", "Playlist not found")));
+
+        mvc.perform(json(post("/api/playlists/rename"), """
+                [{"id": "PLq", "title": "A"}, {"id": "PLexp", "title": "B"}, {"id": "PLscope", "title": "C"},
+                 {"id": "PLnet", "title": "D"}, {"id": "PLgone", "title": "E"}]"""))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.applied").value(0))
+            .andExpect(jsonPath("$.results[0].error").value(containsString("daily API quota")))
+            .andExpect(jsonPath("$.results[1].error").value(containsString("log out and back in")))
+            .andExpect(jsonPath("$.results[2].error").value(containsString("tick the YouTube permission")))
+            .andExpect(jsonPath("$.results[3].error").value(containsString("Couldn't reach YouTube")))
+            .andExpect(jsonPath("$.results[4].error").value("This playlist no longer exists on YouTube."));
+    }
+
+    @Test
+    void createFailuresAreInPlainLanguage() throws Exception {
+        youtube.expect(requestTo(YT + "/playlists?part=snippet,status"))
+            .andExpect(content().json("{\"snippet\": {\"title\": \"Rap S\"}}"))
+            .andRespond(withException(new IOException("Connection refused")));
+        youtube.expect(ExpectedCount.times(PlaylistController.WRITE_ATTEMPTS), requestTo(YT + "/playlists?part=snippet,status"))
+            .andExpect(content().json("{\"snippet\": {\"title\": \"Rap A\"}}"))
+            .andRespond(withStatus(HttpStatus.CONFLICT).contentType(MediaType.APPLICATION_JSON)
+                .body(youtubeError(409, "SERVICE_UNAVAILABLE", "The operation was aborted.")));
+
+        mvc.perform(json(post("/api/playlists/create"), "[{\"title\": \"Rap S\"}, {\"title\": \"Rap A\"}]"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.applied").value(0))
+            .andExpect(jsonPath("$.results[0].error").value("Couldn't reach YouTube - check the connection and try again."))
+            .andExpect(jsonPath("$.results[1].error").value(containsString("busy")))
+            .andExpect(jsonPath("$.results[1].error").value(org.hamcrest.Matchers.not(containsString("409"))));
     }
 
     // ---- auth ---------------------------------------------------------------

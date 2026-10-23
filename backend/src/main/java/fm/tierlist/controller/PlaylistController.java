@@ -25,6 +25,7 @@ import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.HttpServerErrorException;
 import org.springframework.web.client.HttpStatusCodeException;
 import org.springframework.web.client.ResourceAccessException;
+import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
 
 import java.net.URI;
@@ -359,6 +360,27 @@ public class PlaylistController {
         return error.detail();
     }
 
+    static final String PLAYLIST_GONE = "This playlist no longer exists on YouTube.";
+
+    // Logs one failed playlist rename / create (YouTube's status / reason
+    // only - never the token) and says in plain words what went wrong: the
+    // same mapping as a failed request (YoutubeError), made specific where a
+    // playlist write tells us more. Never the raw exception text.
+    static String playlistWriteFailure(String what, String playlist, RuntimeException e) {
+        if (e instanceof HttpStatusCodeException http) {
+            YoutubeError error = YoutubeError.of(http);
+            log.warn("playlist {} failed for {}: YouTube {} ({}): {}",
+                what, playlist, error.youtubeStatus(), error.reason(), error.message());
+            if ("playlistNotFound".equals(error.reason())) return PLAYLIST_GONE;
+            if (error.youtubeStatus() == 409) return "YouTube was busy with this playlist and gave up - try again.";
+            if (error.youtubeStatus() >= 500) return "YouTube had a temporary problem - try again.";
+            return error.detail();
+        }
+        log.warn("playlist {} failed for {}: {}", what, playlist, e.toString());
+        if (e instanceof RestClientException rest) return YoutubeError.noAnswer(rest);
+        return "Something went wrong talking to YouTube - try again.";
+    }
+
     private static String text(Object value) {
         return value instanceof String s && !s.isBlank() ? s : null;
     }
@@ -392,8 +414,13 @@ public class PlaylistController {
             result.put("title", title);
             try {
                 Map<String, Object> body = callYoutubeApi(client, apiBase + "/playlists?part=snippet&id=" + id);
-                List<Map<String, Object>> items = (List<Map<String, Object>>) body.get("items");
-                if (items == null || items.isEmpty()) throw new IllegalStateException("Playlist not found");
+                List<Map<String, Object>> items = body == null ? null : (List<Map<String, Object>>) body.get("items");
+                if (items == null || items.isEmpty()) {
+                    log.warn("playlist rename failed for {}: YouTube has no such playlist", id);
+                    result.put("success", false);
+                    result.put("error", PLAYLIST_GONE);
+                    return result;
+                }
                 Map<String, Object> snippet = new LinkedHashMap<>((Map<String, Object>) items.get(0).get("snippet"));
                 Map<String, Object> newSnippet = new LinkedHashMap<>();
                 newSnippet.put("title", title);
@@ -401,9 +428,9 @@ public class PlaylistController {
                 if (snippet.get("defaultLanguage") != null) newSnippet.put("defaultLanguage", snippet.get("defaultLanguage"));
                 sendJson(client, HttpMethod.PUT, apiBase + "/playlists?part=snippet", Map.of("id", id, "snippet", newSnippet));
                 result.put("success", true);
-            } catch (Exception e) {
+            } catch (RuntimeException e) {
                 result.put("success", false);
-                result.put("error", e.getMessage());
+                result.put("error", playlistWriteFailure("rename", id, e));
             }
             return result;
         });
@@ -435,9 +462,9 @@ public class PlaylistController {
                 );
                 result.put("id", created != null ? created.get("id") : null);
                 result.put("success", true);
-            } catch (Exception e) {
+            } catch (RuntimeException e) {
                 result.put("success", false);
-                result.put("error", e.getMessage());
+                result.put("error", playlistWriteFailure("create", title, e));
             }
             return result;
         });
