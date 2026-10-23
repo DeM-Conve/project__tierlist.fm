@@ -133,6 +133,10 @@ export default function BoardNameEditor({ category, onRenamed }) {
         </Stack>
       ),
       labels: { confirm: `Rename ${changes.length} on YouTube`, cancel: 'Cancel' },
+      // Focus the confirm button, so Enter (the same key that saved the name)
+      // renames - otherwise the focus trap lands on the close button and
+      // Enter cancels.
+      confirmProps: { 'data-autofocus': true },
       onConfirm: () => {
         confirmed.current = true;
         run();
