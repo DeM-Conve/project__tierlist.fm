@@ -23,7 +23,10 @@ export default function PageHeader({ eyebrow, crumb, badge, title, meta, actions
           (inRouter ? <UpCrumb fallback={eyebrow && <Eyebrow>{eyebrow}</Eyebrow>} /> : eyebrow && <Eyebrow>{eyebrow}</Eyebrow>)}
       </Box>
       <Group justify={centered ? 'center' : 'space-between'} align="flex-start" wrap="wrap" gap="md" w={centered ? undefined : '100%'}>
-        <Group gap="sm" wrap="nowrap" align="center" miw={0}>
+        {/* The title side grows and shrinks (its meta line wraps) so the
+            actions stay beside it; they drop under it only when the title
+            side would get narrower than its 20rem basis. */}
+        <Group gap="sm" wrap="nowrap" align="center" miw={0} style={centered ? undefined : { flex: '1 1 20rem' }}>
           {badge}
           <Stack gap="5xs" miw={0}>
             {typeof title === 'string' ? (
@@ -41,7 +44,7 @@ export default function PageHeader({ eyebrow, crumb, badge, title, meta, actions
           </Stack>
         </Group>
         {actions && (
-          <Group gap="xs" wrap="wrap">
+          <Group gap="xs" wrap="wrap" style={{ flexShrink: 0 }}>
             {actions}
           </Group>
         )}
