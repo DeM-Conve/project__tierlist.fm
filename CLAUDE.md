@@ -402,10 +402,11 @@ scripts/backup.sh / scripts/restore.sh    # database backup / restore
   `scripts/restore.sh [file|latest] [--yes]` restores one (load into `<db>_restoring`
   first, stop backend + backup, `tierlistfm-pre-restore-*` safety backup, drop + rename,
   restart, per-table row check against the file's COPY blocks; `latest` skips
-  pre-restore files). Shared bits in `scripts/common.sh`: both honour
-  `COMPOSE_PROJECT_NAME` (old: `TIERLISTFM_PROJECT`), `COMPOSE_FILE`,
+  pre-restore files). Shared bits in `scripts/common.sh`: they and
+  `deploy.sh` honour `COMPOSE_PROJECT_NAME` (old: `TIERLISTFM_PROJECT`), `COMPOSE_FILE`,
   `COMPOSE_ENV_FILES`, so hl can drive them. `scripts/deploy.sh` runs `backup.sh` before
-  deploying when `db` is up. `.env` is never in a backup.
+  deploying when `db` is up, builds with the `BASE_PATH` Compose resolves and checks the
+  bundle the new frontend container's own nginx serves (works behind a proxy too). `.env` is never in a backup.
   Use these instead of hand-made CSV/pg_dump copies before a schema reset.
 
 - **Speed rules** (the user asked for a fast end-to-end experience): nginx and

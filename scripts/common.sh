@@ -1,4 +1,4 @@
-# Shared by scripts/backup.sh and scripts/restore.sh - sourced, not run.
+# Shared by scripts/deploy.sh, backup.sh and restore.sh - sourced, not run.
 #
 # Which Compose project the scripts act on, like `docker compose` itself:
 #   - COMPOSE_PROJECT_NAME (or the older TIERLISTFM_PROJECT) picks the project,

@@ -226,7 +226,7 @@ scripts/restore.sh latest --yes   # starts just the db, restores into it
 docker compose up -d --build      # then the app; migrations bring an older backup up to date
 ```
 
-The scripts act on the same project `docker compose` would: they honour
+The scripts (`backup.sh`, `restore.sh` and `deploy.sh`) act on the same project `docker compose` would: they honour
 `COMPOSE_PROJECT_NAME`, `COMPOSE_FILE` and `COMPOSE_ENV_FILES`, and read `BACKUP_LOCATION`
 from the environment before `.env` - so a tool that runs the app under its own project name
 or with an extra compose file can call them with the same variables.

@@ -5,20 +5,17 @@
 #   scripts/deploy.sh            frontend + backend tests, then deploy both
 #   scripts/deploy.sh frontend   frontend tests, then redeploy the frontend only
 #                                (keeps the backend session - no re-login)
+# It acts on the same Compose project as backup.sh / restore.sh
+# (COMPOSE_PROJECT_NAME, COMPOSE_FILE, COMPOSE_ENV_FILES - see common.sh), so a
+# homelab tool's project and override file are deployed in place.
 set -euo pipefail
-cd "$(dirname "$0")/.."
+source "$(dirname "$0")/common.sh"
 target="${1:-all}"
 
-# A setting from the environment, else .env, else the default (like Compose).
-env_value() {
-  local v="${!1:-}"
-  [ -n "$v" ] || v="$(sed -n "s/^$1=//p" .env 2>/dev/null | tail -1 | sed 's/^["'\'']//; s/["'\'']$//')"
-  echo "${v:-$2}"
-}
-
 echo "==> Frontend: lint, tests, build"
-# Built with the same sub-path as the image, so the bundle hashes compare below.
-base_path="$(env_value TIERLIST_BASE_PATH '')"
+# Built with the same sub-path as the image (the build arg as Compose resolves
+# it), so the bundle hashes compare below.
+base_path="$("${compose[@]}" config | sed -n 's/^ *BASE_PATH: *//p' | head -1 | sed 's/^["'\'']//; s/["'\'']$//')"
 (cd frontend && npx oxlint && npm test && BASE_PATH="$base_path" npx vite build)
 
 if [ "$target" != "frontend" ]; then
@@ -38,19 +35,20 @@ fi
 
 echo "==> All tests passed - deploying"
 # Every deploy gets a restore point (scripts/restore.sh <dump> to go back).
-if [ -n "$(docker compose -p tierlistfm -f docker-compose.yml ps --status running -q db 2>/dev/null)" ]; then
+if [ -n "$(running db)" ]; then
   scripts/backup.sh
 fi
 if [ "$target" = "frontend" ]; then
-  docker compose -f docker-compose.yml up -d --build --no-deps frontend
+  "${compose[@]}" up -d --build --no-deps frontend
 else
-  docker compose -f docker-compose.yml up -d --build
+  "${compose[@]}" up -d --build
 fi
 
 sleep 2
 built=$(ls frontend/dist/assets | grep -o 'index-[^"]*\.js' | head -1)
-port="$(env_value TIERLIST_PORT "$(env_value FRONTEND_PORT 80)")"
-served=$(curl -s "http://localhost:$port" | grep -o 'index-[^"]*\.js' | head -1 || true)
+# Asked of the new container's own nginx, so it works whether the port is
+# published or a reverse proxy sits in front (and whatever sub-path it uses).
+served=$("${compose[@]}" exec -T frontend wget -qO- http://localhost/ 2>/dev/null | grep -o 'index-[^"]*\.js' | head -1 || true)
 echo "==> Built $built, serving ${served:-nothing}"
 [ "$built" = "$served" ] || { echo "!! The served bundle is not the one just built"; exit 1; }
 echo "==> Deployed"
