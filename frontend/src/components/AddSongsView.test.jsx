@@ -53,6 +53,11 @@ describe('AddSongsView', () => {
     dialog.remove();
   });
 
+  it('the page is full width, like every page (no max-width column of its own)', () => {
+    draw();
+    expect(screen.getByTestId('add-songs-page').style.maxWidth).toBe('');
+  });
+
   it('the tier targets shrink with the card (no sideways scroll on a phone)', () => {
     draw();
     const targets = screen.getByTestId('tier-targets').children;

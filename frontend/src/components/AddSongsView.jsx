@@ -233,7 +233,8 @@ export default function AddSongsView({ addSongs, actions, onAddLinks }) {
   const upNext = current ? list.filter((v) => v.videoId !== current.videoId) : [];
 
   return (
-    <Stack gap={SECTION_GAP} maw={1100}>
+    // Full width like every page - no max-width column of its own.
+    <Stack gap={SECTION_GAP} data-testid="add-songs-page">
       <PageHeader
         title="Add a song"
         meta={

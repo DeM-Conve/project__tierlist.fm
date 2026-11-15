@@ -105,7 +105,8 @@ boards, the pending bar, the player, the rail and YouTube agreeing with each oth
 - [!] `scripts/restore.sh` run without hl's COMPOSE_* variables restores into a fresh standalone db, not hl's - refuse when no project is set and an `hl-*` project is running?
 - [!] Add songs: Enter always means "listen", even on a focused button - pass Enter through after Tab (keyboard focus) only?
 - [!] Pasting non-link text outside a text box is silently ignored - show a message everywhere?
-- [!] Add songs page is capped at 1100px wide (against "pages are full width") - keep so tier targets don't stretch?
+- [x] Add songs page was capped at 1100px wide (against "pages are full width"). Decided: full
+  width like every page (`fix/add-songs-full-width`).
 - [!] Leaving Settings -> Playlist naming with unsaved changes gives no warning - ask first?
 - [!] Hand-linked to-do lists aren't counted in the naming page's "Matching playlists" counts - count them?
 - [!] Activity bar icons have two tab stops each (icon + drag handle) - accept?
